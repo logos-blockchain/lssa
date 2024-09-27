@@ -1,0 +1,41 @@
+[package]
+name = "node_runner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+env_logger.workspace = true
+log.workspace = true
+serde.workspace = true
+
+actix-web.workspace = true
+tokio.workspace = true
+
+[dependencies.accounts]
+path = "../accounts"
+
+[dependencies.consensus]
+path = "../consensus"
+
+[dependencies.networking]
+path = "../networking"
+
+[dependencies.storage]
+path = "../storage"
+
+[dependencies.utxo]
+path = "../utxo"
+
+[dependencies.vm]
+path = "../vm"
+
+[dependencies.zkvm]
+path = "../zkvm"
+
+[dependencies.node_rpc]
+path = "../node_rpc"
+
+[dependencies.node_core]
+path = "../node_core"

@@ -1,0 +1,8 @@
+.gitconfig
+res/
+target/
+deps/
+data/
+.idea/
+.vscode/
+Cargo.lock

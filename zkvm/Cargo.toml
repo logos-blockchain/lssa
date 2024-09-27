@@ -1,0 +1,16 @@
+[package]
+name = "zkvm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+env_logger.workspace = true
+log.workspace = true
+serde.workspace = true
+
+#ToDo: Add necessary risc0 dependencies
+
+[dependencies.vm]
+path = "../vm"

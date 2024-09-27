@@ -1,0 +1,59 @@
+[workspace]
+resolver = "2"
+members = [
+    "node_runner",
+    "sequencer_runner",
+    "storage",
+    "accounts",
+    "utxo",
+    "vm",
+    "networking",
+    "consensus",
+    "node_rpc",
+    "sequencer_rpc",
+    "mempool",
+    "zkvm", 
+    "node_core", 
+    "sequencer_core",
+]
+
+[workspace.dependencies]
+anyhow = "1.0"
+num_cpus = "1.13.1"
+openssl = { version = "0.10", features = ["vendored"] }
+openssl-probe = { version = "0.1.2" }
+serde_json = "1.0.81"
+
+env_logger = "0.10"
+log = "0.4"
+
+rocksdb = { version = "0.21.0", default-features = false, features = ["snappy", "jemalloc"] }
+
+#ToDo: Add necessary risc0 submodules for zkvm module
+
+[workspace.dependencies.serde]
+features = ["derive"]
+version = "1.0.60"
+
+[workspace.dependencies.actix-web]
+default-features = false
+version = "=4.1.0"
+
+[workspace.dependencies.clap]
+features = ["derive", "env"]
+version = "3.1.6"
+
+[workspace.dependencies.tokio-retry]
+version = "0.3.0"
+
+[workspace.dependencies.reqwest]
+features = ["json"]
+version = "0.11.16"
+
+[workspace.dependencies.tokio]
+features = ["net", "rt-multi-thread", "sync", "fs"]
+version = "1.28.2"
+
+[workspace.dependencies.tracing]
+features = ["std"]
+version = "0.1.13"
