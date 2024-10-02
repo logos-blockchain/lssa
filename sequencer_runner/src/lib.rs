@@ -11,6 +11,7 @@ pub async fn main_runner() -> Result<()> {
     let _http_server_handle = http_server.handle();
     tokio::spawn(http_server);
 
+    #[allow(clippy::empty_loop)]
     loop {
         //ToDo: Insert activity into main loop
     }
