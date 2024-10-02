@@ -4,6 +4,7 @@ use std::fmt;
 #[derive(serde::Serialize)]
 pub struct RpcParseError(pub String);
 
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// This struct may be returned from JSON RPC server in case of error
 /// It is expected that that this struct has impls From<_> all other RPC errors
 /// like [`RpcBlockError`](crate::types::blocks::RpcBlockError)
