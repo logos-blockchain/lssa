@@ -9,5 +9,9 @@ serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
+lru.workspace = true
+thiserror.workspace = true
 
 rocksdb.workspace = true
+rs_merkle.workspace = true
+sha2.workspace = true
