@@ -1,7 +1,7 @@
 use rs_merkle::Hasher;
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
-use super::HashType;
+use super::TreeHashType;
 
 #[derive(Debug, Clone)]
 ///Our own hasher.
@@ -9,12 +9,12 @@ use super::HashType;
 pub struct OwnHasher {}
 
 impl Hasher for OwnHasher {
-    type Hash = HashType;
+    type Hash = TreeHashType;
 
-    fn hash(data: &[u8]) -> HashType {
+    fn hash(data: &[u8]) -> TreeHashType {
         let mut hasher = Sha256::new();
 
         hasher.update(data);
-        <HashType>::from(hasher.finalize_fixed())
+        <TreeHashType>::from(hasher.finalize_fixed())
     }
 }

@@ -11,6 +11,7 @@ pub mod block;
 pub mod error;
 pub mod merkle_tree_public;
 pub mod transaction;
+pub mod utxo_commitment;
 
 ///Maximal size of stored blocks in base
 ///

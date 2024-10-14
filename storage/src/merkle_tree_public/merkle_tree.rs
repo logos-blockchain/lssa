@@ -2,28 +2,32 @@ use std::collections::HashMap;
 
 use rs_merkle::{MerkleProof, MerkleTree};
 
-use crate::transaction::Transaction;
+use crate::{transaction::Transaction, utxo_commitment::UTXOCommitment};
 
-use super::{hasher::OwnHasher, HashType};
+use super::{hasher::OwnHasher, tree_leav_item::TreeLeavItem, TreeHashType};
 
-pub struct PublicTransactionsMerkleTree {
-    leaves: HashMap<usize, Transaction>,
-    hash_to_id_map: HashMap<HashType, usize>,
+pub struct HashStorageMerkleTree<Leav: TreeLeavItem + Clone> {
+    leaves: HashMap<usize, Leav>,
+    hash_to_id_map: HashMap<TreeHashType, usize>,
     tree: MerkleTree<OwnHasher>,
 }
 
-impl PublicTransactionsMerkleTree {
-    pub fn new(leaves_vec: Vec<Transaction>) -> Self {
+pub type PublicTransactionMerkleTree = HashStorageMerkleTree<Transaction>;
+
+pub type UTXOCommitmentsMerkleTree = HashStorageMerkleTree<UTXOCommitment>;
+
+impl<Leav: TreeLeavItem + Clone> HashStorageMerkleTree<Leav> {
+    pub fn new(leaves_vec: Vec<Leav>) -> Self {
         let mut leaves_map = HashMap::new();
         let mut hash_to_id_map = HashMap::new();
 
-        let leaves_hashed: Vec<HashType> = leaves_vec
+        let leaves_hashed: Vec<TreeHashType> = leaves_vec
             .iter()
             .enumerate()
             .map(|(id, tx)| {
                 leaves_map.insert(id, tx.clone());
-                hash_to_id_map.insert(tx.hash, id);
-                tx.hash
+                hash_to_id_map.insert(tx.hash(), id);
+                tx.hash()
             })
             .collect();
         Self {
@@ -33,23 +37,23 @@ impl PublicTransactionsMerkleTree {
         }
     }
 
-    pub fn get_tx(&self, hash: HashType) -> Option<&Transaction> {
+    pub fn get_tx(&self, hash: TreeHashType) -> Option<&Leav> {
         self.hash_to_id_map
             .get(&hash)
             .and_then(|id| self.leaves.get(id))
     }
 
-    pub fn get_root(&self) -> Option<HashType> {
+    pub fn get_root(&self) -> Option<TreeHashType> {
         self.tree.root()
     }
 
-    pub fn get_proof(&self, hash: HashType) -> Option<MerkleProof<OwnHasher>> {
+    pub fn get_proof(&self, hash: TreeHashType) -> Option<MerkleProof<OwnHasher>> {
         self.hash_to_id_map
             .get(&hash)
             .map(|id| self.tree.proof(&[*id]))
     }
 
-    pub fn get_proof_multiple(&self, hashes: &[HashType]) -> Option<MerkleProof<OwnHasher>> {
+    pub fn get_proof_multiple(&self, hashes: &[TreeHashType]) -> Option<MerkleProof<OwnHasher>> {
         let ids_opt: Vec<Option<&usize>> = hashes
             .iter()
             .map(|hash| self.hash_to_id_map.get(hash))
@@ -66,27 +70,27 @@ impl PublicTransactionsMerkleTree {
         }
     }
 
-    pub fn add_tx(&mut self, tx: Transaction) {
+    pub fn add_tx(&mut self, tx: Leav) {
         let last = self.leaves.len();
 
         self.leaves.insert(last, tx.clone());
-        self.hash_to_id_map.insert(tx.hash, last);
+        self.hash_to_id_map.insert(tx.hash(), last);
 
-        self.tree.insert(tx.hash);
+        self.tree.insert(tx.hash());
 
         self.tree.commit();
     }
 
-    pub fn add_tx_multiple(&mut self, txs: Vec<Transaction>) {
+    pub fn add_tx_multiple(&mut self, txs: Vec<Leav>) {
         for tx in txs.iter() {
             let last = self.leaves.len();
 
             self.leaves.insert(last, tx.clone());
-            self.hash_to_id_map.insert(tx.hash, last);
+            self.hash_to_id_map.insert(tx.hash(), last);
         }
 
         self.tree
-            .append(&mut txs.iter().map(|tx| tx.hash).collect());
+            .append(&mut txs.iter().map(|tx| tx.hash()).collect());
 
         self.tree.commit();
     }

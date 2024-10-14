@@ -1,6 +1,6 @@
 use mempool::mempoolitem::MemPoolItem;
 use serde::{Deserialize, Serialize};
-use storage::transaction::{Transaction, TxHash};
+use storage::{merkle_tree_public::TreeHashType, transaction::Transaction};
 
 #[derive(Debug)]
 pub struct TransactionMempool {
@@ -29,7 +29,7 @@ impl<'de> Deserialize<'de> for TransactionMempool {
 }
 
 impl MemPoolItem for TransactionMempool {
-    type Identifier = TxHash;
+    type Identifier = TreeHashType;
 
     fn identifier(&self) -> Self::Identifier {
         self.tx.hash
