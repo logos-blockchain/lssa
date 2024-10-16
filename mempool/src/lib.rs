@@ -92,6 +92,80 @@ mod tests {
     }
 
     #[test]
+    fn test_mempool_new() {
+        let pool: MemPool<TestItem> = MemPool::new();
+        assert!(pool.is_empty());
+        assert_eq!(pool.len(), 0);
+    }
+
+    #[test]
+    fn test_push_item() {
+        let mut pool = MemPool::new();
+        pool.push_item(test_item_with_id(1));
+        assert!(!pool.is_empty());
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn test_pop_last() {
+        let mut pool = MemPool::new();
+        pool.push_item(test_item_with_id(1));
+        pool.push_item(test_item_with_id(2));
+        let item = pool.pop_last();
+        assert_eq!(item, Some(test_item_with_id(1)));
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn test_peek_last() {
+        let mut pool = MemPool::new();
+        pool.push_item(test_item_with_id(1));
+        pool.push_item(test_item_with_id(2));
+        let item = pool.peek_last();
+        assert_eq!(item, Some(&test_item_with_id(1)));
+    }
+
+    #[test]
+    fn test_pop_size() {
+        let mut pool = MemPool::new();
+        pool.push_item(test_item_with_id(1));
+        pool.push_item(test_item_with_id(2));
+        pool.push_item(test_item_with_id(3));
+
+        let items = pool.pop_size(2);
+        assert_eq!(items, vec![test_item_with_id(1), test_item_with_id(2)]);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn test_drain_size() {
+        let mut pool = MemPool::new();
+        pool.push_item(test_item_with_id(1));
+        pool.push_item(test_item_with_id(2));
+        pool.push_item(test_item_with_id(3));
+        pool.push_item(test_item_with_id(4));
+
+        let items = pool.drain_size(2);
+        assert_eq!(items, vec![test_item_with_id(1), test_item_with_id(2)]);
+        assert_eq!(pool.len(), 2);
+    }
+
+    #[test]
+    fn test_default() {
+        let pool: MemPool<TestItem> = MemPool::default();
+        assert!(pool.is_empty());
+        assert_eq!(pool.len(), 0);
+    }
+
+    #[test]
+    fn test_is_empty() {
+        let mut pool = MemPool::new();
+        assert!(pool.is_empty());
+        pool.push_item(test_item_with_id(1));
+        assert!(!pool.is_empty());
+    }
+
+    #[test]
     fn test_push_pop() {
         let mut mempool: MemPool<TestItem> = MemPool::new();
 
