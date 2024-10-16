@@ -137,6 +137,20 @@ mod tests {
         assert_eq!(pool.len(), 1);
     }
 
+    #[test]
+    fn test_drain_size() {
+        let mut pool = MemPool::new();
+        pool.push_item(test_item_with_id(1));
+        pool.push_item(test_item_with_id(2));
+        pool.push_item(test_item_with_id(3));
+        pool.push_item(test_item_with_id(4));
+
+        let items = pool.drain_size(2);
+        assert_eq!(items, vec![test_item_with_id(1), test_item_with_id(2)]);
+        assert_eq!(pool.len(), 2);
+    }
+
+
 
     #[test]
     fn test_push_pop() {
