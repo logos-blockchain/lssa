@@ -10,6 +10,8 @@ use rocksdb::{
 pub mod block;
 pub mod error;
 pub mod merkle_tree_public;
+pub mod nullifier;
+pub mod nullifier_sparse_merkle_tree;
 pub mod transaction;
 pub mod utxo_commitment;
 
