@@ -116,15 +116,19 @@ mod tests {
         let mut buffer = [0u8; 32];
         let bytes = s.as_bytes();
         let len = std::cmp::min(32, bytes.len());
-        
+
         buffer[..len].copy_from_slice(&bytes[..len]);
         buffer
     }
 
     #[test]
     fn test_new_merkle_tree() {
-        let tx1 = MockTransaction { hash: get_first_32_bytes("tx1") };
-        let tx2 = MockTransaction { hash: get_first_32_bytes("tx2") };
+        let tx1 = MockTransaction {
+            hash: get_first_32_bytes("tx1"),
+        };
+        let tx2 = MockTransaction {
+            hash: get_first_32_bytes("tx2"),
+        };
 
         let tree = HashStorageMerkleTree::new(vec![tx1.clone(), tx2.clone()]);
 
@@ -134,8 +138,12 @@ mod tests {
 
     #[test]
     fn test_get_tx() {
-        let tx1 = MockTransaction { hash: get_first_32_bytes("tx1") };
-        let tx2 = MockTransaction { hash: get_first_32_bytes("tx2") };
+        let tx1 = MockTransaction {
+            hash: get_first_32_bytes("tx1"),
+        };
+        let tx2 = MockTransaction {
+            hash: get_first_32_bytes("tx2"),
+        };
 
         let tree = HashStorageMerkleTree::new(vec![tx1.clone(), tx2.clone()]);
 
@@ -145,8 +153,12 @@ mod tests {
 
     #[test]
     fn test_get_proof() {
-        let tx1 = MockTransaction { hash: get_first_32_bytes("tx1") };
-        let tx2 = MockTransaction { hash: get_first_32_bytes("tx2") };
+        let tx1 = MockTransaction {
+            hash: get_first_32_bytes("tx1"),
+        };
+        let tx2 = MockTransaction {
+            hash: get_first_32_bytes("tx2"),
+        };
 
         let tree = HashStorageMerkleTree::new(vec![tx1.clone(), tx2.clone()]);
 
@@ -156,8 +168,12 @@ mod tests {
 
     #[test]
     fn test_add_tx() {
-        let tx1 = MockTransaction { hash: get_first_32_bytes("tx1") };
-        let tx2 = MockTransaction { hash: get_first_32_bytes("tx2") };
+        let tx1 = MockTransaction {
+            hash: get_first_32_bytes("tx1"),
+        };
+        let tx2 = MockTransaction {
+            hash: get_first_32_bytes("tx2"),
+        };
 
         let mut tree = HashStorageMerkleTree::new(vec![tx1.clone()]);
 
@@ -168,9 +184,15 @@ mod tests {
 
     #[test]
     fn test_add_tx_multiple() {
-        let tx1 = MockTransaction { hash: get_first_32_bytes("tx1") };
-        let tx2 = MockTransaction { hash: get_first_32_bytes("tx2") };
-        let tx3 = MockTransaction { hash: get_first_32_bytes("tx3") };
+        let tx1 = MockTransaction {
+            hash: get_first_32_bytes("tx1"),
+        };
+        let tx2 = MockTransaction {
+            hash: get_first_32_bytes("tx2"),
+        };
+        let tx3 = MockTransaction {
+            hash: get_first_32_bytes("tx3"),
+        };
 
         let mut tree = HashStorageMerkleTree::new(vec![tx1.clone()]);
         tree.add_tx_multiple(vec![tx2.clone(), tx3.clone()]);
@@ -182,9 +204,15 @@ mod tests {
 
     #[test]
     fn test_get_proof_multiple() {
-        let tx1 = MockTransaction { hash: get_first_32_bytes("tx1") };
-        let tx2 = MockTransaction { hash: get_first_32_bytes("tx2") };
-        let tx3 = MockTransaction { hash: get_first_32_bytes("tx3") };
+        let tx1 = MockTransaction {
+            hash: get_first_32_bytes("tx1"),
+        };
+        let tx2 = MockTransaction {
+            hash: get_first_32_bytes("tx2"),
+        };
+        let tx3 = MockTransaction {
+            hash: get_first_32_bytes("tx3"),
+        };
 
         let tree = HashStorageMerkleTree::new(vec![tx1.clone(), tx2.clone(), tx3.clone()]);
         let proof = tree.get_proof_multiple(&[tx1.hash(), tx2.hash()]);
