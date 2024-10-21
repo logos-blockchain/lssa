@@ -59,3 +59,28 @@ jobs:
         if: success() || failure()
         run: |
           cargo clippy --release -- -D warnings
+
+  test:
+    strategy:
+      matrix:
+        platform: [ ubuntu-latest ]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
+
+    name: test - ${{ matrix.crate }} - ${{ matrix.platform }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: test mempool
+        if: success() || failure()
+        run: cargo test -p mempool
+      - name: test storage
+        if: success() || failure()
+        run: cargo test -p storage
