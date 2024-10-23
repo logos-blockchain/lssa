@@ -209,4 +209,19 @@ mod tests {
         let (proof, root) = result.unwrap();
         assert!(root.is_none());
     }
+
+    #[test]
+    fn test_non_membership_proofs_multiple() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let non_member_hashes = vec![[5u8; 32], [6u8; 32], [7u8; 32]];
+
+        let result = tree.get_non_membership_proofs(&non_member_hashes);
+        assert!(result.is_ok());
+
+        let proofs = result.unwrap();
+        for (proof, root) in proofs {
+            assert!(root.is_none());
+        }
+    }
+
 }
