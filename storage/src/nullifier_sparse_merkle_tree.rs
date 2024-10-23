@@ -138,4 +138,15 @@ mod tests {
         let tree = NullifierSparseMerkleTree::new();
         assert!(tree.curr_root.is_none());
     }
+
+    #[test]
+    fn test_insert_single_item() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifier = create_nullifier([1u8; 32]); // Sample 32-byte hash
+
+        let result = tree.insert_item(nullifier);
+        assert!(result.is_ok());
+        assert!(tree.curr_root.is_some());
+    }
+
 }
