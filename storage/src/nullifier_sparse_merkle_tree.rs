@@ -234,4 +234,18 @@ mod tests {
         let proof_result = tree.get_non_membership_proof([1u8; 32]);
         assert!(proof_result.is_err());
     }
+
+    #[test]
+    fn test_insert_and_get_proofs_of_existing_items() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifiers = vec![
+            create_nullifier([1u8; 32]),
+            create_nullifier([2u8; 32]),
+        ];
+
+        tree.insert_items(nullifiers).unwrap();
+
+        let proof_result = tree.get_non_membership_proofs(&[[1u8; 32], [2u8; 32]]);
+        assert!(proof_result.is_err());
+    }
 }
