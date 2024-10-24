@@ -122,5 +122,14 @@ mod tests {
         assert_eq!(interpreted, TestAsset { id: 1, name: "Test".to_string() });
     }
 
+    #[test]
+    fn test_interpret_invalid_asset() {
+        let mut payload = sample_payload();
+        payload.asset = vec![0, 1, 2, 3]; // Invalid data for deserialization
+        let utxo = UTXO::create_utxo_from_payload(payload);
 
+        // This should fail because the asset is not valid JSON for TestAsset
+        let result: Result<TestAsset> = utxo.interpret_asset();
+        assert!(result.is_err());
+    }
 }
