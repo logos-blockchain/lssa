@@ -133,4 +133,17 @@ mod tests {
         assert!(smt.curr_root.is_some());
     }
 
+    #[test]
+    fn test_get_item_exists() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo = sample_utxo();
+
+        smt.insert_item(utxo.clone()).unwrap();
+
+        // Test that the UTXO can be retrieved by hash
+        let retrieved_utxo = smt.get_item(utxo.hash).unwrap();
+        assert!(retrieved_utxo.is_some());
+        assert_eq!(retrieved_utxo.unwrap().hash, utxo.hash);
+    }
+
 }
