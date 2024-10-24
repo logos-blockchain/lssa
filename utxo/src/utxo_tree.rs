@@ -72,3 +72,23 @@ impl Default for UTXOSparseMerkleTree {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use storage::{merkle_tree_public::TreeHashType, AccountId};
+    use crate::utxo_core::{UTXO, UTXOPayload};
+
+    fn sample_utxo_payload() -> UTXOPayload {
+        UTXOPayload {
+            owner: AccountId::default(),
+            asset: vec![1, 2, 3],
+        }
+    }
+
+    fn sample_utxo() -> UTXO {
+        UTXO::create_utxo_from_payload(sample_utxo_payload())
+    }
+
+
+}
