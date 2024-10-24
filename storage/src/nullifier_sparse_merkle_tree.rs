@@ -120,3 +120,129 @@ impl Default for NullifierSparseMerkleTree {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nullifier::UTXONullifier;
+    use monotree::database::MemoryDB;
+    use monotree::hasher::Blake3;
+    use monotree::Monotree;
+
+    fn create_nullifier(hash: TreeHashType) -> UTXONullifier {
+        UTXONullifier { utxo_hash: hash }
+    }
+
+    #[test]
+    fn test_new_tree_initialization() {
+        let tree = NullifierSparseMerkleTree::new();
+        assert!(tree.curr_root.is_none());
+    }
+
+    #[test]
+    fn test_insert_single_item() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifier = create_nullifier([1u8; 32]); // Sample 32-byte hash
+
+        let result = tree.insert_item(nullifier);
+        assert!(result.is_ok());
+        assert!(tree.curr_root.is_some());
+    }
+
+    #[test]
+    fn test_insert_multiple_items() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifiers = vec![
+            create_nullifier([1u8; 32]),
+            create_nullifier([2u8; 32]),
+            create_nullifier([3u8; 32]),
+        ];
+
+        let result = tree.insert_items(nullifiers);
+        assert!(result.is_ok());
+        assert!(tree.curr_root.is_some());
+    }
+
+    #[test]
+    fn test_search_item_inclusion() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifier = create_nullifier([1u8; 32]);
+
+        tree.insert_item(nullifier.clone()).unwrap();
+
+        let result = tree.search_item_inclusion([1u8; 32]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true);
+
+        let non_existing = tree.search_item_inclusion([99u8; 32]);
+        assert!(non_existing.is_ok());
+        assert_eq!(non_existing.unwrap(), false);
+    }
+
+    #[test]
+    fn test_search_multiple_item_inclusions() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifiers = vec![
+            create_nullifier([1u8; 32]),
+            create_nullifier([2u8; 32]),
+            create_nullifier([3u8; 32]),
+        ];
+
+        tree.insert_items(nullifiers).unwrap();
+
+        let search_hashes = vec![[1u8; 32], [2u8; 32], [99u8; 32]];
+        let result = tree.search_item_inclusions(&search_hashes);
+        assert!(result.is_ok());
+
+        let expected_results = vec![true, true, false];
+        assert_eq!(result.unwrap(), expected_results);
+    }
+
+    #[test]
+    fn test_non_membership_proof() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let non_member_hash = [5u8; 32];
+
+        let result = tree.get_non_membership_proof(non_member_hash);
+        assert!(result.is_ok());
+
+        let (proof, root) = result.unwrap();
+        assert!(root.is_none());
+    }
+
+    #[test]
+    fn test_non_membership_proofs_multiple() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let non_member_hashes = vec![[5u8; 32], [6u8; 32], [7u8; 32]];
+
+        let result = tree.get_non_membership_proofs(&non_member_hashes);
+        assert!(result.is_ok());
+
+        let proofs = result.unwrap();
+        for (proof, root) in proofs {
+            assert!(root.is_none());
+        }
+    }
+
+    #[test]
+    fn test_insert_and_get_proof_of_existing_item() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifier = create_nullifier([1u8; 32]);
+
+        tree.insert_item(nullifier.clone()).unwrap();
+
+        let proof_result = tree.get_non_membership_proof([1u8; 32]);
+        assert!(proof_result.is_err());
+    }
+
+    #[test]
+    fn test_insert_and_get_proofs_of_existing_items() {
+        let mut tree = NullifierSparseMerkleTree::new();
+        let nullifiers = vec![create_nullifier([1u8; 32]), create_nullifier([2u8; 32])];
+
+        tree.insert_items(nullifiers).unwrap();
+
+        let proof_result = tree.get_non_membership_proofs(&[[1u8; 32], [2u8; 32]]);
+        assert!(proof_result.is_err());
+    }
+}
