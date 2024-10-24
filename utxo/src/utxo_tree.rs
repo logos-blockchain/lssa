@@ -97,4 +97,22 @@ mod tests {
         assert_eq!(smt.store.len(), 0);
     }
 
+    #[test]
+    fn test_insert_item() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo = sample_utxo();
+
+        let result = smt.insert_item(utxo.clone());
+
+        // Test insertion is successful
+        assert!(result.is_ok());
+
+        // Test UTXO is now stored in the tree
+        assert_eq!(smt.store.get(&utxo.hash).unwrap().hash, utxo.hash);
+
+        // Test curr_root is updated
+        assert!(smt.curr_root.is_some());
+    }
+
+
 }
