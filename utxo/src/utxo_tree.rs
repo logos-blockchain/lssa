@@ -90,5 +90,11 @@ mod tests {
         UTXO::create_utxo_from_payload(sample_utxo_payload())
     }
 
+    #[test]
+    fn test_utxo_sparse_merkle_tree_new() {
+        let smt = UTXOSparseMerkleTree::new();
+        assert!(smt.curr_root.is_none());
+        assert_eq!(smt.store.len(), 0);
+    }
 
 }
