@@ -114,5 +114,23 @@ mod tests {
         assert!(smt.curr_root.is_some());
     }
 
+    #[test]
+    fn test_insert_items() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo1 = sample_utxo();
+        let utxo2 = sample_utxo();
+
+        let result = smt.insert_items(vec![utxo1.clone(), utxo2.clone()]);
+
+        // Test insertion of multiple items is successful
+        assert!(result.is_ok());
+
+        // Test UTXOs are now stored in the tree
+        assert!(smt.store.get(&utxo1.hash).is_some());
+        assert!(smt.store.get(&utxo2.hash).is_some());
+
+        // Test curr_root is updated
+        assert!(smt.curr_root.is_some());
+    }
 
 }
