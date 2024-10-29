@@ -59,7 +59,14 @@ jobs:
         if: success() || failure()
         run: |
           cargo clippy --release -- -D warnings
-
+      - name: install taplo
+        if: success() || failure()
+        run: |
+          cargo install taplo-cli --locked
+      - name: taplo fmt
+        if: success() || failure()
+        run: |
+          taplo fmt --check
   test:
     strategy:
       matrix:
