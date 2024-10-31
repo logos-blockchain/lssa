@@ -1,21 +1,21 @@
 [workspace]
 resolver = "2"
 members = [
-    "node_runner",
-    "sequencer_runner",
-    "storage",
-    "accounts",
-    "utxo",
-    "vm",
-    "networking",
-    "consensus",
-    "node_rpc",
-    "sequencer_rpc",
-    "mempool",
-    "zkvm", 
-    "node_core", 
-    "sequencer_core", 
-    "rpc_primitives",
+  "node_runner",
+  "sequencer_runner",
+  "storage",
+  "accounts",
+  "utxo",
+  "vm",
+  "networking",
+  "consensus",
+  "node_rpc",
+  "sequencer_rpc",
+  "mempool",
+  "zkvm",
+  "node_core",
+  "sequencer_core",
+  "rpc_primitives",
 ]
 
 [workspace.dependencies]
@@ -37,7 +37,9 @@ sha2 = "0.10.8"
 monotree = "0.1.5"
 hex = "0.4.3"
 
-rocksdb = { version = "0.21.0", default-features = false, features = ["snappy"] }
+rocksdb = { version = "0.21.0", default-features = false, features = [
+  "snappy",
+] }
 
 #ToDo: Add necessary risc0 submodules for zkvm module
 
