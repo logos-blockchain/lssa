@@ -77,8 +77,23 @@ impl AddressKeyHolder {
 mod tests {
     use constants_types::{NULLIFIER_SECRET_CONST, VIEVING_SECRET_CONST};
     use elliptic_curve::group::GroupEncoding;
+    use aes_gcm::{Aes256Gcm, aead::{Aead, KeyInit, OsRng}};
+    use k256::{AffinePoint, ProjectivePoint, Scalar};
+    use constants_types::{CipherText, Nonce};
+    use elliptic_curve::group::prime::PrimeCurveAffine;
+    use elliptic_curve::ff::Field;
 
     use super::*;
+
+    #[test]
+    fn test_new_os_random() {
+        // Ensure that a new AddressKeyHolder instance can be created without errors.
+        let address_key_holder = AddressKeyHolder::new_os_random();
+        
+        // Check that key holder fields are initialized with expected types
+        assert!(!Into::<bool>::into(address_key_holder.nullifer_public_key.is_identity()));
+        assert!(!Into::<bool>::into(address_key_holder.viewing_public_key.is_identity()));
+    }
 
     #[test]
     fn key_generation_test() {
