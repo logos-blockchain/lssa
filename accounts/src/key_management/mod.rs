@@ -166,6 +166,41 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn test_decrypt_data_with_incorrect_nonce() {
+        let address_key_holder = AddressKeyHolder::new_os_random();
+
+        // Generate ephemeral public key and shared secret
+        let scalar = Scalar::random(OsRng);
+        let ephemeral_public_key_sender = (ProjectivePoint::generator() * scalar).to_affine();
+        let shared_secret = address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
+
+        // Prepare the encryption key from shared secret
+        let key_raw = shared_secret.to_bytes();
+        let key_raw_adjust_pre = &key_raw.as_slice()[..32];
+        let key_raw_adjust: [u8; 32] = key_raw_adjust_pre.try_into().unwrap();
+        let key: Key<Aes256Gcm> = key_raw_adjust.into();
+
+        let cipher = Aes256Gcm::new(&key);
+
+        // Encrypt sample data with a specific nonce
+        let nonce = Nonce::from_slice(b"unique nonce");
+        let plaintext = b"Sensitive data";
+        let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).expect("encryption failure");
+
+        // Attempt decryption with an incorrect nonce
+        let incorrect_nonce = Nonce::from_slice(b"wrong nonce");
+        let decrypted_data = address_key_holder.decrypt_data(
+        ephemeral_public_key_sender,
+        CipherText::from(ciphertext.clone()),
+        incorrect_nonce.clone(),
+        );
+
+        // The decryption should fail or produce incorrect output due to nonce mismatch
+        assert_ne!(decrypted_data, plaintext);
+    }
+
+    #[test]
     fn key_generation_test() {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
