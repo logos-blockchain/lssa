@@ -26,3 +26,24 @@ pub fn verify(receipt: Receipt, image_id: impl Into<Digest>) {
     .verify(image_id)
     .expect("receipt verification failed");
 }
+
+#[cfg(test)]
+mod tests {
+    use test_methods::{SUMMATION_ELF, SUMMATION_ID};
+    use test_methods::{MULTIPLICATION_ELF, MULTIPLICATION_ID};
+    use super::*;
+
+    #[test]
+    fn simple_sum() {
+        let message = 1;
+        let message_2 = 2;
+    
+        let (digest, receipt) = prove(vec![message, message_2], SUMMATION_ELF);
+    
+        verify(receipt, SUMMATION_ID);
+        assert_eq!(
+            digest,
+            message + message_2
+        );
+    }
+}
