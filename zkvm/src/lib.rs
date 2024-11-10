@@ -46,4 +46,18 @@ mod tests {
             message + message_2
         );
     }
+
+    #[test]
+    fn bigger_sum() {
+        let message = 123476;
+        let message_2 = 2342384;
+    
+        let (digest, receipt) = prove(vec![message, message_2], SUMMATION_ELF);
+    
+        verify(receipt, SUMMATION_ID);
+        assert_eq!(
+            digest,
+            message + message_2
+        );
+    }
 }
