@@ -123,6 +123,14 @@ mod tests {
         assert_eq!(result, big_calculation(message, message_2));
     }
 
+    #[test]
+    fn execute_big_calculation_long() {
+        let message: u128 = 20;
+        let message_2: u128 = 10;
+
+        let result = execute(vec![message, message_2], BIG_CALCULATION_ELF);
+        assert_eq!(result, big_calculation(message, message_2));
+    }
 
     fn big_calculation(lhs: u128, rhs: u128) -> u128 {
         let mut res = 1_u128;
