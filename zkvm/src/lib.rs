@@ -18,7 +18,7 @@ pub fn prove<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) -> (u64, R
 }
 
 // This only executes the program and does not generate a receipt.
-pub fn execute<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) {
+pub fn execute<T: serde::ser::Serialize + for<'de> serde::Deserialize<'de>>(input_vec: Vec<T>, elf: &[u8]) -> T {
     let mut builder = ExecutorEnv::builder();
 
     for input in input_vec {
@@ -28,8 +28,12 @@ pub fn execute<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) {
     let env = builder.build().unwrap();
 
     let exec = default_executor();
+    let session = exec.execute(env, elf).unwrap();
 
-    exec.execute(env, elf).unwrap();
+    // We read the result committed to the journal by the guest code.
+    let result: T = session.journal.decode().unwrap();
+
+    result
 }
 
 pub fn verify(receipt: Receipt, image_id: impl Into<Digest>) {
