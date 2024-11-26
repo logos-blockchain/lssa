@@ -6,6 +6,8 @@ use k256::AffinePoint;
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
 use storage::merkle_tree_public::TreeHashType;
 
+use crate::account_core::PublicKey;
+
 pub mod constants_types;
 pub mod ephemeral_key_holder;
 pub mod secret_holders;
@@ -18,8 +20,8 @@ pub struct AddressKeyHolder {
     top_secret_key_holder: TopSecretKeyHolder,
     utxo_secret_key_holder: UTXOSecretKeyHolder,
     pub address: TreeHashType,
-    pub nullifer_public_key: AffinePoint,
-    pub viewing_public_key: AffinePoint,
+    pub nullifer_public_key: PublicKey,
+    pub viewing_public_key: PublicKey,
 }
 
 impl AddressKeyHolder {

@@ -9,9 +9,13 @@ serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
+rand.workspace = true
 
 [dependencies.storage]
 path = "../storage"
 
 [dependencies.mempool]
 path = "../mempool"
+
+[dependencies.accounts]
+path = "../accounts"

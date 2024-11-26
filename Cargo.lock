@@ -3669,10 +3669,12 @@ dependencies = [
 name = "sequencer_core"
 version = "0.1.0"
 dependencies = [
+ "accounts",
  "anyhow",
  "env_logger",
  "log",
  "mempool",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "storage",
