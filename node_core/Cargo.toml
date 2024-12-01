@@ -9,6 +9,18 @@ serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
+rand.workspace = true
+k256.workspace = true
+sha2.workspace = true
+monotree.workspace = true
+bincode.workspace = true
 
 [dependencies.storage]
 path = "../storage"
+
+[dependencies.utxo]
+path = "../utxo"
+
+[dependencies.secp256k1-zkp]
+workspace = true
+features = ["std", "rand-std", "rand", "serde", "global-context"]
