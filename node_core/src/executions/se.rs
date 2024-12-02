@@ -1,16 +1,22 @@
+use bincode;
 use k256::Scalar;
-use secp256k1_zkp::{compute_adaptive_blinding_factor, verify_commitments_sum_to_equal, CommitmentSecrets, Generator, PedersenCommitment, Tag, Tweak, SECP256K1};
+use monotree::hasher::Blake3;
+use monotree::{Hasher, Monotree, Proof};
 use rand::thread_rng;
+use secp256k1_zkp::{
+    compute_adaptive_blinding_factor, verify_commitments_sum_to_equal, CommitmentSecrets,
+    Generator, PedersenCommitment, Tag, Tweak, SECP256K1,
+};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use serde::{Serialize, Deserialize};
-use storage::{commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree, nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree};
+use storage::{
+    commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree,
+    nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
+};
 use utxo::{
     utxo_core::{UTXOPayload, UTXO},
     utxo_tree::UTXOSparseMerkleTree,
 };
-use monotree::hasher::Blake3;
-use monotree::{Hasher, Monotree, Proof};
-use bincode;
 
 fn commitment_secrets_random(value: u64) -> CommitmentSecrets {
     CommitmentSecrets {
@@ -43,8 +49,8 @@ fn hash(input: &[u8]) -> Vec<u8> {
 
 // Generate nullifiers
 
-// takes the pedersen_commitment and nsk then 
-// returns a list of nullifiers, where the nullifier = hash(pedersen_commitment || nsk) where the hash function will be determined 
+// takes the pedersen_commitment and nsk then
+// returns a list of nullifiers, where the nullifier = hash(pedersen_commitment || nsk) where the hash function will be determined
 
 pub fn generate_nullifiers(pedersen_commitment: &PedersenCommitment, nsk: &[u8]) -> Vec<u8> {
     let mut input = pedersen_commitment.serialize().to_vec();
@@ -54,8 +60,8 @@ pub fn generate_nullifiers(pedersen_commitment: &PedersenCommitment, nsk: &[u8])
 
 // Generate commitments for output UTXOs
 
-// uses the list of output_utxos[] and 
-// returns out_commitments[] where each out_commitments[i] = Commitment(output_utxos[i]) 
+// uses the list of output_utxos[] and
+// returns out_commitments[] where each out_commitments[i] = Commitment(output_utxos[i])
 // where the commitment will be determined
 pub fn generate_commitments(output_utxos: &[UTXO]) -> Vec<Vec<u8>> {
     output_utxos
@@ -69,9 +75,9 @@ pub fn generate_commitments(output_utxos: &[UTXO]) -> Vec<Vec<u8>> {
 
 // Validate inclusion proof for in_commitments
 
-// takes the pedersen_commitment as a leaf, the root hash root_commitment and the path in_commitments_proof[], 
-// returns True if the pedersen_commitment is in the tree with root hash root_commitment 
-// otherwise 
+// takes the pedersen_commitment as a leaf, the root hash root_commitment and the path in_commitments_proof[],
+// returns True if the pedersen_commitment is in the tree with root hash root_commitment
+// otherwise
 // returns False, as membership proof.
 pub fn validate_in_commitments_proof(
     pedersen_commitment: &PedersenCommitment,
@@ -84,17 +90,25 @@ pub fn validate_in_commitments_proof(
         hasher: Blake3::new(),
     };
 
-    let commitments: Vec<_> = in_commitments_proof.into_iter().map(|n_p| Commitment { commitment_hash: n_p.clone() }).collect();
+    let commitments: Vec<_> = in_commitments_proof
+        .into_iter()
+        .map(|n_p| Commitment {
+            commitment_hash: n_p.clone(),
+        })
+        .collect();
     nsmt.insert_items(commitments).unwrap();
 
-    nsmt.get_non_membership_proof(pedersen_commitment.serialize().to_vec()).unwrap().1.is_some()
+    nsmt.get_non_membership_proof(pedersen_commitment.serialize().to_vec())
+        .unwrap()
+        .1
+        .is_some()
 }
 
 // Validate non-membership proof for nullifiers
 
-// takes the nullifier, path nullifiers_proof[] and the root hash root_nullifier, 
-// returns True if the nullifier is not in the tree with root hash root_nullifier 
-// otherwise 
+// takes the nullifier, path nullifiers_proof[] and the root hash root_nullifier,
+// returns True if the nullifier is not in the tree with root hash root_nullifier
+// otherwise
 // returns False, as non-membership proof.
 pub fn validate_nullifiers_proof(
     nullifier: [u8; 32],
@@ -107,16 +121,21 @@ pub fn validate_nullifiers_proof(
         hasher: Blake3::new(),
     };
 
-    let nullifiers: Vec<_> = nullifiers_proof.into_iter().map(|n_p| UTXONullifier { utxo_hash: *n_p }).collect();
+    let nullifiers: Vec<_> = nullifiers_proof
+        .into_iter()
+        .map(|n_p| UTXONullifier { utxo_hash: *n_p })
+        .collect();
     nsmt.insert_items(nullifiers).unwrap();
 
-
-    nsmt.get_non_membership_proof(nullifier).unwrap().1.is_none()
+    nsmt.get_non_membership_proof(nullifier)
+        .unwrap()
+        .1
+        .is_none()
 }
 
 // Check balances
 
-//  takes the public_info and output_utxos[], 
+//  takes the public_info and output_utxos[],
 // returns the True if the token amount in public_info matches the sum of all output_utxos[], otherwise return False.
 pub fn check_balances(public_info: u128, output_utxos: &[UTXO]) -> bool {
     let total_output: u128 = output_utxos.iter().map(|utxo| utxo.amount).sum();
@@ -125,9 +144,13 @@ pub fn check_balances(public_info: u128, output_utxos: &[UTXO]) -> bool {
 
 // Verify Pedersen commitment
 
-// takes the public_info, secret_r and pedersen_commitment and 
+// takes the public_info, secret_r and pedersen_commitment and
 // checks that commitment(public_info,secret_r) is equal pedersen_commitment where the commitment is pedersen commitment.
-pub fn verify_commitment(public_info: u64, secret_r: &[u8], pedersen_commitment: &PedersenCommitment) -> bool {
+pub fn verify_commitment(
+    public_info: u64,
+    secret_r: &[u8],
+    pedersen_commitment: &PedersenCommitment,
+) -> bool {
     let commitment_secrets = CommitmentSecrets {
         value: public_info,
         value_blinding_factor: Tweak::from_slice(secret_r).unwrap(),
@@ -157,7 +180,11 @@ fn se_kernel(
 
     let nullifier = generate_nullifiers(&pedersen_commitment, &nullifier_secret_key.to_bytes());
 
-    validate_in_commitments_proof(&pedersen_commitment, root_commitment.to_vec(), in_commitments_proof);
+    validate_in_commitments_proof(
+        &pedersen_commitment,
+        root_commitment.to_vec(),
+        in_commitments_proof,
+    );
 
     verify_commitment(public_info, secret_r, &pedersen_commitment);
 

@@ -22,11 +22,16 @@ impl CommitmentsSparseMerkleTree {
     }
 
     pub fn insert_item(&mut self, commitment: Commitment) -> Result<(), monotree::Errors> {
-        let root = self.curr_root.as_ref().map(|val | val[0..32].try_into().unwrap());
+        let root = self
+            .curr_root
+            .as_ref()
+            .map(|val| val[0..32].try_into().unwrap());
 
-        let new_root = self
-            .tree
-            .insert(root, &commitment.commitment_hash[0..32].try_into().unwrap(), &commitment.commitment_hash[0..32].try_into().unwrap())?;
+        let new_root = self.tree.insert(
+            root,
+            &commitment.commitment_hash[0..32].try_into().unwrap(),
+            &commitment.commitment_hash[0..32].try_into().unwrap(),
+        )?;
 
         self.curr_root = new_root.map(|val| val.to_vec());
 
@@ -34,13 +39,19 @@ impl CommitmentsSparseMerkleTree {
     }
 
     pub fn insert_items(&mut self, commitments: Vec<Commitment>) -> Result<(), monotree::Errors> {
-        let root = self.curr_root.as_ref().map(|val | val[0..32].try_into().unwrap());
+        let root = self
+            .curr_root
+            .as_ref()
+            .map(|val| val[0..32].try_into().unwrap());
 
-        let hashes: Vec<_> = commitments.iter().map(|val | val.commitment_hash[0..32].try_into().unwrap()).collect::<Vec<_>>();
+        let hashes: Vec<_> = commitments
+            .iter()
+            .map(|val| val.commitment_hash[0..32].try_into().unwrap())
+            .collect::<Vec<_>>();
 
         let new_root = self.tree.inserts(root, &hashes, &hashes)?;
 
-        self.curr_root = new_root.map(|val | val[0..32].try_into().unwrap());
+        self.curr_root = new_root.map(|val| val[0..32].try_into().unwrap());
 
         Ok(())
     }
@@ -50,7 +61,12 @@ impl CommitmentsSparseMerkleTree {
         commitment_hash: CommitmentHashType,
     ) -> Result<bool, monotree::Errors> {
         self.tree
-            .get(self.curr_root.as_ref().map(|val | val[0..32].try_into().unwrap()), &commitment_hash[0..32].try_into().unwrap())
+            .get(
+                self.curr_root
+                    .as_ref()
+                    .map(|val| val[0..32].try_into().unwrap()),
+                &commitment_hash[0..32].try_into().unwrap(),
+            )
             .map(|data| data.is_some())
     }
 
@@ -63,7 +79,12 @@ impl CommitmentsSparseMerkleTree {
         for nullifier_hash in commitment_hashes {
             let is_included = self
                 .tree
-                .get(self.curr_root.as_ref().map(|val | val[0..32].try_into().unwrap()), nullifier_hash[0..32].try_into().unwrap())
+                .get(
+                    self.curr_root
+                        .as_ref()
+                        .map(|val| val[0..32].try_into().unwrap()),
+                    nullifier_hash[0..32].try_into().unwrap(),
+                )
                 .map(|data| data.is_some())?;
 
             inclusions.push(is_included);
@@ -82,8 +103,12 @@ impl CommitmentsSparseMerkleTree {
             Err(monotree::Errors::new("Is a member"))
         } else {
             Ok((
-                self.tree
-                    .get_merkle_proof(self.curr_root.as_ref().map(|val | val[0..32].try_into().unwrap()), &commitment_hash)?,
+                self.tree.get_merkle_proof(
+                    self.curr_root
+                        .as_ref()
+                        .map(|val| val[0..32].try_into().unwrap()),
+                    &commitment_hash,
+                )?,
                 self.curr_root.clone(),
             ))
         }
@@ -105,8 +130,12 @@ impl CommitmentsSparseMerkleTree {
                 ));
             } else {
                 non_membership_proofs.push((
-                    self.tree
-                        .get_merkle_proof(self.curr_root.as_ref().map(|val | val[0..32].try_into().unwrap()), commitment_hash)?,
+                    self.tree.get_merkle_proof(
+                        self.curr_root
+                            .as_ref()
+                            .map(|val| val[0..32].try_into().unwrap()),
+                        commitment_hash,
+                    )?,
                     self.curr_root.clone(),
                 ))
             };
@@ -131,7 +160,9 @@ mod tests {
     use monotree::Monotree;
 
     fn create_nullifier(hash: CommitmentHashType) -> Commitment {
-        Commitment { commitment_hash: hash }
+        Commitment {
+            commitment_hash: hash,
+        }
     }
 
     #[test]
@@ -239,11 +270,15 @@ mod tests {
     #[test]
     fn test_insert_and_get_proofs_of_existing_items() {
         let mut tree = CommitmentsSparseMerkleTree::new();
-        let nullifiers = vec![create_nullifier([1u8; 32].to_vec()), create_nullifier([2u8; 32].to_vec())];
+        let nullifiers = vec![
+            create_nullifier([1u8; 32].to_vec()),
+            create_nullifier([2u8; 32].to_vec()),
+        ];
 
         tree.insert_items(nullifiers).unwrap();
 
-        let proof_result = tree.get_non_membership_proofs(&[[1u8; 32].to_vec(), [2u8; 32].to_vec()]);
+        let proof_result =
+            tree.get_non_membership_proofs(&[[1u8; 32].to_vec(), [2u8; 32].to_vec()]);
         assert!(proof_result.is_err());
     }
 }
