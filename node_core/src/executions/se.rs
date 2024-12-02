@@ -67,3 +67,49 @@ pub fn generate_commitments(output_utxos: &[UTXO]) -> Vec<Vec<u8>> {
         .collect()
 }
 
+// Validate inclusion proof for in_commitments
+
+// takes the pedersen_commitment as a leaf, the root hash root_commitment and the path in_commitments_proof[], 
+// returns True if the pedersen_commitment is in the tree with root hash root_commitment 
+// otherwise 
+// returns False, as membership proof.
+pub fn validate_in_commitments_proof(
+    pedersen_commitment: &PedersenCommitment,
+    root_commitment: Vec<u8>,
+    in_commitments_proof: &[Vec<u8>],
+) -> bool {
+    let mut nsmt = CommitmentsSparseMerkleTree {
+        curr_root: Option::Some(root_commitment),
+        tree: Monotree::default(),
+        hasher: Blake3::new(),
+    };
+
+    let commitments: Vec<_> = in_commitments_proof.into_iter().map(|n_p| Commitment { commitment_hash: n_p.clone() }).collect();
+    nsmt.insert_items(commitments).unwrap();
+
+    nsmt.get_non_membership_proof(pedersen_commitment.serialize().to_vec()).unwrap().1.is_some()
+}
+
+// Validate non-membership proof for nullifiers
+
+// takes the nullifier, path nullifiers_proof[] and the root hash root_nullifier, 
+// returns True if the nullifier is not in the tree with root hash root_nullifier 
+// otherwise 
+// returns False, as non-membership proof.
+pub fn validate_nullifiers_proof(
+    nullifier: [u8; 32],
+    root_nullifier: [u8; 32],
+    nullifiers_proof: &[[u8; 32]],
+) -> bool {
+    let mut nsmt = NullifierSparseMerkleTree {
+        curr_root: Option::Some(root_nullifier),
+        tree: Monotree::default(),
+        hasher: Blake3::new(),
+    };
+
+    let nullifiers: Vec<_> = nullifiers_proof.into_iter().map(|n_p| UTXONullifier { utxo_hash: *n_p }).collect();
+    nsmt.insert_items(nullifiers).unwrap();
+
+
+    nsmt.get_non_membership_proof(nullifier).unwrap().1.is_none()
+}
