@@ -12,7 +12,7 @@ pub mod constants_types;
 pub mod ephemeral_key_holder;
 pub mod secret_holders;
 
-#[derive(Debug)]
+#[derive(Clone)]
 ///Entrypoint to key management
 pub struct AddressKeyHolder {
     //Will be useful in future
