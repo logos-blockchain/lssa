@@ -31,6 +31,6 @@ impl SequecerBlockStore {
     }
 
     pub fn put_block_at_id(&self, block: Block) -> Result<()> {
-        Ok(self.dbio.put_block(block)?)
+        Ok(self.dbio.put_block(block, false)?)
     }
 }

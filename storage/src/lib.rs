@@ -149,7 +149,7 @@ impl RocksDBIO {
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
-        self.put_block(block)?;
+        self.put_block(block, true)?;
         Ok(())
     }
 
@@ -173,13 +173,15 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_block(&self, block: Block) -> DbResult<()> {
+    pub fn put_block(&self, block: Block, first: bool) -> DbResult<()> {
         let cf_block = self.block_column();
 
+        if !first {
         let last_curr_block = self.get_meta_last_block_in_db()?;
 
         if block.block_id > last_curr_block {
             self.put_meta_last_block_in_db(block.block_id)?;
+            }
         }
 
         self.db
