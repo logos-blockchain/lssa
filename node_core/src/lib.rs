@@ -398,7 +398,7 @@ impl NodeCore {
 
         let accout = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
 
-                generate_nullifiers(
+        let nullifier = generate_nullifiers(
                 &utxo,
                 &accout
                     .key_holder
@@ -406,20 +406,19 @@ impl NodeCore {
                     .nullifier_secret_key
                     .to_bytes()
                     .to_vec(),
-            )
-        };
+            );
 
         let (resulting_balances, receipt) = prove_send_utxo_deshielded(utxo, receivers);
 
         TransactionPayload {
             tx_kind: TxKind::Deshielded,
-            execution_input: vec![],
-            execution_output: serde_json::to_vec(&ActionData::SendMoneyDeshieldedTx(
+            execution_input: serde_json::to_vec(&ActionData::SendMoneyDeshieldedTx(
                 SendMoneyDeshieldedTx {
                     receiver_data: resulting_balances,
                 },
             ))
             .unwrap(),
+            execution_output: vec![],
             utxo_commitments_spent_hashes: vec![commitment_in],
             utxo_commitments_created_hashes: vec![],
             nullifier_created_hashes: vec![nullifier.try_into().unwrap()],

@@ -19,6 +19,8 @@ use storage::{
 };
 use utxo::utxo_core::UTXO;
 
+use crate::ActionData;
+
 pub mod accounts_store;
 pub mod block_store;
 
@@ -54,7 +56,37 @@ impl NodeChainStore {
 
     pub fn dissect_insert_block(&mut self, block: Block) -> Result<()> {
         for tx in &block.transactions {
-            // let public_action = serde_json::from_slice(tx.execution_output);
+            if !tx.execution_input.is_empty() {
+                let public_action = serde_json::from_slice::<ActionData>(&tx.execution_input);
+
+                if let Ok(public_action) = public_action {
+                    match public_action {
+                        ActionData::MintMoneyPublicTx(action) => {
+                            let acc_mut = self.acc_map.get_mut(&action.acc);
+
+                            if let Some(acc_mut) = acc_mut {
+                                acc_mut.balance += action.amount as u64;
+                            }
+                        },
+                        ActionData::SendMoneyDeshieldedTx(action) => {
+                            for (balance, acc_addr) in action.receiver_data {
+                                let acc_mut = self.acc_map.get_mut(&acc_addr);
+
+                                if let Some(acc_mut) = acc_mut {
+                                    acc_mut.balance += balance as u64;
+                                }
+                            }
+                        },
+                        ActionData::SendMoneyShieldedTx(action) => {
+                            let acc_mut = self.acc_map.get_mut(&action.acc_sender);
+
+                            if let Some(acc_mut) = acc_mut {
+                                acc_mut.balance = acc_mut.balance.saturating_sub(action.amount as u64);
+                            }
+                        }
+                    }
+                }
+            }
 
             self.utxo_commitments_store.add_tx_multiple(
                 tx.utxo_commitments_created_hashes
