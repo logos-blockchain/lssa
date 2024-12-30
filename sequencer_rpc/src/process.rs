@@ -11,7 +11,9 @@ use rpc_primitives::{
 use crate::{
     rpc_error_responce_inverter,
     types::rpc_structs::{
-        GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse, GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse, RegisterAccountRequest, RegisterAccountResponse, SendTxRequest, SendTxResponse
+        GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
+        GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse,
+        RegisterAccountRequest, RegisterAccountResponse, SendTxRequest, SendTxResponse,
     },
 };
 

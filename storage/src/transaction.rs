@@ -95,13 +95,45 @@ impl Transaction {
     pub fn log(&self) {
         info!("Transaction hash is {:?}", hex::encode(self.hash));
         info!("Transaction tx_kind is {:?}", self.tx_kind);
-        info!("Transaction execution_input is {:?}", hex::encode(self.execution_input.clone()));
-        info!("Transaction execution_output is {:?}", hex::encode(self.execution_output.clone()));
-        info!("Transaction utxo_commitments_spent_hashes is {:?}", self.utxo_commitments_spent_hashes.iter().map(|val| hex::encode(val.clone())));
-        info!("Transaction utxo_commitments_created_hashes is {:?}", self.utxo_commitments_created_hashes.iter().map(|val| hex::encode(val.clone())));
-        info!("Transaction nullifier_created_hashes is {:?}", self.nullifier_created_hashes.iter().map(|val| hex::encode(val.clone())));
-        info!("Transaction execution_proof_private is {:?}", self.execution_proof_private);
-        info!("Transaction encoded_data is {:?}", self.encoded_data.iter().map(|val| (hex::encode(val.0.clone()), hex::encode(val.1.clone()))));
-        info!("Transaction ephemeral_pub_key is {:?}", hex::encode(self.ephemeral_pub_key.clone()));
+        info!(
+            "Transaction execution_input is {:?}",
+            hex::encode(self.execution_input.clone())
+        );
+        info!(
+            "Transaction execution_output is {:?}",
+            hex::encode(self.execution_output.clone())
+        );
+        info!(
+            "Transaction utxo_commitments_spent_hashes is {:?}",
+            self.utxo_commitments_spent_hashes
+                .iter()
+                .map(|val| hex::encode(val.clone()))
+        );
+        info!(
+            "Transaction utxo_commitments_created_hashes is {:?}",
+            self.utxo_commitments_created_hashes
+                .iter()
+                .map(|val| hex::encode(val.clone()))
+        );
+        info!(
+            "Transaction nullifier_created_hashes is {:?}",
+            self.nullifier_created_hashes
+                .iter()
+                .map(|val| hex::encode(val.clone()))
+        );
+        info!(
+            "Transaction execution_proof_private is {:?}",
+            self.execution_proof_private
+        );
+        info!(
+            "Transaction encoded_data is {:?}",
+            self.encoded_data
+                .iter()
+                .map(|val| (hex::encode(val.0.clone()), hex::encode(val.1.clone())))
+        );
+        info!(
+            "Transaction ephemeral_pub_key is {:?}",
+            hex::encode(self.ephemeral_pub_key.clone())
+        );
     }
 }

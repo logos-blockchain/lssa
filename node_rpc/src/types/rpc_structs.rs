@@ -68,7 +68,6 @@ pub struct GetGenesisIdResponse {
     pub genesis_id: u64,
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetLastBlockResponse {
     pub last_block: u64,

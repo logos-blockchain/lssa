@@ -71,7 +71,7 @@ impl Account {
         ephemeral_public_key_sender: AffinePoint,
         ciphertext: CipherText,
         nonce: Nonce,
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, aes_gcm::Error> {
         self.key_holder
             .decrypt_data(ephemeral_public_key_sender, ciphertext, nonce)
     }

@@ -67,7 +67,7 @@ impl NodeChainStore {
                             if let Some(acc_mut) = acc_mut {
                                 acc_mut.balance += action.amount as u64;
                             }
-                        },
+                        }
                         ActionData::SendMoneyDeshieldedTx(action) => {
                             for (balance, acc_addr) in action.receiver_data {
                                 let acc_mut = self.acc_map.get_mut(&acc_addr);
@@ -76,12 +76,13 @@ impl NodeChainStore {
                                     acc_mut.balance += balance as u64;
                                 }
                             }
-                        },
+                        }
                         ActionData::SendMoneyShieldedTx(action) => {
                             let acc_mut = self.acc_map.get_mut(&action.acc_sender);
 
                             if let Some(acc_mut) = acc_mut {
-                                acc_mut.balance = acc_mut.balance.saturating_sub(action.amount as u64);
+                                acc_mut.balance =
+                                    acc_mut.balance.saturating_sub(action.amount as u64);
                             }
                         }
                     }
@@ -128,12 +129,14 @@ impl NodeChainStore {
                                 nonce,
                             );
 
-                            let decoded_utxo_try =
-                                serde_json::from_slice::<UTXO>(&decoded_data_curr_acc);
+                            if let Ok(decoded_data_curr_acc) = decoded_data_curr_acc {
+                                let decoded_utxo_try =
+                                    serde_json::from_slice::<UTXO>(&decoded_data_curr_acc);
 
-                            if let Ok(utxo) = decoded_utxo_try {
-                                if &utxo.owner == acc_id {
-                                    acc.utxo_tree.insert_item(utxo)?;
+                                if let Ok(utxo) = decoded_utxo_try {
+                                    if &utxo.owner == acc_id {
+                                        acc.utxo_tree.insert_item(utxo)?;
+                                    }
                                 }
                             }
                         }

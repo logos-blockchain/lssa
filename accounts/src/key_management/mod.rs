@@ -63,7 +63,7 @@ impl AddressKeyHolder {
         ephemeral_public_key_sender: AffinePoint,
         ciphertext: CipherText,
         nonce: Nonce,
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, aes_gcm::Error> {
         let key_point = self.calculate_shared_secret_receiver(ephemeral_public_key_sender);
         let binding = key_point.to_bytes();
         let key_raw = &binding.as_slice()[..32];
@@ -73,15 +73,27 @@ impl AddressKeyHolder {
 
         let cipher = Aes256Gcm::new(&key);
 
-        cipher.decrypt(&nonce, ciphertext.as_slice()).unwrap()
+        cipher.decrypt(&nonce, ciphertext.as_slice())
     }
 
     pub fn log(&self) {
-        info!("AddressKeyHolder top_secret_key_holder is {:?}", self.top_secret_key_holder);
-        info!("AddressKeyHolder utxo_secret_key_holder is {:?}", self.utxo_secret_key_holder);
+        info!(
+            "AddressKeyHolder top_secret_key_holder is {:?}",
+            self.top_secret_key_holder
+        );
+        info!(
+            "AddressKeyHolder utxo_secret_key_holder is {:?}",
+            self.utxo_secret_key_holder
+        );
         info!("AddressKeyHolder address is {:?}", self.address);
-        info!("AddressKeyHolder nullifer_public_key is {:?}", self.nullifer_public_key);
-        info!("AddressKeyHolder viewing_public_key is {:?}", self.viewing_public_key);
+        info!(
+            "AddressKeyHolder nullifer_public_key is {:?}",
+            self.nullifer_public_key
+        );
+        info!(
+            "AddressKeyHolder viewing_public_key is {:?}",
+            self.viewing_public_key
+        );
     }
 }
 
@@ -158,11 +170,13 @@ mod tests {
             .expect("encryption failure");
 
         // Attempt decryption
-        let decrypted_data: Vec<u8> = address_key_holder.decrypt_data(
-            ephemeral_public_key_sender,
-            CipherText::from(ciphertext),
-            nonce.clone(),
-        );
+        let decrypted_data: Vec<u8> = address_key_holder
+            .decrypt_data(
+                ephemeral_public_key_sender,
+                CipherText::from(ciphertext),
+                nonce.clone(),
+            )
+            .unwrap();
 
         // Verify decryption is successful and matches original plaintext
         assert_eq!(decrypted_data, plaintext);
@@ -225,11 +239,13 @@ mod tests {
 
         // Attempt decryption with an incorrect nonce
         let incorrect_nonce = Nonce::from_slice(b"wrong nonce");
-        let decrypted_data = address_key_holder.decrypt_data(
-            ephemeral_public_key_sender,
-            CipherText::from(ciphertext.clone()),
-            incorrect_nonce.clone(),
-        );
+        let decrypted_data = address_key_holder
+            .decrypt_data(
+                ephemeral_public_key_sender,
+                CipherText::from(ciphertext.clone()),
+                incorrect_nonce.clone(),
+            )
+            .unwrap();
 
         // The decryption should fail or produce incorrect output due to nonce mismatch
         assert_ne!(decrypted_data, plaintext);
@@ -266,11 +282,13 @@ mod tests {
         corrupted_ciphertext[0] ^= 1; // Flip a bit in the ciphertext
 
         // Attempt decryption
-        let result = address_key_holder.decrypt_data(
-            ephemeral_public_key_sender,
-            CipherText::from(corrupted_ciphertext),
-            nonce.clone(),
-        );
+        let result = address_key_holder
+            .decrypt_data(
+                ephemeral_public_key_sender,
+                CipherText::from(corrupted_ciphertext),
+                nonce.clone(),
+            )
+            .unwrap();
 
         // The decryption should fail or produce incorrect output due to tampered ciphertext
         assert_ne!(result, plaintext);
@@ -302,11 +320,13 @@ mod tests {
             .expect("encryption failure");
 
         // Decrypt the data using the `AddressKeyHolder` instance
-        let decrypted_data = address_key_holder.decrypt_data(
-            ephemeral_public_key_sender,
-            CipherText::from(ciphertext),
-            nonce.clone(),
-        );
+        let decrypted_data = address_key_holder
+            .decrypt_data(
+                ephemeral_public_key_sender,
+                CipherText::from(ciphertext),
+                nonce.clone(),
+            )
+            .unwrap();
 
         // Verify the decrypted data matches the original plaintext
         assert_eq!(decrypted_data, plaintext);

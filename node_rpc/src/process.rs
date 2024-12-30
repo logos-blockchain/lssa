@@ -14,7 +14,9 @@ use crate::{
     types::{
         err_rpc::cast_seq_client_error_into_rpc_error,
         rpc_structs::{
-            ExecuteSubscenarioRequest, ExecuteSubscenarioResponse, GetBlockDataRequest, GetBlockDataResponse, GetLastBlockRequest, GetLastBlockResponse, RegisterAccountRequest, RegisterAccountResponse, SendTxRequest
+            ExecuteSubscenarioRequest, ExecuteSubscenarioResponse, GetBlockDataRequest,
+            GetBlockDataResponse, GetLastBlockRequest, GetLastBlockResponse,
+            RegisterAccountRequest, RegisterAccountResponse, SendTxRequest,
         },
     },
 };
@@ -110,9 +112,7 @@ impl JsonHandler {
             }
         };
 
-        let helperstruct = GetBlockDataResponse {
-            block,
-        };
+        let helperstruct = GetBlockDataResponse { block };
 
         respond(helperstruct)
     }
@@ -126,9 +126,7 @@ impl JsonHandler {
             guard.curr_height.load(Ordering::Relaxed)
         };
 
-        let helperstruct = GetLastBlockResponse {
-            last_block,
-        };
+        let helperstruct = GetLastBlockResponse { last_block };
 
         respond(helperstruct)
     }

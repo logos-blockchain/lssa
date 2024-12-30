@@ -68,7 +68,6 @@ impl SequencerRpcRequest {
     }
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequencerRpcResponse {
     pub jsonrpc: String,

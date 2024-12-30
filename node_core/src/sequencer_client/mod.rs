@@ -123,7 +123,10 @@ impl SequencerClient {
 
         let req = serde_json::to_value(genesis_req).unwrap();
 
-        let resp = self.call_method_with_payload("get_genesis", req).await.unwrap();
+        let resp = self
+            .call_method_with_payload("get_genesis", req)
+            .await
+            .unwrap();
 
         let resp_deser = serde_json::from_value(resp).unwrap();
 
