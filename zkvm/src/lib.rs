@@ -52,6 +52,47 @@ pub fn prove_send_utxo(
     )
 }
 
+pub fn prove_send_utxo_multiple_assets_one_receiver(
+    spent_utxos: Vec<UTXO>,
+    number_to_send: usize,
+    receiver: AccountAddress,
+) -> (Vec<UTXO>, Vec<UTXO>, Receipt) {
+    let mut builder = ExecutorEnv::builder();
+    let utxo_payload: Vec<UTXOPayload> = spent_utxos
+        .into_iter()
+        .map(|spent_utxo| spent_utxo.into_payload())
+        .collect();
+
+    builder.write(&utxo_payload).unwrap();
+    builder.write(&number_to_send).unwrap();
+    builder.write(&receiver).unwrap();
+
+    let env = builder.build().unwrap();
+
+    let prover = default_prover();
+
+    let receipt = prover
+        .prove(env, test_methods::SEND_UTXO_MULTIPLE_ASSETS_ELF)
+        .unwrap()
+        .receipt;
+
+    let digest: (Vec<UTXOPayload>, Vec<UTXOPayload>) = receipt.journal.decode().unwrap();
+
+    (
+        digest
+            .0
+            .into_iter()
+            .map(|payload| UTXO::create_utxo_from_payload(payload))
+            .collect(),
+        digest
+            .1
+            .into_iter()
+            .map(|payload| UTXO::create_utxo_from_payload(payload))
+            .collect(),
+        receipt,
+    )
+}
+
 pub fn prove_send_utxo_shielded(
     owner: AccountAddress,
     amount: u128,
@@ -115,6 +156,37 @@ pub fn prove_send_utxo_deshielded(
         digest
             .into_iter()
             .map(|(payload, addr)| (payload.amount, addr))
+            .collect(),
+        receipt,
+    )
+}
+
+pub fn prove_mint_utxo_multiple_assets(
+    amount_to_mint: u128,
+    number_of_assets: usize,
+    owner: AccountAddress,
+) -> (Vec<UTXO>, Receipt) {
+    let mut builder = ExecutorEnv::builder();
+
+    builder.write(&amount_to_mint).unwrap();
+    builder.write(&number_of_assets).unwrap();
+    builder.write(&owner).unwrap();
+
+    let env = builder.build().unwrap();
+
+    let prover = default_prover();
+
+    let receipt = prover
+        .prove(env, test_methods::MINT_UTXO_MULTIPLE_ASSETS_ELF)
+        .unwrap()
+        .receipt;
+
+    let digest: Vec<UTXOPayload> = receipt.journal.decode().unwrap();
+
+    (
+        digest
+            .into_iter()
+            .map(UTXO::create_utxo_from_payload)
             .collect(),
         receipt,
     )

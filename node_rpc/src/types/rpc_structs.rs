@@ -32,6 +32,12 @@ pub struct ExecuteScenarioSplitRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ExecuteScenarioMultipleSendRequest {
+    pub number_of_assets: usize,
+    pub number_to_send: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetGenesisIdRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -43,6 +49,7 @@ parse_request!(GetBlockDataRequest);
 parse_request!(GetGenesisIdRequest);
 parse_request!(ExecuteSubscenarioRequest);
 parse_request!(ExecuteScenarioSplitRequest);
+parse_request!(ExecuteScenarioMultipleSendRequest);
 parse_request!(GetLastBlockRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -72,6 +79,11 @@ pub struct ExecuteSubscenarioResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecuteScenarioSplitResponse {
+    pub scenario_result: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExecuteScenarioMultipleSendResponse {
     pub scenario_result: String,
 }
 

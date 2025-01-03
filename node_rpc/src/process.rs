@@ -14,7 +14,11 @@ use crate::{
     types::{
         err_rpc::cast_seq_client_error_into_rpc_error,
         rpc_structs::{
-            ExecuteScenarioSplitRequest, ExecuteScenarioSplitResponse, ExecuteSubscenarioRequest, ExecuteSubscenarioResponse, GetBlockDataRequest, GetBlockDataResponse, GetLastBlockRequest, GetLastBlockResponse, RegisterAccountRequest, RegisterAccountResponse, SendTxRequest
+            ExecuteScenarioMultipleSendRequest, ExecuteScenarioMultipleSendResponse,
+            ExecuteScenarioSplitRequest, ExecuteScenarioSplitResponse, ExecuteSubscenarioRequest,
+            ExecuteSubscenarioResponse, GetBlockDataRequest, GetBlockDataResponse,
+            GetLastBlockRequest, GetLastBlockResponse, RegisterAccountRequest,
+            RegisterAccountResponse, SendTxRequest,
         },
     },
 };
@@ -61,16 +65,42 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
-    async fn process_request_execute_scenario_split(&self, request: Request) -> Result<Value, RpcErr> {
+    async fn process_request_execute_scenario_split(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
         let req = ExecuteScenarioSplitRequest::parse(Some(request.params))?;
 
         {
             let mut store = self.node_chain_store.lock().await;
 
-            store.scenario_1(req.visibility_list, req.publication_index).await;
+            store
+                .scenario_1(req.visibility_list, req.publication_index)
+                .await;
         }
 
         let helperstruct = ExecuteScenarioSplitResponse {
+            scenario_result: "success".to_string(),
+        };
+
+        respond(helperstruct)
+    }
+
+    async fn process_request_execute_scenario_multiple_send(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
+        let req = ExecuteScenarioMultipleSendRequest::parse(Some(request.params))?;
+
+        {
+            let mut store = self.node_chain_store.lock().await;
+
+            store
+                .scenario_2(req.number_of_assets, req.number_to_send)
+                .await;
+        }
+
+        let helperstruct = ExecuteScenarioMultipleSendResponse {
             scenario_result: "success".to_string(),
         };
 
@@ -154,6 +184,10 @@ impl JsonHandler {
             "get_block" => self.process_get_block_data(request).await,
             "get_last_block" => self.process_get_last_block(request).await,
             "execute_scenario_split" => self.process_request_execute_scenario_split(request).await,
+            "execute_scenario_multiple_send" => {
+                self.process_request_execute_scenario_multiple_send(request)
+                    .await
+            }
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }

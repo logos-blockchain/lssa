@@ -54,6 +54,9 @@ impl EphemeralKeyHolder {
     }
 
     pub fn log(&self) {
-        info!("Ephemeral private key is {:?}", hex::encode(self.ephemeral_secret_key.to_bytes()));
+        info!(
+            "Ephemeral private key is {:?}",
+            hex::encode(self.ephemeral_secret_key.to_bytes())
+        );
     }
 }
