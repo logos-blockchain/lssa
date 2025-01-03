@@ -1,14 +1,11 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
 };
 
 use k256::elliptic_curve::group::GroupEncoding;
 
-use ::storage::transaction::{Transaction, TransactionPayload, TxKind};
+use ::storage::{nullifier::UTXONullifier, transaction::{Transaction, TransactionPayload, TxKind}};
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
 use config::NodeConfig;
@@ -23,7 +20,7 @@ use sequencer_client::{json::SendTxResponse, SequencerClient};
 use serde::{Deserialize, Serialize};
 use storage::NodeChainStore;
 use tokio::{sync::RwLock, task::JoinHandle};
-use utxo::utxo_core::UTXO;
+use utxo::utxo_core::{Asset, UTXO};
 use zkvm::{
     prove_mint_utxo, prove_send_utxo, prove_send_utxo_deshielded, prove_send_utxo_shielded,
 };
@@ -53,10 +50,16 @@ pub struct SendMoneyDeshieldedTx {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct UTXOPublication {
+    pub utxos: Vec<UTXO>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ActionData {
     MintMoneyPublicTx(MintMoneyPublicTx),
     SendMoneyShieldedTx(SendMoneyShieldedTx),
     SendMoneyDeshieldedTx(SendMoneyDeshieldedTx),
+    UTXOPublication(UTXOPublication),
 }
 
 pub struct NodeCore {
@@ -463,10 +466,7 @@ impl NodeCore {
         let tx = self.deposit_money_public(acc, amount);
         tx.log();
 
-        Ok(self
-            .sequencer_client
-            .send_tx(tx)
-            .await?)
+        Ok(self.sequencer_client.send_tx(tx).await?)
     }
 
     pub async fn send_private_send_tx(
@@ -522,12 +522,13 @@ impl NodeCore {
         Ok(self.sequencer_client.send_tx(tx).await?)
     }
 
-    ///Mint utxo, make it public
-    pub async fn subscenario_1(&mut self) {
-        let acc_addr = self.create_new_account().await;
-
+    async fn operate_account_mint_private(
+        &mut self,
+        acc_addr: AccountAddress,
+        amount: u128,
+    ) -> (UTXO, [u8; 32]) {
         let (resp, new_utxo_hash, comm_gen_hash) =
-            self.send_private_mint_tx(acc_addr, 100).await.unwrap();
+            self.send_private_mint_tx(acc_addr, amount).await.unwrap();
         info!("Response for mint private is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -546,12 +547,82 @@ impl NodeCore {
         };
 
         new_utxo.log();
+        info!(
+            "Account address is {:?} ,new utxo owner address is {:?}",
+            hex::encode(acc_addr),
+            hex::encode(new_utxo.owner)
+        );
+        info!(
+            "Account {:?} got new utxo with amount {amount:?}",
+            hex::encode(acc_addr)
+        );
+
+        (new_utxo, comm_gen_hash)
+    }
+
+    async fn operate_account_send_deshielded_one_receiver(
+        &mut self,
+        acc_addr_sender: AccountAddress,
+        acc_addr_rec: AccountAddress,
+        utxo: UTXO,
+        comm_gen_hash: [u8; 32],
+    ) {
+        let amount = utxo.amount;
+
+        let old_balance = {
+            let acc_map_read_guard = self.storage.read().await;
+
+            let acc = acc_map_read_guard.acc_map.get(&acc_addr_rec).unwrap();
+
+            acc.balance
+        };
+
+        info!(
+            "Balance of receiver {:?} now is {old_balance:?}",
+            hex::encode(acc_addr_rec)
+        );
 
         let resp = self
-            .send_deshielded_send_tx(new_utxo, comm_gen_hash, vec![(100, acc_addr)])
+            .send_deshielded_send_tx(utxo, comm_gen_hash, vec![(amount, acc_addr_rec)])
             .await
             .unwrap();
         info!("Response for send deshielded is {resp:?}");
+
+        info!("Awaiting new blocks");
+        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+
+        let new_balance = {
+            let acc_map_read_guard = self.storage.read().await;
+
+            let acc = acc_map_read_guard.acc_map.get(&acc_addr_sender).unwrap();
+
+            acc.balance
+        };
+
+        info!(
+            "Balance of receiver {:?} now is {:?}, delta is {:?}",
+            hex::encode(acc_addr_rec),
+            new_balance,
+            new_balance - old_balance
+        );
+    }
+
+    async fn operate_account_deposit_public(&mut self, acc_addr: AccountAddress, amount: u128) {
+        let old_balance = {
+            let acc_map_read_guard = self.storage.read().await;
+
+            let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
+
+            acc.balance
+        };
+
+        info!(
+            "Balance of {:?} now is {old_balance:?}",
+            hex::encode(acc_addr)
+        );
+
+        let resp = self.send_public_deposit(acc_addr, amount).await.unwrap();
+        info!("Response for public deposit is {resp:?}");
 
         info!("Awaiting new blocks");
         tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
@@ -564,88 +635,24 @@ impl NodeCore {
             acc.balance
         };
 
-        info!("New account public balance is {new_balance:?}");
+        info!(
+            "Balance of {:?} now is {new_balance:?}, delta is {:?}",
+            hex::encode(acc_addr),
+            new_balance - old_balance
+        );
     }
 
-    ///Deposit balance, make it private
-    pub async fn subscenario_2(&mut self) {
-        let acc_addr = self.create_new_account().await;
-
-        let resp = self.send_public_deposit(acc_addr, 100).await.unwrap();
-        info!("Response for public deposit is {resp:?}");
-
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
-
-        {
-            let acc_map_read_guard = self.storage.read().await;
-
-            let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
-            acc.log();
-
-            info!("New acconut public balance is {:?}", acc.balance);
-        };
-
+    async fn operate_account_send_shielded_one_receiver(
+        &mut self,
+        acc_addr_sender: AccountAddress,
+        acc_addr_rec: AccountAddress,
+        amount: u128,
+    ) {
         let (resp, new_utxo_hashes) = self
-            .send_shielded_send_tx(acc_addr, 100, vec![(100, acc_addr)])
+            .send_shielded_send_tx(acc_addr_sender, amount as u64, vec![(amount, acc_addr_rec)])
             .await
             .unwrap();
         info!("Response for send shielded is {resp:?}");
-
-        let new_utxo_hash = new_utxo_hashes[0].1;
-
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
-
-        let new_utxo = {
-            let mut write_guard = self.storage.write().await;
-
-            let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
-            acc.log();
-
-            acc.utxo_tree
-                .get_item(new_utxo_hash)
-                .unwrap()
-                .unwrap()
-                .clone()
-        };
-        new_utxo.log();
-
-        info!("User received new utxo {new_utxo:?}");
-    }
-
-    ///Mint utxo, privately send it to another user
-    pub async fn subscenario_3(&mut self) {
-        let acc_addr = self.create_new_account().await;
-
-        let (resp, new_utxo_hash, comm_gen_hash) =
-            self.send_private_mint_tx(acc_addr, 100).await.unwrap();
-        info!("Response for mint private is {resp:?}");
-
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
-
-        let new_utxo = {
-            let mut write_guard = self.storage.write().await;
-
-            let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
-            acc.log();
-
-            acc.utxo_tree
-                .get_item(new_utxo_hash)
-                .unwrap()
-                .unwrap()
-                .clone()
-        };
-        new_utxo.log();
-
-        let acc_addr_rec = self.create_new_account().await;
-
-        let (resp, new_utxo_hashes) = self
-            .send_private_send_tx(new_utxo, comm_gen_hash, vec![(100, acc_addr_rec)])
-            .await
-            .unwrap();
-        info!("Response for send deshielded is {resp:?}");
 
         let new_utxo_hash = new_utxo_hashes[0].1;
 
@@ -665,8 +672,269 @@ impl NodeCore {
                 .clone()
         };
         new_utxo.log();
+        info!(
+            "Account address is {:?} ,new utxo owner address is {:?}",
+            hex::encode(acc_addr_rec),
+            hex::encode(new_utxo.owner)
+        );
+        info!(
+            "Account {:?} got new utxo with amount {amount:?}",
+            hex::encode(acc_addr_rec)
+        );
+    }
 
-        info!("User {acc_addr_rec:?} received new utxo {new_utxo:?}");
+    async fn operate_account_send_private_one_receiver(
+        &mut self,
+        acc_addr_rec: AccountAddress,
+        utxo: UTXO,
+        comm_gen_hash: [u8; 32],
+    ) {
+        let amount = utxo.amount;
+
+        let (resp, new_utxo_hashes) = self
+            .send_private_send_tx(utxo, comm_gen_hash, vec![(amount, acc_addr_rec)])
+            .await
+            .unwrap();
+        info!("Response for send private is {resp:?}");
+
+        let new_utxo_hash = new_utxo_hashes[0].1;
+
+        info!("Awaiting new blocks");
+        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+
+        let new_utxo = {
+            let mut write_guard = self.storage.write().await;
+
+            let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
+            acc.log();
+
+            acc.utxo_tree
+                .get_item(new_utxo_hash)
+                .unwrap()
+                .unwrap()
+                .clone()
+        };
+        new_utxo.log();
+        info!(
+            "Account address is {:?} ,new utxo owner address is {:?}",
+            hex::encode(acc_addr_rec),
+            hex::encode(new_utxo.owner)
+        );
+        info!(
+            "Account {:?} got new utxo with amount {:?}",
+            hex::encode(acc_addr_rec),
+            new_utxo.amount
+        );
+    }
+
+    pub async fn split_utxo(
+        &self,
+        utxo: UTXO,
+        commitment_in: [u8; 32],
+        receivers: Vec<(u128, AccountAddress)>,
+        visibility_list: [bool; 3],
+    ) -> (Transaction, Vec<(AccountAddress, [u8; 32])>) {
+        let acc_map_read_guard = self.storage.read().await;
+
+        let accout = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
+
+        let nullifier = generate_nullifiers(
+            &utxo,
+            &accout
+                .key_holder
+                .utxo_secret_key_holder
+                .nullifier_secret_key
+                .to_bytes()
+                .to_vec(),
+        );
+
+        let (resulting_utxos, receipt) = prove_send_utxo(utxo, receivers);
+        let utxo_hashes = resulting_utxos
+            .iter()
+            .map(|(utxo, addr)| (addr.clone(), utxo.hash))
+            .collect();
+
+        let utxos: Vec<UTXO> = resulting_utxos
+            .iter()
+            .map(|(utxo, _)| utxo.clone())
+            .collect();
+
+        let ephm_key_holder = &accout.produce_ephemeral_key_holder();
+        ephm_key_holder.log();
+
+        let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
+
+        let encoded_data: Vec<(Vec<u8>, Vec<u8>)> = utxos
+            .iter()
+            .map(|utxo_enc| {
+                let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
+
+                let (ciphertext, nonce) = Account::encrypt_data(
+                    &ephm_key_holder,
+                    accout_enc.key_holder.viewing_public_key,
+                    &serde_json::to_vec(&utxo_enc).unwrap(),
+                );
+
+                (ciphertext, nonce.to_vec())
+            })
+            .collect();
+
+        let commitments = generate_commitments(&utxos);
+
+        let publication = ActionData::UTXOPublication(UTXOPublication {
+            utxos: utxos
+                .iter()
+                .enumerate()
+                .filter_map(|(id, item)| {
+                    if visibility_list[id] {
+                        Some(item.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        });
+
+        (
+            TransactionPayload {
+                tx_kind: TxKind::Shielded,
+                execution_input: vec![],
+                execution_output: serde_json::to_vec(&publication).unwrap(),
+                utxo_commitments_spent_hashes: vec![commitment_in],
+                utxo_commitments_created_hashes: commitments
+                    .clone()
+                    .into_iter()
+                    .map(|hash_data| hash_data.try_into().unwrap())
+                    .collect(),
+                nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
+                execution_proof_private: hex::encode(serde_json::to_vec(&receipt).unwrap()),
+                encoded_data,
+                ephemeral_pub_key: eph_pub_key.to_vec(),
+            }
+            .into(),
+            utxo_hashes,
+        )
+    }
+
+    pub async fn send_split_tx(
+        &self,
+        utxo: UTXO,
+        comm_hash: [u8; 32],
+        receivers: Vec<(u128, AccountAddress)>,
+        visibility_list: [bool; 3],
+    ) -> Result<(SendTxResponse, Vec<([u8; 32], [u8; 32])>, Vec<[u8; 32]>)> {
+        let point_before_prove = std::time::Instant::now();
+        let (tx, utxo_hashes) = self
+            .split_utxo(utxo, comm_hash, receivers, visibility_list)
+            .await;
+        tx.log();
+        let point_after_prove = std::time::Instant::now();
+
+        let timedelta = (point_after_prove - point_before_prove).as_millis();
+        info!("Send private utxo proof spent {timedelta:?} milliseconds");
+
+        let commitments = tx.utxo_commitments_created_hashes.clone();
+
+        Ok((
+            self.sequencer_client.send_tx(tx).await?,
+            utxo_hashes,
+            commitments,
+        ))
+    }
+
+    async fn operate_account_send_split_utxo(
+        &mut self,
+        addrs_receivers: [AccountAddress; 3],
+        utxo: UTXO,
+        comm_gen_hash: [u8; 32],
+        visibility_list: [bool; 3],
+    ) -> (Vec<UTXO>, Vec<[u8; 32]>) {
+        let (resp, new_utxo_hashes, commitments_hashes) = self
+            .send_split_tx(
+                utxo.clone(),
+                comm_gen_hash,
+                addrs_receivers
+                    .clone()
+                    .map(|addr| (utxo.amount / 3, addr))
+                    .to_vec(),
+                visibility_list,
+            )
+            .await
+            .unwrap();
+        info!("Response for send shielded is {resp:?}");
+
+        info!("Awaiting new blocks");
+        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+
+        let new_utxos: Vec<UTXO> = {
+            let mut write_guard = self.storage.write().await;
+
+            new_utxo_hashes
+                .into_iter()
+                .map(|(acc_addr_rec, new_utxo_hash)| {
+                    let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
+
+                    let new_utxo = acc
+                        .utxo_tree
+                        .get_item(new_utxo_hash)
+                        .unwrap()
+                        .unwrap()
+                        .clone();
+                    new_utxo.log();
+
+                    info!(
+                        "Account address is {:?} ,new utxo owner address is {:?}",
+                        hex::encode(acc_addr_rec),
+                        hex::encode(new_utxo.owner)
+                    );
+                    info!(
+                        "Account {:?} got new utxo with amount {:?}",
+                        hex::encode(acc_addr_rec),
+                        new_utxo.amount
+                    );
+
+                    new_utxo
+                })
+                .collect()
+        };
+
+        (new_utxos, commitments_hashes)
+    }
+
+    ///Mint utxo, make it public
+    pub async fn subscenario_1(&mut self) {
+        let acc_addr = self.create_new_account().await;
+
+        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await;
+
+        self.operate_account_send_deshielded_one_receiver(
+            acc_addr,
+            acc_addr,
+            new_utxo,
+            comm_gen_hash,
+        )
+        .await;
+    }
+
+    ///Deposit balance, make it private
+    pub async fn subscenario_2(&mut self) {
+        let acc_addr = self.create_new_account().await;
+
+        self.operate_account_deposit_public(acc_addr, 100).await;
+
+        self.operate_account_send_shielded_one_receiver(acc_addr, acc_addr, 100)
+            .await;
+    }
+
+    ///Mint utxo, privately send it to another user
+    pub async fn subscenario_3(&mut self) {
+        let acc_addr = self.create_new_account().await;
+        let acc_addr_rec = self.create_new_account().await;
+
+        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await;
+
+        self.operate_account_send_private_one_receiver(acc_addr_rec, new_utxo, comm_gen_hash)
+            .await;
     }
 
     ///Deposit balance, shielded send it to another user
@@ -674,46 +942,10 @@ impl NodeCore {
         let acc_addr = self.create_new_account().await;
         let acc_addr_rec = self.create_new_account().await;
 
-        let resp = self.send_public_deposit(acc_addr, 100).await.unwrap();
-        info!("Response for public deposit is {resp:?}");
+        self.operate_account_deposit_public(acc_addr, 100).await;
 
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
-
-        {
-            let acc_map_read_guard = self.storage.read().await;
-            let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
-            acc.log();
-
-            info!("New acconut public balance is {:?}", acc.balance);
-        }
-
-        let (resp, new_utxo_hashes) = self
-            .send_shielded_send_tx(acc_addr, 100, vec![(100, acc_addr_rec)])
-            .await
-            .unwrap();
-        info!("Response for send shielded is {resp:?}");
-
-        let new_utxo_hash = new_utxo_hashes[0].1;
-
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
-
-        let new_utxo = {
-            let mut write_guard = self.storage.write().await;
-
-            let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
-            acc.log();
-
-            acc.utxo_tree
-                .get_item(new_utxo_hash)
-                .unwrap()
-                .unwrap()
-                .clone()
-        };
-        new_utxo.log();
-
-        info!("User {acc_addr_rec:?} received new utxo {new_utxo:?}");
+        self.operate_account_send_shielded_one_receiver(acc_addr, acc_addr_rec, 100)
+            .await;
     }
 
     ///Mint utxo, deshielded send it to another user
@@ -721,42 +953,50 @@ impl NodeCore {
         let acc_addr = self.create_new_account().await;
         let acc_addr_rec = self.create_new_account().await;
 
-        let (resp, new_utxo_hash, comm_gen_hash) =
-            self.send_private_mint_tx(acc_addr, 100).await.unwrap();
-        info!("Response for mint private is {resp:?}");
+        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await;
 
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+        self.operate_account_send_deshielded_one_receiver(
+            acc_addr,
+            acc_addr_rec,
+            new_utxo,
+            comm_gen_hash,
+        )
+        .await;
+    }
 
-        let new_utxo = {
-            let mut write_guard = self.storage.write().await;
+    ///First complex scenario.
+    /// Creating accounts A, B, C, D.
+    /// Minting UTXO for A, splitting it between B, C, D.
+    /// Variable `visibility_list` decides, which of actions will be visible on blockchain.
+    /// Variable `publication index` decides, who of B, C or D moves its UTXO into public state.
+    pub async fn scenario_1(&mut self, visibility_list: [bool; 3], publication_index: usize) {
+        let acc_addr_sender = self.create_new_account().await;
 
-            let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
-            acc.log();
+        let acc_addr_rec_1 = self.create_new_account().await;
+        let acc_addr_rec_2 = self.create_new_account().await;
+        let acc_addr_rec_3 = self.create_new_account().await;
 
-            acc.utxo_tree
-                .get_item(new_utxo_hash)
-                .unwrap()
-                .unwrap()
-                .clone()
-        };
-        new_utxo.log();
+        let addrs_receivers = [acc_addr_rec_1, acc_addr_rec_2, acc_addr_rec_3];
 
-        let resp = self
-            .send_deshielded_send_tx(new_utxo, comm_gen_hash, vec![(100, acc_addr_rec)])
-            .await
-            .unwrap();
-        info!("Response for send deshielded is {resp:?}");
+        let (new_utxo, comm_gen_hash) = self
+            .operate_account_mint_private(acc_addr_sender, 100)
+            .await;
 
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+        let (new_utxos, comm_gen_hashes) = self
+            .operate_account_send_split_utxo(
+                addrs_receivers,
+                new_utxo,
+                comm_gen_hash,
+                visibility_list,
+            )
+            .await;
 
-        {
-            let read_guard = self.storage.read().await;
-            let acc_rec = read_guard.acc_map.get(&acc_addr_rec).unwrap();
-            acc_rec.log();
-
-            info!("New account public balance is {:?}", acc_rec.balance);
-        }
+        self.operate_account_send_deshielded_one_receiver(
+            addrs_receivers[publication_index],
+            addrs_receivers[publication_index],
+            new_utxos[publication_index].clone(),
+            comm_gen_hashes[publication_index],
+        )
+        .await;
     }
 }

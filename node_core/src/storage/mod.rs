@@ -1,20 +1,15 @@
 use std::{collections::HashMap, path::Path};
 
 use accounts::account_core::{Account, AccountAddress};
-use accounts_store::NodeAccountsStore;
 use anyhow::Result;
 use block_store::NodeBlockStore;
 use elliptic_curve::group::GroupEncoding;
 use k256::AffinePoint;
 use storage::{
     block::Block,
-    merkle_tree_public::{
-        merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
-        TreeHashType,
-    },
+    merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
     nullifier::UTXONullifier,
     nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
-    transaction::Transaction,
     utxo_commitment::UTXOCommitment,
 };
 use utxo::utxo_core::UTXO;
@@ -85,6 +80,7 @@ impl NodeChainStore {
                                     acc_mut.balance.saturating_sub(action.amount as u64);
                             }
                         }
+                        _ => {}
                     }
                 }
             }

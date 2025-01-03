@@ -97,11 +97,23 @@ impl Transaction {
         info!("Transaction tx_kind is {:?}", self.tx_kind);
         info!(
             "Transaction execution_input is {:?}",
-            hex::encode(self.execution_input.clone())
+            {
+                if let Ok(vall) = serde_json::from_slice::<serde_json::Value>(&self.execution_input) {
+                    vall
+                } else {
+                    serde_json::Value::Null
+                }
+            }
         );
         info!(
             "Transaction execution_output is {:?}",
-            hex::encode(self.execution_output.clone())
+            {
+                if let Ok(vall) = serde_json::from_slice::<serde_json::Value>(&self.execution_output) {
+                    vall
+                } else {
+                    serde_json::Value::Null
+                }
+            }
         );
         info!(
             "Transaction utxo_commitments_spent_hashes is {:?}",
