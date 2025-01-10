@@ -60,6 +60,57 @@ pub struct ShowTransactionRequest {
     pub tx_hash: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteDepositPublicBalanceRequest {
+    pub account_addr: String,
+    pub amount: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteMintPrivateUTXORequest {
+    pub account_addr: String,
+    pub amount: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteMintPrivateUTXOMultipleAssetsRequest {
+    pub account_addr: String,
+    pub num_of_assets: usize,
+    pub amount: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSendPrivateUTXORequest {
+    pub account_addr_sender: String,
+    pub account_addr_receiver: String,
+    pub utxo_hash: String,
+    pub utxo_commitment: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSendShieldedUTXORequest {
+    pub account_addr_sender: String,
+    pub account_addr_receiver: String,
+    pub amount: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSendDeshieldedBalanceRequest {
+    pub account_addr_sender: String,
+    pub account_addr_receiver: String,
+    pub utxo_hash: String,
+    pub utxo_commitment: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSplitUTXORequest {
+    pub account_addr_sender: String,
+    pub account_addr_receivers: [String; 3],
+    pub visibility_list: [bool; 3],
+    pub utxo_hash: String,
+    pub utxo_commitment: String,
+}
+
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
 parse_request!(GetBlockDataRequest);
@@ -68,9 +119,18 @@ parse_request!(ExecuteSubscenarioRequest);
 parse_request!(ExecuteScenarioSplitRequest);
 parse_request!(ExecuteScenarioMultipleSendRequest);
 parse_request!(GetLastBlockRequest);
+
 parse_request!(ShowAccountPublicBalanceRequest);
 parse_request!(ShowAccountUTXORequest);
 parse_request!(ShowTransactionRequest);
+
+parse_request!(WriteDepositPublicBalanceRequest);
+parse_request!(WriteMintPrivateUTXORequest);
+parse_request!(WriteMintPrivateUTXOMultipleAssetsRequest);
+parse_request!(WriteSendPrivateUTXORequest);
+parse_request!(WriteSendShieldedUTXORequest);
+parse_request!(WriteSendDeshieldedBalanceRequest);
+parse_request!(WriteSplitUTXORequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -141,4 +201,51 @@ pub struct ShowTransactionResponse {
     pub utxo_nullifiers_created_hashes: Vec<String>,
     pub encoded_data: Vec<(String, String)>,
     pub ephemeral_pub_key: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteDepositPublicBalanceResponse {
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UTXOShortEssentialStruct {
+    pub hash: String,
+    pub commitment_hash: String,
+    pub asset: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteMintPrivateUTXOResponse {
+    pub status: String,
+    pub utxo: UTXOShortEssentialStruct,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteMintPrivateUTXOMultipleAssetsResponse {
+    pub status: String,
+    pub utxos: Vec<UTXOShortEssentialStruct>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSendPrivateUTXOResponse {
+    pub status: String,
+    pub utxo_result: UTXOShortEssentialStruct,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSendShieldedUTXOResponse {
+    pub status: String,
+    pub utxo_result: UTXOShortEssentialStruct,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSendDeshieldedUTXOResponse {
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WriteSendSplitUTXOResponse {
+    pub status: String,
+    pub utxo_results: Vec<UTXOShortEssentialStruct>,
 }

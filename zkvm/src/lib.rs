@@ -2,83 +2,144 @@ use accounts::account_core::AccountAddress;
 use risc0_zkvm::{default_executor, default_prover, sha::Digest, ExecutorEnv, Receipt};
 use utxo::utxo_core::{UTXOPayload, UTXO};
 
-pub fn prove_mint_utxo(amount_to_mint: u128, owner: AccountAddress) -> (UTXO, Receipt) {
+#[derive(Debug, thiserror::Error)]
+pub enum ExecutionFailureKind {
+    #[error("Failed to write into builder err: {0:?}")]
+    WriteError(anyhow::Error),
+    #[error("Failed to build builder err: {0:?}")]
+    BuilderError(anyhow::Error),
+    #[error("Failed prove execution err: {0:?}")]
+    ProveError(anyhow::Error),
+    #[error("Failed to decode data from VM: {0:?}")]
+    DecodeError(#[from] risc0_zkvm::serde::Error),
+    #[error("Inputs amounts does not match outputs")]
+    AmountMismatchError,
+}
+
+impl ExecutionFailureKind {
+    pub fn write_error(err: anyhow::Error) -> Self {
+        Self::WriteError(err)
+    }
+
+    pub fn builder_error(err: anyhow::Error) -> Self {
+        Self::BuilderError(err)
+    }
+
+    pub fn prove_error(err: anyhow::Error) -> Self {
+        Self::ProveError(err)
+    }
+}
+
+pub fn prove_mint_utxo(
+    amount_to_mint: u128,
+    owner: AccountAddress,
+) -> Result<(UTXO, Receipt), ExecutionFailureKind> {
     let mut builder = ExecutorEnv::builder();
 
-    builder.write(&amount_to_mint).unwrap();
-    builder.write(&owner).unwrap();
+    builder
+        .write(&amount_to_mint)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&owner)
+        .map_err(ExecutionFailureKind::write_error)?;
 
-    let env = builder.build().unwrap();
+    let env = builder
+        .build()
+        .map_err(ExecutionFailureKind::builder_error)?;
 
     let prover = default_prover();
 
     let receipt = prover
         .prove(env, test_methods::MINT_UTXO_ELF)
-        .unwrap()
+        .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: UTXOPayload = receipt.journal.decode().unwrap();
+    let digest: UTXOPayload = receipt.journal.decode()?;
 
-    (UTXO::create_utxo_from_payload(digest), receipt)
+    Ok((UTXO::create_utxo_from_payload(digest), receipt))
 }
 
 pub fn prove_send_utxo(
     spent_utxo: UTXO,
     owners_parts: Vec<(u128, AccountAddress)>,
-) -> (Vec<(UTXO, AccountAddress)>, Receipt) {
+) -> Result<(Vec<(UTXO, AccountAddress)>, Receipt), ExecutionFailureKind> {
+    let cumulative_spent = owners_parts.iter().fold(0, |acc, item| acc + item.0);
+
+    if cumulative_spent != spent_utxo.amount {
+        return Err(ExecutionFailureKind::AmountMismatchError);
+    }
+
     let mut builder = ExecutorEnv::builder();
     let utxo_payload = spent_utxo.into_payload();
 
-    builder.write(&utxo_payload).unwrap();
-    builder.write(&owners_parts).unwrap();
+    builder
+        .write(&utxo_payload)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&owners_parts)
+        .map_err(ExecutionFailureKind::write_error)?;
 
-    let env = builder.build().unwrap();
+    let env = builder
+        .build()
+        .map_err(ExecutionFailureKind::builder_error)?;
 
     let prover = default_prover();
 
     let receipt = prover
         .prove(env, test_methods::SEND_UTXO_ELF)
-        .unwrap()
+        .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode().unwrap();
+    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode()?;
 
-    (
+    Ok((
         digest
             .into_iter()
             .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload), addr))
             .collect(),
         receipt,
-    )
+    ))
 }
 
 pub fn prove_send_utxo_multiple_assets_one_receiver(
     spent_utxos: Vec<UTXO>,
     number_to_send: usize,
     receiver: AccountAddress,
-) -> (Vec<UTXO>, Vec<UTXO>, Receipt) {
+) -> Result<(Vec<UTXO>, Vec<UTXO>, Receipt), ExecutionFailureKind> {
+    if number_to_send > spent_utxos.len() {
+        return Err(ExecutionFailureKind::AmountMismatchError);
+    }
+
     let mut builder = ExecutorEnv::builder();
     let utxo_payload: Vec<UTXOPayload> = spent_utxos
         .into_iter()
         .map(|spent_utxo| spent_utxo.into_payload())
         .collect();
 
-    builder.write(&utxo_payload).unwrap();
-    builder.write(&number_to_send).unwrap();
-    builder.write(&receiver).unwrap();
+    builder
+        .write(&utxo_payload)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&number_to_send)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&receiver)
+        .map_err(ExecutionFailureKind::write_error)?;
 
-    let env = builder.build().unwrap();
+    let env = builder
+        .build()
+        .map_err(ExecutionFailureKind::builder_error)?;
 
     let prover = default_prover();
 
     let receipt = prover
         .prove(env, test_methods::SEND_UTXO_MULTIPLE_ASSETS_ELF)
-        .unwrap()
+        .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: (Vec<UTXOPayload>, Vec<UTXOPayload>) = receipt.journal.decode().unwrap();
+    let digest: (Vec<UTXOPayload>, Vec<UTXOPayload>) = receipt.journal.decode()?;
 
-    (
+    Ok((
         digest
             .0
             .into_iter()
@@ -90,14 +151,20 @@ pub fn prove_send_utxo_multiple_assets_one_receiver(
             .map(|payload| UTXO::create_utxo_from_payload(payload))
             .collect(),
         receipt,
-    )
+    ))
 }
 
 pub fn prove_send_utxo_shielded(
     owner: AccountAddress,
     amount: u128,
     owners_parts: Vec<(u128, AccountAddress)>,
-) -> (Vec<(UTXO, AccountAddress)>, Receipt) {
+) -> Result<(Vec<(UTXO, AccountAddress)>, Receipt), ExecutionFailureKind> {
+    let cumulative_spent = owners_parts.iter().fold(0, |acc, item| acc + item.0);
+
+    if cumulative_spent != amount {
+        return Err(ExecutionFailureKind::AmountMismatchError);
+    }
+
     let temp_utxo_to_spend = UTXO::create_utxo_from_payload(UTXOPayload {
         owner,
         asset: vec![],
@@ -108,88 +175,114 @@ pub fn prove_send_utxo_shielded(
 
     let mut builder = ExecutorEnv::builder();
 
-    builder.write(&utxo_payload).unwrap();
-    builder.write(&owners_parts).unwrap();
+    builder
+        .write(&utxo_payload)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&owners_parts)
+        .map_err(ExecutionFailureKind::write_error)?;
 
-    let env = builder.build().unwrap();
+    let env = builder
+        .build()
+        .map_err(ExecutionFailureKind::builder_error)?;
 
     let prover = default_prover();
 
     let receipt = prover
         .prove(env, test_methods::SEND_UTXO_ELF)
-        .unwrap()
+        .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode().unwrap();
+    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode()?;
 
-    (
+    Ok((
         digest
             .into_iter()
             .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload), addr))
             .collect(),
         receipt,
-    )
+    ))
 }
 
 pub fn prove_send_utxo_deshielded(
     spent_utxo: UTXO,
     owners_parts: Vec<(u128, AccountAddress)>,
-) -> (Vec<(u128, AccountAddress)>, Receipt) {
+) -> Result<(Vec<(u128, AccountAddress)>, Receipt), ExecutionFailureKind> {
+    let cumulative_spent = owners_parts.iter().fold(0, |acc, item| acc + item.0);
+
+    if cumulative_spent != spent_utxo.amount {
+        return Err(ExecutionFailureKind::AmountMismatchError);
+    }
+
     let mut builder = ExecutorEnv::builder();
     let utxo_payload = spent_utxo.into_payload();
 
-    builder.write(&utxo_payload).unwrap();
-    builder.write(&owners_parts).unwrap();
+    builder
+        .write(&utxo_payload)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&owners_parts)
+        .map_err(ExecutionFailureKind::write_error)?;
 
-    let env = builder.build().unwrap();
+    let env = builder
+        .build()
+        .map_err(ExecutionFailureKind::builder_error)?;
 
     let prover = default_prover();
 
     let receipt = prover
         .prove(env, test_methods::SEND_UTXO_ELF)
-        .unwrap()
+        .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode().unwrap();
+    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode()?;
 
-    (
+    Ok((
         digest
             .into_iter()
             .map(|(payload, addr)| (payload.amount, addr))
             .collect(),
         receipt,
-    )
+    ))
 }
 
 pub fn prove_mint_utxo_multiple_assets(
     amount_to_mint: u128,
     number_of_assets: usize,
     owner: AccountAddress,
-) -> (Vec<UTXO>, Receipt) {
+) -> Result<(Vec<UTXO>, Receipt), ExecutionFailureKind> {
     let mut builder = ExecutorEnv::builder();
 
-    builder.write(&amount_to_mint).unwrap();
-    builder.write(&number_of_assets).unwrap();
-    builder.write(&owner).unwrap();
+    builder
+        .write(&amount_to_mint)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&number_of_assets)
+        .map_err(ExecutionFailureKind::write_error)?;
+    builder
+        .write(&owner)
+        .map_err(ExecutionFailureKind::write_error)?;
 
-    let env = builder.build().unwrap();
+    let env = builder
+        .build()
+        .map_err(ExecutionFailureKind::builder_error)?;
 
     let prover = default_prover();
 
     let receipt = prover
         .prove(env, test_methods::MINT_UTXO_MULTIPLE_ASSETS_ELF)
-        .unwrap()
+        .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<UTXOPayload> = receipt.journal.decode().unwrap();
+    let digest: Vec<UTXOPayload> = receipt.journal.decode()?;
 
-    (
+    Ok((
         digest
             .into_iter()
             .map(UTXO::create_utxo_from_payload)
             .collect(),
         receipt,
-    )
+    ))
 }
 
 pub fn execute_mint_utxo(amount_to_mint: u128, owner: AccountAddress) -> UTXO {

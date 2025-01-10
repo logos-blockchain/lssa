@@ -26,7 +26,7 @@ use tokio::{sync::RwLock, task::JoinHandle};
 use utxo::utxo_core::{Asset, UTXO};
 use zkvm::{
     prove_mint_utxo, prove_mint_utxo_multiple_assets, prove_send_utxo, prove_send_utxo_deshielded,
-    prove_send_utxo_multiple_assets_one_receiver, prove_send_utxo_shielded,
+    prove_send_utxo_multiple_assets_one_receiver, prove_send_utxo_shielded, ExecutionFailureKind,
 };
 
 pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
@@ -165,8 +165,8 @@ impl NodeCore {
         &self,
         acc: AccountAddress,
         amount: u128,
-    ) -> (Transaction, [u8; 32]) {
-        let (utxo, receipt) = prove_mint_utxo(amount, acc);
+    ) -> Result<(Transaction, [u8; 32]), ExecutionFailureKind> {
+        let (utxo, receipt) = prove_mint_utxo(amount, acc)?;
         let result_hash = utxo.hash;
 
         let acc_map_read_guard = self.storage.read().await;
@@ -186,7 +186,7 @@ impl NodeCore {
 
         let comm = generate_commitments(&vec![utxo]);
 
-        (
+        Ok((
             TransactionPayload {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
@@ -203,7 +203,7 @@ impl NodeCore {
             }
             .into(),
             result_hash,
-        )
+        ))
     }
 
     pub async fn mint_utxo_multiple_assets_private(
@@ -211,8 +211,8 @@ impl NodeCore {
         acc: AccountAddress,
         amount: u128,
         number_of_assets: usize,
-    ) -> (Transaction, Vec<[u8; 32]>) {
-        let (utxos, receipt) = prove_mint_utxo_multiple_assets(amount, number_of_assets, acc);
+    ) -> Result<(Transaction, Vec<[u8; 32]>), ExecutionFailureKind> {
+        let (utxos, receipt) = prove_mint_utxo_multiple_assets(amount, number_of_assets, acc)?;
         let result_hashes = utxos.iter().map(|utxo| utxo.hash).collect();
 
         let acc_map_read_guard = self.storage.read().await;
@@ -238,7 +238,7 @@ impl NodeCore {
 
         let comm = generate_commitments(&utxos);
 
-        (
+        Ok((
             TransactionPayload {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
@@ -255,7 +255,7 @@ impl NodeCore {
             }
             .into(),
             result_hashes,
-        )
+        ))
     }
 
     pub fn deposit_money_public(&self, acc: AccountAddress, amount: u128) -> Transaction {
@@ -281,7 +281,7 @@ impl NodeCore {
         utxo: UTXO,
         commitment_in: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
-    ) -> (Transaction, Vec<(AccountAddress, [u8; 32])>) {
+    ) -> Result<(Transaction, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let accout = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
@@ -296,7 +296,7 @@ impl NodeCore {
                 .to_vec(),
         );
 
-        let (resulting_utxos, receipt) = prove_send_utxo(utxo, receivers);
+        let (resulting_utxos, receipt) = prove_send_utxo(utxo, receivers)?;
         let utxo_hashes = resulting_utxos
             .iter()
             .map(|(utxo, addr)| (addr.clone(), utxo.hash))
@@ -329,7 +329,7 @@ impl NodeCore {
 
         let commitments = generate_commitments(&utxos);
 
-        (
+        Ok((
             TransactionPayload {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
@@ -346,7 +346,7 @@ impl NodeCore {
             }
             .into(),
             utxo_hashes,
-        )
+        ))
     }
 
     pub async fn transfer_utxo_multiple_assets_private(
@@ -355,7 +355,7 @@ impl NodeCore {
         commitments_in: Vec<[u8; 32]>,
         number_to_send: usize,
         receiver: AccountAddress,
-    ) -> (Transaction, Vec<[u8; 32]>, Vec<[u8; 32]>) {
+    ) -> Result<(Transaction, Vec<[u8; 32]>, Vec<[u8; 32]>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let accout = acc_map_read_guard.acc_map.get(&utxos[0].owner).unwrap();
@@ -374,7 +374,7 @@ impl NodeCore {
             .collect();
 
         let (resulting_utxos_receiver, resulting_utxos_not_spent, receipt) =
-            prove_send_utxo_multiple_assets_one_receiver(utxos, number_to_send, receiver);
+            prove_send_utxo_multiple_assets_one_receiver(utxos, number_to_send, receiver)?;
 
         let utxo_hashes_receiver = resulting_utxos_receiver
             .iter()
@@ -428,7 +428,7 @@ impl NodeCore {
 
         commitments.extend(commitments_1);
 
-        (
+        Ok((
             TransactionPayload {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
@@ -446,7 +446,7 @@ impl NodeCore {
             .into(),
             utxo_hashes_receiver,
             utxo_hashes_not_spent,
-        )
+        ))
     }
 
     pub async fn transfer_balance_shielded(
@@ -454,7 +454,7 @@ impl NodeCore {
         acc: AccountAddress,
         balance: u64,
         receivers: Vec<(u128, AccountAddress)>,
-    ) -> (Transaction, Vec<(AccountAddress, [u8; 32])>) {
+    ) -> Result<(Transaction, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let accout = acc_map_read_guard.acc_map.get(&acc).unwrap();
@@ -486,7 +486,7 @@ impl NodeCore {
                 .to_vec(),
         );
 
-        let (resulting_utxos, receipt) = prove_send_utxo_shielded(acc, balance as u128, receivers);
+        let (resulting_utxos, receipt) = prove_send_utxo_shielded(acc, balance as u128, receivers)?;
         let utxo_hashes = resulting_utxos
             .iter()
             .map(|(utxo, addr)| (addr.clone(), utxo.hash))
@@ -519,7 +519,7 @@ impl NodeCore {
 
         let commitments = generate_commitments(&utxos);
 
-        (
+        Ok((
             TransactionPayload {
                 tx_kind: TxKind::Shielded,
                 execution_input: serde_json::to_vec(&ActionData::SendMoneyShieldedTx(
@@ -542,7 +542,7 @@ impl NodeCore {
             }
             .into(),
             utxo_hashes,
-        )
+        ))
     }
 
     pub async fn transfer_utxo_deshielded(
@@ -550,7 +550,7 @@ impl NodeCore {
         utxo: UTXO,
         comm_gen_hash: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
-    ) -> Transaction {
+    ) -> Result<Transaction, ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let commitment_in = acc_map_read_guard
@@ -571,9 +571,9 @@ impl NodeCore {
                 .to_vec(),
         );
 
-        let (resulting_balances, receipt) = prove_send_utxo_deshielded(utxo, receivers);
+        let (resulting_balances, receipt) = prove_send_utxo_deshielded(utxo, receivers)?;
 
-        TransactionPayload {
+        Ok(TransactionPayload {
             tx_kind: TxKind::Deshielded,
             execution_input: serde_json::to_vec(&ActionData::SendMoneyDeshieldedTx(
                 SendMoneyDeshieldedTx {
@@ -589,7 +589,7 @@ impl NodeCore {
             encoded_data: vec![],
             ephemeral_pub_key: vec![],
         }
-        .into()
+        .into())
     }
 
     pub async fn send_private_mint_tx(
@@ -598,7 +598,7 @@ impl NodeCore {
         amount: u128,
     ) -> Result<(SendTxResponse, [u8; 32], [u8; 32])> {
         let point_before_prove = std::time::Instant::now();
-        let (tx, utxo_hash) = self.mint_utxo_private(acc, amount).await;
+        let (tx, utxo_hash) = self.mint_utxo_private(acc, amount).await?;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -623,7 +623,7 @@ impl NodeCore {
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes) = self
             .mint_utxo_multiple_assets_private(acc, amount, number_of_assets)
-            .await;
+            .await?;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -657,7 +657,9 @@ impl NodeCore {
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Result<(SendTxResponse, Vec<([u8; 32], [u8; 32])>)> {
         let point_before_prove = std::time::Instant::now();
-        let (tx, utxo_hashes) = self.transfer_utxo_private(utxo, comm_hash, receivers).await;
+        let (tx, utxo_hashes) = self
+            .transfer_utxo_private(utxo, comm_hash, receivers)
+            .await?;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -677,7 +679,7 @@ impl NodeCore {
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes_received, utxo_hashes_not_spent) = self
             .transfer_utxo_multiple_assets_private(utxos, comm_hashes, number_to_send, receiver)
-            .await;
+            .await?;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -698,7 +700,9 @@ impl NodeCore {
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Result<(SendTxResponse, Vec<([u8; 32], [u8; 32])>)> {
         let point_before_prove = std::time::Instant::now();
-        let (tx, utxo_hashes) = self.transfer_balance_shielded(acc, amount, receivers).await;
+        let (tx, utxo_hashes) = self
+            .transfer_balance_shielded(acc, amount, receivers)
+            .await?;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -717,7 +721,7 @@ impl NodeCore {
         let point_before_prove = std::time::Instant::now();
         let tx = self
             .transfer_utxo_deshielded(utxo, comm_gen_hash, receivers)
-            .await;
+            .await?;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -727,13 +731,13 @@ impl NodeCore {
         Ok(self.sequencer_client.send_tx(tx).await?)
     }
 
-    async fn operate_account_mint_private(
+    pub async fn operate_account_mint_private(
         &mut self,
         acc_addr: AccountAddress,
         amount: u128,
-    ) -> (UTXO, [u8; 32]) {
+    ) -> Result<(UTXO, [u8; 32])> {
         let (resp, new_utxo_hash, comm_gen_hash) =
-            self.send_private_mint_tx(acc_addr, amount).await.unwrap();
+            self.send_private_mint_tx(acc_addr, amount).await?;
         info!("Response for mint private is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -762,19 +766,18 @@ impl NodeCore {
             hex::encode(acc_addr)
         );
 
-        (new_utxo, comm_gen_hash)
+        Ok((new_utxo, comm_gen_hash))
     }
 
-    async fn operate_account_mint_multiple_assets_private(
+    pub async fn operate_account_mint_multiple_assets_private(
         &mut self,
         acc_addr: AccountAddress,
         amount: u128,
         number_of_assets: usize,
-    ) -> (Vec<UTXO>, Vec<[u8; 32]>) {
+    ) -> Result<(Vec<UTXO>, Vec<[u8; 32]>)> {
         let (resp, new_utxo_hashes, comm_gen_hashes) = self
             .send_private_mint_multiple_assets_tx(acc_addr, amount, number_of_assets)
-            .await
-            .unwrap();
+            .await?;
         info!("Response for mint multiple assets private is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -812,16 +815,16 @@ impl NodeCore {
                 .collect()
         };
 
-        (new_utxos, comm_gen_hashes)
+        Ok((new_utxos, comm_gen_hashes))
     }
 
-    async fn operate_account_send_deshielded_one_receiver(
+    pub async fn operate_account_send_deshielded_one_receiver(
         &mut self,
         acc_addr_sender: AccountAddress,
         acc_addr_rec: AccountAddress,
         utxo: UTXO,
         comm_gen_hash: [u8; 32],
-    ) {
+    ) -> Result<()> {
         let amount = utxo.amount;
 
         let old_balance = {
@@ -839,8 +842,7 @@ impl NodeCore {
 
         let resp = self
             .send_deshielded_send_tx(utxo, comm_gen_hash, vec![(amount, acc_addr_rec)])
-            .await
-            .unwrap();
+            .await?;
         info!("Response for send deshielded is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -860,9 +862,15 @@ impl NodeCore {
             new_balance,
             new_balance - old_balance
         );
+
+        Ok(())
     }
 
-    async fn operate_account_deposit_public(&mut self, acc_addr: AccountAddress, amount: u128) {
+    pub async fn operate_account_deposit_public(
+        &mut self,
+        acc_addr: AccountAddress,
+        amount: u128,
+    ) -> Result<()> {
         let old_balance = {
             let acc_map_read_guard = self.storage.read().await;
 
@@ -876,7 +884,7 @@ impl NodeCore {
             hex::encode(acc_addr)
         );
 
-        let resp = self.send_public_deposit(acc_addr, amount).await.unwrap();
+        let resp = self.send_public_deposit(acc_addr, amount).await?;
         info!("Response for public deposit is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -895,18 +903,19 @@ impl NodeCore {
             hex::encode(acc_addr),
             new_balance - old_balance
         );
+
+        Ok(())
     }
 
-    async fn operate_account_send_shielded_one_receiver(
+    pub async fn operate_account_send_shielded_one_receiver(
         &mut self,
         acc_addr_sender: AccountAddress,
         acc_addr_rec: AccountAddress,
         amount: u128,
-    ) {
+    ) -> Result<UTXO> {
         let (resp, new_utxo_hashes) = self
             .send_shielded_send_tx(acc_addr_sender, amount as u64, vec![(amount, acc_addr_rec)])
-            .await
-            .unwrap();
+            .await?;
         info!("Response for send shielded is {resp:?}");
 
         let new_utxo_hash = new_utxo_hashes[0].1;
@@ -936,20 +945,21 @@ impl NodeCore {
             "Account {:?} got new utxo with amount {amount:?}",
             hex::encode(acc_addr_rec)
         );
+
+        Ok(new_utxo)
     }
 
-    async fn operate_account_send_private_one_receiver(
+    pub async fn operate_account_send_private_one_receiver(
         &mut self,
         acc_addr_rec: AccountAddress,
         utxo: UTXO,
         comm_gen_hash: [u8; 32],
-    ) {
+    ) -> Result<UTXO> {
         let amount = utxo.amount;
 
         let (resp, new_utxo_hashes) = self
             .send_private_send_tx(utxo, comm_gen_hash, vec![(amount, acc_addr_rec)])
-            .await
-            .unwrap();
+            .await?;
         info!("Response for send private is {resp:?}");
 
         let new_utxo_hash = new_utxo_hashes[0].1;
@@ -980,16 +990,18 @@ impl NodeCore {
             hex::encode(acc_addr_rec),
             new_utxo.amount
         );
+
+        Ok(new_utxo)
     }
 
-    async fn operate_account_send_private_multiple_assets_one_receiver(
+    pub async fn operate_account_send_private_multiple_assets_one_receiver(
         &mut self,
         acc_addr: AccountAddress,
         acc_addr_rec: AccountAddress,
         utxos: Vec<UTXO>,
         comm_gen_hashes: Vec<[u8; 32]>,
         number_to_send: usize,
-    ) {
+    ) -> Result<()> {
         let (resp, new_utxo_hashes_rec, new_utxo_hashes_not_sp) = self
             .send_private_multiple_assets_send_tx(
                 utxos,
@@ -997,8 +1009,7 @@ impl NodeCore {
                 number_to_send,
                 acc_addr_rec,
             )
-            .await
-            .unwrap();
+            .await?;
         info!("Response for send private multiple assets is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -1057,6 +1068,8 @@ impl NodeCore {
                 );
             }
         }
+
+        Ok(())
     }
 
     pub async fn split_utxo(
@@ -1065,7 +1078,7 @@ impl NodeCore {
         commitment_in: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
         visibility_list: [bool; 3],
-    ) -> (Transaction, Vec<(AccountAddress, [u8; 32])>) {
+    ) -> Result<(Transaction, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let accout = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
@@ -1080,7 +1093,7 @@ impl NodeCore {
                 .to_vec(),
         );
 
-        let (resulting_utxos, receipt) = prove_send_utxo(utxo, receivers);
+        let (resulting_utxos, receipt) = prove_send_utxo(utxo, receivers)?;
         let utxo_hashes = resulting_utxos
             .iter()
             .map(|(utxo, addr)| (addr.clone(), utxo.hash))
@@ -1127,7 +1140,7 @@ impl NodeCore {
                 .collect(),
         });
 
-        (
+        Ok((
             TransactionPayload {
                 tx_kind: TxKind::Shielded,
                 execution_input: vec![],
@@ -1145,7 +1158,7 @@ impl NodeCore {
             }
             .into(),
             utxo_hashes,
-        )
+        ))
     }
 
     pub async fn send_split_tx(
@@ -1158,7 +1171,7 @@ impl NodeCore {
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes) = self
             .split_utxo(utxo, comm_hash, receivers, visibility_list)
-            .await;
+            .await?;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -1174,13 +1187,13 @@ impl NodeCore {
         ))
     }
 
-    async fn operate_account_send_split_utxo(
+    pub async fn operate_account_send_split_utxo(
         &mut self,
         addrs_receivers: [AccountAddress; 3],
         utxo: UTXO,
         comm_gen_hash: [u8; 32],
         visibility_list: [bool; 3],
-    ) -> (Vec<UTXO>, Vec<[u8; 32]>) {
+    ) -> Result<(Vec<UTXO>, Vec<[u8; 32]>)> {
         let (resp, new_utxo_hashes, commitments_hashes) = self
             .send_split_tx(
                 utxo.clone(),
@@ -1191,8 +1204,7 @@ impl NodeCore {
                     .to_vec(),
                 visibility_list,
             )
-            .await
-            .unwrap();
+            .await?;
         info!("Response for send shielded is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -1230,14 +1242,14 @@ impl NodeCore {
                 .collect()
         };
 
-        (new_utxos, commitments_hashes)
+        Ok((new_utxos, commitments_hashes))
     }
 
     ///Mint utxo, make it public
-    pub async fn subscenario_1(&mut self) {
+    pub async fn subscenario_1(&mut self) -> Result<()> {
         let acc_addr = self.create_new_account().await;
 
-        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await;
+        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await?;
 
         self.operate_account_send_deshielded_one_receiver(
             acc_addr,
@@ -1245,47 +1257,55 @@ impl NodeCore {
             new_utxo,
             comm_gen_hash,
         )
-        .await;
+        .await?;
+
+        Ok(())
     }
 
     ///Deposit balance, make it private
-    pub async fn subscenario_2(&mut self) {
+    pub async fn subscenario_2(&mut self) -> Result<()> {
         let acc_addr = self.create_new_account().await;
 
-        self.operate_account_deposit_public(acc_addr, 100).await;
+        self.operate_account_deposit_public(acc_addr, 100).await?;
 
         self.operate_account_send_shielded_one_receiver(acc_addr, acc_addr, 100)
-            .await;
+            .await?;
+
+        Ok(())
     }
 
     ///Mint utxo, privately send it to another user
-    pub async fn subscenario_3(&mut self) {
+    pub async fn subscenario_3(&mut self) -> Result<()> {
         let acc_addr = self.create_new_account().await;
         let acc_addr_rec = self.create_new_account().await;
 
-        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await;
+        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await?;
 
         self.operate_account_send_private_one_receiver(acc_addr_rec, new_utxo, comm_gen_hash)
-            .await;
+            .await?;
+
+        Ok(())
     }
 
     ///Deposit balance, shielded send it to another user
-    pub async fn subscenario_4(&mut self) {
+    pub async fn subscenario_4(&mut self) -> Result<()> {
         let acc_addr = self.create_new_account().await;
         let acc_addr_rec = self.create_new_account().await;
 
-        self.operate_account_deposit_public(acc_addr, 100).await;
+        self.operate_account_deposit_public(acc_addr, 100).await?;
 
         self.operate_account_send_shielded_one_receiver(acc_addr, acc_addr_rec, 100)
-            .await;
+            .await?;
+
+        Ok(())
     }
 
     ///Mint utxo, deshielded send it to another user
-    pub async fn subscenario_5(&mut self) {
+    pub async fn subscenario_5(&mut self) -> Result<()> {
         let acc_addr = self.create_new_account().await;
         let acc_addr_rec = self.create_new_account().await;
 
-        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await;
+        let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await?;
 
         self.operate_account_send_deshielded_one_receiver(
             acc_addr,
@@ -1293,7 +1313,9 @@ impl NodeCore {
             new_utxo,
             comm_gen_hash,
         )
-        .await;
+        .await?;
+
+        Ok(())
     }
 
     ///First complex scenario.
@@ -1301,7 +1323,11 @@ impl NodeCore {
     /// Minting UTXO for A, splitting it between B, C, D.
     /// Variable `visibility_list` decides, which of actions will be visible on blockchain.
     /// Variable `publication index` decides, who of B, C or D moves its UTXO into public state.
-    pub async fn scenario_1(&mut self, visibility_list: [bool; 3], publication_index: usize) {
+    pub async fn scenario_1(
+        &mut self,
+        visibility_list: [bool; 3],
+        publication_index: usize,
+    ) -> Result<()> {
         let acc_addr_sender = self.create_new_account().await;
 
         let acc_addr_rec_1 = self.create_new_account().await;
@@ -1311,8 +1337,8 @@ impl NodeCore {
         let addrs_receivers = [acc_addr_rec_1, acc_addr_rec_2, acc_addr_rec_3];
 
         let (new_utxo, comm_gen_hash) = self
-            .operate_account_mint_private(acc_addr_sender, 100)
-            .await;
+            .operate_account_mint_private(acc_addr_sender, 99)
+            .await?;
 
         let (new_utxos, comm_gen_hashes) = self
             .operate_account_send_split_utxo(
@@ -1321,7 +1347,7 @@ impl NodeCore {
                 comm_gen_hash,
                 visibility_list,
             )
-            .await;
+            .await?;
 
         self.operate_account_send_deshielded_one_receiver(
             addrs_receivers[publication_index],
@@ -1329,17 +1355,23 @@ impl NodeCore {
             new_utxos[publication_index].clone(),
             comm_gen_hashes[publication_index],
         )
-        .await;
+        .await?;
+
+        Ok(())
     }
 
     ///Mint number of different assets with same amount for account
-    pub async fn scenario_2(&mut self, number_of_assets: usize, number_to_send: usize) {
+    pub async fn scenario_2(
+        &mut self,
+        number_of_assets: usize,
+        number_to_send: usize,
+    ) -> Result<()> {
         let acc_addr_sender = self.create_new_account().await;
         let acc_addr_receiver = self.create_new_account().await;
 
         let (utxos, comm_gen_hashes) = self
             .operate_account_mint_multiple_assets_private(acc_addr_sender, 100, number_of_assets)
-            .await;
+            .await?;
 
         self.operate_account_send_private_multiple_assets_one_receiver(
             acc_addr_sender,
@@ -1348,6 +1380,15 @@ impl NodeCore {
             comm_gen_hashes,
             number_to_send,
         )
-        .await;
+        .await?;
+
+        Ok(())
     }
+}
+
+pub fn generate_commitments_helper(input_utxos: &[UTXO]) -> Vec<[u8; 32]> {
+    generate_commitments(input_utxos)
+        .into_iter()
+        .map(|comm_raw| comm_raw.try_into().unwrap())
+        .collect()
 }

@@ -5414,6 +5414,7 @@ dependencies = [
  "serde_json",
  "storage",
  "test-methods",
+ "thiserror",
  "utxo",
 ]
 

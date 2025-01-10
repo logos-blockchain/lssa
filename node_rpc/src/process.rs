@@ -1,6 +1,7 @@
 use std::sync::atomic::Ordering;
 
 use actix_web::Error as HttpError;
+use node_core::generate_commitments_helper;
 use serde_json::Value;
 
 use rpc_primitives::{
@@ -21,7 +22,14 @@ use crate::{
             GetLastBlockRequest, GetLastBlockResponse, RegisterAccountRequest,
             RegisterAccountResponse, SendTxRequest, ShowAccountPublicBalanceRequest,
             ShowAccountPublicBalanceResponse, ShowAccountUTXORequest, ShowAccountUTXOResponse,
-            ShowTransactionRequest, ShowTransactionResponse,
+            ShowTransactionRequest, ShowTransactionResponse, UTXOShortEssentialStruct,
+            WriteDepositPublicBalanceRequest, WriteDepositPublicBalanceResponse,
+            WriteMintPrivateUTXOMultipleAssetsRequest, WriteMintPrivateUTXOMultipleAssetsResponse,
+            WriteMintPrivateUTXORequest, WriteMintPrivateUTXOResponse,
+            WriteSendDeshieldedBalanceRequest, WriteSendDeshieldedUTXOResponse,
+            WriteSendPrivateUTXORequest, WriteSendPrivateUTXOResponse,
+            WriteSendShieldedUTXORequest, WriteSendShieldedUTXOResponse,
+            WriteSendSplitUTXOResponse, WriteSplitUTXORequest,
         },
     },
 };
@@ -52,11 +60,11 @@ impl JsonHandler {
             let mut store = self.node_chain_store.lock().await;
 
             match req.scenario_id {
-                1 => store.subscenario_1().await,
-                2 => store.subscenario_2().await,
-                3 => store.subscenario_3().await,
-                4 => store.subscenario_4().await,
-                5 => store.subscenario_5().await,
+                1 => store.subscenario_1().await?,
+                2 => store.subscenario_2().await?,
+                3 => store.subscenario_3().await?,
+                4 => store.subscenario_4().await?,
+                5 => store.subscenario_5().await?,
                 _ => return Err(RpcErr(RpcError::invalid_params("Scenario id not found"))),
             }
         }
@@ -79,7 +87,7 @@ impl JsonHandler {
 
             store
                 .scenario_1(req.visibility_list, req.publication_index)
-                .await;
+                .await?;
         }
 
         let helperstruct = ExecuteScenarioSplitResponse {
@@ -100,7 +108,7 @@ impl JsonHandler {
 
             store
                 .scenario_2(req.number_of_assets, req.number_to_send)
-                .await;
+                .await?;
         }
 
         let helperstruct = ExecuteScenarioMultipleSendResponse {
@@ -121,26 +129,6 @@ impl JsonHandler {
 
         let helperstruct = RegisterAccountResponse {
             status: hex::encode(acc_addr),
-        };
-
-        respond(helperstruct)
-    }
-
-    async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
-        let req = SendTxRequest::parse(Some(request.params))?;
-
-        {
-            let guard = self.node_chain_store.lock().await;
-
-            guard
-                .sequencer_client
-                .send_tx(req.transaction)
-                .await
-                .map_err(cast_seq_client_error_into_rpc_error)?;
-        }
-
-        let helperstruct = RegisterAccountResponse {
-            status: "success".to_string(),
         };
 
         respond(helperstruct)
@@ -333,12 +321,425 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
+    pub async fn process_write_deposit_public_balance(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
+        let req = WriteDepositPublicBalanceRequest::parse(Some(request.params))?;
+
+        let acc_addr_hex_dec = hex::decode(req.account_addr.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode account address from hex string".to_string())
+        })?;
+
+        let acc_addr: [u8; 32] = acc_addr_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        {
+            let mut cover_guard = self.node_chain_store.lock().await;
+
+            cover_guard
+                .operate_account_deposit_public(acc_addr, req.amount as u128)
+                .await?;
+        };
+
+        let helperstruct = WriteDepositPublicBalanceResponse {
+            status: "success".to_string(),
+        };
+
+        respond(helperstruct)
+    }
+
+    pub async fn process_write_mint_utxo(&self, request: Request) -> Result<Value, RpcErr> {
+        let req = WriteMintPrivateUTXORequest::parse(Some(request.params))?;
+
+        let acc_addr_hex_dec = hex::decode(req.account_addr.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode account address from hex string".to_string())
+        })?;
+
+        let acc_addr: [u8; 32] = acc_addr_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        let (utxo, commitment_hash) = {
+            let mut cover_guard = self.node_chain_store.lock().await;
+
+            cover_guard
+                .operate_account_mint_private(acc_addr, req.amount as u128)
+                .await?
+        };
+
+        let helperstruct = WriteMintPrivateUTXOResponse {
+            status: "success".to_string(),
+            utxo: UTXOShortEssentialStruct {
+                hash: hex::encode(utxo.hash),
+                commitment_hash: hex::encode(commitment_hash),
+                asset: utxo.asset,
+            },
+        };
+
+        respond(helperstruct)
+    }
+
+    pub async fn process_write_mint_utxo_multiple_assets(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
+        let req = WriteMintPrivateUTXOMultipleAssetsRequest::parse(Some(request.params))?;
+
+        let acc_addr_hex_dec = hex::decode(req.account_addr.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode account address from hex string".to_string())
+        })?;
+
+        let acc_addr: [u8; 32] = acc_addr_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        let (utxos, commitment_hashes) = {
+            let mut cover_guard = self.node_chain_store.lock().await;
+
+            cover_guard
+                .operate_account_mint_multiple_assets_private(
+                    acc_addr,
+                    req.amount as u128,
+                    req.num_of_assets,
+                )
+                .await?
+        };
+
+        let helperstruct = WriteMintPrivateUTXOMultipleAssetsResponse {
+            status: "success".to_string(),
+            utxos: utxos
+                .into_iter()
+                .zip(commitment_hashes)
+                .map(|(utxo, comm_hash)| UTXOShortEssentialStruct {
+                    hash: hex::encode(utxo.hash),
+                    commitment_hash: hex::encode(comm_hash),
+                    asset: utxo.asset,
+                })
+                .collect(),
+        };
+
+        respond(helperstruct)
+    }
+
+    pub async fn process_write_send_private_utxo(&self, request: Request) -> Result<Value, RpcErr> {
+        let req = WriteSendPrivateUTXORequest::parse(Some(request.params))?;
+
+        let acc_addr_hex_dec_sender =
+            hex::decode(req.account_addr_sender.clone()).map_err(|_| {
+                RpcError::parse_error(
+                    "Failed to decode account address from hex string".to_string(),
+                )
+            })?;
+
+        let acc_addr_sender: [u8; 32] = acc_addr_hex_dec_sender.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        let acc_addr_hex_dec = hex::decode(req.account_addr_receiver.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode account address from hex string".to_string())
+        })?;
+
+        let acc_addr: [u8; 32] = acc_addr_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        let utxo_hash_hex_dec = hex::decode(req.utxo_hash.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode utxo hash from hex string".to_string())
+        })?;
+
+        let utxo_hash: [u8; 32] = utxo_hash_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse utxo hash from bytes".to_string())
+        })?;
+
+        let comm_hash_hex_dec = hex::decode(req.utxo_commitment.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode commitment hash from hex string".to_string())
+        })?;
+
+        let comm_hash: [u8; 32] = comm_hash_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse commitment hash from bytes".to_string())
+        })?;
+
+        let new_utxo_rec = {
+            let mut cover_guard = self.node_chain_store.lock().await;
+
+            let utxo_to_send = {
+                let mut under_guard = cover_guard.storage.write().await;
+
+                let acc = under_guard
+                    .acc_map
+                    .get_mut(&acc_addr_sender)
+                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+
+                acc.utxo_tree
+                    .get_item(utxo_hash)
+                    .map_err(|err| {
+                        RpcError::new_internal_error(None, &format!("DB fetch failure {err:?}"))
+                    })?
+                    .ok_or(RpcError::new_internal_error(
+                        None,
+                        "UTXO does not exist in tree",
+                    ))?
+                    .clone()
+            };
+
+            cover_guard
+                .operate_account_send_private_one_receiver(acc_addr, utxo_to_send, comm_hash)
+                .await?
+        };
+
+        let helperstruct = WriteSendPrivateUTXOResponse {
+            status: "success".to_string(),
+            utxo_result: UTXOShortEssentialStruct {
+                hash: hex::encode(new_utxo_rec.hash),
+                asset: new_utxo_rec.asset.clone(),
+                commitment_hash: hex::encode(generate_commitments_helper(&vec![new_utxo_rec])[0]),
+            },
+        };
+
+        respond(helperstruct)
+    }
+
+    pub async fn process_write_send_shielded_utxo(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
+        let req = WriteSendShieldedUTXORequest::parse(Some(request.params))?;
+
+        let acc_addr_hex_dec_sender =
+            hex::decode(req.account_addr_sender.clone()).map_err(|_| {
+                RpcError::parse_error(
+                    "Failed to decode account address sender from hex string".to_string(),
+                )
+            })?;
+
+        let acc_addr_sender: [u8; 32] = acc_addr_hex_dec_sender.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address sender from bytes".to_string())
+        })?;
+
+        let acc_addr_hex_dec_rec =
+            hex::decode(req.account_addr_receiver.clone()).map_err(|_| {
+                RpcError::parse_error(
+                    "Failed to decode account address receiver from hex string".to_string(),
+                )
+            })?;
+
+        let acc_addr_rec: [u8; 32] = acc_addr_hex_dec_rec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address receiver from bytes".to_string())
+        })?;
+
+        let new_utxo_rec = {
+            let mut cover_guard = self.node_chain_store.lock().await;
+
+            cover_guard
+                .operate_account_send_shielded_one_receiver(
+                    acc_addr_sender,
+                    acc_addr_rec,
+                    req.amount as u128,
+                )
+                .await?
+        };
+
+        let helperstruct = WriteSendShieldedUTXOResponse {
+            status: "success".to_string(),
+            utxo_result: UTXOShortEssentialStruct {
+                hash: hex::encode(new_utxo_rec.hash),
+                asset: new_utxo_rec.asset.clone(),
+                commitment_hash: hex::encode(generate_commitments_helper(&vec![new_utxo_rec])[0]),
+            },
+        };
+
+        respond(helperstruct)
+    }
+
+    pub async fn process_write_send_deshielded_utxo(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
+        let req = WriteSendDeshieldedBalanceRequest::parse(Some(request.params))?;
+
+        let acc_addr_hex_dec_sender =
+            hex::decode(req.account_addr_sender.clone()).map_err(|_| {
+                RpcError::parse_error(
+                    "Failed to decode account address from hex string".to_string(),
+                )
+            })?;
+
+        let acc_addr_sender: [u8; 32] = acc_addr_hex_dec_sender.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        let acc_addr_hex_dec = hex::decode(req.account_addr_receiver.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode account address from hex string".to_string())
+        })?;
+
+        let acc_addr: [u8; 32] = acc_addr_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        let utxo_hash_hex_dec = hex::decode(req.utxo_hash.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode utxo hash from hex string".to_string())
+        })?;
+
+        let utxo_hash: [u8; 32] = utxo_hash_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse utxo hash from bytes".to_string())
+        })?;
+
+        let comm_hash_hex_dec = hex::decode(req.utxo_commitment.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode commitment hash from hex string".to_string())
+        })?;
+
+        let comm_hash: [u8; 32] = comm_hash_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse commitment hash from bytes".to_string())
+        })?;
+
+        {
+            let mut cover_guard = self.node_chain_store.lock().await;
+
+            let utxo_to_send = {
+                let mut under_guard = cover_guard.storage.write().await;
+
+                let acc = under_guard
+                    .acc_map
+                    .get_mut(&acc_addr_sender)
+                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+
+                acc.utxo_tree
+                    .get_item(utxo_hash)
+                    .map_err(|err| {
+                        RpcError::new_internal_error(None, &format!("DB fetch failure {err:?}"))
+                    })?
+                    .ok_or(RpcError::new_internal_error(
+                        None,
+                        "UTXO does not exist in tree",
+                    ))?
+                    .clone()
+            };
+
+            cover_guard
+                .operate_account_send_deshielded_one_receiver(
+                    acc_addr_sender,
+                    acc_addr,
+                    utxo_to_send,
+                    comm_hash,
+                )
+                .await?
+        };
+
+        let helperstruct = WriteSendDeshieldedUTXOResponse {
+            status: "success".to_string(),
+        };
+
+        respond(helperstruct)
+    }
+
+    pub async fn process_write_send_split_utxo(&self, request: Request) -> Result<Value, RpcErr> {
+        let req = WriteSplitUTXORequest::parse(Some(request.params))?;
+
+        let acc_addr_hex_dec_sender =
+            hex::decode(req.account_addr_sender.clone()).map_err(|_| {
+                RpcError::parse_error(
+                    "Failed to decode account address from hex string".to_string(),
+                )
+            })?;
+
+        let acc_addr_sender: [u8; 32] = acc_addr_hex_dec_sender.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse account address from bytes".to_string())
+        })?;
+
+        let acc_addresses = {
+            let mut res_addrs = vec![];
+
+            for item in req.account_addr_receivers {
+                let hex_dec_item = hex::decode(item).map_err(|_| {
+                    RpcError::parse_error(
+                        "Failed to decode account address from hex string".to_string(),
+                    )
+                })?;
+
+                let dec_item = hex_dec_item.try_into().map_err(|_| {
+                    RpcError::parse_error(
+                        "Failed to decode account address from hex string".to_string(),
+                    )
+                })?;
+
+                res_addrs.push(dec_item);
+            }
+
+            res_addrs.try_into().unwrap()
+        };
+
+        let utxo_hash_hex_dec = hex::decode(req.utxo_hash.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode utxo hash from hex string".to_string())
+        })?;
+
+        let utxo_hash: [u8; 32] = utxo_hash_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse utxo hash from bytes".to_string())
+        })?;
+
+        let comm_hash_hex_dec = hex::decode(req.utxo_commitment.clone()).map_err(|_| {
+            RpcError::parse_error("Failed to decode commitment hash from hex string".to_string())
+        })?;
+
+        let comm_hash: [u8; 32] = comm_hash_hex_dec.try_into().map_err(|_| {
+            RpcError::parse_error("Failed to parse commitment hash from bytes".to_string())
+        })?;
+
+        let (new_utxos, commitment_hashes) = {
+            let mut cover_guard = self.node_chain_store.lock().await;
+
+            let utxo_to_send = {
+                let mut under_guard = cover_guard.storage.write().await;
+
+                let acc = under_guard
+                    .acc_map
+                    .get_mut(&acc_addr_sender)
+                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+
+                acc.utxo_tree
+                    .get_item(utxo_hash)
+                    .map_err(|err| {
+                        RpcError::new_internal_error(None, &format!("DB fetch failure {err:?}"))
+                    })?
+                    .ok_or(RpcError::new_internal_error(
+                        None,
+                        "UTXO does not exist in tree",
+                    ))?
+                    .clone()
+            };
+
+            cover_guard
+                .operate_account_send_split_utxo(
+                    acc_addresses,
+                    utxo_to_send,
+                    comm_hash,
+                    req.visibility_list,
+                )
+                .await?
+        };
+
+        let helperstruct = WriteSendSplitUTXOResponse {
+            status: "success".to_string(),
+            utxo_results: new_utxos
+                .into_iter()
+                .zip(commitment_hashes)
+                .map(|(utxo, comm_hash)| UTXOShortEssentialStruct {
+                    hash: hex::encode(utxo.hash),
+                    commitment_hash: hex::encode(comm_hash),
+                    asset: utxo.asset,
+                })
+                .collect(),
+        };
+
+        respond(helperstruct)
+    }
+
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             //Todo : Add handling of more JSON RPC methods
-            "register_account" => self.process_register_account(request).await,
+            "write_register_account" => self.process_register_account(request).await,
             "execute_subscenario" => self.process_request_execute_subscenario(request).await,
-            "send_tx" => self.process_send_tx(request).await,
             "get_block" => self.process_get_block_data(request).await,
             "get_last_block" => self.process_get_last_block(request).await,
             "execute_scenario_split" => self.process_request_execute_scenario_split(request).await,
@@ -350,7 +751,7 @@ impl JsonHandler {
                 self.process_show_account_public_balance(request).await
             }
             "show_account_utxo" => self.process_show_account_utxo_request(request).await,
-            "show_trasnaction" => self.process_show_transaction(request).await,
+            "show_transaction" => self.process_show_transaction(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
