@@ -752,6 +752,17 @@ impl JsonHandler {
             }
             "show_account_utxo" => self.process_show_account_utxo_request(request).await,
             "show_transaction" => self.process_show_transaction(request).await,
+            "write_deposit_public_balance" => {
+                self.process_write_deposit_public_balance(request).await
+            }
+            "write_mint_utxo" => self.process_write_mint_utxo(request).await,
+            "write_mint_utxo_multiple_assets" => {
+                self.process_write_mint_utxo_multiple_assets(request).await
+            }
+            "write_send_utxo_private" => self.process_write_send_private_utxo(request).await,
+            "write_send_utxo_shielded" => self.process_write_send_shielded_utxo(request).await,
+            "write_send_utxo_deshielded" => self.process_write_send_deshielded_utxo(request).await,
+            "write_split_utxo" => self.process_write_send_split_utxo(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
