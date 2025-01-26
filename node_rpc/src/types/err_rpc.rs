@@ -53,5 +53,9 @@ pub fn cast_seq_client_error_into_rpc_error(seq_cli_err: SequencerClientError) -
     match seq_cli_err {
         SequencerClientError::SerdeError(_) => RpcError::serialization_error(&error_string),
         SequencerClientError::HTTPError(_) => RpcError::new_internal_error(None, &error_string),
+        SequencerClientError::InternalError(err) => RpcError::new_internal_error(
+            err.error.data,
+            &serde_json::to_string(&err.error.error_struct).unwrap_or(String::default()),
+        ),
     }
 }

@@ -1,3 +1,4 @@
+use rpc_primitives::errors::RpcError;
 use serde::{Deserialize, Serialize};
 use storage::{block::Block, transaction::Transaction};
 
@@ -72,5 +73,12 @@ impl SequencerRpcRequest {
 pub struct SequencerRpcResponse {
     pub jsonrpc: String,
     pub result: serde_json::Value,
+    pub id: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SequencerRpcError {
+    pub jsonrpc: String,
+    pub error: RpcError,
     pub id: u64,
 }

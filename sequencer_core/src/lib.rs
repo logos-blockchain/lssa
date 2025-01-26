@@ -57,9 +57,9 @@ impl SequencerCore {
         }
     }
 
-    fn execute_check_transaction_on_state(
+    pub fn transaction_pre_check(
         &mut self,
-        tx: TransactionMempool,
+        tx: &Transaction,
     ) -> Result<(), TransactionMalformationErrorKind> {
         let Transaction {
             hash,
@@ -69,7 +69,7 @@ impl SequencerCore {
             ref utxo_commitments_created_hashes,
             ref nullifier_created_hashes,
             ..
-        } = tx.tx;
+        } = tx;
 
         //Sanity check
         match tx_kind {
@@ -80,7 +80,7 @@ impl SequencerCore {
                     //Public transactions can not make private operations.
                     return Err(
                         TransactionMalformationErrorKind::PublicTransactionChangedPrivateData {
-                            tx: hash,
+                            tx: *hash,
                         },
                     );
                 }
@@ -92,7 +92,7 @@ impl SequencerCore {
                     //between public and private state.
                     return Err(
                         TransactionMalformationErrorKind::PrivateTransactionChangedPublicData {
-                            tx: hash,
+                            tx: *hash,
                         },
                     );
                 }
@@ -101,7 +101,7 @@ impl SequencerCore {
         };
 
         //Tree checks
-        let tx_tree_check = self.store.pub_tx_store.get_tx(hash).is_some();
+        let tx_tree_check = self.store.pub_tx_store.get_tx(*hash).is_some();
         let nullifier_tree_check = nullifier_created_hashes
             .iter()
             .map(|nullifier_hash| {
@@ -122,20 +122,45 @@ impl SequencerCore {
             .any(|check| check);
 
         if tx_tree_check {
-            return Err(TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: hash });
+            return Err(TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: *hash });
         }
 
         if nullifier_tree_check {
             return Err(
-                TransactionMalformationErrorKind::NullifierAlreadyPresentInTree { tx: hash },
+                TransactionMalformationErrorKind::NullifierAlreadyPresentInTree { tx: *hash },
             );
         }
 
         if utxo_commitments_check {
             return Err(
-                TransactionMalformationErrorKind::UTXOCommitmentAlreadyPresentInTree { tx: hash },
+                TransactionMalformationErrorKind::UTXOCommitmentAlreadyPresentInTree { tx: *hash },
             );
         }
+
+        Ok(())
+    }
+
+    pub fn push_tx_into_mempool_pre_check(
+        &mut self,
+        item: TransactionMempool,
+    ) -> Result<(), TransactionMalformationErrorKind> {
+        self.transaction_pre_check(&item.tx)?;
+
+        self.mempool.push_item(item);
+
+        Ok(())
+    }
+
+    fn execute_check_transaction_on_state(
+        &mut self,
+        tx: TransactionMempool,
+    ) -> Result<(), TransactionMalformationErrorKind> {
+        let Transaction {
+            hash,
+            ref utxo_commitments_created_hashes,
+            ref nullifier_created_hashes,
+            ..
+        } = tx.tx;
 
         for utxo_comm in utxo_commitments_created_hashes {
             self.store

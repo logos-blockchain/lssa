@@ -43,8 +43,7 @@ impl JsonHandler {
             let message_inner = self
                 .process_request_internal(request)
                 .await
-                .map_err(|e| e.0)
-                .map_err(rpc_error_responce_inverter);
+                .map_err(|e| e.0);
             Ok(Message::response(id, message_inner))
         } else {
             Ok(Message::error(RpcError::parse_error(

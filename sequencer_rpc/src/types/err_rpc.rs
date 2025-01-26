@@ -1,6 +1,7 @@
 use log::debug;
 
 use rpc_primitives::errors::{RpcError, RpcParseError};
+use sequencer_core::TransactionMalformationErrorKind;
 
 pub struct RpcErr(pub RpcError);
 
@@ -37,6 +38,15 @@ impl RpcErrKind for serde_json::Error {
 impl RpcErrKind for RpcErrInternal {
     fn into_rpc_err(self) -> RpcError {
         RpcError::new_internal_error(None, &format!("{self:#?}"))
+    }
+}
+
+impl RpcErrKind for TransactionMalformationErrorKind {
+    fn into_rpc_err(self) -> RpcError {
+        RpcError::new_internal_error(
+            Some(serde_json::to_value(self).unwrap()),
+            "transaction not accepted",
+        )
     }
 }
 

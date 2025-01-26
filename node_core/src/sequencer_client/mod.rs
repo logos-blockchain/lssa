@@ -3,7 +3,7 @@ use anyhow::Result;
 use json::{
     GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
     RegisterAccountRequest, RegisterAccountResponse, SendTxRequest, SendTxResponse,
-    SequencerRpcRequest, SequencerRpcResponse,
+    SequencerRpcError, SequencerRpcRequest, SequencerRpcResponse,
 };
 use k256::elliptic_curve::group::GroupEncoding;
 use reqwest::Client;
@@ -26,6 +26,8 @@ pub enum SequencerClientError {
     HTTPError(reqwest::Error),
     #[error("Serde error")]
     SerdeError(serde_json::Error),
+    #[error("Internal error")]
+    InternalError(SequencerRpcError),
 }
 
 impl From<reqwest::Error> for SequencerClientError {
@@ -37,6 +39,12 @@ impl From<reqwest::Error> for SequencerClientError {
 impl From<serde_json::Error> for SequencerClientError {
     fn from(value: serde_json::Error) -> Self {
         SequencerClientError::SerdeError(value)
+    }
+}
+
+impl From<SequencerRpcError> for SequencerClientError {
+    fn from(value: SequencerRpcError) -> Self {
+        SequencerClientError::InternalError(value)
     }
 }
 
@@ -62,9 +70,16 @@ impl SequencerClient {
 
         let call_res = call_builder.json(&request).send().await?;
 
-        let response = call_res.json::<SequencerRpcResponse>().await?;
+        let response_vall = call_res.json::<Value>().await?;
 
-        Ok(response.result)
+        if let Ok(response) = serde_json::from_value::<SequencerRpcResponse>(response_vall.clone())
+        {
+            Ok(response.result)
+        } else {
+            let err_resp = serde_json::from_value::<SequencerRpcError>(response_vall)?;
+
+            Err(err_resp.into())
+        }
     }
 
     pub async fn get_block(

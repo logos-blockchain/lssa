@@ -1,5 +1,7 @@
 use actix_web::Error as HttpError;
-use sequencer_core::sequecer_store::accounts_store::AccountPublicData;
+use sequencer_core::{
+    sequecer_store::accounts_store::AccountPublicData, TransactionMalformationErrorKind,
+};
 use serde_json::Value;
 
 use rpc_primitives::{
@@ -8,13 +10,10 @@ use rpc_primitives::{
     parser::RpcRequest,
 };
 
-use crate::{
-    rpc_error_responce_inverter,
-    types::rpc_structs::{
-        GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
-        GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse,
-        RegisterAccountRequest, RegisterAccountResponse, SendTxRequest, SendTxResponse,
-    },
+use crate::types::rpc_structs::{
+    GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
+    GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse, RegisterAccountRequest,
+    RegisterAccountResponse, SendTxRequest, SendTxResponse,
 };
 
 use super::{respond, types::err_rpc::RpcErr, JsonHandler};
@@ -26,8 +25,7 @@ impl JsonHandler {
             let message_inner = self
                 .process_request_internal(request)
                 .await
-                .map_err(|e| e.0)
-                .map_err(rpc_error_responce_inverter);
+                .map_err(|e| e.0);
             Ok(Message::response(id, message_inner))
         } else {
             Ok(Message::error(RpcError::parse_error(
@@ -74,7 +72,7 @@ impl JsonHandler {
         {
             let mut state = self.sequencer_state.lock().await;
 
-            state.mempool.push_item(send_tx_req.transaction);
+            state.push_tx_into_mempool_pre_check(send_tx_req.transaction)?;
         }
 
         let helperstruct = SendTxResponse {
