@@ -281,5 +281,26 @@ mod tests {
         }
     }
 
+    fn create_dummy_transaction(
+        hash: TreeHashType, 
+        nullifier_created_hashes: Vec<[u8; 32]>,
+        utxo_commitments_spent_hashes: Vec<[u8; 32]>,
+        utxo_commitments_created_hashes: Vec<[u8; 32]>,
+    ) -> Transaction {
+        Transaction {
+            hash,
+            tx_kind: TxKind::Private,
+            execution_input: vec![],
+            execution_output: vec![],
+            utxo_commitments_spent_hashes,
+            utxo_commitments_created_hashes,
+            nullifier_created_hashes,
+            execution_proof_private: "dummy_proof".to_string(),
+            encoded_data: vec![],
+            ephemeral_pub_key: vec![10, 11, 12],
+        }
+    }
+
+
 
 }
