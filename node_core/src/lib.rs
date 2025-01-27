@@ -146,6 +146,16 @@ impl NodeCore {
         })
     }
 
+    pub async fn get_roots(&self) -> [[u8; 32]; 3] {
+        let storage = self.storage.read().await;
+        //All roots are non-None after start of node main loop
+        [
+            storage.nullifier_store.curr_root.unwrap(),
+            storage.utxo_commitments_store.get_root().unwrap(),
+            storage.pub_tx_store.get_root().unwrap(),
+        ]
+    }
+
     pub async fn create_new_account(&mut self) -> AccountAddress {
         let account = Account::new();
         account.log();
@@ -597,6 +607,9 @@ impl NodeCore {
         acc: AccountAddress,
         amount: u128,
     ) -> Result<(SendTxResponse, [u8; 32], [u8; 32])> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hash) = self.mint_utxo_private(acc, amount).await?;
         tx.log();
@@ -608,7 +621,7 @@ impl NodeCore {
         info!("Mint utxo proof spent {timedelta:?} milliseconds");
 
         Ok((
-            self.sequencer_client.send_tx(tx).await?,
+            self.sequencer_client.send_tx(tx, tx_roots).await?,
             utxo_hash,
             commitment_generated_hash,
         ))
@@ -620,6 +633,9 @@ impl NodeCore {
         amount: u128,
         number_of_assets: usize,
     ) -> Result<(SendTxResponse, Vec<[u8; 32]>, Vec<[u8; 32]>)> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes) = self
             .mint_utxo_multiple_assets_private(acc, amount, number_of_assets)
@@ -633,7 +649,7 @@ impl NodeCore {
         info!("Mint utxo proof spent {timedelta:?} milliseconds");
 
         Ok((
-            self.sequencer_client.send_tx(tx).await?,
+            self.sequencer_client.send_tx(tx, tx_roots).await?,
             utxo_hashes,
             commitment_generated_hashes,
         ))
@@ -644,10 +660,13 @@ impl NodeCore {
         acc: AccountAddress,
         amount: u128,
     ) -> Result<SendTxResponse> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let tx = self.deposit_money_public(acc, amount);
         tx.log();
 
-        Ok(self.sequencer_client.send_tx(tx).await?)
+        Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
     }
 
     pub async fn send_private_send_tx(
@@ -656,6 +675,9 @@ impl NodeCore {
         comm_hash: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Result<(SendTxResponse, Vec<([u8; 32], [u8; 32])>)> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes) = self
             .transfer_utxo_private(utxo, comm_hash, receivers)
@@ -666,7 +688,10 @@ impl NodeCore {
         let timedelta = (point_after_prove - point_before_prove).as_millis();
         info!("Send private utxo proof spent {timedelta:?} milliseconds");
 
-        Ok((self.sequencer_client.send_tx(tx).await?, utxo_hashes))
+        Ok((
+            self.sequencer_client.send_tx(tx, tx_roots).await?,
+            utxo_hashes,
+        ))
     }
 
     pub async fn send_private_multiple_assets_send_tx(
@@ -676,6 +701,9 @@ impl NodeCore {
         number_to_send: usize,
         receiver: AccountAddress,
     ) -> Result<(SendTxResponse, Vec<[u8; 32]>, Vec<[u8; 32]>)> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes_received, utxo_hashes_not_spent) = self
             .transfer_utxo_multiple_assets_private(utxos, comm_hashes, number_to_send, receiver)
@@ -687,7 +715,7 @@ impl NodeCore {
         info!("Send private utxo proof spent {timedelta:?} milliseconds");
 
         Ok((
-            self.sequencer_client.send_tx(tx).await?,
+            self.sequencer_client.send_tx(tx, tx_roots).await?,
             utxo_hashes_received,
             utxo_hashes_not_spent,
         ))
@@ -699,6 +727,9 @@ impl NodeCore {
         amount: u64,
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Result<(SendTxResponse, Vec<([u8; 32], [u8; 32])>)> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes) = self
             .transfer_balance_shielded(acc, amount, receivers)
@@ -709,7 +740,10 @@ impl NodeCore {
         let timedelta = (point_after_prove - point_before_prove).as_millis();
         info!("Send balance shielded proof spent {timedelta:?} milliseconds");
 
-        Ok((self.sequencer_client.send_tx(tx).await?, utxo_hashes))
+        Ok((
+            self.sequencer_client.send_tx(tx, tx_roots).await?,
+            utxo_hashes,
+        ))
     }
 
     pub async fn send_deshielded_send_tx(
@@ -718,6 +752,9 @@ impl NodeCore {
         comm_gen_hash: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Result<SendTxResponse> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let point_before_prove = std::time::Instant::now();
         let tx = self
             .transfer_utxo_deshielded(utxo, comm_gen_hash, receivers)
@@ -728,7 +765,7 @@ impl NodeCore {
         let timedelta = (point_after_prove - point_before_prove).as_millis();
         info!("Send deshielded utxo proof spent {timedelta:?} milliseconds");
 
-        Ok(self.sequencer_client.send_tx(tx).await?)
+        Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
     }
 
     pub async fn operate_account_mint_private(
@@ -1168,6 +1205,9 @@ impl NodeCore {
         receivers: Vec<(u128, AccountAddress)>,
         visibility_list: [bool; 3],
     ) -> Result<(SendTxResponse, Vec<([u8; 32], [u8; 32])>, Vec<[u8; 32]>)> {
+        //Considering proof time, needs to be done before proof
+        let tx_roots = self.get_roots().await;
+
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hashes) = self
             .split_utxo(utxo, comm_hash, receivers, visibility_list)
@@ -1181,7 +1221,7 @@ impl NodeCore {
         let commitments = tx.utxo_commitments_created_hashes.clone();
 
         Ok((
-            self.sequencer_client.send_tx(tx).await?,
+            self.sequencer_client.send_tx(tx, tx_roots).await?,
             utxo_hashes,
             commitments,
         ))

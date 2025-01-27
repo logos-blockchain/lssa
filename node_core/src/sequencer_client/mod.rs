@@ -100,8 +100,12 @@ impl SequencerClient {
     pub async fn send_tx(
         &self,
         transaction: Transaction,
+        tx_roots: [[u8; 32]; 3],
     ) -> Result<SendTxResponse, SequencerClientError> {
-        let tx_req = SendTxRequest { transaction };
+        let tx_req = SendTxRequest {
+            transaction,
+            tx_roots,
+        };
 
         let req = serde_json::to_value(tx_req)?;
 

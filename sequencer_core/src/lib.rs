@@ -32,6 +32,8 @@ pub enum TransactionMalformationErrorKind {
     TxHashAlreadyPresentInTree { tx: TreeHashType },
     NullifierAlreadyPresentInTree { tx: TreeHashType },
     UTXOCommitmentAlreadyPresentInTree { tx: TreeHashType },
+    MempoolFullForRound { tx: TreeHashType },
+    ChainStateFurtherThanTransactionState { tx: TreeHashType },
     FailedToInsert { tx: TreeHashType, details: String },
 }
 
@@ -57,9 +59,19 @@ impl SequencerCore {
         }
     }
 
+    pub fn get_tree_roots(&self) -> [[u8; 32]; 3] {
+        //All roots are non-None after start of sequencer main loop
+        [
+            self.store.nullifier_store.curr_root.unwrap(),
+            self.store.utxo_commitments_store.get_root().unwrap(),
+            self.store.pub_tx_store.get_root().unwrap(),
+        ]
+    }
+
     pub fn transaction_pre_check(
         &mut self,
         tx: &Transaction,
+        tx_roots: [[u8; 32]; 3],
     ) -> Result<(), TransactionMalformationErrorKind> {
         let Transaction {
             hash,
@@ -70,6 +82,22 @@ impl SequencerCore {
             ref nullifier_created_hashes,
             ..
         } = tx;
+
+        let mempool_size = self.mempool.len();
+
+        if mempool_size >= self.sequencer_config.max_num_tx_in_block {
+            return Err(TransactionMalformationErrorKind::MempoolFullForRound { tx: *hash });
+        }
+
+        let curr_sequencer_roots = self.get_tree_roots();
+
+        if tx_roots != curr_sequencer_roots {
+            return Err(
+                TransactionMalformationErrorKind::ChainStateFurtherThanTransactionState {
+                    tx: *hash,
+                },
+            );
+        }
 
         //Sanity check
         match tx_kind {
@@ -143,8 +171,9 @@ impl SequencerCore {
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
         item: TransactionMempool,
+        tx_roots: [[u8; 32]; 3],
     ) -> Result<(), TransactionMalformationErrorKind> {
-        self.transaction_pre_check(&item.tx)?;
+        self.transaction_pre_check(&item.tx, tx_roots)?;
 
         self.mempool.push_item(item);
 
