@@ -314,4 +314,15 @@ mod tests {
         sequencer.produce_new_block_with_mempool_transactions();
     }
 
+    #[test]
+    fn test_start_from_config() {
+        let config = setup_sequencer_config();
+        let sequencer = SequencerCore::start_from_config(config.clone());
+
+        assert_eq!(sequencer.chain_height, config.genesis_id);
+        assert_eq!(sequencer.sequencer_config.max_num_tx_in_block, 10);
+        assert_eq!(sequencer.sequencer_config.port, 8080);
+    }
+
+
 }
