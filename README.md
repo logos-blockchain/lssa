@@ -3,6 +3,8 @@ This repo serves for Nescience Node testnet
 
 For more details you can read [blogpost](https://vac.dev/rlog/Nescience-state-separation-architecture/)
 
+For more details on node functionality [here](https://www.notion.so/5-Testnet-initial-results-analysis-18e8f96fb65c808a835cc43b7a84cddf)
+
 # How to run
 Node and sequecer require Rust installation to build. Preferable latest stable version.
 
