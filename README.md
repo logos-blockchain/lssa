@@ -1,6 +1,8 @@
 # nescience-testnet
 This repo serves for Nescience Node testnet
 
+For more details you can read (blogpost)[https://vac.dev/rlog/Nescience-state-separation-architecture/]
+
 # How to run
 Node and sequecer require Rust installation to build. Preferable latest stable version.
 
@@ -8,6 +10,15 @@ Rust can be installed as
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Node needs RISC0 toolchain to run.
+
+It can be installed as
+
+```sh
+curl -L https://risczero.com/install | bash
+rzup install
 ```
 
 After cloning this repository the following actions need to be done:
