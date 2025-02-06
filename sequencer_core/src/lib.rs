@@ -60,11 +60,13 @@ impl SequencerCore {
     }
 
     pub fn get_tree_roots(&self) -> [[u8; 32]; 3] {
-        //All roots are non-None after start of sequencer main loop
         [
-            self.store.nullifier_store.curr_root.unwrap(),
-            self.store.utxo_commitments_store.get_root().unwrap(),
-            self.store.pub_tx_store.get_root().unwrap(),
+            self.store.nullifier_store.curr_root.unwrap_or([0; 32]),
+            self.store
+                .utxo_commitments_store
+                .get_root()
+                .unwrap_or([0; 32]),
+            self.store.pub_tx_store.get_root().unwrap_or([0; 32]),
         ]
     }
 
