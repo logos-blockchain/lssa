@@ -254,3 +254,148 @@ impl SequencerCore {
         Ok(self.chain_height - 1)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{fmt::format, path::PathBuf};
+
+    use rand::Rng;
+    use storage::transaction::{Transaction, TxKind};
+    use transaction_mempool::TransactionMempool;
+
+    fn setup_sequencer_config() -> SequencerConfig {
+        let mut rng = rand::thread_rng();
+        let random_u8: u8 = rng.gen();
+
+        let path_str = format!("/tmp/sequencer_{:?}", random_u8);
+
+        SequencerConfig {
+            home: PathBuf::from(path_str),
+            override_rust_log: Some("info".to_string()),
+            genesis_id: 1,
+            is_genesis_random: false,
+            max_num_tx_in_block: 10,
+            block_create_timeout_millis: 1000,
+            port: 8080,
+        }
+    }
+
+    fn create_dummy_transaction(
+        hash: TreeHashType,
+        nullifier_created_hashes: Vec<[u8; 32]>,
+        utxo_commitments_spent_hashes: Vec<[u8; 32]>,
+        utxo_commitments_created_hashes: Vec<[u8; 32]>,
+    ) -> Transaction {
+        Transaction {
+            hash,
+            tx_kind: TxKind::Private,
+            execution_input: vec![],
+            execution_output: vec![],
+            utxo_commitments_spent_hashes,
+            utxo_commitments_created_hashes,
+            nullifier_created_hashes,
+            execution_proof_private: "dummy_proof".to_string(),
+            encoded_data: vec![],
+            ephemeral_pub_key: vec![10, 11, 12],
+        }
+    }
+
+    fn common_setup(mut sequencer: &mut SequencerCore) {
+        let tx = create_dummy_transaction([12; 32], vec![[9; 32]], vec![[7; 32]], vec![[8; 32]]);
+        let tx_mempool = TransactionMempool { tx };
+        sequencer.mempool.push_item(tx_mempool);
+
+        sequencer.produce_new_block_with_mempool_transactions();
+    }
+
+    #[test]
+    fn test_start_from_config() {
+        let config = setup_sequencer_config();
+        let sequencer = SequencerCore::start_from_config(config.clone());
+
+        assert_eq!(sequencer.chain_height, config.genesis_id);
+        assert_eq!(sequencer.sequencer_config.max_num_tx_in_block, 10);
+        assert_eq!(sequencer.sequencer_config.port, 8080);
+    }
+
+    #[test]
+    fn test_get_tree_roots() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let roots = sequencer.get_tree_roots();
+        assert_eq!(roots.len(), 3); // Should return three roots
+    }
+
+    #[test]
+    fn test_transaction_pre_check_pass() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let tx = create_dummy_transaction([1; 32], vec![[91; 32]], vec![[71; 32]], vec![[81; 32]]);
+        let tx_roots = sequencer.get_tree_roots();
+        let result = sequencer.transaction_pre_check(&tx, tx_roots);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_transaction_pre_check_fail_mempool_full() {
+        let config = SequencerConfig {
+            max_num_tx_in_block: 1,
+            ..setup_sequencer_config()
+        };
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let tx = create_dummy_transaction([2; 32], vec![[92; 32]], vec![[72; 32]], vec![[82; 32]]);
+        let tx_roots = sequencer.get_tree_roots();
+
+        // Fill the mempool
+        let dummy_tx = TransactionMempool { tx: tx.clone() };
+        sequencer.mempool.push_item(dummy_tx);
+
+        let result = sequencer.transaction_pre_check(&tx, tx_roots);
+
+        assert!(matches!(
+            result,
+            Err(TransactionMalformationErrorKind::MempoolFullForRound { .. })
+        ));
+    }
+
+    #[test]
+    fn test_push_tx_into_mempool_pre_check() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let tx = create_dummy_transaction([3; 32], vec![[93; 32]], vec![[73; 32]], vec![[83; 32]]);
+        let tx_roots = sequencer.get_tree_roots();
+        let tx_mempool = TransactionMempool { tx };
+
+        let result = sequencer.push_tx_into_mempool_pre_check(tx_mempool.clone(), tx_roots);
+        assert!(result.is_ok());
+        assert_eq!(sequencer.mempool.len(), 1);
+    }
+
+    #[test]
+    fn test_produce_new_block_with_mempool_transactions() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        let tx = create_dummy_transaction([4; 32], vec![[94; 32]], vec![[7; 32]], vec![[8; 32]]);
+        let tx_mempool = TransactionMempool { tx };
+        sequencer.mempool.push_item(tx_mempool);
+
+        let block_id = sequencer.produce_new_block_with_mempool_transactions();
+        assert!(block_id.is_ok());
+        assert_eq!(block_id.unwrap(), 1);
+    }
+}
