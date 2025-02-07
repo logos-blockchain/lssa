@@ -56,7 +56,10 @@ pub fn prove_mint_utxo(
 
     let digest: UTXOPayload = receipt.journal.decode()?;
 
-    Ok((UTXO::create_utxo_from_payload(digest).map_err(ExecutionFailureKind::write_error)?, receipt))
+    Ok((
+        UTXO::create_utxo_from_payload(digest).map_err(ExecutionFailureKind::write_error)?,
+        receipt,
+    ))
 }
 
 pub fn prove_send_utxo(
@@ -96,7 +99,8 @@ pub fn prove_send_utxo(
         digest
             .into_iter()
             .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload).map(|sel| (sel, addr))))
-            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>().map_err(ExecutionFailureKind::write_error)?,
+            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>()
+            .map_err(ExecutionFailureKind::write_error)?,
         receipt,
     ))
 }
@@ -144,12 +148,14 @@ pub fn prove_send_utxo_multiple_assets_one_receiver(
             .0
             .into_iter()
             .map(|payload| UTXO::create_utxo_from_payload(payload))
-            .collect::<anyhow::Result<Vec<UTXO>>>().map_err(ExecutionFailureKind::write_error)?,
+            .collect::<anyhow::Result<Vec<UTXO>>>()
+            .map_err(ExecutionFailureKind::write_error)?,
         digest
             .1
             .into_iter()
             .map(|payload| UTXO::create_utxo_from_payload(payload))
-            .collect::<anyhow::Result<Vec<UTXO>>>().map_err(ExecutionFailureKind::write_error)?,
+            .collect::<anyhow::Result<Vec<UTXO>>>()
+            .map_err(ExecutionFailureKind::write_error)?,
         receipt,
     ))
 }
@@ -170,7 +176,8 @@ pub fn prove_send_utxo_shielded(
         asset: vec![],
         amount,
         privacy_flag: true,
-    }).map_err(ExecutionFailureKind::write_error)?;
+    })
+    .map_err(ExecutionFailureKind::write_error)?;
     let utxo_payload = temp_utxo_to_spend.into_payload();
 
     let mut builder = ExecutorEnv::builder();
@@ -199,7 +206,8 @@ pub fn prove_send_utxo_shielded(
         digest
             .into_iter()
             .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload).map(|sel| (sel, addr))))
-            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>().map_err(ExecutionFailureKind::write_error)?,
+            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>()
+            .map_err(ExecutionFailureKind::write_error)?,
         receipt,
     ))
 }
@@ -280,7 +288,8 @@ pub fn prove_mint_utxo_multiple_assets(
         digest
             .into_iter()
             .map(UTXO::create_utxo_from_payload)
-            .collect::<anyhow::Result<Vec<UTXO>>>().map_err(ExecutionFailureKind::write_error)?,
+            .collect::<anyhow::Result<Vec<UTXO>>>()
+            .map_err(ExecutionFailureKind::write_error)?,
         receipt,
     ))
 }
@@ -319,8 +328,7 @@ pub fn execute_send_utxo(
 
     let receipt = executor.execute(env, test_methods::SEND_UTXO_ELF)?;
 
-    let digest: (UTXOPayload, Vec<(UTXOPayload, AccountAddress)>) =
-        receipt.journal.decode()?;
+    let digest: (UTXOPayload, Vec<(UTXOPayload, AccountAddress)>) = receipt.journal.decode()?;
 
     Ok((
         UTXO::create_utxo_from_payload(digest.0)?,
@@ -328,11 +336,15 @@ pub fn execute_send_utxo(
             .1
             .into_iter()
             .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload).map(|sel| (sel, addr))))
-            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>().map_err(ExecutionFailureKind::write_error)?,
+            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>()
+            .map_err(ExecutionFailureKind::write_error)?,
     ))
 }
 
-pub fn prove<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) -> anyhow::Result<(u64, Receipt)> {
+pub fn prove<T: serde::ser::Serialize>(
+    input_vec: Vec<T>,
+    elf: &[u8],
+) -> anyhow::Result<(u64, Receipt)> {
     let mut builder = ExecutorEnv::builder();
 
     for input in input_vec {
@@ -372,8 +384,7 @@ pub fn execute<T: serde::ser::Serialize + for<'de> serde::Deserialize<'de>>(
 }
 
 pub fn verify(receipt: Receipt, image_id: impl Into<Digest>) -> anyhow::Result<()> {
-    Ok(receipt
-        .verify(image_id)?)
+    Ok(receipt.verify(image_id)?)
 }
 
 #[cfg(test)]
