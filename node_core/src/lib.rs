@@ -7,7 +7,7 @@ use k256::elliptic_curve::group::GroupEncoding;
 
 use ::storage::transaction::{Transaction, TransactionPayload, TxKind};
 use accounts::account_core::{Account, AccountAddress};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use config::NodeConfig;
 use executions::{
     private_exec::{generate_commitments, generate_nullifiers},
@@ -474,8 +474,7 @@ impl NodeCore {
                     .viewing_secret_key
                     .to_bytes()
                     .to_vec(),
-            )
-            .unwrap(),
+            ).map_err(|err| anyhow!("{:?}", err)).map_err(ExecutionFailureKind::write_error)?,
             generator_blinding_factor: Tweak::new(&mut thread_rng()),
         };
 
@@ -782,8 +781,7 @@ impl NodeCore {
             let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
 
             acc.utxo_tree
-                .get_item(new_utxo_hash)
-                .unwrap()
+                .get_item(new_utxo_hash)?
                 .unwrap()
                 .clone()
         };
@@ -963,8 +961,7 @@ impl NodeCore {
             acc.log();
 
             acc.utxo_tree
-                .get_item(new_utxo_hash)
-                .unwrap()
+                .get_item(new_utxo_hash)?
                 .unwrap()
                 .clone()
         };
@@ -1007,8 +1004,7 @@ impl NodeCore {
             acc.log();
 
             acc.utxo_tree
-                .get_item(new_utxo_hash)
-                .unwrap()
+                .get_item(new_utxo_hash)?
                 .unwrap()
                 .clone()
         };
@@ -1057,8 +1053,7 @@ impl NodeCore {
 
                 let new_utxo = acc
                     .utxo_tree
-                    .get_item(new_utxo_hash)
-                    .unwrap()
+                    .get_item(new_utxo_hash)?
                     .unwrap()
                     .clone();
 
@@ -1082,8 +1077,7 @@ impl NodeCore {
 
                 let new_utxo = acc
                     .utxo_tree
-                    .get_item(new_utxo_hash)
-                    .unwrap()
+                    .get_item(new_utxo_hash)?
                     .unwrap()
                     .clone();
 
