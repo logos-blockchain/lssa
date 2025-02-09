@@ -11,17 +11,20 @@ use rpc_primitives::{
 };
 use storage::transaction::ActionData;
 
-use rpc_primitives::requests::{GetLastBlockRequest, GetLastBlockResponse, RegisterAccountRequest, RegisterAccountResponse, GetBlockDataRequest, GetBlockDataResponse};
+use rpc_primitives::requests::{
+    GetBlockDataRequest, GetBlockDataResponse, GetLastBlockRequest, GetLastBlockResponse,
+    RegisterAccountRequest, RegisterAccountResponse,
+};
 
 use crate::types::rpc_structs::{
     ExecuteScenarioMultipleSendRequest, ExecuteScenarioMultipleSendResponse,
     ExecuteScenarioSplitRequest, ExecuteScenarioSplitResponse, ExecuteSubscenarioRequest,
-    ExecuteSubscenarioResponse,
-    ShowAccountPublicBalanceRequest, ShowAccountPublicBalanceResponse, ShowAccountUTXORequest,
-    ShowAccountUTXOResponse, ShowTransactionRequest, ShowTransactionResponse,
-    UTXOShortEssentialStruct, WriteDepositPublicBalanceRequest, WriteDepositPublicBalanceResponse,
-    WriteMintPrivateUTXOMultipleAssetsRequest, WriteMintPrivateUTXOMultipleAssetsResponse,
-    WriteMintPrivateUTXORequest, WriteMintPrivateUTXOResponse, WriteSendDeshieldedBalanceRequest,
+    ExecuteSubscenarioResponse, ShowAccountPublicBalanceRequest, ShowAccountPublicBalanceResponse,
+    ShowAccountUTXORequest, ShowAccountUTXOResponse, ShowTransactionRequest,
+    ShowTransactionResponse, UTXOShortEssentialStruct, WriteDepositPublicBalanceRequest,
+    WriteDepositPublicBalanceResponse, WriteMintPrivateUTXOMultipleAssetsRequest,
+    WriteMintPrivateUTXOMultipleAssetsResponse, WriteMintPrivateUTXORequest,
+    WriteMintPrivateUTXOResponse, WriteSendDeshieldedBalanceRequest,
     WriteSendDeshieldedUTXOResponse, WriteSendPrivateUTXORequest, WriteSendPrivateUTXOResponse,
     WriteSendShieldedUTXORequest, WriteSendShieldedUTXOResponse, WriteSendSplitUTXOResponse,
     WriteSplitUTXORequest,
