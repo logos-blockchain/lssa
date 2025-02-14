@@ -1,12 +1,14 @@
 use accounts::account_core::Account;
 use anyhow::Result;
 use json::{
-    GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
-    RegisterAccountRequest, RegisterAccountResponse, SendTxRequest, SendTxResponse,
-    SequencerRpcError, SequencerRpcRequest, SequencerRpcResponse,
+    SendTxRequest, SendTxResponse, SequencerRpcError, SequencerRpcRequest, SequencerRpcResponse,
 };
 use k256::elliptic_curve::group::GroupEncoding;
 use reqwest::Client;
+use rpc_primitives::requests::{
+    GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
+    RegisterAccountRequest, RegisterAccountResponse,
+};
 use serde_json::Value;
 use storage::transaction::Transaction;
 
