@@ -1,7 +1,7 @@
-use rpc_primitives::errors::RpcParseError;
-use rpc_primitives::parse_request;
-use rpc_primitives::parser::parse_params;
-use rpc_primitives::parser::RpcRequest;
+use crate::errors::RpcParseError;
+use crate::parse_request;
+use crate::parser::parse_params;
+use crate::parser::RpcRequest;
 use sequencer_core::transaction_mempool::TransactionMempool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

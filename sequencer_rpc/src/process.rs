@@ -8,7 +8,7 @@ use rpc_primitives::{
     parser::RpcRequest,
 };
 
-use crate::types::rpc_structs::{
+use rpc_primitives::requests::{
     GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
     GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse, RegisterAccountRequest,
     RegisterAccountResponse, SendTxRequest, SendTxResponse,

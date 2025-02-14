@@ -3839,8 +3839,10 @@ dependencies = [
  "anyhow",
  "env_logger",
  "log",
+ "sequencer_core",
  "serde",
  "serde_json",
+ "storage",
 ]
 
 [[package]]

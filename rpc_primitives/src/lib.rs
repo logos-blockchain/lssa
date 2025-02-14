@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub mod errors;
 pub mod message;
 pub mod parser;
+pub mod requests;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct RpcPollingConfig {
