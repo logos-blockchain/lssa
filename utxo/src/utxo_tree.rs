@@ -88,7 +88,7 @@ mod tests {
         }
     }
 
-    fn sample_utxo() -> UTXO {
+    fn sample_utxo() -> anyhow::Result<UTXO> {
         UTXO::create_utxo_from_payload(sample_utxo_payload())
     }
 
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn test_insert_item() {
         let mut smt = UTXOSparseMerkleTree::new();
-        let utxo = sample_utxo();
+        let utxo = sample_utxo().unwrap();
 
         let result = smt.insert_item(utxo.clone());
 
@@ -119,8 +119,8 @@ mod tests {
     #[test]
     fn test_insert_items() {
         let mut smt = UTXOSparseMerkleTree::new();
-        let utxo1 = sample_utxo();
-        let utxo2 = sample_utxo();
+        let utxo1 = sample_utxo().unwrap();
+        let utxo2 = sample_utxo().unwrap();
 
         let result = smt.insert_items(vec![utxo1.clone(), utxo2.clone()]);
 
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn test_get_item_exists() {
         let mut smt = UTXOSparseMerkleTree::new();
-        let utxo = sample_utxo();
+        let utxo = sample_utxo().unwrap();
 
         smt.insert_item(utxo.clone()).unwrap();
 
@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn test_get_item_not_exists() {
         let mut smt = UTXOSparseMerkleTree::new();
-        let utxo = sample_utxo();
+        let utxo = sample_utxo().unwrap();
 
         // Insert one UTXO and try to fetch a different hash
         smt.insert_item(utxo).unwrap();
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_get_membership_proof() {
         let mut smt = UTXOSparseMerkleTree::new();
-        let utxo = sample_utxo();
+        let utxo = sample_utxo().unwrap();
 
         smt.insert_item(utxo.clone()).unwrap();
 

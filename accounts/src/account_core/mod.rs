@@ -110,7 +110,7 @@ impl Account {
             privacy_flag,
         };
 
-        let asset_utxo = UTXO::create_utxo_from_payload(payload_with_asset);
+        let asset_utxo = UTXO::create_utxo_from_payload(payload_with_asset)?;
 
         self.utxo_tree.insert_item(asset_utxo)?;
 
@@ -138,7 +138,7 @@ mod tests {
         UTXONullifier::default()
     }
 
-    fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> UTXO {
+    fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> anyhow::Result<UTXO> {
         let payload = UTXOPayload {
             owner: address,
             asset: vec![],
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_mark_spent_utxo() {
         let mut account = Account::new();
-        let utxo = generate_dummy_utxo(account.address, 100);
+        let utxo = generate_dummy_utxo(account.address, 100).unwrap();
         account.add_new_utxo_outputs(vec![utxo]).unwrap();
 
         let mut utxo_nullifier_map = HashMap::new();
@@ -174,8 +174,8 @@ mod tests {
     #[test]
     fn test_add_new_utxo_outputs() {
         let mut account = Account::new();
-        let utxo1 = generate_dummy_utxo(account.address, 100);
-        let utxo2 = generate_dummy_utxo(account.address, 200);
+        let utxo1 = generate_dummy_utxo(account.address, 100).unwrap();
+        let utxo2 = generate_dummy_utxo(account.address, 200).unwrap();
 
         let result = account.add_new_utxo_outputs(vec![utxo1.clone(), utxo2.clone()]);
 

@@ -29,8 +29,8 @@ pub struct UTXOPayload {
 }
 
 impl UTXO {
-    pub fn create_utxo_from_payload(payload_with_asset: UTXOPayload) -> Self {
-        let raw_payload = serde_json::to_vec(&payload_with_asset).unwrap();
+    pub fn create_utxo_from_payload(payload_with_asset: UTXOPayload) -> anyhow::Result<Self> {
+        let raw_payload = serde_json::to_vec(&payload_with_asset)?;
 
         let mut hasher = sha2::Sha256::new();
 
@@ -38,14 +38,14 @@ impl UTXO {
 
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
-        Self {
+        Ok(Self {
             hash,
             owner: payload_with_asset.owner,
             nullifier: None,
             asset: payload_with_asset.asset,
             amount: payload_with_asset.amount,
             privacy_flag: payload_with_asset.privacy_flag,
-        }
+        })
     }
 
     pub fn consume_utxo(&mut self, nullifier: UTXONullifier) -> Result<()> {
@@ -123,7 +123,7 @@ mod tests {
     #[test]
     fn test_create_utxo_from_payload() {
         let payload = sample_payload();
-        let utxo = UTXO::create_utxo_from_payload(payload.clone());
+        let utxo = UTXO::create_utxo_from_payload(payload.clone()).unwrap();
 
         // Ensure hash is created and the UTXO fields are correctly assigned
         assert_eq!(utxo.owner, payload.owner);
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_consume_utxo() {
         let payload = sample_payload();
-        let mut utxo = UTXO::create_utxo_from_payload(payload);
+        let mut utxo = UTXO::create_utxo_from_payload(payload).unwrap();
 
         let nullifier = sample_nullifier();
 
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_interpret_asset() {
         let payload = sample_payload();
-        let utxo = UTXO::create_utxo_from_payload(payload);
+        let utxo = UTXO::create_utxo_from_payload(payload).unwrap();
 
         // Interpret asset as TestAsset
         let interpreted: TestAsset = utxo.interpret_asset().unwrap();
@@ -168,7 +168,7 @@ mod tests {
     fn test_interpret_invalid_asset() {
         let mut payload = sample_payload();
         payload.asset = vec![0, 1, 2, 3]; // Invalid data for deserialization
-        let utxo = UTXO::create_utxo_from_payload(payload);
+        let utxo = UTXO::create_utxo_from_payload(payload).unwrap();
 
         // This should fail because the asset is not valid JSON for TestAsset
         let result: Result<TestAsset> = utxo.interpret_asset();
