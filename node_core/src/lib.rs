@@ -207,7 +207,10 @@ impl NodeCore {
                     .map(|hash_data| hash_data.try_into().unwrap())
                     .collect(),
                 nullifier_created_hashes: vec![],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt).unwrap(),
+                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
+                    receipt,
+                )
+                .unwrap(),
                 encoded_data: vec![(encoded_data.0, encoded_data.1.to_vec())],
                 ephemeral_pub_key: eph_pub_key.to_vec(),
             }
@@ -259,7 +262,10 @@ impl NodeCore {
                     .map(|hash_data| hash_data.try_into().unwrap())
                     .collect(),
                 nullifier_created_hashes: vec![],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt).unwrap(),
+                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
+                    receipt,
+                )
+                .unwrap(),
                 encoded_data,
                 ephemeral_pub_key: eph_pub_key.to_vec(),
             }
@@ -332,7 +338,10 @@ impl NodeCore {
                     .map(|hash_data| hash_data.try_into().unwrap())
                     .collect(),
                 nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt).unwrap(),
+                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
+                    receipt,
+                )
+                .unwrap(),
                 encoded_data,
                 ephemeral_pub_key: eph_pub_key.to_vec(),
             }
@@ -431,7 +440,10 @@ impl NodeCore {
                     .map(|hash_data| hash_data.try_into().unwrap())
                     .collect(),
                 nullifier_created_hashes: nullifiers,
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt).unwrap(),
+                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
+                    receipt,
+                )
+                .unwrap(),
                 encoded_data,
                 ephemeral_pub_key: eph_pub_key.to_vec(),
             }
@@ -451,7 +463,10 @@ impl NodeCore {
 
         let account = acc_map_read_guard.acc_map.get(&acc).unwrap();
 
-        let commitment = sc_core::transaction_payloads_tools::generate_secret_random_commitment(balance, account).unwrap();
+        let commitment = sc_core::transaction_payloads_tools::generate_secret_random_commitment(
+            balance, account,
+        )
+        .unwrap();
 
         let nullifier = executions::se::generate_nullifiers(
             &commitment,
@@ -513,7 +528,10 @@ impl NodeCore {
                     .map(|hash_data| hash_data.try_into().unwrap())
                     .collect(),
                 nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt).unwrap(),
+                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
+                    receipt,
+                )
+                .unwrap(),
                 encoded_data,
                 ephemeral_pub_key: eph_pub_key.to_vec(),
             }
@@ -562,7 +580,8 @@ impl NodeCore {
             utxo_commitments_spent_hashes: vec![commitment_in],
             utxo_commitments_created_hashes: vec![],
             nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
-            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt).unwrap(),
+            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt)
+                .unwrap(),
             encoded_data: vec![],
             ephemeral_pub_key: vec![],
         }
@@ -630,9 +649,15 @@ impl NodeCore {
         //Considering proof time, needs to be done before proof
         let tx_roots = self.get_roots().await;
 
-        let tx: Transaction = sc_core::transaction_payloads_tools::create_public_transaction_payload(serde_json::to_vec(&ActionData::MintMoneyPublicTx(
-            MintMoneyPublicTx { acc, amount },
-        )).unwrap()).into();
+        let tx: Transaction =
+            sc_core::transaction_payloads_tools::create_public_transaction_payload(
+                serde_json::to_vec(&ActionData::MintMoneyPublicTx(MintMoneyPublicTx {
+                    acc,
+                    amount,
+                }))
+                .unwrap(),
+            )
+            .into();
         tx.log();
 
         Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
@@ -1136,7 +1161,10 @@ impl NodeCore {
                     .map(|hash_data| hash_data.try_into().unwrap())
                     .collect(),
                 nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt).unwrap(),
+                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
+                    receipt,
+                )
+                .unwrap(),
                 encoded_data,
                 ephemeral_pub_key: eph_pub_key.to_vec(),
             }
