@@ -8,15 +8,10 @@ use k256::elliptic_curve::group::GroupEncoding;
 
 use ::storage::transaction::{Transaction, TransactionPayload, TxKind};
 use accounts::account_core::{Account, AccountAddress};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use config::NodeConfig;
-use executions::{
-    private_exec::{generate_commitments, generate_nullifiers},
-    se::{commit, tag_random},
-};
+use executions::private_exec::{generate_commitments, generate_nullifiers};
 use log::info;
-use rand::thread_rng;
-use secp256k1_zkp::{CommitmentSecrets, Tweak};
 use sequencer_client::{json::SendTxResponse, SequencerClient};
 use serde::{Deserialize, Serialize};
 use storage::NodeChainStore;
