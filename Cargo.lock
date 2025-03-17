@@ -1203,6 +1203,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "core_primitives"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "elliptic-curve",
+ "env_logger",
+ "log",
+ "monotree",
+ "sequencer_core",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "storage",
+]
+
+[[package]]
 name = "cpp_demangle"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
