@@ -1,6 +1,4 @@
-use log::info;
 use serde::{Deserialize, Serialize};
-use sha2::{digest::FixedOutput, Digest};
 
 use crate::merkle_tree_public::TreeHashType;
 

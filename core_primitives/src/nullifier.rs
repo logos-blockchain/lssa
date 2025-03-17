@@ -1,7 +1,7 @@
 use crate::merkle_tree_public::TreeHashType;
 use monotree::database::MemoryDB;
 use monotree::hasher::Blake3;
-use monotree::{Hasher, Monotree, Proof};
+use monotree::Monotree;
 use serde::{Deserialize, Serialize};
 
 //ToDo: Update Nullifier model, when it is clear
