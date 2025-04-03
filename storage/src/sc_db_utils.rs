@@ -172,5 +172,13 @@ mod tests {
         assert!(matches!(changes[0], DataBlobChangeVariant::Deleted { .. }));
     }
 
+    #[test]
+    fn test_compare_blob_lists_modified() {
+        let old_list: Vec<DataBlob> = vec![[1; SC_DATA_BLOB_SIZE]];
+        let new_list: Vec<DataBlob> = vec![[2; SC_DATA_BLOB_SIZE]];
 
+        let changes = compare_blob_lists(&old_list, &new_list);
+        assert_eq!(changes.len(), 1);
+        assert!(matches!(changes[0], DataBlobChangeVariant::Modified { .. }));
+    }
 }
