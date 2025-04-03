@@ -189,6 +189,8 @@ impl NodeCore {
             &serde_json::to_vec(&utxo).unwrap(),
         );
 
+        let tag = accout.make_tag();
+
         let comm = generate_commitments(&vec![utxo]);
 
         Ok((
@@ -206,7 +208,7 @@ impl NodeCore {
                     receipt,
                 )
                 .unwrap(),
-                encoded_data: vec![(encoded_data.0, encoded_data.1.to_vec())],
+                encoded_data: vec![(encoded_data.0, encoded_data.1.to_vec(), tag)],
                 ephemeral_pub_key: eph_pub_key.to_vec(),
             }
             .into(),
@@ -235,13 +237,16 @@ impl NodeCore {
         let encoded_data = utxos
             .iter()
             .map(|utxo| {
-                Account::encrypt_data(
-                    &ephm_key_holder,
-                    accout.key_holder.viewing_public_key,
-                    &serde_json::to_vec(&utxo).unwrap(),
+                (
+                    Account::encrypt_data(
+                        &ephm_key_holder,
+                        accout.key_holder.viewing_public_key,
+                        &serde_json::to_vec(&utxo).unwrap(),
+                    ),
+                    accout.make_tag(),
                 )
             })
-            .map(|(ciphertext, nonce)| (ciphertext, nonce.to_vec()))
+            .map(|((ciphertext, nonce), tag)| (ciphertext, nonce.to_vec(), tag))
             .collect();
 
         let comm = generate_commitments(&utxos);
@@ -305,7 +310,7 @@ impl NodeCore {
 
         let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
 
-        let encoded_data: Vec<(Vec<u8>, Vec<u8>)> = utxos
+        let encoded_data: Vec<(Vec<u8>, Vec<u8>, u8)> = utxos
             .iter()
             .map(|utxo_enc| {
                 let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
@@ -316,7 +321,9 @@ impl NodeCore {
                     &serde_json::to_vec(&utxo_enc).unwrap(),
                 );
 
-                (ciphertext, nonce.to_vec())
+                let tag = accout_enc.make_tag();
+
+                (ciphertext, nonce.to_vec(), tag)
             })
             .collect();
 
@@ -387,7 +394,7 @@ impl NodeCore {
 
         let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
 
-        let mut encoded_data: Vec<(Vec<u8>, Vec<u8>)> = resulting_utxos_receiver
+        let mut encoded_data: Vec<(Vec<u8>, Vec<u8>, u8)> = resulting_utxos_receiver
             .iter()
             .map(|utxo_enc| {
                 let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
@@ -398,11 +405,13 @@ impl NodeCore {
                     &serde_json::to_vec(&utxo_enc).unwrap(),
                 );
 
-                (ciphertext, nonce.to_vec())
+                let tag = accout_enc.make_tag();
+
+                (ciphertext, nonce.to_vec(), tag)
             })
             .collect();
 
-        let encoded_data_1: Vec<(Vec<u8>, Vec<u8>)> = resulting_utxos_not_spent
+        let encoded_data_1: Vec<(Vec<u8>, Vec<u8>, u8)> = resulting_utxos_not_spent
             .iter()
             .map(|utxo_enc| {
                 let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
@@ -413,7 +422,9 @@ impl NodeCore {
                     &serde_json::to_vec(&utxo_enc).unwrap(),
                 );
 
-                (ciphertext, nonce.to_vec())
+                let tag = accout_enc.make_tag();
+
+                (ciphertext, nonce.to_vec(), tag)
             })
             .collect();
 
@@ -489,7 +500,7 @@ impl NodeCore {
 
         let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
 
-        let encoded_data: Vec<(Vec<u8>, Vec<u8>)> = utxos
+        let encoded_data: Vec<(Vec<u8>, Vec<u8>, u8)> = utxos
             .iter()
             .map(|utxo_enc| {
                 let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
@@ -500,7 +511,9 @@ impl NodeCore {
                     &serde_json::to_vec(&utxo_enc).unwrap(),
                 );
 
-                (ciphertext, nonce.to_vec())
+                let tag = accout_enc.make_tag();
+
+                (ciphertext, nonce.to_vec(), tag)
             })
             .collect();
 
@@ -1113,7 +1126,7 @@ impl NodeCore {
 
         let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
 
-        let encoded_data: Vec<(Vec<u8>, Vec<u8>)> = utxos
+        let encoded_data: Vec<(Vec<u8>, Vec<u8>, u8)> = utxos
             .iter()
             .map(|utxo_enc| {
                 let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
@@ -1124,7 +1137,9 @@ impl NodeCore {
                     &serde_json::to_vec(&utxo_enc).unwrap(),
                 );
 
-                (ciphertext, nonce.to_vec())
+                let tag = accout_enc.make_tag();
+
+                (ciphertext, nonce.to_vec(), tag)
             })
             .collect();
 

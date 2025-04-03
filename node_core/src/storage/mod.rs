@@ -111,7 +111,7 @@ impl NodeChainStore {
                 if ephemeral_public_key_sender.is_some().into() {
                     let ephemeral_public_key_sender = ephemeral_public_key_sender.unwrap();
 
-                    for (ciphertext, nonce) in tx.encoded_data.clone() {
+                    for (ciphertext, nonce, tag) in tx.encoded_data.clone() {
                         let slice = nonce.as_slice();
                         let nonce =
                             accounts::key_management::constants_types::Nonce::clone_from_slice(
@@ -119,19 +119,21 @@ impl NodeChainStore {
                             );
 
                         for (acc_id, acc) in self.acc_map.iter_mut() {
-                            let decoded_data_curr_acc = acc.decrypt_data(
-                                ephemeral_public_key_sender,
-                                ciphertext.clone(),
-                                nonce,
-                            );
+                            if acc_id[0] == tag {
+                                let decoded_data_curr_acc = acc.decrypt_data(
+                                    ephemeral_public_key_sender,
+                                    ciphertext.clone(),
+                                    nonce,
+                                );
 
-                            if let Ok(decoded_data_curr_acc) = decoded_data_curr_acc {
-                                let decoded_utxo_try =
-                                    serde_json::from_slice::<UTXO>(&decoded_data_curr_acc);
+                                if let Ok(decoded_data_curr_acc) = decoded_data_curr_acc {
+                                    let decoded_utxo_try =
+                                        serde_json::from_slice::<UTXO>(&decoded_data_curr_acc);
 
-                                if let Ok(utxo) = decoded_utxo_try {
-                                    if &utxo.owner == acc_id {
-                                        acc.utxo_tree.insert_item(utxo)?;
+                                    if let Ok(utxo) = decoded_utxo_try {
+                                        if &utxo.owner == acc_id {
+                                            acc.utxo_tree.insert_item(utxo)?;
+                                        }
                                     }
                                 }
                             }

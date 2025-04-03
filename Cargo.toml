@@ -18,6 +18,7 @@ members = [
   "rpc_primitives",
   "common",
   "sc_core",
+  "core_primitives",
 ]
 
 [workspace.dependencies]

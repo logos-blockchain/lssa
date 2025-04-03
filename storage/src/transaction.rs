@@ -12,6 +12,7 @@ use sha2::digest::typenum::{UInt, UTerm};
 
 pub type CipherText = Vec<u8>;
 pub type Nonce = GenericArray<u8, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>>;
+pub type Tag = u8;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum TxKind {
@@ -39,7 +40,7 @@ pub struct Transaction {
     ///Execution proof (private part)
     pub execution_proof_private: String,
     ///Encoded blobs of data
-    pub encoded_data: Vec<(CipherText, Vec<u8>)>,
+    pub encoded_data: Vec<(CipherText, Vec<u8>, Tag)>,
     ///Transaction senders ephemeral pub key
     pub ephemeral_pub_key: Vec<u8>,
 }
@@ -61,7 +62,7 @@ pub struct TransactionPayload {
     ///Execution proof (private part)
     pub execution_proof_private: String,
     ///Encoded blobs of data
-    pub encoded_data: Vec<(CipherText, Vec<u8>)>,
+    pub encoded_data: Vec<(CipherText, Vec<u8>, Tag)>,
     ///Transaction senders ephemeral pub key
     pub ephemeral_pub_key: Vec<u8>,
 }

@@ -4,7 +4,7 @@ use anyhow::Result;
 use k256::AffinePoint;
 use log::info;
 use serde::Serialize;
-use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier};
+use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, transaction::Tag};
 use utxo::{
     utxo_core::{UTXOPayload, UTXO},
     utxo_tree::UTXOSparseMerkleTree,
@@ -121,6 +121,10 @@ impl Account {
         info!("Keys generated");
         info!("Account address is {:?}", hex::encode(self.address));
         info!("Account balance is {:?}", self.balance);
+    }
+
+    pub fn make_tag(&self) -> Tag {
+        self.address[0]
     }
 }
 
