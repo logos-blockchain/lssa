@@ -49,7 +49,7 @@ pub fn produce_blob_list_from_sc_public_state<S: Serialize>(
     let ser_data = serde_json::to_vec(state)?;
 
     //`ToDo` Replace with `next_chunk` usage, when feature stabilizes in Rust
-    for i in 0..(ser_data.len() / SC_DATA_BLOB_SIZE) {
+    for i in 0..=(ser_data.len() / SC_DATA_BLOB_SIZE) {
         let next_chunk: Vec<u8>;
 
         if (i + 1) * SC_DATA_BLOB_SIZE < ser_data.len() {
