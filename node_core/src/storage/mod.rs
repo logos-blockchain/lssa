@@ -106,39 +106,31 @@ impl NodeChainStore {
                     .collect(),
             )?;
 
-            let slice_try: Result<[u8; 33], _> = tx.ephemeral_pub_key.clone().try_into();
-            let eph_key_compressed =
-                slice_try.and_then(|inner| Ok(<AffinePoint as GroupEncoding>::Repr::from(inner)));
+            let eph_key_compressed = serde_json::to_vec(&tx.ephemeral_pub_key);
 
             if let Ok(eph_key_compressed) = eph_key_compressed {
-                let ephemeral_public_key_sender = AffinePoint::from_bytes(&eph_key_compressed);
 
-                if ephemeral_public_key_sender.is_some().into() {
-                    let ephemeral_public_key_sender = ephemeral_public_key_sender.unwrap();
+                let ephemeral_public_key_sender = serde_json::from_slice::<AffinePoint>(&eph_key_compressed)?;
 
-                    for (ciphertext, nonce, tag) in tx.encoded_data.clone() {
-                        let slice = nonce.as_slice();
-                        let nonce =
-                            accounts::key_management::constants_types::Nonce::clone_from_slice(
-                                slice,
+                for (ciphertext, nonce, tag) in tx.encoded_data.clone() {
+                    let slice = nonce.as_slice();
+                    let nonce =
+                        accounts::key_management::constants_types::Nonce::clone_from_slice(
+                            slice,
+                        );
+                    for (acc_id, acc) in self.acc_map.iter_mut() {
+                        if acc_id[0] == tag {
+                            let decoded_data_curr_acc = acc.decrypt_data(
+                                ephemeral_public_key_sender,
+                                ciphertext.clone(),
+                                nonce,
                             );
-
-                        for (acc_id, acc) in self.acc_map.iter_mut() {
-                            if acc_id[0] == tag {
-                                let decoded_data_curr_acc = acc.decrypt_data(
-                                    ephemeral_public_key_sender,
-                                    ciphertext.clone(),
-                                    nonce,
-                                );
-
-                                if let Ok(decoded_data_curr_acc) = decoded_data_curr_acc {
-                                    let decoded_utxo_try =
-                                        serde_json::from_slice::<UTXO>(&decoded_data_curr_acc);
-
-                                    if let Ok(utxo) = decoded_utxo_try {
-                                        if &utxo.owner == acc_id {
-                                            acc.utxo_tree.insert_item(utxo)?;
-                                        }
+                            if let Ok(decoded_data_curr_acc) = decoded_data_curr_acc {
+                                let decoded_utxo_try =
+                                    serde_json::from_slice::<UTXO>(&decoded_data_curr_acc);
+                                if let Ok(utxo) = decoded_utxo_try {
+                                    if &utxo.owner == acc_id {
+                                        acc.utxo_tree.insert_item(utxo)?;
                                     }
                                 }
                             }
