@@ -26,6 +26,16 @@ pub struct Account {
     pub utxo_tree: UTXOSparseMerkleTree,
 }
 
+///A strucure, which represents all the visible(public) information
+///
+/// known to each node about account `address`
+pub struct AccountPublicMask {
+    pub nullifier_public_key: AffinePoint,
+    pub viewing_public_key: AffinePoint,
+    pub address: AccountAddress,
+    pub balance: u64,
+}
+
 impl Account {
     pub fn new() -> Self {
         let key_holder = AddressKeyHolder::new_os_random();
@@ -125,6 +135,16 @@ impl Account {
 
     pub fn make_tag(&self) -> Tag {
         self.address[0]
+    }
+
+    ///Produce account public mask
+    pub fn make_account_public_mask(&self) -> AccountPublicMask {
+        AccountPublicMask {
+            nullifier_public_key: self.key_holder.nullifer_public_key,
+            viewing_public_key: self.key_holder.viewing_public_key,
+            address: self.address,
+            balance: self.balance,
+        }
     }
 }
 

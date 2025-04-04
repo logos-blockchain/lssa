@@ -1,10 +1,14 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::Path,
+};
 
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
 use block_store::NodeBlockStore;
 use elliptic_curve::group::GroupEncoding;
 use k256::AffinePoint;
+use public_context::PublicSCContext;
 use storage::{
     block::Block,
     merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
@@ -18,6 +22,7 @@ use crate::ActionData;
 
 pub mod accounts_store;
 pub mod block_store;
+pub mod public_context;
 
 pub struct NodeChainStore {
     pub acc_map: HashMap<AccountAddress, Account>,
@@ -148,5 +153,22 @@ impl NodeChainStore {
         self.block_store.put_block_at_id(block)?;
 
         Ok(())
+    }
+
+    pub fn produce_context(&self, caller: AccountAddress) -> PublicSCContext {
+        let mut account_masks = BTreeMap::new();
+
+        for (acc_addr, acc) in &self.acc_map {
+            account_masks.insert(*acc_addr, acc.make_account_public_mask());
+        }
+
+        PublicSCContext {
+            caller_address: caller,
+            caller_balance: self.acc_map.get(&caller).unwrap().balance,
+            account_masks,
+            nullifier_store_root: self.nullifier_store.curr_root.unwrap_or([0; 32]),
+            comitment_store_root: self.utxo_commitments_store.get_root().unwrap_or([0; 32]),
+            pub_tx_store_root: self.pub_tx_store.get_root().unwrap_or([0; 32]),
+        }
     }
 }

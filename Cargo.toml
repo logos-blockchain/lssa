@@ -58,7 +58,7 @@ features = ["std", "std_rng", "getrandom"]
 version = "0.8.5"
 
 [workspace.dependencies.k256]
-features = ["ecdsa-core", "arithmetic", "expose-field"]
+features = ["ecdsa-core", "arithmetic", "expose-field", "serde"]
 version = "0.13.4"
 
 [workspace.dependencies.elliptic-curve]
