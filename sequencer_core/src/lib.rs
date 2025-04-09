@@ -300,6 +300,9 @@ mod tests {
             execution_proof_private: "dummy_proof".to_string(),
             encoded_data: vec![],
             ephemeral_pub_key: vec![10, 11, 12],
+            commitment: vec![],
+            tweak: Tweak::new(&mut rng),
+            secret_r: [0; 32],
         }
     }
 
