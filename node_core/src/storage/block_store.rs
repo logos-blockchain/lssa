@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use storage::{block::Block, RocksDBIO};
+use storage::sc_db_utils::DataBlob;
 
 pub struct NodeBlockStore {
     dbio: RocksDBIO,
@@ -40,6 +41,10 @@ impl NodeBlockStore {
 
     pub fn put_block_at_id(&self, block: Block) -> Result<()> {
         Ok(self.dbio.put_block(block, false)?)
+    }
+
+    pub fn get_sc_sc_state(&self, sc_addr: &str) -> Result<Vec<DataBlob>> {
+        Ok(self.dbio.get_sc_sc_state(sc_addr)?)
     }
 }
 
