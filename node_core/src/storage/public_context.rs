@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
 
 use accounts::account_core::{AccountAddress, AccountPublicMask};
+use serde::{Serialize};
 use storage::merkle_tree_public::TreeHashType;
 
 ///Strucutre, representing context, given to a smart contract on a call
+#[derive(Serialize)]
 pub struct PublicSCContext {
     pub caller_address: AccountAddress,
     pub caller_balance: u64,
