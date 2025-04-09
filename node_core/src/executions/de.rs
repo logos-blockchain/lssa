@@ -154,6 +154,26 @@ pub fn verify_commitment(
     commitment == *pedersen_commitment
 }
 
+// new_commitment
+pub fn new_commitment(
+    public_info: u64,
+    secret_r: &[u8],
+) -> (Tweak, &[u8], PedersenCommitment) {
+    let generator_blinding_factor = Tweak::new(&mut thread_rng());
+    let commitment_secrets = CommitmentSecrets {
+        value: public_info,
+        value_blinding_factor: Tweak::from_slice(secret_r).unwrap(),
+        generator_blinding_factor,
+    };
+
+    let tag = tag_random();
+    let commitment = commit(&commitment_secrets, tag);
+
+    (generator_blinding_factor, secret_r, commitment)
+}
+
+
+
 #[allow(unused)]
 fn de_kernel(
     root_commitment: &[u8],
