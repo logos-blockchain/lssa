@@ -240,6 +240,24 @@ impl NodeCore {
         ))
     }
 
+    fn vec_u8_to_vec_u64(bytes: Vec<u8>) -> Vec<u64> {
+        // Pad with zeros to make sure it's a multiple of 8
+        let mut padded = bytes.clone();
+        while padded.len() % 8 != 0 {
+            padded.push(0);
+        }
+    
+        padded
+            .chunks(8)
+            .map(|chunk| {
+                let mut array = [0u8; 8];
+                array.copy_from_slice(chunk);
+                u64::from_le_bytes(array)
+            })
+            .collect()
+    }
+
+
     pub async fn mint_utxo_multiple_assets_private(
         &self,
         acc: AccountAddress,
