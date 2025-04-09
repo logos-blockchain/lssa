@@ -269,9 +269,9 @@ impl NodeCore {
 
         let acc_map_read_guard = self.storage.read().await;
 
-        let accout = acc_map_read_guard.acc_map.get(&acc).unwrap();
+        let account = acc_map_read_guard.acc_map.get(&acc).unwrap();
 
-        let ephm_key_holder = &accout.produce_ephemeral_key_holder();
+        let ephm_key_holder = &account.produce_ephemeral_key_holder();
         ephm_key_holder.log();
 
         let eph_pub_key =
@@ -283,16 +283,37 @@ impl NodeCore {
                 (
                     Account::encrypt_data(
                         &ephm_key_holder,
-                        accout.key_holder.viewing_public_key,
+                        account.key_holder.viewing_public_key,
                         &serde_json::to_vec(&utxo).unwrap(),
                     ),
-                    accout.make_tag(),
+                    account.make_tag(),
                 )
             })
             .map(|((ciphertext, nonce), tag)| (ciphertext, nonce.to_vec(), tag))
             .collect();
 
         let comm = generate_commitments(&utxos);
+
+        // TODO: fix address when correspoding method will be added
+        let sc_addr = "";
+        let mut rng = rand::thread_rng();
+        let secret_r: [u8; 32] = rng.gen();
+
+        let sc_state = acc_map_read_guard.block_store.get_sc_sc_state(sc_addr).map_err(ExecutionFailureKind::db_error)?;
+
+        let mut vec_values_u64: Vec<Vec<u64>> =  sc_state.into_iter().map(|slice| Self::vec_u8_to_vec_u64(slice.to_vec())).collect();
+
+        let context = acc_map_read_guard.produce_context(account.address);
+
+        let serialized_context = serde_json::to_vec(&context).unwrap();
+
+        let serialized_context_u64 = Self::vec_u8_to_vec_u64(serialized_context);
+
+        vec_values_u64.push(serialized_context_u64);
+
+        let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
+
+        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
 
         Ok((
             TransactionPayload {
@@ -311,6 +332,9 @@ impl NodeCore {
                 .unwrap(),
                 encoded_data,
                 ephemeral_pub_key: eph_pub_key.to_vec(),
+                commitment,
+                tweak,
+                secret_r: secret_r.try_into().unwrap(),
             }
             .into(),
             result_hashes,
