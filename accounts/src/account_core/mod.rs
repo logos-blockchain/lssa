@@ -29,6 +29,7 @@ pub struct Account {
 ///A strucure, which represents all the visible(public) information
 ///
 /// known to each node about account `address`
+#[derive(Serialize)]
 pub struct AccountPublicMask {
     pub nullifier_public_key: AffinePoint,
     pub viewing_public_key: AffinePoint,
