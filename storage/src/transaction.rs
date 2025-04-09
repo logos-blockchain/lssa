@@ -1,6 +1,7 @@
 use log::info;
 use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
+use secp256k1_zkp::{rand, PedersenCommitment, Tweak};
 
 use crate::merkle_tree_public::TreeHashType;
 
@@ -43,6 +44,12 @@ pub struct Transaction {
     pub encoded_data: Vec<(CipherText, Vec<u8>, Tag)>,
     ///Transaction senders ephemeral pub key
     pub ephemeral_pub_key: Vec<u8>,
+    ///Public (Pedersen) commitment
+    pub commitment: Vec<PedersenCommitment>,
+    ///tweak
+    pub tweak: Tweak,
+    ///secret_r
+    pub secret_r: [u8; 32],
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -65,6 +72,12 @@ pub struct TransactionPayload {
     pub encoded_data: Vec<(CipherText, Vec<u8>, Tag)>,
     ///Transaction senders ephemeral pub key
     pub ephemeral_pub_key: Vec<u8>,
+    ///Public (Pedersen) commitment
+    pub commitment: Vec<PedersenCommitment>,
+    ///tweak
+    pub tweak: Tweak,
+    ///secret_r
+    pub secret_r: [u8; 32],
 }
 
 impl From<TransactionPayload> for Transaction {
@@ -77,6 +90,8 @@ impl From<TransactionPayload> for Transaction {
 
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
+        let mut rng = rand::thread_rng();
+
         Self {
             hash,
             tx_kind: value.tx_kind,
@@ -88,6 +103,9 @@ impl From<TransactionPayload> for Transaction {
             execution_proof_private: value.execution_proof_private,
             encoded_data: value.encoded_data,
             ephemeral_pub_key: value.ephemeral_pub_key,
+            commitment: value.commitment,
+            tweak: Tweak::new(&mut rng),
+            secret_r: [0; 32],
         }
     }
 }
