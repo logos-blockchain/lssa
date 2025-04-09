@@ -13,6 +13,10 @@ sha2.workspace = true
 elliptic-curve.workspace = true
 monotree.workspace = true
 
+[dependencies.secp256k1-zkp]
+workspace = true
+features = ["std", "rand-std", "rand", "serde", "global-context"]
+
 [dependencies.storage]
 path = "../storage"
 
