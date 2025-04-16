@@ -1,9 +1,9 @@
 use accounts::account_core::Account;
 use anyhow::Result;
+use common::transaction::{TransactionPayload, TxKind};
 use rand::thread_rng;
 use risc0_zkvm::Receipt;
 use secp256k1_zkp::{CommitmentSecrets, PedersenCommitment, Tweak};
-use storage::transaction::{TransactionPayload, TxKind};
 use utxo::utxo_core::UTXO;
 
 use crate::proofs_circuits::{commit, generate_nullifiers, tag_random};

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use common::merkle_tree_public::TreeHashType;
 use monotree::database::MemoryDB;
 use monotree::hasher::Blake3;
 use monotree::{Hasher, Monotree, Proof};
-use storage::merkle_tree_public::TreeHashType;
 
 use crate::utxo_core::UTXO;
 
@@ -75,9 +75,10 @@ impl Default for UTXOSparseMerkleTree {
 
 #[cfg(test)]
 mod tests {
+    use common::AccountId;
+
     use super::*;
     use crate::utxo_core::{UTXOPayload, UTXO};
-    use storage::{merkle_tree_public::TreeHashType, AccountId};
 
     fn sample_utxo_payload() -> UTXOPayload {
         UTXOPayload {

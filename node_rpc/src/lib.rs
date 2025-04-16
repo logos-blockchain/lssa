@@ -4,11 +4,11 @@ pub mod types;
 
 use std::sync::Arc;
 
-use node_core::{config::NodeConfig, NodeCore};
-use rpc_primitives::{
+use common::rpc_primitives::{
     errors::{RpcError, RpcErrorKind},
     RpcPollingConfig,
 };
+use node_core::{config::NodeConfig, NodeCore};
 use serde::Serialize;
 use serde_json::Value;
 

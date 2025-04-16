@@ -4,7 +4,7 @@ pub mod types;
 
 use std::sync::Arc;
 
-use rpc_primitives::{
+use common::rpc_primitives::{
     errors::{RpcError, RpcErrorKind},
     RpcPollingConfig,
 };

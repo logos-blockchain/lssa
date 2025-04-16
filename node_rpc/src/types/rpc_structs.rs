@@ -1,10 +1,10 @@
-use rpc_primitives::errors::RpcParseError;
-use rpc_primitives::parse_request;
-use rpc_primitives::parser::parse_params;
-use rpc_primitives::parser::RpcRequest;
+use common::parse_request;
+use common::rpc_primitives::errors::RpcParseError;
+use common::rpc_primitives::parser::parse_params;
+use common::rpc_primitives::parser::RpcRequest;
+use common::transaction::TxKind;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use storage::transaction::TxKind;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecuteSubscenarioRequest {

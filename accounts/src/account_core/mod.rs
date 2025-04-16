@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use common::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, transaction::Tag};
 use k256::AffinePoint;
 use log::info;
 use serde::Serialize;
-use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, transaction::Tag};
 use utxo::{
     utxo_core::{UTXOPayload, UTXO},
     utxo_tree::UTXOSparseMerkleTree,

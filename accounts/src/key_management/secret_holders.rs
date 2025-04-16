@@ -1,8 +1,8 @@
+use common::merkle_tree_public::TreeHashType;
 use elliptic_curve::PrimeField;
 use k256::{AffinePoint, FieldBytes, Scalar};
 use rand::{rngs::OsRng, RngCore};
 use sha2::{digest::FixedOutput, Digest};
-use storage::merkle_tree_public::TreeHashType;
 
 use super::constants_types::{NULLIFIER_SECRET_CONST, VIEVING_SECRET_CONST};
 

@@ -38,9 +38,6 @@ path = "../utxo"
 [dependencies.zkvm]
 path = "../zkvm"
 
-[dependencies.rpc_primitives]
-path = "../rpc_primitives"
-
 [dependencies.common]
 path = "../common"
 

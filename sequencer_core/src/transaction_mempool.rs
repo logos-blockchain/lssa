@@ -1,10 +1,16 @@
+use common::{merkle_tree_public::TreeHashType, transaction::Transaction};
 use mempool::mempoolitem::MemPoolItem;
 use serde::{Deserialize, Serialize};
-use storage::{merkle_tree_public::TreeHashType, transaction::Transaction};
 
 #[derive(Debug, Clone)]
 pub struct TransactionMempool {
     pub tx: Transaction,
+}
+
+impl From<Transaction> for TransactionMempool {
+    fn from(value: Transaction) -> Self {
+        Self { tx: value }
+    }
 }
 
 impl Serialize for TransactionMempool {

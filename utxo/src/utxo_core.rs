@@ -1,8 +1,8 @@
 use anyhow::Result;
+use common::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
 use log::info;
 use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
-use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
 
 ///Raw asset data
 pub type Asset = Vec<u8>;
@@ -87,7 +87,6 @@ impl UTXO {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug)]
     struct TestAsset {

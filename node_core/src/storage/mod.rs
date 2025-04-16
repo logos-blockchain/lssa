@@ -6,15 +6,15 @@ use std::{
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
 use block_store::NodeBlockStore;
-use k256::AffinePoint;
-use public_context::PublicSCContext;
-use storage::{
+use common::{
     block::Block,
     merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
     nullifier::UTXONullifier,
     nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
     utxo_commitment::UTXOCommitment,
 };
+use k256::AffinePoint;
+use public_context::PublicSCContext;
 use utxo::utxo_core::UTXO;
 
 use crate::ActionData;

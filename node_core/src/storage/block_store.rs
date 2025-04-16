@@ -1,8 +1,9 @@
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
+use common::block::Block;
 use storage::sc_db_utils::DataBlob;
-use storage::{block::Block, RocksDBIO};
+use storage::RocksDBIO;
 
 pub struct NodeBlockStore {
     dbio: RocksDBIO,
@@ -51,7 +52,7 @@ impl NodeBlockStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use storage::block::{Block, Data};
+    use common::block::Data;
     use tempfile::tempdir;
 
     fn create_genesis_block() -> Block {

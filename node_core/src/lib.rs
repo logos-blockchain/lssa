@@ -5,9 +5,9 @@ use std::sync::{
 
 use common::ExecutionFailureKind;
 
-use ::storage::transaction::{Transaction, TransactionPayload, TxKind};
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
+use common::transaction::{Transaction, TransactionPayload, TxKind};
 use config::NodeConfig;
 use executions::private_exec::{generate_commitments, generate_nullifiers};
 use log::info;

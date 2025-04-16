@@ -41,8 +41,5 @@ path = "../zkvm"
 [dependencies.node_core]
 path = "../node_core"
 
-[dependencies.rpc_primitives]
-path = "../rpc_primitives"
-
 [dependencies.common]
 path = "../common"

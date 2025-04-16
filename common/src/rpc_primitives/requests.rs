@@ -1,11 +1,12 @@
-use crate::errors::RpcParseError;
+use crate::block::Block;
 use crate::parse_request;
-use crate::parser::parse_params;
-use crate::parser::RpcRequest;
-use sequencer_core::transaction_mempool::TransactionMempool;
+use crate::transaction::Transaction;
+
+use super::errors::RpcParseError;
+use super::parser::parse_params;
+use super::parser::RpcRequest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use storage::block::Block;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloRequest {}
@@ -19,7 +20,7 @@ pub struct RegisterAccountRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
-    pub transaction: TransactionMempool,
+    pub transaction: Transaction,
     ///Nullifier Root, UTXO Commitment Root, Pub Tx Root
     pub tx_roots: [[u8; 32]; 3],
 }

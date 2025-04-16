@@ -32,5 +32,5 @@ path = "../sequencer_core"
 [dependencies.storage]
 path = "../storage"
 
-[dependencies.rpc_primitives]
-path = "../rpc_primitives"
+[dependencies.common]
+path = "../common"

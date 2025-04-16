@@ -1,5 +1,5 @@
+use common::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
 use serde::{Deserialize, Serialize};
-use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
 
 ///Raw asset data
 pub type Asset = Vec<u8>;

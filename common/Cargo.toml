@@ -12,5 +12,12 @@ reqwest.workspace = true
 monotree.workspace = true
 risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.0" }
 
-[dependencies.rpc_primitives]
-path = "../rpc_primitives"
+rs_merkle.workspace = true
+sha2.workspace = true
+log.workspace = true
+elliptic-curve.workspace = true
+hex.workspace = true
+
+[dependencies.secp256k1-zkp]
+workspace = true
+features = ["std", "rand-std", "rand", "serde", "global-context"]

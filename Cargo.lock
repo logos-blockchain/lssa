@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
+ "common",
  "elliptic-curve",
  "env_logger",
  "hex",
@@ -17,7 +18,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.8",
- "storage",
  "utxo",
 ]
 
@@ -1078,12 +1078,17 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "elliptic-curve",
+ "hex",
+ "log",
  "monotree",
  "reqwest 0.11.27",
  "risc0-zkvm",
- "rpc_primitives",
+ "rs_merkle",
+ "secp256k1-zkp",
  "serde",
  "serde_json",
+ "sha2 0.10.8",
  "thiserror 1.0.69",
 ]
 
@@ -1150,6 +1155,7 @@ name = "core_primitives"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "common",
  "elliptic-curve",
  "env_logger",
  "log",
@@ -3110,7 +3116,6 @@ dependencies = [
  "rand 0.8.5",
  "reqwest 0.11.27",
  "risc0-zkvm",
- "rpc_primitives",
  "sc_core",
  "secp256k1-zkp",
  "serde",
@@ -3141,7 +3146,6 @@ dependencies = [
  "log",
  "networking",
  "node_core",
- "rpc_primitives",
  "serde",
  "serde_json",
  "storage",
@@ -3160,13 +3164,13 @@ dependencies = [
  "actix-web",
  "anyhow",
  "clap",
+ "common",
  "consensus",
  "env_logger",
  "log",
  "networking",
  "node_core",
  "node_rpc",
- "rpc_primitives",
  "serde",
  "serde_json",
  "storage",
@@ -4369,19 +4373,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rpc_primitives"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "env_logger",
- "log",
- "sequencer_core",
- "serde",
- "serde_json",
- "storage",
-]
-
-[[package]]
 name = "rrs-lib"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4680,6 +4671,7 @@ version = "0.1.0"
 dependencies = [
  "accounts",
  "anyhow",
+ "common",
  "elliptic-curve",
  "env_logger",
  "k256",
@@ -4700,6 +4692,7 @@ dependencies = [
  "actix-cors",
  "actix-web",
  "anyhow",
+ "common",
  "consensus",
  "env_logger",
  "futures",
@@ -4707,7 +4700,6 @@ dependencies = [
  "log",
  "mempool",
  "networking",
- "rpc_primitives",
  "sequencer_core",
  "serde",
  "serde_json",
@@ -4723,12 +4715,12 @@ dependencies = [
  "actix-web",
  "anyhow",
  "clap",
+ "common",
  "consensus",
  "env_logger",
  "log",
  "mempool",
  "networking",
- "rpc_primitives",
  "sequencer_core",
  "sequencer_rpc",
  "serde",
@@ -4969,18 +4961,14 @@ name = "storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "elliptic-curve",
+ "common",
  "env_logger",
  "hex",
  "log",
  "lru",
- "monotree",
  "rocksdb",
- "rs_merkle",
- "secp256k1-zkp",
  "serde",
  "serde_json",
- "sha2 0.10.8",
  "thiserror 1.0.69",
 ]
 
@@ -5522,6 +5510,7 @@ name = "utxo"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "common",
  "env_logger",
  "hex",
  "log",
@@ -5529,7 +5518,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.8",
- "storage",
 ]
 
 [[package]]
@@ -6238,7 +6226,6 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_json",
- "storage",
  "test-methods",
  "thiserror 1.0.69",
  "utxo",

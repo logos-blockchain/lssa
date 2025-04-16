@@ -2,12 +2,12 @@ use std::path::Path;
 
 use accounts_store::SequencerAccountsStore;
 use block_store::SequecerBlockStore;
-use rand::{rngs::OsRng, RngCore};
-use storage::{
+use common::{
     block::{Block, HashableBlockData},
     merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
     nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
 };
+use rand::{rngs::OsRng, RngCore};
 
 pub mod accounts_store;
 pub mod block_store;

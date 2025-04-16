@@ -1,14 +1,14 @@
 use actix_web::Error as HttpError;
-use sequencer_core::sequecer_store::accounts_store::AccountPublicData;
+use sequencer_core::sequencer_store::accounts_store::AccountPublicData;
 use serde_json::Value;
 
-use rpc_primitives::{
+use common::rpc_primitives::{
     errors::RpcError,
     message::{Message, Request},
     parser::RpcRequest,
 };
 
-use rpc_primitives::requests::{
+use common::rpc_primitives::requests::{
     GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
     GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse, RegisterAccountRequest,
     RegisterAccountResponse, SendTxRequest, SendTxResponse,
@@ -70,7 +70,10 @@ impl JsonHandler {
         {
             let mut state = self.sequencer_state.lock().await;
 
-            state.push_tx_into_mempool_pre_check(send_tx_req.transaction, send_tx_req.tx_roots)?;
+            state.push_tx_into_mempool_pre_check(
+                send_tx_req.transaction.into(),
+                send_tx_req.tx_roots,
+            )?;
         }
 
         let helperstruct = SendTxResponse {

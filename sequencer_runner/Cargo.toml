@@ -34,5 +34,5 @@ path = "../sequencer_rpc"
 [dependencies.sequencer_core]
 path = "../sequencer_core"
 
-[dependencies.rpc_primitives]
-path = "../rpc_primitives"
+[dependencies.common]
+path = "../common"

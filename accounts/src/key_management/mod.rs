@@ -1,10 +1,10 @@
 use aes_gcm::{aead::Aead, Aes256Gcm, Key, KeyInit};
+use common::merkle_tree_public::TreeHashType;
 use constants_types::{CipherText, Nonce};
 use ephemeral_key_holder::EphemeralKeyHolder;
 use k256::AffinePoint;
 use log::info;
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
-use storage::merkle_tree_public::TreeHashType;
 
 use crate::account_core::PublicKey;
 

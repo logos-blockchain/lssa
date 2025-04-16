@@ -16,8 +16,8 @@ elliptic-curve.workspace = true
 hex.workspace = true
 aes-gcm.workspace = true
 
-[dependencies.storage]
-path = "../storage"
-
 [dependencies.utxo]
 path = "../utxo"
+
+[dependencies.common]
+path = "../common"

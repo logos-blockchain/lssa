@@ -2,12 +2,12 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use clap::Parser;
+use common::rpc_primitives::RpcConfig;
 use consensus::ConsensusManager;
 use log::info;
 use networking::peer_manager::PeerManager;
 use node_core::NodeCore;
 use node_rpc::new_http_server;
-use rpc_primitives::RpcConfig;
 use tokio::sync::Mutex;
 
 pub mod config;

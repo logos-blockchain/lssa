@@ -1,5 +1,5 @@
 use anyhow::Result;
-use storage::nullifier::UTXONullifier;
+use common::nullifier::UTXONullifier;
 use utxo::utxo_core::{UTXOPayload, UTXO};
 
 pub fn utxo_change_owner(

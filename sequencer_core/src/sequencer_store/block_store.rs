@@ -1,7 +1,8 @@
 use std::path::Path;
 
 use anyhow::Result;
-use storage::{block::Block, RocksDBIO};
+use common::block::Block;
+use storage::RocksDBIO;
 
 pub struct SequecerBlockStore {
     dbio: RocksDBIO,

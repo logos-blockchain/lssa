@@ -7,8 +7,8 @@ use futures::Future;
 use futures::FutureExt;
 use log::info;
 
-use rpc_primitives::message::Message;
-use rpc_primitives::RpcConfig;
+use common::rpc_primitives::message::Message;
+use common::rpc_primitives::RpcConfig;
 use sequencer_core::SequencerCore;
 use tokio::sync::Mutex;
 

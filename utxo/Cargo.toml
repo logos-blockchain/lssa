@@ -13,5 +13,5 @@ monotree.workspace = true
 sha2.workspace = true
 hex.workspace = true
 
-[dependencies.storage]
-path = "../storage"
+[dependencies.common]
+path = "../common"

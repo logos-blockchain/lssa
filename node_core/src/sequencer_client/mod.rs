@@ -1,15 +1,15 @@
 use accounts::account_core::Account;
 use anyhow::Result;
+use common::rpc_primitives::requests::{
+    GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
+    RegisterAccountRequest, RegisterAccountResponse,
+};
+use common::transaction::Transaction;
 use common::{SequencerClientError, SequencerRpcError};
 use json::{SendTxRequest, SendTxResponse, SequencerRpcRequest, SequencerRpcResponse};
 use k256::elliptic_curve::group::GroupEncoding;
 use reqwest::Client;
-use rpc_primitives::requests::{
-    GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
-    RegisterAccountRequest, RegisterAccountResponse,
-};
 use serde_json::Value;
-use storage::transaction::Transaction;
 
 use crate::config::NodeConfig;
 

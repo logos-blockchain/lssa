@@ -22,3 +22,6 @@ path = "../storage"
 
 [dependencies.sequencer_core]
 path = "../sequencer_core"
+
+[dependencies.common]
+path = "../common"

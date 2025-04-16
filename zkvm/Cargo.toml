@@ -17,9 +17,6 @@ test-methods = { path = "test_methods" }
 [dependencies.accounts]
 path = "../accounts"
 
-[dependencies.storage]
-path = "../storage"
-
 [dependencies.utxo]
 path = "../utxo"
 

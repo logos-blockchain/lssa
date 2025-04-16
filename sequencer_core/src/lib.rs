@@ -1,21 +1,21 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use config::SequencerConfig;
-use mempool::MemPool;
-use sequecer_store::{accounts_store::AccountPublicData, SequecerChainStore};
-use serde::{Deserialize, Serialize};
-use storage::{
+use common::{
     block::{Block, HashableBlockData},
     merkle_tree_public::TreeHashType,
     nullifier::UTXONullifier,
     transaction::{Transaction, TxKind},
     utxo_commitment::UTXOCommitment,
 };
+use config::SequencerConfig;
+use mempool::MemPool;
+use sequencer_store::{accounts_store::AccountPublicData, SequecerChainStore};
+use serde::{Deserialize, Serialize};
 use transaction_mempool::TransactionMempool;
 
 pub mod config;
-pub mod sequecer_store;
+pub mod sequencer_store;
 pub mod transaction_mempool;
 
 pub struct SequencerCore {
@@ -262,9 +262,9 @@ mod tests {
     use super::*;
     use std::{fmt::format, path::PathBuf};
 
+    use common::transaction::{Transaction, TxKind};
     use rand::Rng;
     use secp256k1_zkp::Tweak;
-    use storage::transaction::{Transaction, TxKind};
     use transaction_mempool::TransactionMempool;
 
     fn setup_sequencer_config() -> SequencerConfig {

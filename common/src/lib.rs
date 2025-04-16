@@ -1,5 +1,20 @@
-use rpc_primitives::errors::RpcError;
+use merkle_tree_public::TreeHashType;
 use serde::Deserialize;
+
+pub mod block;
+pub mod commitment;
+pub mod commitments_sparse_merkle_tree;
+pub mod merkle_tree_public;
+pub mod nullifier;
+pub mod nullifier_sparse_merkle_tree;
+pub mod rpc_primitives;
+pub mod transaction;
+pub mod utxo_commitment;
+
+use rpc_primitives::errors::RpcError;
+
+///Account id on blockchain
+pub type AccountId = TreeHashType;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequencerRpcError {

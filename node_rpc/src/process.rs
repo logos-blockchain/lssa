@@ -4,14 +4,14 @@ use actix_web::Error as HttpError;
 use node_core::generate_commitments_helper;
 use serde_json::Value;
 
-use rpc_primitives::{
+use common::rpc_primitives::{
     errors::RpcError,
     message::{Message, Request},
     parser::RpcRequest,
 };
-use storage::transaction::ActionData;
+use common::transaction::ActionData;
 
-use rpc_primitives::requests::{
+use common::rpc_primitives::requests::{
     GetBlockDataRequest, GetBlockDataResponse, GetLastBlockRequest, GetLastBlockResponse,
     RegisterAccountRequest, RegisterAccountResponse,
 };

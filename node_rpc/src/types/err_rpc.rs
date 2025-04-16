@@ -1,7 +1,7 @@
 use common::{ExecutionFailureKind, SequencerClientError};
 use log::debug;
 
-use rpc_primitives::errors::{RpcError, RpcParseError};
+use common::rpc_primitives::errors::{RpcError, RpcParseError};
 
 pub struct RpcErr(pub RpcError);
 

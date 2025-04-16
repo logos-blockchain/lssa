@@ -7,10 +7,10 @@ use futures::Future;
 use futures::FutureExt;
 use log::info;
 
+use common::rpc_primitives::message::Message;
+use common::rpc_primitives::RpcConfig;
 use node_core::config::NodeConfig;
 use node_core::NodeCore;
-use rpc_primitives::message::Message;
-use rpc_primitives::RpcConfig;
 use tokio::sync::Mutex;
 
 use super::JsonHandler;

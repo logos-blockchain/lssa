@@ -1,14 +1,14 @@
 use bincode;
+use common::{
+    commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree,
+    nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
+};
 use k256::Scalar;
 use monotree::hasher::Blake3;
 use monotree::{Hasher, Monotree};
 use rand::{thread_rng, RngCore};
 use secp256k1_zkp::{CommitmentSecrets, Generator, PedersenCommitment, Tag, Tweak, SECP256K1};
 use sha2::{Digest, Sha256};
-use storage::{
-    commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree,
-    nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
-};
 use utxo::utxo_core::UTXO;
 
 fn hash(input: &[u8]) -> Vec<u8> {

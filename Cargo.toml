@@ -15,7 +15,6 @@ members = [
   "zkvm",
   "node_core",
   "sequencer_core",
-  "rpc_primitives",
   "common",
   "sc_core",
   "core_primitives",

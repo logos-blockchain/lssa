@@ -2,8 +2,8 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use clap::Parser;
+use common::rpc_primitives::RpcConfig;
 use log::info;
-use rpc_primitives::RpcConfig;
 use sequencer_core::SequencerCore;
 use sequencer_rpc::new_http_server;
 use tokio::sync::Mutex;

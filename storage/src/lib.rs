@@ -1,27 +1,15 @@
 use std::{path::Path, sync::Arc};
 
-use block::Block;
+use common::block::Block;
 use error::DbError;
 use log::warn;
-use merkle_tree_public::TreeHashType;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
 };
 use sc_db_utils::{produce_blob_from_fit_vec, DataBlob, DataBlobChangeVariant};
 
-pub mod block;
-pub mod commitment;
-pub mod commitments_sparse_merkle_tree;
 pub mod error;
-pub mod merkle_tree_public;
-pub mod nullifier;
-pub mod nullifier_sparse_merkle_tree;
 pub mod sc_db_utils;
-pub mod transaction;
-pub mod utxo_commitment;
-
-///Account id on blockchain
-pub type AccountId = TreeHashType;
 
 ///Maximal size of stored blocks in base
 ///

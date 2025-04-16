@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::errors::RpcParseError;
+use super::errors::RpcParseError;
 
 pub trait RpcRequest: Sized {
     fn parse(value: Option<Value>) -> Result<Self, RpcParseError>;

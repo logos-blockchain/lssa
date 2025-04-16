@@ -1,12 +1,12 @@
 use bincode;
+use common::{
+    commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree,
+    nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
+};
 use k256::Scalar;
 use monotree::hasher::Blake3;
 use monotree::{Hasher, Monotree};
 use sha2::{Digest, Sha256};
-use storage::{
-    commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree,
-    nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
-};
 use utxo::utxo_core::UTXO;
 
 fn hash(input: &[u8]) -> Vec<u8> {
