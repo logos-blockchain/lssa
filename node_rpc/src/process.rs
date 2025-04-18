@@ -50,7 +50,7 @@ pub const WRITE_SEND_UTXO_SHIELDED: &str = "write_send_utxo_shielded";
 pub const WRITE_SEND_UTXO_DESHIELDED: &str = "write_send_utxo_deshielded";
 pub const WRITE_SPLIT_UTXO: &str = "write_split_utxo";
 
-pub const  SUCCESS: &str = "success";
+pub const SUCCESS: &str = "success";
 
 pub const ACCOUNT_NOT_FOUND: &str = "Account not found";
 pub const TRANSACTION_NOT_FOUND: &str = "Transaction not found";
@@ -791,9 +791,7 @@ impl JsonHandler {
                 self.process_request_execute_scenario_multiple_send(request)
                     .await
             }
-            SHOW_ACCOUNT_PUBLIC_BALANCE => {
-                self.process_show_account_public_balance(request).await
-            }
+            SHOW_ACCOUNT_PUBLIC_BALANCE => self.process_show_account_public_balance(request).await,
             SHOW_ACCOUNT_UTXO => self.process_show_account_utxo_request(request).await,
             SHOW_TRANSACTION => self.process_show_transaction(request).await,
             WRITE_DEPOSIT_PUBLIC_BALANCE => {
