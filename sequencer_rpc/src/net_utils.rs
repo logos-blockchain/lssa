@@ -16,6 +16,8 @@ use super::JsonHandler;
 
 pub const SHUTDOWN_TIMEOUT_SECS: u64 = 10;
 
+pub const NETWORK: &str = "network";
+
 fn rpc_handler(
     message: web::Json<Message>,
     handler: web::Data<JsonHandler>,
@@ -51,7 +53,7 @@ pub fn new_http_server(
         polling_config,
         limits_config,
     } = config;
-    info!(target:"network", "Starting http server at {}", addr);
+    info!(target:NETWORK, "Starting http server at {}", addr);
     let handler = web::Data::new(JsonHandler {
         polling_config,
         sequencer_state: seuquencer_core.clone(),
