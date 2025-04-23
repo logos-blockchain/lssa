@@ -33,6 +33,28 @@ use crate::types::{
     },
 };
 
+pub const WRITE_REGISTER_ACCOUNT: &str = "write_register_account";
+pub const EXECUTE_SUBSCENARIO: &str = "execute_subscenario";
+pub const GET_BLOCK: &str = "get_block";
+pub const GET_LAST_BLOCK: &str = "get_last_block";
+pub const EXECUTE_SCENARIO_SPLIT: &str = "execute_scenario_split";
+pub const EXECUTE_SCENARIO_MULTIPLE_SEND: &str = "execute_scenario_multiple_send";
+pub const SHOW_ACCOUNT_PUBLIC_BALANCE: &str = "show_account_public_balance";
+pub const SHOW_ACCOUNT_UTXO: &str = "show_account_utxo";
+pub const SHOW_TRANSACTION: &str = "show_transaction";
+pub const WRITE_DEPOSIT_PUBLIC_BALANCE: &str = "write_deposit_public_balance";
+pub const WRITE_MINT_UTXO: &str = "write_mint_utxo";
+pub const WRITE_MINT_UTXO_MULTIPLE_ASSETS: &str = "write_mint_utxo_multiple_assets";
+pub const WRITE_SEND_UTXO_PRIVATE: &str = "write_send_utxo_private";
+pub const WRITE_SEND_UTXO_SHIELDED: &str = "write_send_utxo_shielded";
+pub const WRITE_SEND_UTXO_DESHIELDED: &str = "write_send_utxo_deshielded";
+pub const WRITE_SPLIT_UTXO: &str = "write_split_utxo";
+
+pub const SUCCESS: &str = "success";
+
+pub const ACCOUNT_NOT_FOUND: &str = "Account not found";
+pub const TRANSACTION_NOT_FOUND: &str = "Transaction not found";
+
 use super::{respond, types::err_rpc::RpcErr, JsonHandler};
 
 impl JsonHandler {
@@ -83,7 +105,7 @@ impl JsonHandler {
         }
 
         let helperstruct = ExecuteSubscenarioResponse {
-            scenario_result: "success".to_string(),
+            scenario_result: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -105,7 +127,7 @@ impl JsonHandler {
         }
 
         let helperstruct = ExecuteScenarioSplitResponse {
-            scenario_result: "success".to_string(),
+            scenario_result: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -127,7 +149,7 @@ impl JsonHandler {
         }
 
         let helperstruct = ExecuteScenarioMultipleSendResponse {
-            scenario_result: "success".to_string(),
+            scenario_result: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -201,7 +223,7 @@ impl JsonHandler {
                 let acc = under_guard
                     .acc_map
                     .get(&acc_addr)
-                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+                    .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
                 acc.balance
             }
@@ -243,7 +265,7 @@ impl JsonHandler {
                 let acc = under_guard
                     .acc_map
                     .get_mut(&acc_addr)
-                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+                    .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
                 let utxo = acc
                     .utxo_tree
@@ -253,7 +275,7 @@ impl JsonHandler {
                     })?
                     .ok_or(RpcError::new_internal_error(
                         None,
-                        "UTXO does not exist in tree",
+                        "UTXO does not exist in the tree",
                     ))?;
 
                 (utxo.asset.clone(), utxo.amount)
@@ -289,7 +311,7 @@ impl JsonHandler {
                 let tx = under_guard
                     .pub_tx_store
                     .get_tx(tx_hash)
-                    .ok_or(RpcError::new_internal_error(None, "Transactio not found"))?;
+                    .ok_or(RpcError::new_internal_error(None, TRANSACTION_NOT_FOUND))?;
 
                 ShowTransactionResponse {
                     hash: req.tx_hash,
@@ -360,7 +382,7 @@ impl JsonHandler {
         };
 
         let helperstruct = WriteDepositPublicBalanceResponse {
-            status: "success".to_string(),
+            status: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -387,7 +409,7 @@ impl JsonHandler {
         };
 
         let helperstruct = WriteMintPrivateUTXOResponse {
-            status: "success".to_string(),
+            status: SUCCESS.to_string(),
             utxo: UTXOShortEssentialStruct {
                 hash: hex::encode(utxo.hash),
                 commitment_hash: hex::encode(commitment_hash),
@@ -426,7 +448,7 @@ impl JsonHandler {
         };
 
         let helperstruct = WriteMintPrivateUTXOMultipleAssetsResponse {
-            status: "success".to_string(),
+            status: SUCCESS.to_string(),
             utxos: utxos
                 .into_iter()
                 .zip(commitment_hashes)
@@ -488,7 +510,7 @@ impl JsonHandler {
                 let acc = under_guard
                     .acc_map
                     .get_mut(&acc_addr_sender)
-                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+                    .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
                 acc.utxo_tree
                     .get_item(utxo_hash)
@@ -509,7 +531,7 @@ impl JsonHandler {
         };
 
         let helperstruct = WriteSendPrivateUTXOResponse {
-            status: "success".to_string(),
+            status: SUCCESS.to_string(),
             utxo_result: UTXOShortEssentialStruct {
                 hash: hex::encode(new_utxo_rec.hash),
                 asset: new_utxo_rec.asset.clone(),
@@ -562,7 +584,7 @@ impl JsonHandler {
         };
 
         let helperstruct = WriteSendShieldedUTXOResponse {
-            status: "success".to_string(),
+            status: SUCCESS.to_string(),
             utxo_result: UTXOShortEssentialStruct {
                 hash: hex::encode(new_utxo_rec.hash),
                 asset: new_utxo_rec.asset.clone(),
@@ -623,7 +645,7 @@ impl JsonHandler {
                 let acc = under_guard
                     .acc_map
                     .get_mut(&acc_addr_sender)
-                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+                    .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
                 acc.utxo_tree
                     .get_item(utxo_hash)
@@ -649,7 +671,7 @@ impl JsonHandler {
         };
 
         let helperstruct = WriteSendDeshieldedUTXOResponse {
-            status: "success".to_string(),
+            status: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -716,7 +738,7 @@ impl JsonHandler {
                 let acc = under_guard
                     .acc_map
                     .get_mut(&acc_addr_sender)
-                    .ok_or(RpcError::new_internal_error(None, "Account not found"))?;
+                    .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
                 acc.utxo_tree
                     .get_item(utxo_hash)
@@ -742,7 +764,7 @@ impl JsonHandler {
         };
 
         let helperstruct = WriteSendSplitUTXOResponse {
-            status: "success".to_string(),
+            status: SUCCESS.to_string(),
             utxo_results: new_utxos
                 .into_iter()
                 .zip(commitment_hashes)
@@ -760,31 +782,29 @@ impl JsonHandler {
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             //Todo : Add handling of more JSON RPC methods
-            "write_register_account" => self.process_register_account(request).await,
-            "execute_subscenario" => self.process_request_execute_subscenario(request).await,
-            "get_block" => self.process_get_block_data(request).await,
-            "get_last_block" => self.process_get_last_block(request).await,
-            "execute_scenario_split" => self.process_request_execute_scenario_split(request).await,
-            "execute_scenario_multiple_send" => {
+            WRITE_REGISTER_ACCOUNT => self.process_register_account(request).await,
+            EXECUTE_SUBSCENARIO => self.process_request_execute_subscenario(request).await,
+            GET_BLOCK => self.process_get_block_data(request).await,
+            GET_LAST_BLOCK => self.process_get_last_block(request).await,
+            EXECUTE_SCENARIO_SPLIT => self.process_request_execute_scenario_split(request).await,
+            EXECUTE_SCENARIO_MULTIPLE_SEND => {
                 self.process_request_execute_scenario_multiple_send(request)
                     .await
             }
-            "show_account_public_balance" => {
-                self.process_show_account_public_balance(request).await
-            }
-            "show_account_utxo" => self.process_show_account_utxo_request(request).await,
-            "show_transaction" => self.process_show_transaction(request).await,
-            "write_deposit_public_balance" => {
+            SHOW_ACCOUNT_PUBLIC_BALANCE => self.process_show_account_public_balance(request).await,
+            SHOW_ACCOUNT_UTXO => self.process_show_account_utxo_request(request).await,
+            SHOW_TRANSACTION => self.process_show_transaction(request).await,
+            WRITE_DEPOSIT_PUBLIC_BALANCE => {
                 self.process_write_deposit_public_balance(request).await
             }
-            "write_mint_utxo" => self.process_write_mint_utxo(request).await,
-            "write_mint_utxo_multiple_assets" => {
+            WRITE_MINT_UTXO => self.process_write_mint_utxo(request).await,
+            WRITE_MINT_UTXO_MULTIPLE_ASSETS => {
                 self.process_write_mint_utxo_multiple_assets(request).await
             }
-            "write_send_utxo_private" => self.process_write_send_private_utxo(request).await,
-            "write_send_utxo_shielded" => self.process_write_send_shielded_utxo(request).await,
-            "write_send_utxo_deshielded" => self.process_write_send_deshielded_utxo(request).await,
-            "write_split_utxo" => self.process_write_send_split_utxo(request).await,
+            WRITE_SEND_UTXO_PRIVATE => self.process_write_send_private_utxo(request).await,
+            WRITE_SEND_UTXO_SHIELDED => self.process_write_send_shielded_utxo(request).await,
+            WRITE_SEND_UTXO_DESHIELDED => self.process_write_send_deshielded_utxo(request).await,
+            WRITE_SPLIT_UTXO => self.process_write_send_split_utxo(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }

@@ -16,6 +16,17 @@ use common::rpc_primitives::requests::{
 
 use super::{respond, types::err_rpc::RpcErr, JsonHandler};
 
+pub const HELLO: &str = "hello";
+pub const REGISTER_ACCOUNT: &str = "register_account";
+pub const SEND_TX: &str = "send_tx";
+pub const GET_BLOCK: &str = "get_block";
+pub const GET_GENESIS: &str = "get_genesis";
+pub const GET_LAST_BLOCK: &str = "get_last_block";
+
+pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
+
+pub const SUCCESS: &str = "Success";
+
 impl JsonHandler {
     pub async fn process(&self, message: Message) -> Result<Message, HttpError> {
         let id = message.id();
@@ -38,7 +49,7 @@ impl JsonHandler {
         let _hello_request = HelloRequest::parse(Some(request.params))?;
 
         let helperstruct = HelloResponse {
-            greeting: "HELLO_FROM_SEQUENCER".to_string(),
+            greeting: HELLO_FROM_SEQUENCER.to_string(),
         };
 
         respond(helperstruct)
@@ -58,7 +69,7 @@ impl JsonHandler {
         }
 
         let helperstruct = RegisterAccountResponse {
-            status: "Success".to_string(),
+            status: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -77,7 +88,7 @@ impl JsonHandler {
         }
 
         let helperstruct = SendTxResponse {
-            status: "Success".to_string(),
+            status: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -130,12 +141,12 @@ impl JsonHandler {
 
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
-            "hello" => self.process_temp_hello(request).await,
-            "register_account" => self.process_register_account_request(request).await,
-            "send_tx" => self.process_send_tx(request).await,
-            "get_block" => self.process_get_block_data(request).await,
-            "get_genesis" => self.process_get_genesis(request).await,
-            "get_last_block" => self.process_get_last_block(request).await,
+            HELLO => self.process_temp_hello(request).await,
+            REGISTER_ACCOUNT => self.process_register_account_request(request).await,
+            SEND_TX => self.process_send_tx(request).await,
+            GET_BLOCK => self.process_get_block_data(request).await,
+            GET_GENESIS => self.process_get_genesis(request).await,
+            GET_LAST_BLOCK => self.process_get_last_block(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }

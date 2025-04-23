@@ -4,7 +4,7 @@ use k256::{AffinePoint, FieldBytes, Scalar};
 use rand::{rngs::OsRng, RngCore};
 use sha2::{digest::FixedOutput, Digest};
 
-use super::constants_types::{NULLIFIER_SECRET_CONST, VIEVING_SECRET_CONST};
+use super::constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};
 
 #[derive(Debug)]
 ///Seed holder. Non-clonable to ensure that different holders use different seeds.
@@ -63,7 +63,7 @@ impl TopSecretKeyHolder {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update(self.secret_spending_key.to_bytes());
-        hasher.update(NULLIFIER_SECRET_CONST);
+        hasher.update(*NULLIFIER_SECRET_CONST);
 
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
@@ -74,7 +74,7 @@ impl TopSecretKeyHolder {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update(self.secret_spending_key.to_bytes());
-        hasher.update(VIEVING_SECRET_CONST);
+        hasher.update(*VIEWING_SECRET_CONST);
 
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 

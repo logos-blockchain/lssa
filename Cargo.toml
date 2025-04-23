@@ -17,7 +17,6 @@ members = [
   "sequencer_core",
   "common",
   "sc_core",
-  "core_primitives",
 ]
 
 [workspace.dependencies]
@@ -30,7 +29,7 @@ actix = "0.13.0"
 actix-cors = "0.6.1"
 futures = "0.3"
 actix-rt = "*"
-
+lazy_static = "1.5.0"
 env_logger = "0.10"
 log = "0.4"
 lru = "0.7.8"

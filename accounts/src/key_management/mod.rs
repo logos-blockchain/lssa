@@ -112,10 +112,9 @@ mod tests {
         Aes256Gcm,
     };
     use constants_types::{CipherText, Nonce};
-    use constants_types::{NULLIFIER_SECRET_CONST, VIEVING_SECRET_CONST};
+    use constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};
     use elliptic_curve::ff::Field;
     use elliptic_curve::group::prime::PrimeCurveAffine;
-    use elliptic_curve::group::GroupEncoding;
     use k256::{AffinePoint, ProjectivePoint, Scalar};
 
     use super::*;
@@ -360,9 +359,9 @@ mod tests {
         );
         println!(
             "Nullifier constant {:?}",
-            hex::encode(NULLIFIER_SECRET_CONST)
+            hex::encode(*NULLIFIER_SECRET_CONST)
         );
-        println!("Viewing constatnt {:?}", hex::encode(VIEVING_SECRET_CONST));
+        println!("Viewing constatnt {:?}", hex::encode(*VIEWING_SECRET_CONST));
         println!();
 
         println!("======Holders======");

@@ -10,6 +10,8 @@ use tokio::sync::Mutex;
 
 pub mod config;
 
+pub const RUST_LOG: &str = "RUST_LOG";
+
 #[derive(Parser, Debug)]
 #[clap(version)]
 struct Args {
@@ -29,7 +31,7 @@ pub async fn main_runner() -> Result<()> {
     if let Some(ref rust_log) = app_config.override_rust_log {
         info!("RUST_LOG env var set to {rust_log:?}");
 
-        std::env::set_var("RUST_LOG", rust_log);
+        std::env::set_var(RUST_LOG, rust_log);
     }
 
     env_logger::init();

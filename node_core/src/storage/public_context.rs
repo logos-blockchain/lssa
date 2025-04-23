@@ -4,6 +4,15 @@ use accounts::account_core::{AccountAddress, AccountPublicMask};
 use common::merkle_tree_public::TreeHashType;
 use serde::{ser::SerializeStruct, Serialize};
 
+pub const PUBLIC_SC_CONTEXT: &str = "PublicSCContext";
+pub const CALLER_ADDRESS: &str = "caller_address";
+pub const CALLER_BALANCE: &str = "caller_balance";
+pub const ACCOUNT_MASKS_KEYS_SORTED: &str = "account_masks_keys_sorted";
+pub const ACCOUNT_MASKS_VALUES_SORTED: &str = "account_masks_values_sorted";
+pub const NULLIFIER_STORE_ROOT: &str = "nullifier_store_root";
+pub const COMMITMENT_STORE_ROOT: &str = "commitment_store_root";
+pub const PUT_TX_STORE_ROOT: &str = "put_tx_store_root";
+
 ///Strucutre, representing context, given to a smart contract on a call
 pub struct PublicSCContext {
     pub caller_address: AccountAddress,
@@ -26,15 +35,15 @@ impl Serialize for PublicSCContext {
             self.account_masks.values().cloned().collect();
         account_mask_values.sort_by(|left, right| left.address.cmp(&right.address));
 
-        let mut s = serializer.serialize_struct("PublicSCContext", 7)?;
+        let mut s = serializer.serialize_struct(PUBLIC_SC_CONTEXT, 7)?;
 
-        s.serialize_field("caller_address", &self.caller_address)?;
-        s.serialize_field("caller_balance", &self.caller_balance)?;
-        s.serialize_field("account_masks_keys_sorted", &account_masks_keys)?;
-        s.serialize_field("account_masks_values_sorted", &account_mask_values)?;
-        s.serialize_field("nullifier_store_root", &self.nullifier_store_root)?;
-        s.serialize_field("commitment_store_root", &self.comitment_store_root)?;
-        s.serialize_field("put_tx_store_root", &self.pub_tx_store_root)?;
+        s.serialize_field(CALLER_ADDRESS, &self.caller_address)?;
+        s.serialize_field(CALLER_BALANCE, &self.caller_balance)?;
+        s.serialize_field(ACCOUNT_MASKS_KEYS_SORTED, &account_masks_keys)?;
+        s.serialize_field(ACCOUNT_MASKS_VALUES_SORTED, &account_mask_values)?;
+        s.serialize_field(NULLIFIER_STORE_ROOT, &self.nullifier_store_root)?;
+        s.serialize_field(COMMITMENT_STORE_ROOT, &self.comitment_store_root)?;
+        s.serialize_field(PUT_TX_STORE_ROOT, &self.pub_tx_store_root)?;
 
         s.end()
     }

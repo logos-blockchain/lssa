@@ -260,7 +260,7 @@ impl SequencerCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fmt::format, path::PathBuf};
+    use std::path::PathBuf;
 
     use common::transaction::{Transaction, TxKind};
     use rand::Rng;

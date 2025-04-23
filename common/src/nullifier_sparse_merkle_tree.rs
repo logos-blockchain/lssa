@@ -125,9 +125,6 @@ impl Default for NullifierSparseMerkleTree {
 mod tests {
     use super::*;
     use crate::nullifier::UTXONullifier;
-    use monotree::database::MemoryDB;
-    use monotree::hasher::Blake3;
-    use monotree::Monotree;
 
     fn create_nullifier(hash: TreeHashType) -> UTXONullifier {
         UTXONullifier { utxo_hash: hash }
