@@ -851,7 +851,7 @@ impl NodeCore {
         let new_balance = {
             let acc_map_read_guard = self.storage.read().await;
 
-            let acc = acc_map_read_guard.acc_map.get(&acc_addr_sender).unwrap();
+            let acc = acc_map_read_guard.acc_map.get(&acc_addr_rec).unwrap();
 
             acc.balance
         };

@@ -11,7 +11,7 @@ log.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 
-risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-1.2" }
+risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.0" }
 test-methods = { path = "test_methods" }
 
 [dependencies.accounts]
