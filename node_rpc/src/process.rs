@@ -13,27 +13,27 @@ use common::transaction::ActionData;
 
 use common::rpc_primitives::requests::{
     GetBlockDataRequest, GetBlockDataResponse, GetLastBlockRequest, GetLastBlockResponse,
-    RegisterAccountRequest, RegisterAccountResponse,
 };
 
 use crate::types::{
     err_rpc::cast_common_execution_error_into_rpc_error,
     rpc_structs::{
-        ExecuteScenarioMultipleSendRequest, ExecuteScenarioMultipleSendResponse,
-        ExecuteScenarioSplitRequest, ExecuteScenarioSplitResponse, ExecuteSubscenarioRequest,
-        ExecuteSubscenarioResponse, ShowAccountPublicBalanceRequest,
-        ShowAccountPublicBalanceResponse, ShowAccountUTXORequest, ShowAccountUTXOResponse,
-        ShowTransactionRequest, ShowTransactionResponse, UTXOShortEssentialStruct,
-        WriteDepositPublicBalanceRequest, WriteDepositPublicBalanceResponse,
-        WriteMintPrivateUTXOMultipleAssetsRequest, WriteMintPrivateUTXOMultipleAssetsResponse,
-        WriteMintPrivateUTXORequest, WriteMintPrivateUTXOResponse,
-        WriteSendDeshieldedBalanceRequest, WriteSendDeshieldedUTXOResponse,
-        WriteSendPrivateUTXORequest, WriteSendPrivateUTXOResponse, WriteSendShieldedUTXORequest,
-        WriteSendShieldedUTXOResponse, WriteSendSplitUTXOResponse, WriteSplitUTXORequest,
+        CreateAccountRequest, CreateAccountResponse, ExecuteScenarioMultipleSendRequest,
+        ExecuteScenarioMultipleSendResponse, ExecuteScenarioSplitRequest,
+        ExecuteScenarioSplitResponse, ExecuteSubscenarioRequest, ExecuteSubscenarioResponse,
+        ShowAccountPublicBalanceRequest, ShowAccountPublicBalanceResponse, ShowAccountUTXORequest,
+        ShowAccountUTXOResponse, ShowTransactionRequest, ShowTransactionResponse,
+        UTXOShortEssentialStruct, WriteDepositPublicBalanceRequest,
+        WriteDepositPublicBalanceResponse, WriteMintPrivateUTXOMultipleAssetsRequest,
+        WriteMintPrivateUTXOMultipleAssetsResponse, WriteMintPrivateUTXORequest,
+        WriteMintPrivateUTXOResponse, WriteSendDeshieldedBalanceRequest,
+        WriteSendDeshieldedUTXOResponse, WriteSendPrivateUTXORequest, WriteSendPrivateUTXOResponse,
+        WriteSendShieldedUTXORequest, WriteSendShieldedUTXOResponse, WriteSendSplitUTXOResponse,
+        WriteSplitUTXORequest,
     },
 };
 
-pub const WRITE_REGISTER_ACCOUNT: &str = "write_register_account";
+pub const CREATE_ACCOUNT: &str = "create_account";
 pub const EXECUTE_SUBSCENARIO: &str = "execute_subscenario";
 pub const GET_BLOCK: &str = "get_block";
 pub const GET_LAST_BLOCK: &str = "get_last_block";
@@ -155,8 +155,8 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
-    async fn process_register_account(&self, request: Request) -> Result<Value, RpcErr> {
-        let _req = RegisterAccountRequest::parse(Some(request.params))?;
+    async fn process_create_account(&self, request: Request) -> Result<Value, RpcErr> {
+        let _req = CreateAccountRequest::parse(Some(request.params))?;
 
         let acc_addr = {
             let mut guard = self.node_chain_store.lock().await;
@@ -164,7 +164,7 @@ impl JsonHandler {
             guard.create_new_account().await
         };
 
-        let helperstruct = RegisterAccountResponse {
+        let helperstruct = CreateAccountResponse {
             status: hex::encode(acc_addr),
         };
 
@@ -782,7 +782,7 @@ impl JsonHandler {
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             //Todo : Add handling of more JSON RPC methods
-            WRITE_REGISTER_ACCOUNT => self.process_register_account(request).await,
+            CREATE_ACCOUNT => self.process_create_account(request).await,
             EXECUTE_SUBSCENARIO => self.process_request_execute_subscenario(request).await,
             GET_BLOCK => self.process_get_block_data(request).await,
             GET_LAST_BLOCK => self.process_get_last_block(request).await,
