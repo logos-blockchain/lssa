@@ -661,7 +661,6 @@ impl JsonHandler {
 
             cover_guard
                 .operate_account_send_deshielded_one_receiver(
-                    acc_addr_sender,
                     acc_addr,
                     utxo_to_send,
                     comm_hash,

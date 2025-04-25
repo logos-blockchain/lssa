@@ -1130,7 +1130,6 @@ impl NodeCore {
 
     pub async fn operate_account_send_deshielded_one_receiver(
         &mut self,
-        acc_addr_sender: AccountAddress,
         acc_addr_rec: AccountAddress,
         utxo: UTXO,
         comm_gen_hash: [u8; 32],
@@ -1592,7 +1591,6 @@ impl NodeCore {
 
         self.operate_account_send_deshielded_one_receiver(
             acc_addr,
-            acc_addr,
             new_utxo,
             comm_gen_hash,
         )
@@ -1647,7 +1645,6 @@ impl NodeCore {
         let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await?;
 
         self.operate_account_send_deshielded_one_receiver(
-            acc_addr,
             acc_addr_rec,
             new_utxo,
             comm_gen_hash,
@@ -1689,7 +1686,6 @@ impl NodeCore {
             .await?;
 
         self.operate_account_send_deshielded_one_receiver(
-            addrs_receivers[publication_index],
             addrs_receivers[publication_index],
             new_utxos[publication_index].clone(),
             comm_gen_hashes[publication_index],
