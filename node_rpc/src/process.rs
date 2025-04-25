@@ -660,11 +660,7 @@ impl JsonHandler {
             };
 
             cover_guard
-                .operate_account_send_deshielded_one_receiver(
-                    acc_addr,
-                    utxo_to_send,
-                    comm_hash,
-                )
+                .operate_account_send_deshielded_one_receiver(acc_addr, utxo_to_send, comm_hash)
                 .await
                 .map_err(cast_common_execution_error_into_rpc_error)?
         };

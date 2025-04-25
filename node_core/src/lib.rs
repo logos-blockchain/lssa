@@ -1589,12 +1589,8 @@ impl NodeCore {
 
         let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await?;
 
-        self.operate_account_send_deshielded_one_receiver(
-            acc_addr,
-            new_utxo,
-            comm_gen_hash,
-        )
-        .await?;
+        self.operate_account_send_deshielded_one_receiver(acc_addr, new_utxo, comm_gen_hash)
+            .await?;
 
         Ok(())
     }
@@ -1644,12 +1640,8 @@ impl NodeCore {
 
         let (new_utxo, comm_gen_hash) = self.operate_account_mint_private(acc_addr, 100).await?;
 
-        self.operate_account_send_deshielded_one_receiver(
-            acc_addr_rec,
-            new_utxo,
-            comm_gen_hash,
-        )
-        .await?;
+        self.operate_account_send_deshielded_one_receiver(acc_addr_rec, new_utxo, comm_gen_hash)
+            .await?;
 
         Ok(())
     }
