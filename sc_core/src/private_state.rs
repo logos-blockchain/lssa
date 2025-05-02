@@ -287,4 +287,17 @@ mod tests {
         assert_eq!(read.len(), 0);
     }
 
+    #[test]
+    fn test_write_rewrite() {
+        let mut state = PrivateSCState::new();
+        let data1 = vec![1u8; PRIVATE_BLOB_SIZE * 2];
+        write_num_bytes_append(&mut state, data1).unwrap();
+
+        let rewrite_data = vec![2u8; PRIVATE_BLOB_SIZE];
+        let last_slot = write_num_bytes_rewrite(&mut state, rewrite_data.clone(), 1).unwrap();
+
+        assert_eq!(last_slot, 1);
+        assert_eq!(state.get(&1).unwrap().0[0], 2);
+    }
+
 }
