@@ -300,4 +300,16 @@ mod tests {
         assert_eq!(state.get(&1).unwrap().0[0], 2);
     }
 
+    #[test]
+    fn test_empty_write_error() {
+        let mut state = PrivateSCState::new();
+
+        let append_result = write_num_bytes_append(&mut state, vec![]);
+        assert!(matches!(append_result, Err(PrivateStateError::EmptyWrite)));
+
+        let rewrite_result = write_num_bytes_rewrite(&mut state, vec![], 0);
+        assert!(matches!(rewrite_result, Err(PrivateStateError::EmptyWrite)));
+    }
+
+
 }
