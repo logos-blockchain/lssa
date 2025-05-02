@@ -256,4 +256,11 @@ mod tests {
         assert_eq!(blob, deserialized);
     }
 
+    #[test]
+    fn test_calculate_offset_slot() {
+        assert_eq!(calculate_offset_slot(0), 0);
+        assert_eq!(calculate_offset_slot(PRIVATE_BLOB_SIZE), 1);
+        assert_eq!(calculate_offset_slot(PRIVATE_BLOB_SIZE * 2 - 1), 1);
+    }
+
 }
