@@ -316,6 +316,9 @@ mod tests {
         let state = PrivateSCState::new();
 
         let result = read_num_bytes_start(&state, PRIVATE_BLOB_SIZE * 2);
-        assert!(matches!(result, Err(PrivateStateError::ReadSizeMismatch(_, _))));
+        assert!(matches!(
+            result,
+            Err(PrivateStateError::ReadSizeMismatch(_, _))
+        ));
     }
 }
