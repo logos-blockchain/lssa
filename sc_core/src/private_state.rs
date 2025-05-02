@@ -214,3 +214,21 @@ pub fn write_num_bytes_rewrite(
 
     Ok(curr_slot)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn test_blob_from_fit_vec_and_slice() {
+        let data = vec![1u8, 2, 3];
+        let blob_from_vec = produce_blob_from_fit_vec(data.clone());
+        let blob_from_slice = produce_blob_from_fit_slice(&data);
+
+        assert_eq!(blob_from_vec, blob_from_slice);
+        assert_eq!(blob_from_vec.0[0..3], [1, 2, 3]);
+        assert_eq!(blob_from_vec.0[3..], [0u8; PRIVATE_BLOB_SIZE - 3]);
+    }
+
+}
