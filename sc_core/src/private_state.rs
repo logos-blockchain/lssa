@@ -231,4 +231,11 @@ mod tests {
         assert_eq!(blob_from_vec.0[3..], [0u8; PRIVATE_BLOB_SIZE - 3]);
     }
 
+    #[test]
+    #[should_panic]
+    fn test_blob_from_fit_vec_panic() {
+        let data = vec![1u8; PRIVATE_BLOB_SIZE + 1];
+        let _ = produce_blob_from_fit_vec(data);
+    }
+
 }
