@@ -1,11 +1,11 @@
 use aes_gcm::{aead::Aead, Aes256Gcm, Key, KeyInit};
 use common::merkle_tree_public::TreeHashType;
 use constants_types::{CipherText, Nonce};
+use elliptic_curve::point::AffineCoordinates;
 use ephemeral_key_holder::EphemeralKeyHolder;
 use k256::AffinePoint;
 use log::info;
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
-use elliptic_curve::point::AffineCoordinates;
 
 use crate::account_core::PublicKey;
 
@@ -110,13 +110,12 @@ mod tests {
     };
     use constants_types::{CipherText, Nonce};
     use constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};
-    use elliptic_curve::{ff::Field, PrimeField};
     use elliptic_curve::group::prime::PrimeCurveAffine;
-    use k256::{AffinePoint, ProjectivePoint, Scalar};
     use elliptic_curve::point::AffineCoordinates;
+    use elliptic_curve::{ff::Field, PrimeField};
+    use k256::{AffinePoint, ProjectivePoint, Scalar};
 
     use super::*;
-
 
     #[test]
     fn test_new_os_random() {
