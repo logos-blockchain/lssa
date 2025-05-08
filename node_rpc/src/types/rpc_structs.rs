@@ -90,6 +90,9 @@ pub struct WriteSplitUTXORequest {
     pub utxo_commitment: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateAccountRequest {}
+
 // parse_request!(GetGenesisIdRequest);
 parse_request!(ExecuteSubscenarioRequest);
 parse_request!(ExecuteScenarioSplitRequest);
@@ -107,6 +110,7 @@ parse_request!(WriteSendPrivateUTXORequest);
 parse_request!(WriteSendShieldedUTXORequest);
 parse_request!(WriteSendDeshieldedBalanceRequest);
 parse_request!(WriteSplitUTXORequest);
+parse_request!(CreateAccountRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecuteSubscenarioResponse {
@@ -194,4 +198,9 @@ pub struct WriteSendDeshieldedUTXOResponse {
 pub struct WriteSendSplitUTXOResponse {
     pub status: String,
     pub utxo_results: Vec<UTXOShortEssentialStruct>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateAccountResponse {
+    pub status: String,
 }
