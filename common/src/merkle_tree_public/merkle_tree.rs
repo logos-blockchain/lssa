@@ -40,6 +40,32 @@ impl<Leaf: TreeLeavItem + Clone> HashStorageMerkleTreeDeserializer<Leaf> {
     }
 }
 
+impl<'de, Leav: TreeLeavItem + Clone + Deserialize<'de>> Visitor<'de> for HashStorageMerkleTreeDeserializer<Leav> {
+    type Value= HashStorageMerkleTree<Leav>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("HashStorageMerkleTree key value sequence.")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut vector = vec![];
+
+        loop {
+            let opt_key = seq.next_element::<Leav>()?;
+            if let Some(value) = opt_key {
+                vector.push(value);
+            } else {
+                break;
+            }
+        }
+
+        Ok(HashStorageMerkleTree::new(vector))
+    }
+}
+
 
 
 pub type PublicTransactionMerkleTree = HashStorageMerkleTree<Transaction>;
