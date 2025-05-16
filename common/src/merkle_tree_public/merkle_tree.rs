@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt, marker::PhantomData};
 
 use rs_merkle::{MerkleProof, MerkleTree};
 use serde::{
-    de::{self, SeqAccess, Visitor},
+    de::{SeqAccess, Visitor},
     ser::SerializeSeq,
     Deserialize, Deserializer, Serialize,
 };
