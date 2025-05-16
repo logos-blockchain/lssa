@@ -12,6 +12,24 @@ pub struct HashStorageMerkleTree<Leav: TreeLeavItem + Clone> {
     tree: MerkleTree<OwnHasher>,
 }
 
+impl<Leav: TreeLeavItem + Clone + Serialize> Serialize for HashStorageMerkleTree<Leav> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut vector = self.leaves.iter().collect::<Vec<_>>();
+        vector.sort_by(|a, b| a.0.cmp(b.0));
+
+        let mut seq = serializer.serialize_seq(Some(self.leaves.len()))?;
+        for element in vector.iter() {
+            seq.serialize_element(element.1)?;
+        }
+        seq.end()
+    }
+}
+
+
+
 pub type PublicTransactionMerkleTree = HashStorageMerkleTree<Transaction>;
 
 pub type UTXOCommitmentsMerkleTree = HashStorageMerkleTree<UTXOCommitment>;
