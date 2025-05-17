@@ -1,9 +1,8 @@
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 use anyhow::Result;
 use common::{
     merkle_tree_public::TreeHashType,
-    nullifier::{self, UTXONullifier},
     transaction::Tag,
 };
 use k256::AffinePoint;
@@ -152,10 +151,6 @@ impl Default for Account {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn generate_dummy_utxo_nullifier() -> UTXONullifier {
-        UTXONullifier::default()
-    }
 
     fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> anyhow::Result<UTXO> {
         let payload = UTXOPayload {
