@@ -5,9 +5,7 @@ use common::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, transac
 use k256::AffinePoint;
 use log::info;
 use serde::Serialize;
-use utxo::{
-    utxo_core::{UTXOPayload, UTXO},
-};
+use utxo::utxo_core::{UTXOPayload, UTXO};
 
 use crate::key_management::{
     constants_types::{CipherText, Nonce},

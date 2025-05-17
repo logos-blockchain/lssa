@@ -1101,11 +1101,7 @@ impl NodeCore {
                 .map(|new_utxo_hash| {
                     let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
 
-                    let new_utxo = acc
-                        .utxos
-                        .get(&new_utxo_hash)
-                        .unwrap()
-                        .clone();
+                    let new_utxo = acc.utxos.get(&new_utxo_hash).unwrap().clone();
 
                     new_utxo.log();
                     info!(
@@ -1555,11 +1551,7 @@ impl NodeCore {
                 .map(|(acc_addr_rec, new_utxo_hash)| {
                     let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
 
-                    let new_utxo = acc
-                        .utxos
-                        .get(&new_utxo_hash)
-                        .unwrap()
-                        .clone();
+                    let new_utxo = acc.utxos.get(&new_utxo_hash).unwrap().clone();
                     new_utxo.log();
 
                     info!(
