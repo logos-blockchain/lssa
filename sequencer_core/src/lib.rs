@@ -5,7 +5,6 @@ use common::{
     block::{Block, HashableBlockData},
     merkle_tree_public::TreeHashType,
     nullifier::UTXONullifier,
-    nullifier_sparse_merkle_tree::NullifierTreeInput,
     transaction::{Transaction, TxKind},
     utxo_commitment::UTXOCommitment,
 };
@@ -62,7 +61,10 @@ impl SequencerCore {
 
     pub fn get_tree_roots(&self) -> [[u8; 32]; 3] {
         [
-            self.store.nullifier_store.curr_root.unwrap_or([0; 32]),
+            self.store
+                .nullifier_store
+                .get_curr_root()
+                .unwrap_or([0; 32]),
             self.store
                 .utxo_commitments_store
                 .get_root()
@@ -139,7 +141,6 @@ impl SequencerCore {
                 self.store
                     .nullifier_store
                     .search_item_inclusion(*nullifier_hash)
-                    .unwrap_or(false)
             })
             .any(|check| check);
         let utxo_commitments_check = utxo_commitments_created_hashes
@@ -202,17 +203,10 @@ impl SequencerCore {
                 .add_tx(UTXOCommitment { hash: *utxo_comm });
         }
 
-        for (idx, nullifier) in nullifier_created_hashes.iter().enumerate() {
+        for nullifier in nullifier_created_hashes.iter() {
             self.store
                 .nullifier_store
-                .insert_item(NullifierTreeInput {
-                    nullifier_id: idx as u64,
-                    tx_id,
-                    block_id,
-                    nullifier: UTXONullifier {
-                        utxo_hash: *nullifier,
-                    },
-                })
+                .insert_item(*nullifier)
                 .map_err(|err| TransactionMalformationErrorKind::FailedToInsert {
                     tx: hash,
                     details: format!("{err:?}"),

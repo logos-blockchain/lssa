@@ -1,14 +1,10 @@
 use std::collections::BTreeMap;
 
 use bincode;
-use common::nullifier_sparse_merkle_tree::NullifierTreeInput;
 use common::{
-    commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree,
-    nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
+    commitment::Commitment, indexed_merkle_tree::IndexedMerkleTreeWrapper, nullifier::UTXONullifier,
 };
 use k256::Scalar;
-use monotree::hasher::Blake3;
-use monotree::{Hasher, Monotree};
 use sha2::{Digest, Sha256};
 use utxo::utxo_core::UTXO;
 
@@ -53,24 +49,16 @@ pub fn validate_in_commitments_proof(
     // Replace with Merkle proof verification logic.
     // hash(&[pedersen_commitment.serialize().to_vec(), in_commitments_proof.concat()].concat()) == root_commitment
 
-    let mut nsmt = CommitmentsSparseMerkleTree {
-        curr_root: Option::Some(root_commitment),
-        tree: Monotree::default(),
-        hasher: Blake3::new(),
-    };
+    let mut nsmt = IndexedMerkleTreeWrapper::new();
 
     let commitments: Vec<_> = in_commitments_proof
         .into_iter()
-        .map(|n_p| Commitment {
-            commitment_hash: n_p.clone(),
-        })
+        .map(|n_p| n_p.clone().try_into().unwrap())
         .collect();
     nsmt.insert_items(commitments).unwrap();
 
-    nsmt.get_non_membership_proof(in_commitment.clone())
-        .unwrap()
-        .1
-        .is_some()
+    nsmt.get_non_membership_proof(in_commitment.clone().try_into().unwrap())
+        .is_ok()
 }
 
 // Validate non-membership proof for nullifiers
@@ -82,32 +70,16 @@ pub fn validate_nullifiers_proof(
     root_nullifier: [u8; 32],
     nullifiers_proof: &[[u8; 32]],
 ) -> bool {
-    //There is no need for storage, so ids can be default there
-    let id = 1;
+    let mut nsmt = IndexedMerkleTreeWrapper::new();
 
-    let mut nsmt = NullifierSparseMerkleTree {
-        curr_root: Option::Some(root_nullifier),
-        tree: Monotree::default(),
-        hasher: Blake3::new(),
-        leafs: BTreeMap::new(),
-    };
-
-    let nullifiers: Vec<_> = nullifiers_proof
+    let commitments: Vec<_> = nullifiers_proof
         .into_iter()
-        .enumerate()
-        .map(|(idx, n_p)| NullifierTreeInput {
-            nullifier_id: idx as u64,
-            tx_id: id,
-            block_id: id,
-            nullifier: UTXONullifier { utxo_hash: *n_p },
-        })
+        .map(|n_p| n_p.clone().try_into().unwrap())
         .collect();
-    nsmt.insert_items(nullifiers).unwrap();
+    nsmt.insert_items(commitments).unwrap();
 
-    nsmt.get_non_membership_proof(nullifier)
-        .unwrap()
-        .1
-        .is_none()
+    nsmt.get_non_membership_proof(nullifier.clone().try_into().unwrap())
+        .is_ok()
 }
 
 #[allow(unused)]

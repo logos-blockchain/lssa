@@ -167,7 +167,7 @@ impl NodeCore {
     pub async fn get_roots(&self) -> [[u8; 32]; 3] {
         let storage = self.storage.read().await;
         [
-            storage.nullifier_store.curr_root.unwrap_or([0; 32]),
+            storage.nullifier_store.get_curr_root().unwrap_or([0; 32]),
             storage.utxo_commitments_store.get_root().unwrap_or([0; 32]),
             storage.pub_tx_store.get_root().unwrap_or([0; 32]),
         ]
