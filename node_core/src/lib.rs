@@ -10,9 +10,8 @@ use anyhow::Result;
 use chain_storage::NodeChainStore;
 use common::transaction::{Transaction, TransactionPayload, TxKind};
 use config::NodeConfig;
-use executions::private_exec::{generate_commitments, generate_nullifiers};
 use log::info;
-use sc_core::proofs_circuits::pedersen_commitment_vec;
+use sc_core::proofs_circuits::{generate_commitments, generate_nullifiers, generate_nullifiers_se, pedersen_commitment_vec};
 use sequencer_client::{json::SendTxResponse, SequencerClient};
 use serde::{Deserialize, Serialize};
 use storage::sc_db_utils::DataBlobChangeVariant;
@@ -28,7 +27,6 @@ pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
 
 pub mod chain_storage;
 pub mod config;
-pub mod executions;
 ///Module, which includes pre start setup helperfunctions  
 pub mod pre_start;
 pub mod sequencer_client;
@@ -164,10 +162,9 @@ impl NodeCore {
         })
     }
 
-    pub async fn get_roots(&self) -> [[u8; 32]; 3] {
+    pub async fn get_roots(&self) -> [[u8; 32]; 2] {
         let storage = self.storage.read().await;
         [
-            storage.nullifier_store.get_curr_root().unwrap_or([0; 32]),
             storage.utxo_commitments_store.get_root().unwrap_or([0; 32]),
             storage.pub_tx_store.get_root().unwrap_or([0; 32]),
         ]
@@ -651,7 +648,7 @@ impl NodeCore {
         )
         .unwrap();
 
-        let nullifier = executions::se::generate_nullifiers(
+        let nullifier = generate_nullifiers_se(
             &commitment,
             &account
                 .key_holder

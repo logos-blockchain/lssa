@@ -9,7 +9,6 @@ pub const CALLER_ADDRESS: &str = "caller_address";
 pub const CALLER_BALANCE: &str = "caller_balance";
 pub const ACCOUNT_MASKS_KEYS_SORTED: &str = "account_masks_keys_sorted";
 pub const ACCOUNT_MASKS_VALUES_SORTED: &str = "account_masks_values_sorted";
-pub const NULLIFIER_STORE_ROOT: &str = "nullifier_store_root";
 pub const COMMITMENT_STORE_ROOT: &str = "commitment_store_root";
 pub const PUT_TX_STORE_ROOT: &str = "put_tx_store_root";
 
@@ -18,7 +17,6 @@ pub struct PublicSCContext {
     pub caller_address: AccountAddress,
     pub caller_balance: u64,
     pub account_masks: BTreeMap<AccountAddress, AccountPublicMask>,
-    pub nullifier_store_root: TreeHashType,
     pub comitment_store_root: TreeHashType,
     pub pub_tx_store_root: TreeHashType,
 }
@@ -41,7 +39,6 @@ impl Serialize for PublicSCContext {
         s.serialize_field(CALLER_BALANCE, &self.caller_balance)?;
         s.serialize_field(ACCOUNT_MASKS_KEYS_SORTED, &account_masks_keys)?;
         s.serialize_field(ACCOUNT_MASKS_VALUES_SORTED, &account_mask_values)?;
-        s.serialize_field(NULLIFIER_STORE_ROOT, &self.nullifier_store_root)?;
         s.serialize_field(COMMITMENT_STORE_ROOT, &self.comitment_store_root)?;
         s.serialize_field(PUT_TX_STORE_ROOT, &self.pub_tx_store_root)?;
 
@@ -100,7 +97,6 @@ mod tests {
 
     fn create_test_context() -> PublicSCContext {
         let caller_address = [1; 32];
-        let nullifier_store_root = [2; 32];
         let comitment_store_root = [3; 32];
         let pub_tx_store_root = [4; 32];
 
@@ -118,7 +114,6 @@ mod tests {
             caller_address,
             caller_balance: 100,
             account_masks,
-            nullifier_store_root,
             comitment_store_root,
             pub_tx_store_root,
         }

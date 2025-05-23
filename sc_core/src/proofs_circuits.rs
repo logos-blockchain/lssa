@@ -1,9 +1,4 @@
-use std::collections::BTreeMap;
-
 use bincode;
-use common::{
-    commitment::Commitment, indexed_merkle_tree::IndexedMerkleTreeWrapper, nullifier::UTXONullifier,
-};
 use k256::Scalar;
 use rand::{thread_rng, RngCore};
 use secp256k1_zkp::{CommitmentSecrets, Generator, PedersenCommitment, Tag, Tweak, SECP256K1};
@@ -44,23 +39,14 @@ pub fn generate_commitments(input_utxos: &[UTXO]) -> Vec<Vec<u8>> {
 // returns True if the in_commitments[i] is in the tree with root hash root_commitment otherwise returns False, as membership proof.
 pub fn validate_in_commitments_proof(
     in_commitment: &Vec<u8>,
-    root_commitment: Vec<u8>,
+    _root_commitment: Vec<u8>,
     in_commitments_proof: &[Vec<u8>],
 ) -> bool {
     // Placeholder implementation.
     // Replace with Merkle proof verification logic.
     // hash(&[pedersen_commitment.serialize().to_vec(), in_commitments_proof.concat()].concat()) == root_commitment
 
-    let mut nsmt = IndexedMerkleTreeWrapper::new();
-
-    let commitments: Vec<_> = in_commitments_proof
-        .into_iter()
-        .map(|n_p| n_p.clone().try_into().unwrap())
-        .collect();
-    nsmt.insert_items(commitments).unwrap();
-
-    nsmt.get_non_membership_proof(in_commitment.clone().try_into().unwrap())
-        .is_ok()
+    in_commitments_proof.contains(in_commitment)
 }
 
 // Validate non-membership proof for nullifiers
@@ -69,19 +55,10 @@ pub fn validate_in_commitments_proof(
 // returns True if the nullifiers[i] is not in the tree with root hash root_nullifier otherwise returns False, as non-membership proof.
 pub fn validate_nullifiers_proof(
     nullifier: [u8; 32],
-    root_nullifier: [u8; 32],
+    _root_nullifier: [u8; 32],
     nullifiers_proof: &[[u8; 32]],
 ) -> bool {
-    let mut nsmt = IndexedMerkleTreeWrapper::new();
-
-    let commitments: Vec<_> = nullifiers_proof
-        .into_iter()
-        .map(|n_p| n_p.clone().try_into().unwrap())
-        .collect();
-    nsmt.insert_items(commitments).unwrap();
-
-    nsmt.get_non_membership_proof(nullifier.clone().try_into().unwrap())
-        .is_ok()
+    !nullifiers_proof.contains(&nullifier)
 }
 
 #[allow(unused)]
@@ -246,19 +223,10 @@ fn de_kernel(
 // returns False, as membership proof.
 pub fn validate_in_commitments_proof_se(
     pedersen_commitment: &PedersenCommitment,
-    root_commitment: Vec<u8>,
+    _root_commitment: Vec<u8>,
     in_commitments_proof: &[Vec<u8>],
 ) -> bool {
-    let mut nsmt = IndexedMerkleTreeWrapper::new();
-
-    let commitments: Vec<_> = in_commitments_proof
-        .into_iter()
-        .map(|n_p| n_p.clone().try_into().unwrap())
-        .collect();
-    nsmt.insert_items(commitments).unwrap();
-
-    nsmt.get_non_membership_proof(pedersen_commitment.serialize().to_vec().try_into().unwrap())
-        .is_ok()
+    in_commitments_proof.contains(&pedersen_commitment.serialize().to_vec())
 }
 
 // Generate nullifiers SE

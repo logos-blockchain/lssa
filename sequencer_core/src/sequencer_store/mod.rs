@@ -1,11 +1,10 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use accounts_store::SequencerAccountsStore;
 use block_store::SequecerBlockStore;
 use common::{
     block::{Block, HashableBlockData},
-    indexed_merkle_tree::IndexedMerkleTreeWrapper,
-    merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
+    merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree}, nullifier::UTXONullifier,
 };
 use rand::{rngs::OsRng, RngCore};
 
@@ -15,7 +14,7 @@ pub mod block_store;
 pub struct SequecerChainStore {
     pub acc_store: SequencerAccountsStore,
     pub block_store: SequecerBlockStore,
-    pub nullifier_store: IndexedMerkleTreeWrapper,
+    pub nullifier_store: HashSet<UTXONullifier>,
     pub utxo_commitments_store: UTXOCommitmentsMerkleTree,
     pub pub_tx_store: PublicTransactionMerkleTree,
 }
@@ -23,7 +22,7 @@ pub struct SequecerChainStore {
 impl SequecerChainStore {
     pub fn new_with_genesis(home_dir: &Path, genesis_id: u64, is_genesis_random: bool) -> Self {
         let acc_store = SequencerAccountsStore::default();
-        let nullifier_store = IndexedMerkleTreeWrapper::default();
+        let nullifier_store = HashSet::new();
         let utxo_commitments_store = UTXOCommitmentsMerkleTree::new(vec![]);
         let pub_tx_store = PublicTransactionMerkleTree::new(vec![]);
 

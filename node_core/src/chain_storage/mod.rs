@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     path::Path,
 };
 
@@ -8,7 +8,6 @@ use anyhow::Result;
 use block_store::NodeBlockStore;
 use common::{
     block::Block,
-    indexed_merkle_tree::IndexedMerkleTreeWrapper,
     merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
     nullifier::UTXONullifier,
     utxo_commitment::UTXOCommitment,
@@ -26,7 +25,7 @@ pub mod public_context;
 pub struct NodeChainStore {
     pub acc_map: HashMap<AccountAddress, Account>,
     pub block_store: NodeBlockStore,
-    pub nullifier_store: IndexedMerkleTreeWrapper,
+    pub nullifier_store: HashSet<UTXONullifier>,
     pub utxo_commitments_store: UTXOCommitmentsMerkleTree,
     pub pub_tx_store: PublicTransactionMerkleTree,
 }
@@ -34,7 +33,7 @@ pub struct NodeChainStore {
 impl NodeChainStore {
     pub fn new_with_genesis(home_dir: &Path, genesis_block: Block) -> Self {
         let acc_map = HashMap::new();
-        let nullifier_store = IndexedMerkleTreeWrapper::default();
+        let nullifier_store = HashSet::new();
         let utxo_commitments_store = UTXOCommitmentsMerkleTree::new(vec![]);
         let pub_tx_store = PublicTransactionMerkleTree::new(vec![]);
 
@@ -54,7 +53,7 @@ impl NodeChainStore {
     }
 
     pub fn dissect_insert_block(&mut self, block: Block) -> Result<()> {
-        for (tx_id, tx) in block.transactions.iter().enumerate() {
+        for tx in &block.transactions {
             if !tx.execution_input.is_empty() {
                 let public_action = serde_json::from_slice::<ActionData>(&tx.execution_input);
 
@@ -97,8 +96,9 @@ impl NodeChainStore {
                     .collect(),
             );
 
-            self.nullifier_store
-                .insert_items(tx.nullifier_created_hashes.clone())?;
+            for nullifier in tx.nullifier_created_hashes.iter() {
+                self.nullifier_store.insert(UTXONullifier { utxo_hash: *nullifier });
+            }
 
             if !tx.encoded_data.is_empty() {
                 let ephemeral_public_key_sender =
@@ -148,7 +148,6 @@ impl NodeChainStore {
             caller_address: caller,
             caller_balance: self.acc_map.get(&caller).unwrap().balance,
             account_masks,
-            nullifier_store_root: self.nullifier_store.get_curr_root().unwrap_or([0; 32]),
             comitment_store_root: self.utxo_commitments_store.get_root().unwrap_or([0; 32]),
             pub_tx_store_root: self.pub_tx_store.get_root().unwrap_or([0; 32]),
         }

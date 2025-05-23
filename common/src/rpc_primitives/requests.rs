@@ -21,8 +21,8 @@ pub struct RegisterAccountRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
     pub transaction: Transaction,
-    ///Nullifier Root, UTXO Commitment Root, Pub Tx Root
-    pub tx_roots: [[u8; 32]; 3],
+    ///UTXO Commitment Root, Pub Tx Root
+    pub tx_roots: [[u8; 32]; 2],
 }
 
 #[derive(Serialize, Deserialize, Debug)]
