@@ -115,6 +115,7 @@ impl RocksDBIO {
         //ToDo: Add more column families for different data
         let _cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let _cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
+        let _cfsnapshot = ColumnFamilyDescriptor::new(CF_SNAPSHOT_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
