@@ -1,6 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt, marker::PhantomData};
 
 use rs_merkle::{MerkleProof, MerkleTree};
+use serde::{
+    de::{SeqAccess, Visitor},
+    ser::SerializeSeq,
+    Deserialize, Deserializer, Serialize,
+};
 
 use crate::{transaction::Transaction, utxo_commitment::UTXOCommitment};
 
@@ -10,6 +15,70 @@ pub struct HashStorageMerkleTree<Leav: TreeLeavItem + Clone> {
     leaves: HashMap<usize, Leav>,
     hash_to_id_map: HashMap<TreeHashType, usize>,
     tree: MerkleTree<OwnHasher>,
+}
+
+impl<Leav: TreeLeavItem + Clone + Serialize> Serialize for HashStorageMerkleTree<Leav> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut vector = self.leaves.iter().collect::<Vec<_>>();
+        vector.sort_by(|a, b| a.0.cmp(b.0));
+
+        let mut seq = serializer.serialize_seq(Some(self.leaves.len()))?;
+        for element in vector.iter() {
+            seq.serialize_element(element.1)?;
+        }
+        seq.end()
+    }
+}
+
+struct HashStorageMerkleTreeDeserializer<Leav: TreeLeavItem + Clone> {
+    marker: PhantomData<fn() -> HashStorageMerkleTree<Leav>>,
+}
+
+impl<Leaf: TreeLeavItem + Clone> HashStorageMerkleTreeDeserializer<Leaf> {
+    fn new() -> Self {
+        HashStorageMerkleTreeDeserializer {
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'de, Leav: TreeLeavItem + Clone + Deserialize<'de>> Visitor<'de>
+    for HashStorageMerkleTreeDeserializer<Leav>
+{
+    type Value = HashStorageMerkleTree<Leav>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("HashStorageMerkleTree key value sequence.")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut vector = vec![];
+
+        loop {
+            let opt_key = seq.next_element::<Leav>()?;
+            if let Some(value) = opt_key {
+                vector.push(value);
+            } else {
+                break;
+            }
+        }
+
+        Ok(HashStorageMerkleTree::new(vector))
+    }
+}
+
+impl<'de, Leav: TreeLeavItem + Clone + Deserialize<'de>> serde::Deserialize<'de>
+    for HashStorageMerkleTree<Leav>
+{
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_seq(HashStorageMerkleTreeDeserializer::new())
+    }
 }
 
 pub type PublicTransactionMerkleTree = HashStorageMerkleTree<Transaction>;
@@ -101,7 +170,7 @@ mod tests {
     use super::*;
 
     // Mock implementation of TreeLeavItem trait for testing
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     struct MockTransaction {
         pub hash: TreeHashType,
     }
@@ -134,6 +203,26 @@ mod tests {
 
         assert_eq!(tree.leaves.len(), 2);
         assert!(tree.get_root().is_some());
+    }
+
+    #[test]
+    fn test_new_merkle_tree_serialize() {
+        let tx1 = MockTransaction {
+            hash: get_first_32_bytes("tx1"),
+        };
+        let tx2 = MockTransaction {
+            hash: get_first_32_bytes("tx2"),
+        };
+
+        let tree = HashStorageMerkleTree::new(vec![tx1.clone(), tx2.clone()]);
+
+        let binding = serde_json::to_vec(&tree).unwrap();
+
+        let obj: HashStorageMerkleTree<MockTransaction> = serde_json::from_slice(&binding).unwrap();
+
+        assert_eq!(tree.leaves, obj.leaves);
+        assert_eq!(tree.hash_to_id_map, obj.hash_to_id_map);
+        assert_eq!(tree.tree.root(), obj.tree.root());
     }
 
     #[test]
