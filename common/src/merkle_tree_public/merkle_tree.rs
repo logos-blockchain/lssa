@@ -221,6 +221,8 @@ mod tests {
         let obj: HashStorageMerkleTree<MockTransaction> = serde_json::from_slice(&binding).unwrap();
 
         assert_eq!(tree.leaves, obj.leaves);
+        assert_eq!(tree.hash_to_id_map, obj.hash_to_id_map);
+        assert_eq!(tree.tree.root(), obj.tree.root());
     }
 
     #[test]
