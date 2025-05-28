@@ -35,12 +35,25 @@ pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
 ///Key to list of all known smart contract addresses
 pub const DB_META_SC_LIST: &str = "sc_list";
 
+///Key base for storing snapshot which describe block id
+pub const DB_SNAPSHOT_BLOCK_ID_KEY: &str = "block_id";
+///Key base for storing snapshot which describe commitment
+pub const DB_SNAPSHOT_COMMITMENT_KEY: &str = "commitment";
+///Key base for storing snapshot which describe transaction
+pub const DB_SNAPSHOT_TRANSACTION_KEY: &str = "transaction";
+///Key base for storing snapshot which describe nullifier
+pub const DB_SNAPSHOT_NULLIFIER_KEY: &str = "nullifier";
+///Key base for storing snapshot which describe account
+pub const DB_SNAPSHOT_ACCOUNT_KEY: &str = "account";
+
 ///Name of block column family
 pub const CF_BLOCK_NAME: &str = "cf_block";
 ///Name of meta column family
 pub const CF_META_NAME: &str = "cf_meta";
 ///Name of smart contract column family
 pub const CF_SC_NAME: &str = "cf_sc";
+///Name of snapshot column family
+pub const CF_SNAPSHOT_NAME: &str = "cf_snapshot";
 
 ///Suffix, used to mark field, which contain length of smart contract
 pub const SC_LEN_SUFFIX: &str = "sc_len";
@@ -59,6 +72,7 @@ impl RocksDBIO {
         let cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
         let cfsc = ColumnFamilyDescriptor::new(CF_SC_NAME, cf_opts.clone());
+        let cfsnapshot = ColumnFamilyDescriptor::new(CF_SNAPSHOT_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -66,7 +80,7 @@ impl RocksDBIO {
         let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(
             &db_opts,
             path,
-            vec![cfb, cfmeta, cfsc],
+            vec![cfb, cfmeta, cfsc, cfsnapshot],
         );
 
         let dbio = Self {
@@ -101,6 +115,7 @@ impl RocksDBIO {
         //ToDo: Add more column families for different data
         let _cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let _cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
+        let _cfsnapshot = ColumnFamilyDescriptor::new(CF_SNAPSHOT_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -119,6 +134,10 @@ impl RocksDBIO {
 
     pub fn sc_column(&self) -> Arc<BoundColumnFamily> {
         self.db.cf_handle(CF_SC_NAME).unwrap()
+    }
+
+    pub fn snapshot_column(&self) -> Arc<BoundColumnFamily> {
+        self.db.cf_handle(CF_SNAPSHOT_NAME).unwrap()
     }
 
     pub fn get_meta_first_block_in_db(&self) -> DbResult<u64> {
@@ -383,6 +402,142 @@ impl RocksDBIO {
         }
 
         Ok(data_blob_list)
+    }
+
+    pub fn get_snapshot_block_id(&self) -> DbResult<u64> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_BLOCK_ID_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(u64::from_be_bytes(data.try_into().unwrap()))
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot block ID not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_snapshot_commitment(&self) -> DbResult<Vec<u8>> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_COMMITMENT_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(data)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot commitment not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_snapshot_transaction(&self) -> DbResult<Vec<u8>> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_TRANSACTION_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(data)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot transaction not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_snapshot_nullifier(&self) -> DbResult<Vec<u8>> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_NULLIFIER_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(data)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot nullifier not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_snapshot_account(&self) -> DbResult<Vec<u8>> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_ACCOUNT_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(data)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot account not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn put_snapshot_block_id_db(&self, block_id: u64) -> DbResult<()> {
+        let cf_snapshot = self.snapshot_column();
+        self.db
+            .put_cf(
+                &cf_snapshot,
+                DB_SNAPSHOT_BLOCK_ID_KEY.as_bytes(),
+                block_id.to_be_bytes(),
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
+    pub fn put_snapshot_commitement_db(&self, commitment: Vec<u8>) -> DbResult<()> {
+        let cf_snapshot = self.snapshot_column();
+        self.db
+            .put_cf(
+                &cf_snapshot,
+                DB_SNAPSHOT_COMMITMENT_KEY.as_bytes(),
+                commitment,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
+    pub fn put_snapshot_transaction_db(&self, transaction: Vec<u8>) -> DbResult<()> {
+        let cf_snapshot = self.snapshot_column();
+        self.db
+            .put_cf(
+                &cf_snapshot,
+                DB_SNAPSHOT_TRANSACTION_KEY.as_bytes(),
+                transaction,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
+    pub fn put_snapshot_nullifier_db(&self, nullifier: Vec<u8>) -> DbResult<()> {
+        let cf_snapshot = self.snapshot_column();
+        self.db
+            .put_cf(
+                &cf_snapshot,
+                DB_SNAPSHOT_NULLIFIER_KEY.as_bytes(),
+                nullifier,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
+    pub fn put_snapshot_account_db(&self, account: Vec<u8>) -> DbResult<()> {
+        let cf_snapshot = self.snapshot_column();
+        self.db
+            .put_cf(&cf_snapshot, DB_SNAPSHOT_ACCOUNT_KEY.as_bytes(), account)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
     }
 }
 
