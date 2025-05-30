@@ -1,8 +1,9 @@
 use accounts::account_core::AccountAddress;
 use common::ExecutionFailureKind;
+use rand::{rngs::OsRng, RngCore};
 use risc0_zkvm::{default_executor, default_prover, sha::Digest, ExecutorEnv, Receipt};
 use serde::Serialize;
-use utxo::utxo_core::{UTXOPayload, UTXO};
+use utxo::utxo_core::{Randomness, UTXOPayload, UTXO};
 
 pub mod gas_calculator;
 
@@ -43,6 +44,12 @@ pub fn prove_mint_utxo(
         .write(&owner)
         .map_err(ExecutionFailureKind::write_error)?;
 
+    let mut randomness = Randomness::default();
+    OsRng.fill_bytes(&mut randomness);
+    builder
+        .write(&randomness)
+        .map_err(ExecutionFailureKind::write_error)?;
+
     let env = builder
         .build()
         .map_err(ExecutionFailureKind::builder_error)?;
@@ -56,10 +63,7 @@ pub fn prove_mint_utxo(
 
     let digest: UTXOPayload = receipt.journal.decode()?;
 
-    Ok((
-        UTXO::create_utxo_from_payload(digest).map_err(ExecutionFailureKind::write_error)?,
-        receipt,
-    ))
+    Ok((UTXO::create_utxo_from_payload(digest), receipt))
 }
 
 pub fn prove_send_utxo(
@@ -78,8 +82,18 @@ pub fn prove_send_utxo(
     builder
         .write(&utxo_payload)
         .map_err(ExecutionFailureKind::write_error)?;
+
+    let owners_parts_with_randomness = owners_parts
+        .into_iter()
+        .map(|(amount, addr)| {
+            let mut randomness = Randomness::default();
+            OsRng.fill_bytes(&mut randomness);
+            (amount, addr, randomness)
+        })
+        .collect::<Vec<_>>();
+
     builder
-        .write(&owners_parts)
+        .write(&owners_parts_with_randomness)
         .map_err(ExecutionFailureKind::write_error)?;
 
     let env = builder
@@ -98,9 +112,8 @@ pub fn prove_send_utxo(
     Ok((
         digest
             .into_iter()
-            .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload).map(|sel| (sel, addr))))
-            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>()
-            .map_err(ExecutionFailureKind::write_error)?,
+            .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload), addr))
+            .collect(),
         receipt,
     ))
 }
@@ -148,14 +161,12 @@ pub fn prove_send_utxo_multiple_assets_one_receiver(
             .0
             .into_iter()
             .map(|payload| UTXO::create_utxo_from_payload(payload))
-            .collect::<anyhow::Result<Vec<UTXO>>>()
-            .map_err(ExecutionFailureKind::write_error)?,
+            .collect(),
         digest
             .1
             .into_iter()
             .map(|payload| UTXO::create_utxo_from_payload(payload))
-            .collect::<anyhow::Result<Vec<UTXO>>>()
-            .map_err(ExecutionFailureKind::write_error)?,
+            .collect(),
         receipt,
     ))
 }
@@ -171,13 +182,7 @@ pub fn prove_send_utxo_shielded(
         return Err(ExecutionFailureKind::AmountMismatchError);
     }
 
-    let temp_utxo_to_spend = UTXO::create_utxo_from_payload(UTXOPayload {
-        owner,
-        asset: vec![],
-        amount,
-        privacy_flag: true,
-    })
-    .map_err(ExecutionFailureKind::write_error)?;
+    let temp_utxo_to_spend = UTXO::new(owner, vec![], amount, true);
     let utxo_payload = temp_utxo_to_spend.into_payload();
 
     let mut builder = ExecutorEnv::builder();
@@ -185,8 +190,18 @@ pub fn prove_send_utxo_shielded(
     builder
         .write(&utxo_payload)
         .map_err(ExecutionFailureKind::write_error)?;
+
+    let owners_parts_with_randomness = owners_parts
+        .into_iter()
+        .map(|(amount, addr)| {
+            let mut randomness = Randomness::default();
+            OsRng.fill_bytes(&mut randomness);
+            (amount, addr, randomness)
+        })
+        .collect::<Vec<_>>();
+
     builder
-        .write(&owners_parts)
+        .write(&owners_parts_with_randomness)
         .map_err(ExecutionFailureKind::write_error)?;
 
     let env = builder
@@ -205,9 +220,8 @@ pub fn prove_send_utxo_shielded(
     Ok((
         digest
             .into_iter()
-            .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload).map(|sel| (sel, addr))))
-            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>()
-            .map_err(ExecutionFailureKind::write_error)?,
+            .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload), addr))
+            .collect(),
         receipt,
     ))
 }
@@ -228,8 +242,18 @@ pub fn prove_send_utxo_deshielded(
     builder
         .write(&utxo_payload)
         .map_err(ExecutionFailureKind::write_error)?;
+
+    let owners_parts_with_randomness = owners_parts
+        .into_iter()
+        .map(|(amount, addr)| {
+            let mut randomness = Randomness::default();
+            OsRng.fill_bytes(&mut randomness);
+            (amount, addr, randomness)
+        })
+        .collect::<Vec<_>>();
+
     builder
-        .write(&owners_parts)
+        .write(&owners_parts_with_randomness)
         .map_err(ExecutionFailureKind::write_error)?;
 
     let env = builder
@@ -288,8 +312,7 @@ pub fn prove_mint_utxo_multiple_assets(
         digest
             .into_iter()
             .map(UTXO::create_utxo_from_payload)
-            .collect::<anyhow::Result<Vec<UTXO>>>()
-            .map_err(ExecutionFailureKind::write_error)?,
+            .collect(),
         receipt,
     ))
 }
@@ -308,7 +331,7 @@ pub fn execute_mint_utxo(amount_to_mint: u128, owner: AccountAddress) -> anyhow:
 
     let digest: UTXOPayload = receipt.journal.decode()?;
 
-    UTXO::create_utxo_from_payload(digest)
+    Ok(UTXO::create_utxo_from_payload(digest))
 }
 
 pub fn execute_send_utxo(
@@ -320,7 +343,16 @@ pub fn execute_send_utxo(
     let utxo_payload = spent_utxo.into_payload();
 
     builder.write(&utxo_payload)?;
-    builder.write(&owners_parts)?;
+    let owners_parts_with_randomness = owners_parts
+        .into_iter()
+        .map(|(amount, addr)| {
+            let mut randomness = Randomness::default();
+            OsRng.fill_bytes(&mut randomness);
+            (amount, addr, randomness)
+        })
+        .collect::<Vec<_>>();
+
+    builder.write(&owners_parts_with_randomness)?;
 
     let env = builder.build()?;
 
@@ -331,13 +363,12 @@ pub fn execute_send_utxo(
     let digest: (UTXOPayload, Vec<(UTXOPayload, AccountAddress)>) = receipt.journal.decode()?;
 
     Ok((
-        UTXO::create_utxo_from_payload(digest.0)?,
+        UTXO::create_utxo_from_payload(digest.0),
         digest
             .1
             .into_iter()
-            .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload).map(|sel| (sel, addr))))
-            .collect::<anyhow::Result<Vec<(UTXO, [u8; 32])>>>()
-            .map_err(ExecutionFailureKind::write_error)?,
+            .map(|(payload, addr)| (UTXO::create_utxo_from_payload(payload), addr))
+            .collect(),
     ))
 }
 
