@@ -192,4 +192,41 @@ mod tests {
         let result = node_store.get_block_at_id(42);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_put_snapshot_at_block_id() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let genesis_block = create_genesis_block();
+        let node_store = NodeBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
+
+        let id = 3;
+        let accounts_ser = vec![1, 2, 3, 4];
+        let comm_ser = vec![5, 6, 7, 8];
+        let txs_ser = vec![9, 10, 11, 12];
+        let nullifiers_ser = vec![13, 14, 15, 16];
+
+        node_store
+            .put_snapshot_at_block_id(
+                id,
+                accounts_ser.clone(),
+                comm_ser.clone(),
+                txs_ser.clone(),
+                nullifiers_ser.clone(),
+            )
+            .unwrap();
+
+        assert_eq!(node_store.dbio.get_snapshot_block_id().unwrap(), id);
+        assert_eq!(
+            node_store.dbio.get_snapshot_account().unwrap(),
+            accounts_ser
+        );
+        assert_eq!(node_store.dbio.get_snapshot_commitment().unwrap(), comm_ser);
+        assert_eq!(node_store.dbio.get_snapshot_transaction().unwrap(), txs_ser);
+        assert_eq!(
+            node_store.dbio.get_snapshot_nullifier().unwrap(),
+            nullifiers_ser
+        );
+    }
 }
