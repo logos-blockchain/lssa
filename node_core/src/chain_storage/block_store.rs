@@ -56,6 +56,20 @@ impl NodeBlockStore {
     pub fn get_sc_sc_state(&self, sc_addr: &str) -> Result<Vec<DataBlob>> {
         Ok(self.dbio.get_sc_sc_state(sc_addr)?)
     }
+
+    pub fn get_snapshot_block_id(&self) -> Result<u64> {
+        Ok(self.dbio.get_snapshot_block_id()?)
+    }
+
+    pub fn get_snapshot_account(&self) -> Result<HashMap<[u8; 32], Account>> {
+        Ok(serde_json::from_slice(&self.dbio.get_snapshot_account()?)?)
+    }
+
+    pub fn get_snapshot_commitment(&self) -> Result<HashStorageMerkleTree<UTXOCommitment>> {
+        Ok(serde_json::from_slice(&self.dbio.get_snapshot_commitment()?)?)
+    }
+
+
 }
 
 #[cfg(test)]
