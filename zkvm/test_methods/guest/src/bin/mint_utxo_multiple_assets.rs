@@ -12,12 +12,14 @@ pub struct UTXOPayload {
     // TODO: change to u256
     pub amount: u128,
     pub privacy_flag: bool,
+    pub randomness: [u8; 32],
 }
 
 fn main() {
     let amount_to_mint: u128 = env::read();
     let number_of_assets: usize = env::read();
     let owner: AccountAddr = env::read();
+    let randomness: [u8; 32] = env::read();
 
     let mut asseted_utxos = vec![];
 
@@ -27,6 +29,7 @@ fn main() {
             asset: vec![i as u8],
             amount: amount_to_mint,
             privacy_flag: true,
+            randomness
         };
 
         asseted_utxos.push(payload);

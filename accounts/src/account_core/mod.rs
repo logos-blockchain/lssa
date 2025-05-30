@@ -92,7 +92,7 @@ impl Account {
             }
             self.utxos.insert(utxo.hash, utxo);
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn update_public_balance(&mut self, new_balance: u64) {
@@ -105,14 +105,12 @@ impl Account {
         amount: u128,
         privacy_flag: bool,
     ) -> Result<()> {
-        let payload_with_asset = UTXOPayload {
-            owner: self.address,
-            asset: serde_json::to_vec(&asset)?,
+        let asset_utxo = UTXO::new(
+            self.address,
+            serde_json::to_vec(&asset)?,
             amount,
             privacy_flag,
-        };
-
-        let asset_utxo = UTXO::create_utxo_from_payload(payload_with_asset)?;
+        );
 
         self.utxos.insert(asset_utxo.hash, asset_utxo);
 
@@ -150,14 +148,8 @@ impl Default for Account {
 mod tests {
     use super::*;
 
-    fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> anyhow::Result<UTXO> {
-        let payload = UTXOPayload {
-            owner: address,
-            asset: vec![],
-            amount,
-            privacy_flag: false,
-        };
-        UTXO::create_utxo_from_payload(payload)
+    fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> UTXO {
+        UTXO::new(address, vec![], amount, false)
     }
 
     #[test]
@@ -171,8 +163,8 @@ mod tests {
     #[test]
     fn test_add_new_utxo_outputs() {
         let mut account = Account::new();
-        let utxo1 = generate_dummy_utxo(account.address, 100).unwrap();
-        let utxo2 = generate_dummy_utxo(account.address, 200).unwrap();
+        let utxo1 = generate_dummy_utxo(account.address, 100);
+        let utxo2 = generate_dummy_utxo(account.address, 200);
 
         let result = account.add_new_utxo_outputs(vec![utxo1.clone(), utxo2.clone()]);
 

@@ -11,6 +11,7 @@ log.workspace = true
 serde.workspace = true
 sha2.workspace = true
 hex.workspace = true
+rand.workspace = true
 
 [dependencies.common]
 path = "../common"

@@ -12,6 +12,7 @@ pub struct UTXOPayload {
     // TODO: change to u256
     pub amount: u128,
     pub privacy_flag: bool,
+    pub randomness: [u8; 32],
 }
 
 fn main() {
