@@ -1,0 +1,17 @@
+[package]
+name = "sc_example"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde_json = "1.0.81"
+
+[dependencies.sc_core]
+path = "../../sc_core"
+
+[dependencies.utxo]
+path = "../../utxo"
+
+[dependencies.serde]
+features = ["derive"]
+version = "1.0.60"

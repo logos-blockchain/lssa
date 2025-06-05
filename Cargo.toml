@@ -19,6 +19,11 @@ members = [
   "sc_core",
 ]
 
+exclude = [
+  "template/sc_example",
+  "template/zk_sc_test"
+]
+
 [workspace.dependencies]
 anyhow = "1.0"
 num_cpus = "1.13.1"
