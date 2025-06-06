@@ -34,6 +34,17 @@ pub struct AccountPublicMask {
     pub balance: u64,
 }
 
+impl AccountPublicMask {
+    pub fn encrypt_data(
+        ephemeral_key_holder: &EphemeralKeyHolder,
+        viewing_public_key_receiver: AffinePoint,
+        data: &[u8],
+    ) -> (CipherText, Nonce) {
+        ephemeral_key_holder.encrypt_data(viewing_public_key_receiver, data)
+    }
+
+}
+
 impl Account {
     pub fn new() -> Self {
         let key_holder = AddressKeyHolder::new_os_random();
