@@ -19,10 +19,7 @@ members = [
   "sc_core",
 ]
 
-exclude = [
-  "template/sc_example",
-  "template/zk_sc_test"
-]
+exclude = ["template/sc_example", "template/zk_sc_test"]
 
 [workspace.dependencies]
 anyhow = "1.0"
