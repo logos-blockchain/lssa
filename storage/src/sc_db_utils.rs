@@ -118,6 +118,24 @@ mod tests {
     }
 
     #[test]
+    fn test_serialize_deserialize_data_blob_change_variant() {
+        let blob1 = sample_data_blob();
+        let blob2 = produce_blob_from_fit_vec((50..50 + SC_DATA_BLOB_SIZE as u8).collect());
+
+        let variants = vec![
+            DataBlobChangeVariant::Created { id: 1, blob: blob1 },
+            DataBlobChangeVariant::Modified { id: 2, blob_old: blob1, blob_new: blob2 },
+            DataBlobChangeVariant::Deleted { id: 3 },
+        ];
+
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let deserialized: DataBlobChangeVariant = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, deserialized);
+        }
+    }
+
+    #[test]
     fn test_produce_blob_from_fit_vec() {
         let data = (0..0 + 255).collect();
         let blob = produce_blob_from_fit_vec(data);
