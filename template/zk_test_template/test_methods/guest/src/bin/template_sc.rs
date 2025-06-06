@@ -6,12 +6,7 @@ use {sc_name}::{SmartContract, InputParameters, PublicOutputs, PrivateOutputs};
 use sc_core::traits::{IContract, IInputParameters, IPublicOutput, IPrivateOutput};
 use sc_core::{{execution_type_trait}};
 
-use sc_core::PublicSCContext;
-
-//Not sure, how path will look like, so
-//ToDo: Make it available from sc_core
-//Curently in storage
-use sc_core::{produce_blob_list_from_sc_public_state, compare_blob_lists};
+use sc_core::{PublicSCContext, produce_blob_list_from_sc_public_state, compare_blob_lists};
 
 fn main() {
     let mut state: SmartContract = env::read();

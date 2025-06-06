@@ -49,7 +49,7 @@ impl DataBlob {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DataBlobChangeVariant {
     Created {
         id: usize,
@@ -86,9 +86,28 @@ pub fn produce_blob_from_fit_vec(data: Vec<u8>) -> DataBlob {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json;
 
     const TEST_BLOB_SIZE: usize = 256; // Define a test blob size for simplicity
     static SC_DATA_BLOB_SIZE: usize = TEST_BLOB_SIZE;
+
+    fn sample_vec() -> Vec<u8> {
+        (0..SC_DATA_BLOB_SIZE).collect::<Vec<usize>>().iter().map(|&x| x as u8).collect()
+    }
+
+    fn sample_data_blob() -> DataBlob {
+        let vec: Vec<u8> = sample_vec();
+        produce_blob_from_fit_vec(vec)
+    }
+
+    #[test]
+    fn test_serialize_data_blob() {
+        let blob = sample_data_blob();
+        let json = serde_json::to_string(&blob).unwrap();
+
+        let expected_json = serde_json::to_string(&sample_vec()).unwrap();
+        assert_eq!(json, expected_json);
+    }
 
     #[test]
     fn test_produce_blob_from_fit_vec() {
