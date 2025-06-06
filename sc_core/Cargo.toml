@@ -30,6 +30,9 @@ path = "../utxo"
 [dependencies.common]
 path = "../common"
 
+[dependencies.storage]
+path = "../storage"
+
 [dependencies.secp256k1-zkp]
 workspace = true
 features = ["std", "rand-std", "rand", "serde", "global-context"]
