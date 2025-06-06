@@ -110,6 +110,14 @@ mod tests {
     }
 
     #[test]
+    fn test_deserialize_data_blob() {
+        let data = sample_vec();
+        let json = serde_json::to_string(&data).unwrap();
+        let deserialized: DataBlob = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.to_vec(), data);
+    }
+
+    #[test]
     fn test_produce_blob_from_fit_vec() {
         let data = (0..0 + 255).collect();
         let blob = produce_blob_from_fit_vec(data);
