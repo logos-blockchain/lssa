@@ -1,5 +1,8 @@
 use serde::Serialize;
-use storage::{sc_db_utils::{produce_blob_from_fit_vec, DataBlob, DataBlobChangeVariant}, SC_DATA_BLOB_SIZE};
+use storage::{
+    sc_db_utils::{produce_blob_from_fit_vec, DataBlob, DataBlobChangeVariant},
+    SC_DATA_BLOB_SIZE,
+};
 
 ///Creates blob list from generic serializable state
 ///

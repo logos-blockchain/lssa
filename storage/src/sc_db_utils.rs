@@ -92,7 +92,11 @@ mod tests {
     static SC_DATA_BLOB_SIZE: usize = TEST_BLOB_SIZE;
 
     fn sample_vec() -> Vec<u8> {
-        (0..SC_DATA_BLOB_SIZE).collect::<Vec<usize>>().iter().map(|&x| x as u8).collect()
+        (0..SC_DATA_BLOB_SIZE)
+            .collect::<Vec<usize>>()
+            .iter()
+            .map(|&x| x as u8)
+            .collect()
     }
 
     fn sample_data_blob() -> DataBlob {
@@ -124,7 +128,11 @@ mod tests {
 
         let variants = vec![
             DataBlobChangeVariant::Created { id: 1, blob: blob1 },
-            DataBlobChangeVariant::Modified { id: 2, blob_old: blob1, blob_new: blob2 },
+            DataBlobChangeVariant::Modified {
+                id: 2,
+                blob_old: blob1,
+                blob_new: blob2,
+            },
             DataBlobChangeVariant::Deleted { id: 3 },
         ];
 
