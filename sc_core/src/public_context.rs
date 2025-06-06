@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use accounts::account_core::{AccountAddress, AccountPublicMask};
 use common::merkle_tree_public::TreeHashType;
 use serde::{ser::SerializeStruct, Serialize};
+use crate::traits::IPrivateOutput;
 
 pub const PUBLIC_SC_CONTEXT: &str = "PublicSCContext";
 pub const CALLER_ADDRESS: &str = "caller_address";
@@ -86,6 +87,34 @@ impl PublicSCContext {
         }
 
         Ok(u64_list)
+    }
+
+    pub fn encode_utxo_for_owners<IPO: IPrivateOutput>(&self, private_outputs: IPO) -> Vec<(Vec<u8>, Vec<u8>, u8)> {
+        let utxos = private_outputs.make_utxo_list();
+
+        // ToDo: when errorhandling is implemented this `unwrap()` call has to be removed
+        let caller_account_mask = self.account_masks.get(&self.caller_address).unwrap();
+
+        let ephm_key_holder = caller_account_mask.produce_ephemeral_key_holder();
+
+        let encoded_data = utxos
+            .iter()
+            .map(|utxo| {
+                // ToDo: when errorhandling is implemented this `unwrap()` call has to be removed
+                let account_mask = self.account_masks.get(&utxo.owner).unwrap();
+                (
+                    AccountPublicMask::encrypt_data(
+                        &ephm_key_holder,
+                    account_mask.viewing_public_key,
+                        &serde_json::to_vec(&utxo).unwrap(),
+                    ),
+                    account_mask.make_tag(),
+                )
+            })
+            .map(|((ciphertext, nonce), tag)| (ciphertext, nonce.to_vec(), tag))
+            .collect();
+
+        encoded_data
     }
 }
 

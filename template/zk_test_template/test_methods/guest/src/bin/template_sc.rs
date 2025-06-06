@@ -44,17 +44,16 @@ fn main() {
     env::commit(&state_changes);
 
     //Next, push one of possible variants depending on execution type
-    //ToDo: Make UTXO encoding for their owners available from PublicSCContext
     {
         public => {
             env::commit(&public_outputs);
         },
         private => {
-            env::commit(&(public_context.encode_utxo_for_owners(private_outputs.make_utxo_list())));
+            env::commit(&(public_context.encode_utxo_for_owners(private_outputs)));
         },
         shielded | deshielded => {
             env::commit(&public_outputs);
-            env::commit(&(public_context.encode_utxo_for_owners(private_outputs.make_utxo_list())));
+            env::commit(&(public_context.encode_utxo_for_owners(private_outputs)));
         },
     }
 }
