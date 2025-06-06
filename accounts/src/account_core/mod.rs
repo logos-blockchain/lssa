@@ -43,6 +43,13 @@ impl AccountPublicMask {
         ephemeral_key_holder.encrypt_data(viewing_public_key_receiver, data)
     }
 
+    pub fn make_tag(&self) -> Tag {
+        self.address[0]
+    }
+
+    pub fn produce_ephemeral_key_holder(&self) -> EphemeralKeyHolder {
+        EphemeralKeyHolder::new_os_random()
+    }
 }
 
 impl Account {
