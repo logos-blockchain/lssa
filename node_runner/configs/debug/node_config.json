@@ -12,5 +12,6 @@
         "gas_cost_deploy": 1000,
         "gas_limit_deploy": 30000000,
         "gas_limit_runtime": 30000000
-    }
+    },
+    "shapshot_frequency_in_blocks": 10
 }

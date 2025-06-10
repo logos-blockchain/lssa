@@ -49,4 +49,6 @@ pub struct NodeConfig {
     pub port: u16,
     ///Gas config
     pub gas_config: GasConfig,
+    ///Frequency of snapshots
+    pub shapshot_frequency_in_blocks: u64,
 }

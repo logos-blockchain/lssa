@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    path::Path,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
@@ -13,10 +10,11 @@ use common::{
     utxo_commitment::UTXOCommitment,
 };
 use k256::AffinePoint;
+use log::{info, warn};
 use public_context::PublicSCContext;
 use utxo::utxo_core::UTXO;
 
-use crate::ActionData;
+use crate::{config::NodeConfig, ActionData};
 
 pub mod accounts_store;
 pub mod block_store;
@@ -28,6 +26,7 @@ pub struct NodeChainStore {
     pub nullifier_store: HashSet<UTXONullifier>,
     pub utxo_commitments_store: UTXOCommitmentsMerkleTree,
     pub pub_tx_store: PublicTransactionMerkleTree,
+    pub node_config: NodeConfig,
 }
 
 impl NodeChainStore {
@@ -41,7 +40,7 @@ impl NodeChainStore {
         //Sequencer should panic if unable to open db,
         //as fixing this issue may require actions non-native to program scope
         let block_store =
-            NodeBlockStore::open_db_with_genesis(&home_dir.join("rocksdb"), Some(genesis_block))
+            NodeBlockStore::open_db_with_genesis(&config.home.join("rocksdb"), Some(genesis_block))
                 .unwrap();
 
         if let Ok(temp_block_id) = block_store.get_snapshot_block_id() {
@@ -65,6 +64,8 @@ impl NodeChainStore {
     }
 
     pub fn dissect_insert_block(&mut self, block: Block) -> Result<()> {
+        let block_id = block.block_id;
+
         for tx in &block.transactions {
             if !tx.execution_input.is_empty() {
                 let public_action = serde_json::from_slice::<ActionData>(&tx.execution_input);
@@ -147,6 +148,47 @@ impl NodeChainStore {
         }
 
         self.block_store.put_block_at_id(block)?;
+
+        //Snapshot
+        if block_id % self.node_config.shapshot_frequency_in_blocks == 0 {
+            //Serializing all important data structures
+
+            //If we fail serialization, it is not the reason to stop running
+            //Logging on warn level in this cases
+
+            if let Ok(accounts_ser) = serde_json::to_vec(&self.acc_map).inspect_err(|err| {
+                warn!("Failed to serialize accounts data {err:#?}");
+            }) {
+                if let Ok(comm_ser) =
+                    serde_json::to_vec(&self.utxo_commitments_store).inspect_err(|err| {
+                        warn!("Failed to serialize commitments {err:#?}");
+                    })
+                {
+                    if let Ok(txs_ser) = serde_json::to_vec(&self.pub_tx_store).inspect_err(|err| {
+                        warn!("Failed to serialize transactions {err:#?}");
+                    }) {
+                        if let Ok(nullifiers_ser) = serde_json::to_vec(&self.nullifier_store)
+                            .inspect_err(|err| {
+                                warn!("Failed to serialize nullifiers {err:#?}");
+                            })
+                        {
+                            let snapshot_trace = self.block_store.put_snapshot_at_block_id(
+                                block_id,
+                                accounts_ser,
+                                comm_ser,
+                                txs_ser,
+                                nullifiers_ser,
+                            );
+
+                            info!(
+                                "Snapshot executed at {:?} with results {snapshot_trace:#?}",
+                                block_id
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
