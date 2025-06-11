@@ -12,6 +12,8 @@ use log::error;
 use storage::sc_db_utils::{DataBlob, DataBlobChangeVariant};
 use storage::RocksDBIO;
 
+use crate::chain_storage::AccMap;
+
 pub struct NodeBlockStore {
     dbio: RocksDBIO,
 }
@@ -69,7 +71,8 @@ impl NodeBlockStore {
     }
 
     pub fn get_snapshot_account(&self) -> Result<HashMap<[u8; 32], Account>> {
-        Ok(serde_json::from_slice(&self.dbio.get_snapshot_account()?)?)
+        let temp: AccMap = serde_json::from_slice(&self.dbio.get_snapshot_account()?)?;
+        Ok(temp.into())
     }
 
     pub fn get_snapshot_commitment(&self) -> Result<HashStorageMerkleTree<UTXOCommitment>> {
