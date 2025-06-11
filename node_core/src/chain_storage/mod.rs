@@ -270,3 +270,116 @@ impl NodeChainStore {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use crate::config::GasConfig;
+    use super::*;
+    use common::merkle_tree_public::TreeHashType;
+    use secp256k1_zkp::Tweak;
+    use tempfile::tempdir;
+    use accounts::account_core::Account;
+    use common::block::{Block, Data};
+    use common::transaction::{Transaction, TxKind};
+
+    fn create_genesis_block() -> Block {
+        Block {
+            block_id: 0,
+            prev_block_id: 0,
+            prev_block_hash: [0; 32],
+            hash: [1; 32],
+            transactions: vec![],
+            data: Data::default(),
+        }
+    }
+
+    fn create_dummy_transaction(
+        hash: TreeHashType,
+        // execution_input: Vec<u8>,
+        nullifier_created_hashes: Vec<[u8; 32]>,
+        utxo_commitments_spent_hashes: Vec<[u8; 32]>,
+        utxo_commitments_created_hashes: Vec<[u8; 32]>,
+    ) -> Transaction {
+        let mut rng = rand::thread_rng();
+
+        Transaction {
+            hash,
+            tx_kind: TxKind::Private,
+            execution_input: vec![],
+            execution_output: vec![],
+            utxo_commitments_spent_hashes,
+            utxo_commitments_created_hashes,
+            nullifier_created_hashes,
+            execution_proof_private: "dummy_proof".to_string(),
+            encoded_data: vec![],
+            ephemeral_pub_key: vec![10, 11, 12],
+            commitment: vec![],
+            tweak: Tweak::new(&mut rng),
+            secret_r: [0; 32],
+            sc_addr: "sc_addr".to_string(),
+            state_changes: (serde_json::Value::Null, 0),
+        }
+    }
+
+    fn create_sample_block(block_id: u64, prev_block_id: u64) -> Block {
+        Block {
+            block_id: block_id,
+            prev_block_id: prev_block_id,
+            prev_block_hash: [0; 32],
+            hash: [1; 32],
+            transactions: vec![],
+            data: Data::default(),
+        }
+    }
+
+    fn create_sample_node_config(home: PathBuf) -> NodeConfig {
+        NodeConfig {
+            home,
+            override_rust_log: None,
+            sequencer_addr: "http://127.0.0.1".to_string(),
+            seq_poll_timeout_secs: 1,
+            port: 8000,
+            gas_config: create_sample_gas_config(),
+            shapshot_frequency_in_blocks: 1,
+        }
+    }
+
+    fn create_sample_gas_config() -> GasConfig {
+        GasConfig {
+            gas_fee_per_byte_deploy: 0,
+            gas_fee_per_input_buffer_runtime: 0,
+            gas_fee_per_byte_runtime: 0,
+            gas_cost_runtime: 0,
+            gas_cost_deploy: 0,
+            gas_limit_deploy: 0,
+            gas_limit_runtime: 0,
+        }
+    }
+
+    fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> UTXO {
+        UTXO::new(address, vec![], amount, false)
+    }
+
+    #[test]
+    fn test_new_initializes_correctly() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let config = create_sample_node_config(path.to_path_buf());
+
+        let genesis_block = create_genesis_block();
+
+        let (store, block_id) = NodeChainStore::new(config.clone(), genesis_block.clone()).unwrap();
+
+        assert_eq!(block_id, 0);
+        assert!(store.acc_map.is_empty());
+        assert!(store.nullifier_store.is_empty());
+        assert_eq!(
+            store.utxo_commitments_store.get_root().unwrap_or([0; 32]),
+            [0; 32]
+        );
+    }
+
+
+}
