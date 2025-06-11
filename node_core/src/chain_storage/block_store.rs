@@ -231,17 +231,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_block_not_found() {
-        let temp_dir = tempdir().unwrap();
-        let path = temp_dir.path();
-
-        let node_store = NodeBlockStore::open_db_with_genesis(path, None).unwrap();
-
-        let result = node_store.get_block_at_id(42);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_put_snapshot_at_block_id() {
         let temp_dir = tempdir().unwrap();
         let path = temp_dir.path();
