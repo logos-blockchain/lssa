@@ -18,9 +18,9 @@ TO COMPLETE
 [ ] Subtask 2
 [ ] Subtask 3
 
-## 🌱 Follow-ups
+## 🧪 How to Test
 
-*If there’s additional work to be done later, create and link an issue here.*
+*How to verify that this PR works as intended.*
 
 TO COMPLETE
 
@@ -29,6 +29,13 @@ TO COMPLETE
 *Link PRs that must be merged before this one.*
 
 TO COMPLETE
+
+## 🌱 Follow-ups
+
+*If there’s additional work to be done later, create and link an issue here.*
+
+TO COMPLETE
+
 
 ## 📋 PR Completion Checklist
 
