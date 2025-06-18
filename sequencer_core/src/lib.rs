@@ -59,9 +59,8 @@ impl SequencerCore {
         }
     }
 
-    pub fn get_tree_roots(&self) -> [[u8; 32]; 3] {
+    pub fn get_tree_roots(&self) -> [[u8; 32]; 2] {
         [
-            self.store.nullifier_store.curr_root.unwrap_or([0; 32]),
             self.store
                 .utxo_commitments_store
                 .get_root()
@@ -73,7 +72,7 @@ impl SequencerCore {
     pub fn transaction_pre_check(
         &mut self,
         tx: &Transaction,
-        tx_roots: [[u8; 32]; 3],
+        tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
         let Transaction {
             hash,
@@ -135,10 +134,9 @@ impl SequencerCore {
         let nullifier_tree_check = nullifier_created_hashes
             .iter()
             .map(|nullifier_hash| {
-                self.store
-                    .nullifier_store
-                    .search_item_inclusion(*nullifier_hash)
-                    .unwrap_or(false)
+                self.store.nullifier_store.contains(&UTXONullifier {
+                    utxo_hash: *nullifier_hash,
+                })
             })
             .any(|check| check);
         let utxo_commitments_check = utxo_commitments_created_hashes
@@ -173,7 +171,7 @@ impl SequencerCore {
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
         item: TransactionMempool,
-        tx_roots: [[u8; 32]; 3],
+        tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
         self.transaction_pre_check(&item.tx, tx_roots)?;
 
@@ -187,7 +185,8 @@ impl SequencerCore {
         tx: TransactionMempool,
     ) -> Result<(), TransactionMalformationErrorKind> {
         let Transaction {
-            hash,
+            // ToDo: remove hashing of transactions on node side [Issue #66]
+            hash: _,
             ref utxo_commitments_created_hashes,
             ref nullifier_created_hashes,
             ..
@@ -199,16 +198,10 @@ impl SequencerCore {
                 .add_tx(UTXOCommitment { hash: *utxo_comm });
         }
 
-        for nullifier in nullifier_created_hashes {
-            self.store
-                .nullifier_store
-                .insert_item(UTXONullifier {
-                    utxo_hash: *nullifier,
-                })
-                .map_err(|err| TransactionMalformationErrorKind::FailedToInsert {
-                    tx: hash,
-                    details: format!("{err:?}"),
-                })?;
+        for nullifier in nullifier_created_hashes.iter() {
+            self.store.nullifier_store.insert(UTXONullifier {
+                utxo_hash: *nullifier,
+            });
         }
 
         self.store.pub_tx_store.add_tx(tx.tx);
@@ -225,12 +218,14 @@ impl SequencerCore {
 
     ///Produces new block from transactions in mempool
     pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<u64> {
+        let new_block_height = self.chain_height + 1;
+
         let transactions = self
             .mempool
             .pop_size(self.sequencer_config.max_num_tx_in_block);
 
-        for tx in transactions.clone() {
-            self.execute_check_transaction_on_state(tx)?;
+        for tx in &transactions {
+            self.execute_check_transaction_on_state(tx.clone())?;
         }
 
         let prev_block_hash = self
@@ -240,7 +235,7 @@ impl SequencerCore {
             .hash;
 
         let hashable_data = HashableBlockData {
-            block_id: self.chain_height + 1,
+            block_id: new_block_height,
             prev_block_id: self.chain_height,
             transactions: transactions.into_iter().map(|tx_mem| tx_mem.tx).collect(),
             data: vec![],
@@ -337,7 +332,7 @@ mod tests {
         common_setup(&mut sequencer);
 
         let roots = sequencer.get_tree_roots();
-        assert_eq!(roots.len(), 3); // Should return three roots
+        assert_eq!(roots.len(), 2); // Should return two roots
     }
 
     #[test]

@@ -81,6 +81,5 @@ pub fn cast_common_execution_error_into_rpc_error(comm_exec_err: ExecutionFailur
         ExecutionFailureKind::SequencerClientError(seq_cli_err) => {
             cast_seq_client_error_into_rpc_error(seq_cli_err)
         }
-        ExecutionFailureKind::MonoTreeError(_) => RpcError::new_internal_error(None, &error_string),
     }
 }

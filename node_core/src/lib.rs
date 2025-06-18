@@ -10,9 +10,10 @@ use anyhow::Result;
 use chain_storage::NodeChainStore;
 use common::transaction::{Transaction, TransactionPayload, TxKind};
 use config::NodeConfig;
-use executions::private_exec::{generate_commitments, generate_nullifiers};
 use log::info;
-use sc_core::proofs_circuits::pedersen_commitment_vec;
+use sc_core::proofs_circuits::{
+    generate_commitments, generate_nullifiers, generate_nullifiers_se, pedersen_commitment_vec,
+};
 use sequencer_client::{json::SendTxResponse, SequencerClient};
 use serde::{Deserialize, Serialize};
 use storage::sc_db_utils::DataBlobChangeVariant;
@@ -28,7 +29,6 @@ pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
 
 pub mod chain_storage;
 pub mod config;
-pub mod executions;
 ///Module, which includes pre start setup helperfunctions  
 pub mod pre_start;
 pub mod sequencer_client;
@@ -94,15 +94,13 @@ impl NodeCore {
         let client = Arc::new(SequencerClient::new(config.clone())?);
 
         let genesis_id = client.get_genesis_id().await?;
-        info!("Gesesis id is {genesis_id:?}");
+        info!("Genesis id is {genesis_id:?}");
 
         let genesis_block = client.get_block(genesis_id.genesis_id).await?.block;
 
-        let mut storage = NodeChainStore::new_with_genesis(&config.home, genesis_block);
+        let (mut storage, mut chain_height) = NodeChainStore::new(config.clone(), genesis_block)?;
 
         pre_start::setup_empty_sc_states(&storage).await?;
-
-        let mut chain_height = genesis_id.genesis_id;
 
         //Chain update loop
         loop {
@@ -164,10 +162,9 @@ impl NodeCore {
         })
     }
 
-    pub async fn get_roots(&self) -> [[u8; 32]; 3] {
+    pub async fn get_roots(&self) -> [[u8; 32]; 2] {
         let storage = self.storage.read().await;
         [
-            storage.nullifier_store.curr_root.unwrap_or([0; 32]),
             storage.utxo_commitments_store.get_root().unwrap_or([0; 32]),
             storage.pub_tx_store.get_root().unwrap_or([0; 32]),
         ]
@@ -651,7 +648,7 @@ impl NodeCore {
         )
         .unwrap();
 
-        let nullifier = executions::se::generate_nullifiers(
+        let nullifier = generate_nullifiers_se(
             &commitment,
             &account
                 .key_holder
@@ -1062,7 +1059,7 @@ impl NodeCore {
 
             let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
 
-            acc.utxo_tree.get_item(new_utxo_hash)?.unwrap().clone()
+            acc.utxos.get(&new_utxo_hash).unwrap().clone()
         };
 
         new_utxo.log();
@@ -1101,12 +1098,7 @@ impl NodeCore {
                 .map(|new_utxo_hash| {
                     let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
 
-                    let new_utxo = acc
-                        .utxo_tree
-                        .get_item(new_utxo_hash)
-                        .unwrap()
-                        .unwrap()
-                        .clone();
+                    let new_utxo = acc.utxos.get(&new_utxo_hash).unwrap().clone();
 
                     new_utxo.log();
                     info!(
@@ -1238,7 +1230,7 @@ impl NodeCore {
             let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
             acc.log();
 
-            acc.utxo_tree.get_item(new_utxo_hash)?.unwrap().clone()
+            acc.utxos.get(&new_utxo_hash).unwrap().clone()
         };
         new_utxo.log();
         info!(
@@ -1278,7 +1270,7 @@ impl NodeCore {
             let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
             acc.log();
 
-            acc.utxo_tree.get_item(new_utxo_hash)?.unwrap().clone()
+            acc.utxos.get(&new_utxo_hash).unwrap().clone()
         };
         new_utxo.log();
         info!(
@@ -1323,7 +1315,7 @@ impl NodeCore {
                 let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
                 acc.log();
 
-                let new_utxo = acc.utxo_tree.get_item(new_utxo_hash)?.unwrap().clone();
+                let new_utxo = acc.utxos.get(&new_utxo_hash).unwrap().clone();
 
                 new_utxo.log();
                 info!(
@@ -1343,7 +1335,7 @@ impl NodeCore {
                 let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
                 acc.log();
 
-                let new_utxo = acc.utxo_tree.get_item(new_utxo_hash)?.unwrap().clone();
+                let new_utxo = acc.utxos.get(&new_utxo_hash).unwrap().clone();
 
                 new_utxo.log();
                 info!(
@@ -1556,12 +1548,7 @@ impl NodeCore {
                 .map(|(acc_addr_rec, new_utxo_hash)| {
                     let acc = write_guard.acc_map.get_mut(&acc_addr_rec).unwrap();
 
-                    let new_utxo = acc
-                        .utxo_tree
-                        .get_item(new_utxo_hash)
-                        .unwrap()
-                        .unwrap()
-                        .clone();
+                    let new_utxo = acc.utxos.get(&new_utxo_hash).unwrap().clone();
                     new_utxo.log();
 
                     info!(

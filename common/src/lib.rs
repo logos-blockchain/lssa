@@ -3,10 +3,8 @@ use serde::Deserialize;
 
 pub mod block;
 pub mod commitment;
-pub mod commitments_sparse_merkle_tree;
 pub mod merkle_tree_public;
 pub mod nullifier;
-pub mod nullifier_sparse_merkle_tree;
 pub mod rpc_primitives;
 pub mod transaction;
 pub mod utxo_commitment;
@@ -67,8 +65,6 @@ pub enum ExecutionFailureKind {
     AmountMismatchError,
     #[error("Sequencer client error: {0:?}")]
     SequencerClientError(#[from] SequencerClientError),
-    #[error("Datebase returned error : {0:?}")]
-    MonoTreeError(#[from] monotree::Errors),
     #[error("Insufficient gas for operation")]
     InsufficientGasError,
     #[error("Can not pay for operation")]

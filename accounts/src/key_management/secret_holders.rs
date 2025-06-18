@@ -2,6 +2,7 @@ use common::merkle_tree_public::TreeHashType;
 use elliptic_curve::PrimeField;
 use k256::{AffinePoint, FieldBytes, Scalar};
 use rand::{rngs::OsRng, RngCore};
+use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
 
 use super::constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};
@@ -13,13 +14,13 @@ pub struct SeedHolder {
     seed: Scalar,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 ///Secret spending key holder. Produces `UTXOSecretKeyHolder` objects.
 pub struct TopSecretKeyHolder {
     pub secret_spending_key: Scalar,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 ///Nullifier secret key and viewing secret key holder. Produces public keys. Can produce address. Can produce shared secret for recepient.
 pub struct UTXOSecretKeyHolder {
     pub nullifier_secret_key: Scalar,

@@ -1,22 +1,24 @@
 use anyhow::Result;
-use common::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
+use common::{merkle_tree_public::TreeHashType, AccountId};
 use log::info;
+use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
 
 ///Raw asset data
 pub type Asset = Vec<u8>;
+pub type Randomness = [u8; 32];
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 ///Container for raw utxo payload
 pub struct UTXO {
     pub hash: TreeHashType,
     pub owner: AccountId,
-    pub nullifier: Option<UTXONullifier>,
     pub asset: Asset,
     // TODO: change to u256
     pub amount: u128,
     pub privacy_flag: bool,
+    pub randomness: Randomness,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,36 +28,47 @@ pub struct UTXOPayload {
     // TODO: change to u256
     pub amount: u128,
     pub privacy_flag: bool,
+    pub randomness: Randomness,
+}
+
+impl UTXOPayload {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut result = Vec::new();
+        result.extend_from_slice(&self.owner);
+        result.extend_from_slice(&self.asset);
+        result.extend_from_slice(&self.amount.to_be_bytes());
+        result.push(self.privacy_flag as u8);
+        result.extend_from_slice(&self.randomness);
+        result
+    }
 }
 
 impl UTXO {
-    pub fn create_utxo_from_payload(payload_with_asset: UTXOPayload) -> anyhow::Result<Self> {
-        let raw_payload = serde_json::to_vec(&payload_with_asset)?;
-
+    pub fn new(owner: AccountId, asset: Asset, amount: u128, privacy_flag: bool) -> Self {
+        let mut randomness = Randomness::default();
+        OsRng.fill_bytes(&mut randomness);
+        let payload = UTXOPayload {
+            owner,
+            asset,
+            amount,
+            privacy_flag,
+            randomness,
+        };
+        Self::create_utxo_from_payload(payload)
+    }
+    pub fn create_utxo_from_payload(payload_with_asset: UTXOPayload) -> Self {
         let mut hasher = sha2::Sha256::new();
-
-        hasher.update(&raw_payload);
-
+        hasher.update(&payload_with_asset.to_bytes());
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
-        Ok(Self {
+        Self {
             hash,
             owner: payload_with_asset.owner,
-            nullifier: None,
             asset: payload_with_asset.asset,
             amount: payload_with_asset.amount,
             privacy_flag: payload_with_asset.privacy_flag,
-        })
-    }
-
-    pub fn consume_utxo(&mut self, nullifier: UTXONullifier) -> Result<()> {
-        if self.nullifier.is_some() {
-            anyhow::bail!("UTXO already consumed");
-        } else {
-            self.nullifier = Some(nullifier);
+            randomness: payload_with_asset.randomness,
         }
-
-        Ok(())
     }
 
     pub fn interpret_asset<'de, ToInterpret: Deserialize<'de>>(&'de self) -> Result<ToInterpret> {
@@ -68,16 +81,13 @@ impl UTXO {
             asset: self.asset.clone(),
             amount: self.amount,
             privacy_flag: self.privacy_flag,
+            randomness: self.randomness,
         }
     }
 
     pub fn log(&self) {
         info!("UTXO hash is {:?}", hex::encode(self.hash));
         info!("UTXO owner is {:?}", hex::encode(self.owner));
-        info!(
-            "UTXO nullifier is {:?}",
-            self.nullifier.clone().map(|val| hex::encode(val.utxo_hash))
-        );
         info!("UTXO asset is {:?}", hex::encode(self.asset.clone()));
         info!("UTXO amount is {:?}", self.amount);
         info!("UTXO privacy_flag is {:?}", self.privacy_flag);
@@ -98,14 +108,6 @@ mod tests {
         AccountId::default()
     }
 
-    fn sample_nullifier() -> UTXONullifier {
-        UTXONullifier::default()
-    }
-
-    fn sample_tree_hash() -> TreeHashType {
-        TreeHashType::default()
-    }
-
     fn sample_payload() -> UTXOPayload {
         UTXOPayload {
             owner: sample_account(),
@@ -116,40 +118,24 @@ mod tests {
             .unwrap(),
             amount: 10,
             privacy_flag: false,
+            randomness: Randomness::default(),
         }
     }
 
     #[test]
     fn test_create_utxo_from_payload() {
         let payload = sample_payload();
-        let utxo = UTXO::create_utxo_from_payload(payload.clone()).unwrap();
+        let utxo = UTXO::create_utxo_from_payload(payload.clone());
 
         // Ensure hash is created and the UTXO fields are correctly assigned
         assert_eq!(utxo.owner, payload.owner);
         assert_eq!(utxo.asset, payload.asset);
-        assert!(utxo.nullifier.is_none());
-    }
-
-    #[test]
-    fn test_consume_utxo() {
-        let payload = sample_payload();
-        let mut utxo = UTXO::create_utxo_from_payload(payload).unwrap();
-
-        let nullifier = sample_nullifier();
-
-        // First consumption should succeed
-        assert!(utxo.consume_utxo(nullifier.clone()).is_ok());
-        assert_eq!(utxo.nullifier, Some(nullifier));
-
-        // Second consumption should fail
-        let result = utxo.consume_utxo(sample_nullifier());
-        assert!(result.is_err());
     }
 
     #[test]
     fn test_interpret_asset() {
         let payload = sample_payload();
-        let utxo = UTXO::create_utxo_from_payload(payload).unwrap();
+        let utxo = UTXO::create_utxo_from_payload(payload);
 
         // Interpret asset as TestAsset
         let interpreted: TestAsset = utxo.interpret_asset().unwrap();
@@ -167,7 +153,7 @@ mod tests {
     fn test_interpret_invalid_asset() {
         let mut payload = sample_payload();
         payload.asset = vec![0, 1, 2, 3]; // Invalid data for deserialization
-        let utxo = UTXO::create_utxo_from_payload(payload).unwrap();
+        let utxo = UTXO::create_utxo_from_payload(payload);
 
         // This should fail because the asset is not valid JSON for TestAsset
         let result: Result<TestAsset> = utxo.interpret_asset();

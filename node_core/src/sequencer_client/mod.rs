@@ -73,7 +73,7 @@ impl SequencerClient {
     pub async fn send_tx(
         &self,
         transaction: Transaction,
-        tx_roots: [[u8; 32]; 3],
+        tx_roots: [[u8; 32]; 2],
     ) -> Result<SendTxResponse, SequencerClientError> {
         let tx_req = SendTxRequest {
             transaction,

@@ -268,11 +268,8 @@ impl JsonHandler {
                     .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
                 let utxo = acc
-                    .utxo_tree
-                    .get_item(utxo_hash)
-                    .map_err(|err| {
-                        RpcError::new_internal_error(None, &format!("DB fetch failure {err:?}"))
-                    })?
+                    .utxos
+                    .get(&utxo_hash)
                     .ok_or(RpcError::new_internal_error(
                         None,
                         "UTXO does not exist in the tree",
@@ -512,11 +509,8 @@ impl JsonHandler {
                     .get_mut(&acc_addr_sender)
                     .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
-                acc.utxo_tree
-                    .get_item(utxo_hash)
-                    .map_err(|err| {
-                        RpcError::new_internal_error(None, &format!("DB fetch failure {err:?}"))
-                    })?
+                acc.utxos
+                    .get(&utxo_hash)
                     .ok_or(RpcError::new_internal_error(
                         None,
                         "UTXO does not exist in tree",
@@ -647,11 +641,8 @@ impl JsonHandler {
                     .get_mut(&acc_addr_sender)
                     .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
-                acc.utxo_tree
-                    .get_item(utxo_hash)
-                    .map_err(|err| {
-                        RpcError::new_internal_error(None, &format!("DB fetch failure {err:?}"))
-                    })?
+                acc.utxos
+                    .get(&utxo_hash)
                     .ok_or(RpcError::new_internal_error(
                         None,
                         "UTXO does not exist in tree",
@@ -735,11 +726,8 @@ impl JsonHandler {
                     .get_mut(&acc_addr_sender)
                     .ok_or(RpcError::new_internal_error(None, ACCOUNT_NOT_FOUND))?;
 
-                acc.utxo_tree
-                    .get_item(utxo_hash)
-                    .map_err(|err| {
-                        RpcError::new_internal_error(None, &format!("DB fetch failure {err:?}"))
-                    })?
+                acc.utxos
+                    .get(&utxo_hash)
                     .ok_or(RpcError::new_internal_error(
                         None,
                         "UTXO does not exist in tree",

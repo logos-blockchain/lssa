@@ -1,4 +1,5 @@
-use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, Key, KeyInit};
+use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, KeyInit};
+use elliptic_curve::point::AffineCoordinates;
 use elliptic_curve::PrimeField;
 use k256::{AffinePoint, FieldBytes, Scalar};
 use log::info;
@@ -39,14 +40,8 @@ impl EphemeralKeyHolder {
         viewing_public_key_receiver: AffinePoint,
         data: &[u8],
     ) -> (CipherText, Nonce) {
-        let key_point = self.calculate_shared_secret_sender(viewing_public_key_receiver);
-        let binding = serde_json::to_vec(&key_point).unwrap();
-        let key_raw = &binding.as_slice()[..32];
-        let key_raw_adjust: [u8; 32] = key_raw.try_into().unwrap();
-
-        let key: Key<Aes256Gcm> = key_raw_adjust.into();
-
-        let cipher = Aes256Gcm::new(&key);
+        let shared_secret = self.calculate_shared_secret_sender(viewing_public_key_receiver);
+        let cipher = Aes256Gcm::new(&shared_secret.x());
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
         (cipher.encrypt(&nonce, data).unwrap(), nonce)

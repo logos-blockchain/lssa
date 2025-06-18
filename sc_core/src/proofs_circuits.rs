@@ -1,11 +1,5 @@
 use bincode;
-use common::{
-    commitment::Commitment, commitments_sparse_merkle_tree::CommitmentsSparseMerkleTree,
-    nullifier::UTXONullifier, nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
-};
 use k256::Scalar;
-use monotree::hasher::Blake3;
-use monotree::{Hasher, Monotree};
 use rand::{thread_rng, RngCore};
 use secp256k1_zkp::{CommitmentSecrets, Generator, PedersenCommitment, Tag, Tweak, SECP256K1};
 use sha2::{Digest, Sha256};
@@ -44,59 +38,21 @@ pub fn generate_commitments(input_utxos: &[UTXO]) -> Vec<Vec<u8>> {
 // takes the in_commitments[i] as a leaf, the root hash root_commitment and the path in_commitments_proofs[i][],
 // returns True if the in_commitments[i] is in the tree with root hash root_commitment otherwise returns False, as membership proof.
 pub fn validate_in_commitments_proof(
-    in_commitment: &Vec<u8>,
-    root_commitment: Vec<u8>,
-    in_commitments_proof: &[Vec<u8>],
+    _in_commitment: &Vec<u8>,
+    _root_commitment: Vec<u8>,
+    _in_commitments_proof: &[Vec<u8>],
 ) -> bool {
-    // Placeholder implementation.
-    // Replace with Merkle proof verification logic.
-    // hash(&[pedersen_commitment.serialize().to_vec(), in_commitments_proof.concat()].concat()) == root_commitment
+    // ToDo: Implement correct check
 
-    let mut nsmt = CommitmentsSparseMerkleTree {
-        curr_root: Option::Some(root_commitment),
-        tree: Monotree::default(),
-        hasher: Blake3::new(),
-    };
-
-    let commitments: Vec<_> = in_commitments_proof
-        .into_iter()
-        .map(|n_p| Commitment {
-            commitment_hash: n_p.clone(),
-        })
-        .collect();
-    nsmt.insert_items(commitments).unwrap();
-
-    nsmt.get_non_membership_proof(in_commitment.clone())
-        .unwrap()
-        .1
-        .is_some()
+    todo!()
 }
 
-// Validate non-membership proof for nullifiers
-
-// takes the nullifiers[i], path nullifiers_proof[i][] and the root hash root_nullifier,
-// returns True if the nullifiers[i] is not in the tree with root hash root_nullifier otherwise returns False, as non-membership proof.
-pub fn validate_nullifiers_proof(
+// Validate that `nullifier` has not been present in set items before
+pub fn validate_nullifier_not_present_in_set_items(
     nullifier: [u8; 32],
-    root_nullifier: [u8; 32],
-    nullifiers_proof: &[[u8; 32]],
+    nullifiers_items: &[[u8; 32]],
 ) -> bool {
-    let mut nsmt = NullifierSparseMerkleTree {
-        curr_root: Option::Some(root_nullifier),
-        tree: Monotree::default(),
-        hasher: Blake3::new(),
-    };
-
-    let nullifiers: Vec<_> = nullifiers_proof
-        .into_iter()
-        .map(|n_p| UTXONullifier { utxo_hash: *n_p })
-        .collect();
-    nsmt.insert_items(nullifiers).unwrap();
-
-    nsmt.get_non_membership_proof(nullifier)
-        .unwrap()
-        .1
-        .is_none()
+    !nullifiers_items.contains(&nullifier)
 }
 
 #[allow(unused)]
@@ -124,9 +80,8 @@ fn private_kernel(
     }
 
     for nullifier in nullifiers.iter() {
-        validate_nullifiers_proof(
+        validate_nullifier_not_present_in_set_items(
             nullifier[0..32].try_into().unwrap(),
-            root_nullifier,
             nullifiers_proof,
         );
     }
@@ -243,9 +198,8 @@ fn de_kernel(
     }
 
     for nullifier in nullifiers.iter() {
-        validate_nullifiers_proof(
+        validate_nullifier_not_present_in_set_items(
             nullifier[0..32].try_into().unwrap(),
-            root_nullifier,
             nullifiers_proof,
         );
     }
@@ -260,28 +214,13 @@ fn de_kernel(
 // otherwise
 // returns False, as membership proof.
 pub fn validate_in_commitments_proof_se(
-    pedersen_commitment: &PedersenCommitment,
-    root_commitment: Vec<u8>,
-    in_commitments_proof: &[Vec<u8>],
+    _pedersen_commitment: &PedersenCommitment,
+    _root_commitment: Vec<u8>,
+    _in_commitments_proof: &[Vec<u8>],
 ) -> bool {
-    let mut nsmt = CommitmentsSparseMerkleTree {
-        curr_root: Option::Some(root_commitment),
-        tree: Monotree::default(),
-        hasher: Blake3::new(),
-    };
+    // ToDo: Implement correct check
 
-    let commitments: Vec<_> = in_commitments_proof
-        .into_iter()
-        .map(|n_p| Commitment {
-            commitment_hash: n_p.clone(),
-        })
-        .collect();
-    nsmt.insert_items(commitments).unwrap();
-
-    nsmt.get_non_membership_proof(pedersen_commitment.serialize().to_vec())
-        .unwrap()
-        .1
-        .is_some()
+    todo!()
 }
 
 // Generate nullifiers SE
