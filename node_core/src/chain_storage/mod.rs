@@ -242,8 +242,7 @@ impl NodeChainStore {
                             );
 
                             info!(
-                                "Snapshot executed at {:?} with results {snapshot_trace:#?}",
-                                block_id
+                                "Snapshot executed at {block_id:?} with results {snapshot_trace:#?}"
                             );
                         }
                     }

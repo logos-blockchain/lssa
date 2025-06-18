@@ -131,23 +131,20 @@ impl SequencerCore {
 
         //Tree checks
         let tx_tree_check = self.store.pub_tx_store.get_tx(*hash).is_some();
-        let nullifier_tree_check = nullifier_created_hashes
-            .iter()
-            .map(|nullifier_hash| {
-                self.store.nullifier_store.contains(&UTXONullifier {
-                    utxo_hash: *nullifier_hash,
-                })
+        let nullifier_tree_check = nullifier_created_hashes.iter().any(|nullifier_hash| {
+            self.store.nullifier_store.contains(&UTXONullifier {
+                utxo_hash: *nullifier_hash,
             })
-            .any(|check| check);
-        let utxo_commitments_check = utxo_commitments_created_hashes
-            .iter()
-            .map(|utxo_commitment_hash| {
-                self.store
-                    .utxo_commitments_store
-                    .get_tx(*utxo_commitment_hash)
-                    .is_some()
-            })
-            .any(|check| check);
+        });
+        let utxo_commitments_check =
+            utxo_commitments_created_hashes
+                .iter()
+                .any(|utxo_commitment_hash| {
+                    self.store
+                        .utxo_commitments_store
+                        .get_tx(*utxo_commitment_hash)
+                        .is_some()
+                });
 
         if tx_tree_check {
             return Err(TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: *hash });
