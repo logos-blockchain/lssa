@@ -10,13 +10,10 @@ TO COMPLETE
 
 TO COMPLETE
 
-## ✅ Todo (subtasks)
-
-TO COMPLETE
-
-[ ] Subtask 1
-[ ] Subtask 2
-[ ] Subtask 3
+[ ] Change ...
+[ ] Add ...
+[ ] Fix ...
+[ ] ...
 
 ## 🧪 How to Test
 
@@ -28,14 +25,13 @@ TO COMPLETE
 
 *Link PRs that must be merged before this one.*
 
-TO COMPLETE
+TO COMPLETE IF APPLICABLE
 
-## 🌱 Follow-ups
+## 🔜 Future Work
 
-*If there’s additional work to be done later, create and link an issue here.*
+*List any work intentionally left out of this PR, whether due to scope, prioritization, or pending decisions.*
 
-TO COMPLETE
-
+TO COMPLETE IF APPLICABLE
 
 ## 📋 PR Completion Checklist
 
