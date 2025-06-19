@@ -4,7 +4,7 @@ use anyhow::Result;
 use common::{merkle_tree_public::TreeHashType, transaction::Tag};
 use k256::AffinePoint;
 use log::info;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utxo::utxo_core::UTXO;
 
 use crate::key_management::{
@@ -16,11 +16,70 @@ use crate::key_management::{
 pub type PublicKey = AffinePoint;
 pub type AccountAddress = TreeHashType;
 
+#[derive(Clone)]
 pub struct Account {
     pub key_holder: AddressKeyHolder,
     pub address: AccountAddress,
     pub balance: u64,
     pub utxos: HashMap<TreeHashType, UTXO>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AccountForSerialization {
+    pub key_holder: AddressKeyHolder,
+    pub address: AccountAddress,
+    pub balance: u64,
+    pub utxos: HashMap<String, UTXO>,
+}
+
+impl From<Account> for AccountForSerialization {
+    fn from(value: Account) -> Self {
+        AccountForSerialization {
+            key_holder: value.key_holder,
+            address: value.address,
+            balance: value.balance,
+            utxos: value
+                .utxos
+                .into_iter()
+                .map(|(key, val)| (hex::encode(key), val))
+                .collect(),
+        }
+    }
+}
+
+impl From<AccountForSerialization> for Account {
+    fn from(value: AccountForSerialization) -> Self {
+        Account {
+            key_holder: value.key_holder,
+            address: value.address,
+            balance: value.balance,
+            utxos: value
+                .utxos
+                .into_iter()
+                .map(|(key, val)| (hex::decode(key).unwrap().try_into().unwrap(), val))
+                .collect(),
+        }
+    }
+}
+
+impl Serialize for Account {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let account_for_serialization: AccountForSerialization = From::from(self.clone());
+        account_for_serialization.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Account {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let account_for_serialization = <AccountForSerialization>::deserialize(deserializer)?;
+        Ok(account_for_serialization.into())
+    }
 }
 
 ///A strucure, which represents all the visible(public) information

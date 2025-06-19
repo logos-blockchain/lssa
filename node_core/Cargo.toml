@@ -18,7 +18,7 @@ reqwest.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tempfile.workspace = true
-risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.0" }
+risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.1" }
 hex.workspace = true
 actix-rt.workspace = true
 

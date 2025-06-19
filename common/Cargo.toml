@@ -9,7 +9,7 @@ thiserror.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 reqwest.workspace = true
-risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.0" }
+risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.1" }
 
 rs_merkle.workspace = true
 sha2.workspace = true

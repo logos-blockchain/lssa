@@ -6,6 +6,7 @@ use ephemeral_key_holder::EphemeralKeyHolder;
 use k256::AffinePoint;
 use log::info;
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
+use serde::{Deserialize, Serialize};
 
 use crate::account_core::PublicKey;
 
@@ -13,7 +14,7 @@ pub mod constants_types;
 pub mod ephemeral_key_holder;
 pub mod secret_holders;
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 ///Entrypoint to key management
 pub struct AddressKeyHolder {
     //Will be useful in future

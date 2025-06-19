@@ -2,7 +2,6 @@ use std::{path::Path, sync::Arc};
 
 use common::block::Block;
 use error::DbError;
-use log::warn;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
 };
@@ -103,9 +102,8 @@ impl RocksDBIO {
 
             Ok(dbio)
         } else {
-            warn!("Starting db in unset mode, will have to set starting block manually");
-
-            Ok(dbio)
+            // Here we are trying to start a DB without a block, one should not do it.
+            unreachable!()
         }
     }
 

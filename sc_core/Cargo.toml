@@ -19,7 +19,7 @@ light-poseidon.workspace = true
 ark-bn254.workspace = true
 ark-ff.workspace = true
 
-risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.0" }
+risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.1" }
 
 [dependencies.accounts]
 path = "../accounts"
