@@ -10,8 +10,8 @@ use common::{
     utxo_commitment::UTXOCommitment,
 };
 use k256::AffinePoint;
-use sc_core::public_context::PublicSCContext;
 use log::{info, warn};
+use sc_core::public_context::PublicSCContext;
 use serde::{Deserialize, Serialize};
 use utxo::utxo_core::UTXO;
 
