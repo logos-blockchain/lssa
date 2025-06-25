@@ -34,28 +34,6 @@ pub fn create_public_transaction_payload(
     }
 }
 
-pub fn encode_utxos_to_receivers(
-    utxos_receivers: Vec<(UTXO, &Account)>,
-) -> Vec<(Vec<u8>, Vec<u8>)> {
-    let mut all_encoded_data = vec![];
-
-    for (utxo, receiver) in utxos_receivers {
-        let ephm_key_holder = &receiver.produce_ephemeral_key_holder();
-
-        let encoded_data = Account::encrypt_data(
-            &ephm_key_holder,
-            receiver.key_holder.viewing_public_key,
-            &serde_json::to_vec(&utxo).unwrap(),
-        );
-
-        let encoded_data_vec = (encoded_data.0, encoded_data.1.to_vec());
-
-        all_encoded_data.push(encoded_data_vec);
-    }
-
-    all_encoded_data
-}
-
 pub fn generate_nullifiers_spent_utxos(utxos_spent: Vec<(UTXO, &Account)>) -> Vec<Vec<u8>> {
     let mut all_nullifiers = vec![];
 
