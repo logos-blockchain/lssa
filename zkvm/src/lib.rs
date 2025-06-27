@@ -574,4 +574,18 @@ mod tests {
         assert_eq!(outputs.len(), 2);
     }
 
+#[test]
+    fn test_prove_send_utxo_deshielded() {
+        let owner = AccountAddress::default();
+        let amount = 100;
+        let (utxo, _) = prove_mint_utxo(amount, owner).unwrap();
+        let parts = vec![(60, owner), (40, owner)];
+
+        let (outputs, _) = prove_send_utxo_deshielded(utxo, parts.clone()).unwrap();
+
+        let total: u128 = outputs.iter().map(|(amt, _)| amt).sum();
+        assert_eq!(total, amount);
+        assert_eq!(outputs.len(), 2);
+    }
+
 }
