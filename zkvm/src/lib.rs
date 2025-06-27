@@ -588,4 +588,17 @@ mod tests {
         assert_eq!(outputs.len(), 2);
     }
 
+    #[test]
+    fn test_prove_send_utxo_shielded() {
+        let owner = AccountAddress::default();
+        let amount = 100;
+        let parts = vec![(60, owner), (40, owner)];
+
+        let (outputs, _) = prove_send_utxo_shielded(owner, amount, parts.clone()).unwrap();
+
+        let total: u128 = outputs.iter().map(|(utxo, _)| utxo.amount).sum();
+        assert_eq!(total, amount);
+        assert_eq!(outputs.len(), 2);
+    }
+
 }
