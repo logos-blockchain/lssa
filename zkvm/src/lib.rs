@@ -528,7 +528,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
-#[test]
+    #[test]
     fn test_gas_limits_check_insufficient_funds() {
         let message = 1;
         let message_2 = 2;
@@ -550,7 +550,7 @@ mod tests {
         assert_eq!(utxo_exec.owner, owner);
     }
 
-#[test]
+    #[test]
     fn test_prove_mint_utxo() {
         let owner = AccountAddress::default();
         let amount = 123456789;
@@ -560,7 +560,7 @@ mod tests {
         assert_eq!(utxo.owner, owner);
     }
 
-#[test]
+    #[test]
     fn test_prove_send_utxo() {
         let owner = AccountAddress::default();
         let amount = 100;
@@ -574,7 +574,7 @@ mod tests {
         assert_eq!(outputs.len(), 2);
     }
 
-#[test]
+    #[test]
     fn test_prove_send_utxo_deshielded() {
         let owner = AccountAddress::default();
         let amount = 100;
@@ -601,4 +601,20 @@ mod tests {
         assert_eq!(outputs.len(), 2);
     }
 
+    #[test]
+    fn test_prove_send_utxo_multiple_assets_one_receiver() {
+        let owner = AccountAddress::default();
+        let receiver = AccountAddress::default();
+
+        let utxos = vec![
+            prove_mint_utxo(100, owner).unwrap().0,
+            prove_mint_utxo(50, owner).unwrap().0,
+        ];
+
+        let (to_receiver, to_change, _receipt) = prove_send_utxo_multiple_assets_one_receiver(utxos, 1, receiver).unwrap();
+        let total_to_receiver: u128 = to_receiver.iter().map(|u| u.amount).sum();
+
+        assert!(total_to_receiver > 0);
+        assert_eq!(to_receiver.len() + to_change.len(), 2);
+    }
 }
