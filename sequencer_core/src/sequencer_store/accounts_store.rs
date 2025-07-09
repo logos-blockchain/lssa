@@ -1,27 +1,11 @@
-use accounts::account_core::{AccountAddress, PublicKey};
-use k256::AffinePoint;
+use accounts::account_core::AccountAddress;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountPublicData {
-    pub nullifier_public_key: PublicKey,
-    pub viewing_public_key: PublicKey,
+    pub balance: u64,
     pub address: AccountAddress,
-}
-
-impl AccountPublicData {
-    pub fn from_raw(
-        address: AccountAddress,
-        nullifier_public_key: Vec<u8>,
-        viewing_public_key: Vec<u8>,
-    ) -> Self {
-        Self {
-            nullifier_public_key: serde_json::from_slice::<AffinePoint>(&nullifier_public_key)
-                .unwrap(),
-            viewing_public_key: serde_json::from_slice::<AffinePoint>(&viewing_public_key).unwrap(),
-            address,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
