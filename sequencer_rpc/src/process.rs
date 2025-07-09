@@ -1,5 +1,4 @@
 use actix_web::Error as HttpError;
-use sequencer_core::sequencer_store::accounts_store::AccountPublicData;
 use serde_json::Value;
 
 use common::rpc_primitives::{
@@ -61,11 +60,7 @@ impl JsonHandler {
         {
             let mut acc_store = self.sequencer_state.lock().await;
 
-            acc_store.register_account(AccountPublicData::from_raw(
-                acc_req.address,
-                acc_req.nullifier_public_key,
-                acc_req.viewing_public_key,
-            ));
+            acc_store.register_account(acc_req.address);
         }
 
         let helperstruct = RegisterAccountResponse {

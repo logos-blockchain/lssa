@@ -7,7 +7,6 @@ use common::rpc_primitives::requests::{
 use common::transaction::Transaction;
 use common::{SequencerClientError, SequencerRpcError};
 use json::{SendTxRequest, SendTxResponse, SequencerRpcRequest, SequencerRpcResponse};
-use k256::elliptic_curve::group::GroupEncoding;
 use reqwest::Client;
 use serde_json::Value;
 
@@ -94,8 +93,6 @@ impl SequencerClient {
         account: &Account,
     ) -> Result<RegisterAccountResponse, SequencerClientError> {
         let acc_req = RegisterAccountRequest {
-            nullifier_public_key: account.key_holder.nullifer_public_key.to_bytes().to_vec(),
-            viewing_public_key: account.key_holder.viewing_public_key.to_bytes().to_vec(),
             address: account.address,
         };
 

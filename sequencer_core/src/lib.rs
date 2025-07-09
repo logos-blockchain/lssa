@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use accounts::account_core::AccountAddress;
 use anyhow::Result;
 use common::{
     block::{Block, HashableBlockData},
@@ -10,7 +11,7 @@ use common::{
 };
 use config::SequencerConfig;
 use mempool::MemPool;
-use sequencer_store::{accounts_store::AccountPublicData, SequecerChainStore};
+use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
 use transaction_mempool::TransactionMempool;
 
@@ -209,11 +210,8 @@ impl SequencerCore {
         Ok(())
     }
 
-    pub fn register_account(&mut self, acc_data: AccountPublicData) {
-        self.store
-            .acc_store
-            .accounts
-            .insert(acc_data.address, acc_data);
+    pub fn register_account(&mut self, account_addr: AccountAddress) {
+        self.store.acc_store.register_account(account_addr);
     }
 
     ///Produces new block from transactions in mempool
@@ -306,12 +304,14 @@ mod tests {
         }
     }
 
-    fn common_setup(mut sequencer: &mut SequencerCore) {
+    fn common_setup(sequencer: &mut SequencerCore) {
         let tx = create_dummy_transaction([12; 32], vec![[9; 32]], vec![[7; 32]], vec![[8; 32]]);
         let tx_mempool = TransactionMempool { tx };
         sequencer.mempool.push_item(tx_mempool);
 
-        sequencer.produce_new_block_with_mempool_transactions();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
     }
 
     #[test]

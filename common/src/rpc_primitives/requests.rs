@@ -13,8 +13,6 @@ pub struct HelloRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RegisterAccountRequest {
-    pub nullifier_public_key: Vec<u8>,
-    pub viewing_public_key: Vec<u8>,
     pub address: [u8; 32],
 }
 
