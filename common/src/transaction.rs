@@ -57,16 +57,6 @@ pub struct Transaction {
     pub state_changes: (serde_json::Value, usize),
 }
 
-impl Transaction {
-    pub fn hash(&self) -> TreeHashType {
-        let raw_data = serde_json::to_vec(&self).unwrap();
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(&raw_data);
-        TreeHashType::from(hasher.finalize_fixed())
-    }
-}
-
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MintMoneyPublicTx {
     pub acc: [u8; 32],
@@ -161,6 +151,13 @@ impl ActionData {
 }
 
 impl Transaction {
+    pub fn hash(&self) -> TreeHashType {
+        let raw_data = serde_json::to_vec(&self).unwrap();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&raw_data);
+        TreeHashType::from(hasher.finalize_fixed())
+    }
+
     pub fn log(&self) {
         info!("Transaction hash is {:?}", hex::encode(self.hash()));
         info!("Transaction tx_kind is {:?}", self.tx_kind);
