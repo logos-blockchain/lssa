@@ -266,3 +266,41 @@ impl Transaction {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use secp256k1_zkp::{constants::SECRET_KEY_SIZE, Tweak};
+    use sha2::{digest::FixedOutput, Digest};
+
+    use crate::{merkle_tree_public::TreeHashType, transaction::{Transaction, TxKind}};
+
+    #[test]
+    fn test_transaction_hash_is_sha256_of_json_bytes() {
+        let tx = Transaction {
+            tx_kind: TxKind::Public,
+            execution_input: vec![1, 2, 3, 4],
+            execution_output: vec![5, 6, 7, 8],
+            utxo_commitments_spent_hashes: vec![[9; 32], [10; 32], [11; 32], [12; 32]],
+            utxo_commitments_created_hashes: vec![[13; 32]],
+            nullifier_created_hashes: vec![[0; 32], [1; 32], [2; 32], [3; 32]],
+            execution_proof_private: "loremipsum".to_string(),
+            encoded_data: vec![(vec![255,255,255], vec![254, 254, 254], 1)],
+            ephemeral_pub_key: vec![5; 32],
+            commitment: vec![],
+            tweak: Tweak::from_slice(&[7; SECRET_KEY_SIZE]).unwrap(),
+            secret_r: [8; 32],
+            sc_addr: "someAddress".to_string(),
+            state_changes: (serde_json::Value::Null, 10),
+        };
+        let expected_hash = {
+            let data = serde_json::to_vec(&tx).unwrap();
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(&data);
+            TreeHashType::from(hasher.finalize_fixed())
+        };
+
+        let hash = tx.hash();
+
+        assert_eq!(expected_hash, hash);
+    }
+}
