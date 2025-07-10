@@ -1,5 +1,5 @@
 use log::info;
-use secp256k1_zkp::{PedersenCommitment, Tweak};
+use secp256k1_zkp::{PedersenCommitment, PublicKey, Scalar, Tweak};
 use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
 
@@ -55,6 +55,25 @@ pub struct Transaction {
     ///
     /// First value represents vector of changes, second is new length of a state
     pub state_changes: (serde_json::Value, usize),
+}
+
+#[derive(Serialize, Deserialize)]
+struct TransactionSignature {}
+
+/// A transaction with a signature.
+/// Meant to be sent through the network to the sequencer
+#[derive(Serialize, Deserialize)]
+pub struct UnverifiedSignedTransaction {
+    transaction: Transaction,
+    signature: TransactionSignature
+}
+
+/// A transaction with a valid signature over its hash.
+/// Can only be constructed from an `UnverifiedSignedTransaction`
+/// if the signature is valid
+pub struct VerifiedSignedTransaction {
+    transaction: Transaction,
+    signature: TransactionSignature
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -150,6 +169,9 @@ impl ActionData {
     }
 }
 
+type SignaturePrivateKey = Scalar;
+type SignaturePublicKey = PublicKey;
+
 impl Transaction {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
     pub fn hash(&self) -> TreeHashType {
@@ -160,6 +182,13 @@ impl Transaction {
         let mut hasher = sha2::Sha256::new();
         hasher.update(&raw_data);
         TreeHashType::from(hasher.finalize_fixed())
+    }
+
+    pub fn sign(self, _private_key: SignaturePrivateKey) -> UnverifiedSignedTransaction {
+        let _hash = self.hash();
+        // Implement actual signature over `hash`
+        let signature = TransactionSignature {};
+        UnverifiedSignedTransaction { transaction: self, signature }
     }
 
     pub fn log(&self) {
@@ -211,6 +240,14 @@ impl Transaction {
             "Transaction ephemeral_pub_key is {:?}",
             hex::encode(self.ephemeral_pub_key.clone())
         );
+    }
+}
+
+impl UnverifiedSignedTransaction {
+    pub fn into_verified(self) -> VerifiedSignedTransaction {
+        let hash = self.transaction.hash();
+        // Check signature over hash
+        todo!()
     }
 }
 
