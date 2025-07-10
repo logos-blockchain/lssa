@@ -66,60 +66,6 @@ impl Transaction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-///General transaction object
-pub struct TransactionPayload {
-    pub tx_kind: TxKind,
-    ///Tx input data (public part)
-    pub execution_input: Vec<u8>,
-    ///Tx output data (public_part)
-    pub execution_output: Vec<u8>,
-    ///Tx input utxo commitments
-    pub utxo_commitments_spent_hashes: Vec<TreeHashType>,
-    ///Tx output utxo commitments
-    pub utxo_commitments_created_hashes: Vec<TreeHashType>,
-    ///Tx output nullifiers
-    pub nullifier_created_hashes: Vec<TreeHashType>,
-    ///Execution proof (private part)
-    pub execution_proof_private: String,
-    ///Encoded blobs of data
-    pub encoded_data: Vec<(CipherText, Vec<u8>, Tag)>,
-    ///Transaction senders ephemeral pub key
-    pub ephemeral_pub_key: Vec<u8>,
-    ///Public (Pedersen) commitment
-    pub commitment: Vec<PedersenCommitment>,
-    ///tweak
-    pub tweak: Tweak,
-    ///secret_r
-    pub secret_r: [u8; 32],
-    ///Hex-encoded address of a smart contract account called
-    pub sc_addr: String,
-    ///Recorded changes in state of smart contract
-    ///
-    /// First value represents vector of changes, second is new length of a state
-    pub state_changes: (serde_json::Value, usize),
-}
-
-impl From<TransactionPayload> for Transaction {
-    fn from(value: TransactionPayload) -> Self {
-        Self {
-            tx_kind: value.tx_kind,
-            execution_input: value.execution_input,
-            execution_output: value.execution_output,
-            utxo_commitments_spent_hashes: value.utxo_commitments_spent_hashes,
-            utxo_commitments_created_hashes: value.utxo_commitments_created_hashes,
-            nullifier_created_hashes: value.nullifier_created_hashes,
-            execution_proof_private: value.execution_proof_private,
-            encoded_data: value.encoded_data,
-            ephemeral_pub_key: value.ephemeral_pub_key,
-            commitment: value.commitment,
-            tweak: value.tweak,
-            secret_r: value.secret_r,
-            sc_addr: value.sc_addr,
-            state_changes: value.state_changes,
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MintMoneyPublicTx {
