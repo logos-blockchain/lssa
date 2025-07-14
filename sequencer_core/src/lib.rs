@@ -5,7 +5,7 @@ use common::{
     block::{Block, HashableBlockData},
     merkle_tree_public::TreeHashType,
     nullifier::UTXONullifier,
-    transaction::{Transaction, TxKind},
+    transaction::{TransactionBody, TxKind},
     utxo_commitment::UTXOCommitment,
 };
 use config::SequencerConfig;
@@ -71,10 +71,10 @@ impl SequencerCore {
 
     pub fn transaction_pre_check(
         &mut self,
-        tx: &Transaction,
+        tx: &TransactionBody,
         tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
-        let Transaction {
+        let TransactionBody {
             tx_kind,
             ref execution_input,
             ref execution_output,
@@ -188,7 +188,7 @@ impl SequencerCore {
         &mut self,
         tx: TransactionMempool,
     ) -> Result<(), TransactionMalformationErrorKind> {
-        let Transaction {
+        let TransactionBody {
             ref utxo_commitments_created_hashes,
             ref nullifier_created_hashes,
             ..
@@ -259,7 +259,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    use common::transaction::{Transaction, TxKind};
+    use common::transaction::{TransactionBody, TxKind};
     use rand::Rng;
     use secp256k1_zkp::Tweak;
     use transaction_mempool::TransactionMempool;
@@ -285,10 +285,10 @@ mod tests {
         nullifier_created_hashes: Vec<[u8; 32]>,
         utxo_commitments_spent_hashes: Vec<[u8; 32]>,
         utxo_commitments_created_hashes: Vec<[u8; 32]>,
-    ) -> Transaction {
+    ) -> TransactionBody {
         let mut rng = rand::thread_rng();
 
-        Transaction {
+        TransactionBody {
             tx_kind: TxKind::Private,
             execution_input: vec![],
             execution_output: vec![],

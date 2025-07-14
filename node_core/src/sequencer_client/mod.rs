@@ -4,7 +4,7 @@ use common::rpc_primitives::requests::{
     GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
     RegisterAccountRequest, RegisterAccountResponse,
 };
-use common::transaction::Transaction;
+use common::transaction::TransactionBody;
 use common::{SequencerClientError, SequencerRpcError};
 use json::{SendTxRequest, SendTxResponse, SequencerRpcRequest, SequencerRpcResponse};
 use k256::elliptic_curve::group::GroupEncoding;
@@ -72,7 +72,7 @@ impl SequencerClient {
 
     pub async fn send_tx(
         &self,
-        transaction: Transaction,
+        transaction: TransactionBody,
         tx_roots: [[u8; 32]; 2],
     ) -> Result<SendTxResponse, SequencerClientError> {
         let tx_req = SendTxRequest {

@@ -1,7 +1,7 @@
 use rs_merkle::Hasher;
 use serde::{Deserialize, Serialize};
 
-use crate::{merkle_tree_public::hasher::OwnHasher, transaction::Transaction};
+use crate::{merkle_tree_public::hasher::OwnHasher, transaction::TransactionBody};
 
 pub type BlockHash = [u8; 32];
 pub type Data = Vec<u8>;
@@ -13,7 +13,7 @@ pub struct Block {
     pub prev_block_id: BlockId,
     pub prev_block_hash: BlockHash,
     pub hash: BlockHash,
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<TransactionBody>,
     pub data: Data,
 }
 
@@ -22,7 +22,7 @@ pub struct HashableBlockData {
     pub block_id: BlockId,
     pub prev_block_id: BlockId,
     pub prev_block_hash: BlockHash,
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<TransactionBody>,
     pub data: Data,
 }
 

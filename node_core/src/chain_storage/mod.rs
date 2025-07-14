@@ -278,7 +278,7 @@ mod tests {
     use accounts::account_core::Account;
     use common::block::{Block, Data};
     use common::merkle_tree_public::TreeHashType;
-    use common::transaction::{Transaction, TxKind};
+    use common::transaction::{TransactionBody, TxKind};
     use secp256k1_zkp::Tweak;
     use std::path::PathBuf;
     use tempfile::tempdir;
@@ -300,10 +300,10 @@ mod tests {
         nullifier_created_hashes: Vec<[u8; 32]>,
         utxo_commitments_spent_hashes: Vec<[u8; 32]>,
         utxo_commitments_created_hashes: Vec<[u8; 32]>,
-    ) -> Transaction {
+    ) -> TransactionBody {
         let mut rng = rand::thread_rng();
 
-        Transaction {
+        TransactionBody {
             tx_kind: TxKind::Private,
             execution_input: vec![],
             execution_output: vec![],

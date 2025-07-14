@@ -8,7 +8,7 @@ use common::ExecutionFailureKind;
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
 use chain_storage::NodeChainStore;
-use common::transaction::{Transaction, TxKind};
+use common::transaction::{TransactionBody, TxKind};
 use config::NodeConfig;
 use log::info;
 use sc_core::proofs_circuits::{
@@ -189,7 +189,7 @@ impl NodeCore {
         &self,
         acc: AccountAddress,
         amount: u128,
-    ) -> Result<(Transaction, [u8; 32]), ExecutionFailureKind> {
+    ) -> Result<(TransactionBody, [u8; 32]), ExecutionFailureKind> {
         let (utxo, receipt) = prove_mint_utxo(amount, acc)?;
         let result_hash = utxo.hash;
 
@@ -246,7 +246,7 @@ impl NodeCore {
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
-            Transaction {
+            TransactionBody {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
                 execution_output: vec![],
@@ -278,7 +278,7 @@ impl NodeCore {
         acc: AccountAddress,
         amount: u128,
         number_of_assets: usize,
-    ) -> Result<(Transaction, Vec<[u8; 32]>), ExecutionFailureKind> {
+    ) -> Result<(TransactionBody, Vec<[u8; 32]>), ExecutionFailureKind> {
         let (utxos, receipt) = prove_mint_utxo_multiple_assets(amount, number_of_assets, acc)?;
         let result_hashes = utxos.iter().map(|utxo| utxo.hash).collect();
 
@@ -343,7 +343,7 @@ impl NodeCore {
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
-            Transaction {
+            TransactionBody {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
                 execution_output: vec![],
@@ -375,7 +375,7 @@ impl NodeCore {
         utxo: UTXO,
         commitment_in: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
-    ) -> Result<(Transaction, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
+    ) -> Result<(TransactionBody, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let account = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
@@ -459,7 +459,7 @@ impl NodeCore {
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
-            Transaction {
+            TransactionBody {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
                 execution_output: vec![],
@@ -492,7 +492,7 @@ impl NodeCore {
         commitments_in: Vec<[u8; 32]>,
         number_to_send: usize,
         receiver: AccountAddress,
-    ) -> Result<(Transaction, Vec<[u8; 32]>, Vec<[u8; 32]>), ExecutionFailureKind> {
+    ) -> Result<(TransactionBody, Vec<[u8; 32]>, Vec<[u8; 32]>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let account = acc_map_read_guard.acc_map.get(&utxos[0].owner).unwrap();
@@ -604,7 +604,7 @@ impl NodeCore {
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
-            Transaction {
+            TransactionBody {
                 tx_kind: TxKind::Private,
                 execution_input: vec![],
                 execution_output: vec![],
@@ -637,7 +637,7 @@ impl NodeCore {
         acc: AccountAddress,
         balance: u64,
         receivers: Vec<(u128, AccountAddress)>,
-    ) -> Result<(Transaction, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
+    ) -> Result<(TransactionBody, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let account = acc_map_read_guard.acc_map.get(&acc).unwrap();
@@ -727,7 +727,7 @@ impl NodeCore {
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
-            Transaction {
+            TransactionBody {
                 tx_kind: TxKind::Shielded,
                 execution_input: serde_json::to_vec(&ActionData::SendMoneyShieldedTx(
                     SendMoneyShieldedTx {
@@ -765,7 +765,7 @@ impl NodeCore {
         utxo: UTXO,
         comm_gen_hash: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
-    ) -> Result<Transaction, ExecutionFailureKind> {
+    ) -> Result<TransactionBody, ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let commitment_in = acc_map_read_guard
@@ -820,7 +820,7 @@ impl NodeCore {
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
-        Ok(Transaction {
+        Ok(TransactionBody {
             tx_kind: TxKind::Deshielded,
             execution_input: serde_json::to_vec(&ActionData::SendMoneyDeshieldedTx(
                 SendMoneyDeshieldedTx {
@@ -924,7 +924,7 @@ impl NodeCore {
         let new_len = 0;
         let state_changes = (serde_json::to_value(state_changes).unwrap(), new_len);
 
-        let tx: Transaction =
+        let tx: TransactionBody =
             sc_core::transaction_payloads_tools::create_public_transaction_payload(
                 serde_json::to_vec(&ActionData::MintMoneyPublicTx(MintMoneyPublicTx {
                     acc,
@@ -1361,7 +1361,7 @@ impl NodeCore {
         commitment_in: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
         visibility_list: [bool; 3],
-    ) -> Result<(Transaction, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
+    ) -> Result<(TransactionBody, Vec<(AccountAddress, [u8; 32])>), ExecutionFailureKind> {
         let acc_map_read_guard = self.storage.read().await;
 
         let account = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
@@ -1459,7 +1459,7 @@ impl NodeCore {
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
-            Transaction {
+            TransactionBody {
                 tx_kind: TxKind::Shielded,
                 execution_input: vec![],
                 execution_output: serde_json::to_vec(&publication).unwrap(),

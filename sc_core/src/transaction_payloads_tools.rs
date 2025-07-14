@@ -1,6 +1,6 @@
 use accounts::account_core::Account;
 use anyhow::Result;
-use common::transaction::{Transaction, TxKind};
+use common::transaction::{TransactionBody, TxKind};
 use rand::thread_rng;
 use risc0_zkvm::Receipt;
 use secp256k1_zkp::{CommitmentSecrets, PedersenCommitment, Tweak};
@@ -15,8 +15,8 @@ pub fn create_public_transaction_payload(
     secret_r: [u8; 32],
     sc_addr: String,
     state_changes: (serde_json::Value, usize),
-) -> Transaction {
-    Transaction {
+) -> TransactionBody {
+    TransactionBody {
         tx_kind: TxKind::Public,
         execution_input,
         execution_output: vec![],

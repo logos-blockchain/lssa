@@ -7,7 +7,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::{transaction::Transaction, utxo_commitment::UTXOCommitment};
+use crate::{transaction::TransactionBody, utxo_commitment::UTXOCommitment};
 
 use super::{hasher::OwnHasher, tree_leav_item::TreeLeavItem, TreeHashType};
 
@@ -81,7 +81,7 @@ impl<'de, Leav: TreeLeavItem + Clone + Deserialize<'de>> serde::Deserialize<'de>
     }
 }
 
-pub type PublicTransactionMerkleTree = HashStorageMerkleTree<Transaction>;
+pub type PublicTransactionMerkleTree = HashStorageMerkleTree<TransactionBody>;
 
 pub type UTXOCommitmentsMerkleTree = HashStorageMerkleTree<UTXOCommitment>;
 

@@ -25,7 +25,7 @@ pub enum TxKind {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 ///General transaction object
-pub struct Transaction {
+pub struct TransactionBody {
     pub tx_kind: TxKind,
     ///Tx input data (public part)
     pub execution_input: Vec<u8>,
@@ -58,22 +58,25 @@ pub struct Transaction {
 }
 
 #[derive(Serialize, Deserialize)]
-struct TransactionSignature {}
+struct TransactionSignature;
+
+#[derive(Serialize, Deserialize)]
+struct TransactionHash;
 
 /// A transaction with a signature.
 /// Meant to be sent through the network to the sequencer
 #[derive(Serialize, Deserialize)]
-pub struct UnverifiedSignedTransaction {
-    transaction: Transaction,
-    signature: TransactionSignature
+pub struct SignedTransaction {
+    body: TransactionBody,
+    signature: TransactionSignature,
 }
 
 /// A transaction with a valid signature over its hash.
 /// Can only be constructed from an `UnverifiedSignedTransaction`
 /// if the signature is valid
-pub struct VerifiedSignedTransaction {
-    transaction: Transaction,
-    signature: TransactionSignature
+pub struct AuthenticatedTransaction {
+    hash: TransactionHash,
+    signed_tx: SignedTransaction
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -172,7 +175,7 @@ impl ActionData {
 type SignaturePrivateKey = Scalar;
 type SignaturePublicKey = PublicKey;
 
-impl Transaction {
+impl TransactionBody {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
     pub fn hash(&self) -> TreeHashType {
         // TODO: Remove `unwrap` by implementing a `to_bytes` method
@@ -184,11 +187,14 @@ impl Transaction {
         TreeHashType::from(hasher.finalize_fixed())
     }
 
-    pub fn sign(self, _private_key: SignaturePrivateKey) -> UnverifiedSignedTransaction {
+    pub fn sign(self, _private_key: SignaturePrivateKey) -> SignedTransaction {
         let _hash = self.hash();
         // Implement actual signature over `hash`
         let signature = TransactionSignature {};
-        UnverifiedSignedTransaction { transaction: self, signature }
+        SignedTransaction {
+            body: self,
+            signature,
+        }
     }
 
     pub fn log(&self) {
@@ -243,11 +249,38 @@ impl Transaction {
     }
 }
 
-impl UnverifiedSignedTransaction {
-    pub fn into_verified(self) -> VerifiedSignedTransaction {
-        let hash = self.transaction.hash();
+impl SignedTransaction {
+    pub fn into_authenticated(self) -> AuthenticatedTransaction {
+        let hash = TransactionHash; // self.body.hash();
         // Check signature over hash
-        todo!()
+        AuthenticatedTransaction {
+            hash,
+            signed_tx: self
+        }
+    }
+}
+
+impl AuthenticatedTransaction {
+    pub fn as_signed(&self) -> &SignedTransaction {
+        &self.signed_tx
+    }
+}
+
+impl Serialize for AuthenticatedTransaction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_signed().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AuthenticatedTransaction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        SignedTransaction::deserialize(deserializer).map(|signed_tx| signed_tx.into_authenticated())
     }
 }
 
@@ -258,12 +291,12 @@ mod tests {
 
     use crate::{
         merkle_tree_public::TreeHashType,
-        transaction::{Transaction, TxKind},
+        transaction::{TransactionBody, TxKind},
     };
 
     #[test]
     fn test_transaction_hash_is_sha256_of_json_bytes() {
-        let tx = Transaction {
+        let tx = TransactionBody {
             tx_kind: TxKind::Public,
             execution_input: vec![1, 2, 3, 4],
             execution_output: vec![5, 6, 7, 8],

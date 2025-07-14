@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use common::block::Block;
 use common::merkle_tree_public::merkle_tree::HashStorageMerkleTree;
 use common::nullifier::UTXONullifier;
-use common::transaction::Transaction;
+use common::transaction::TransactionBody;
 use common::utxo_commitment::UTXOCommitment;
 use log::error;
 use storage::sc_db_utils::{DataBlob, DataBlobChangeVariant};
@@ -87,7 +87,7 @@ impl NodeBlockStore {
         )?)
     }
 
-    pub fn get_snapshot_transaction(&self) -> Result<HashStorageMerkleTree<Transaction>> {
+    pub fn get_snapshot_transaction(&self) -> Result<HashStorageMerkleTree<TransactionBody>> {
         Ok(serde_json::from_slice(
             &self.dbio.get_snapshot_transaction()?,
         )?)
