@@ -1,11 +1,11 @@
-use common::transaction::TransactionBody;
+use common::transaction::SignedTransaction;
 use serde::{Deserialize, Serialize};
 
 //Requests
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
-    pub transaction: TransactionBody,
+    pub transaction: SignedTransaction,
     ///UTXO Commitment Root, Pub Tx Root
     pub tx_roots: [[u8; 32]; 2],
 }

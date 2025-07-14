@@ -1,5 +1,6 @@
+use k256::Scalar;
 use log::info;
-use secp256k1_zkp::{PedersenCommitment, PublicKey, Scalar, Tweak};
+use secp256k1_zkp::{PedersenCommitment, Tweak};
 use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
 
@@ -10,6 +11,8 @@ use elliptic_curve::{
     generic_array::GenericArray,
 };
 use sha2::digest::typenum::{UInt, UTerm};
+
+use crate::TransactionSignatureError;
 
 pub type CipherText = Vec<u8>;
 pub type Nonce = GenericArray<u8, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>>;
@@ -55,28 +58,6 @@ pub struct TransactionBody {
     ///
     /// First value represents vector of changes, second is new length of a state
     pub state_changes: (serde_json::Value, usize),
-}
-
-#[derive(Serialize, Deserialize)]
-struct TransactionSignature;
-
-#[derive(Serialize, Deserialize)]
-struct TransactionHash;
-
-/// A transaction with a signature.
-/// Meant to be sent through the network to the sequencer
-#[derive(Serialize, Deserialize)]
-pub struct SignedTransaction {
-    body: TransactionBody,
-    signature: TransactionSignature,
-}
-
-/// A transaction with a valid signature over its hash.
-/// Can only be constructed from an `UnverifiedSignedTransaction`
-/// if the signature is valid
-pub struct AuthenticatedTransaction {
-    hash: TransactionHash,
-    signed_tx: SignedTransaction
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -172,9 +153,6 @@ impl ActionData {
     }
 }
 
-type SignaturePrivateKey = Scalar;
-type SignaturePublicKey = PublicKey;
-
 impl TransactionBody {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
     pub fn hash(&self) -> TreeHashType {
@@ -185,16 +163,6 @@ impl TransactionBody {
         let mut hasher = sha2::Sha256::new();
         hasher.update(&raw_data);
         TreeHashType::from(hasher.finalize_fixed())
-    }
-
-    pub fn sign(self, _private_key: SignaturePrivateKey) -> SignedTransaction {
-        let _hash = self.hash();
-        // Implement actual signature over `hash`
-        let signature = TransactionSignature {};
-        SignedTransaction {
-            body: self,
-            signature,
-        }
     }
 
     pub fn log(&self) {
@@ -249,38 +217,62 @@ impl TransactionBody {
     }
 }
 
+type SignaturePrivateKey = Scalar;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TransactionSignature;
+
+type TransactionHash = TreeHashType;
+
+/// A transaction with a signature.
+/// Meant to be sent through the network to the sequencer
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SignedTransaction {
+    pub body: TransactionBody,
+    signature: TransactionSignature,
+}
+
 impl SignedTransaction {
-    pub fn into_authenticated(self) -> AuthenticatedTransaction {
-        let hash = TransactionHash; // self.body.hash();
-        // Check signature over hash
-        AuthenticatedTransaction {
-            hash,
-            signed_tx: self
-        }
+    pub fn from_transaction_body(
+        body: TransactionBody,
+        _private_key: SignaturePrivateKey,
+    ) -> SignedTransaction {
+        let _hash = body.hash();
+        // TODO: Implement actual signature over `hash`
+        let signature = TransactionSignature {};
+        Self { body, signature }
     }
+
+    pub fn into_authenticated(self) -> Result<AuthenticatedTransaction, TransactionSignatureError> {
+        let hash = self.body.hash();
+        // TODO: Check signature over hash
+        Err(TransactionSignatureError::InvalidSignature)
+    }
+}
+
+/// A transaction with a valid signature over the hash of its body.
+/// Can only be constructed from an `SignedTransaction`
+/// if the signature is valid
+pub struct AuthenticatedTransaction {
+    hash: TransactionHash,
+    signed_tx: SignedTransaction,
 }
 
 impl AuthenticatedTransaction {
     pub fn as_signed(&self) -> &SignedTransaction {
         &self.signed_tx
     }
-}
 
-impl Serialize for AuthenticatedTransaction {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.as_signed().serialize(serializer)
+    pub fn body(&self) -> &TransactionBody {
+        &self.signed_tx.body
     }
-}
 
-impl<'de> Deserialize<'de> for AuthenticatedTransaction {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        SignedTransaction::deserialize(deserializer).map(|signed_tx| signed_tx.into_authenticated())
+    pub fn signature(&self) -> &TransactionSignature {
+        &self.signed_tx.signature
+    }
+
+    pub fn hash(&self) -> &TransactionHash {
+        &self.hash
     }
 }
 

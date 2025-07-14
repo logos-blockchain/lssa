@@ -996,6 +996,7 @@ dependencies = [
  "anyhow",
  "elliptic-curve",
  "hex",
+ "k256",
  "log",
  "reqwest 0.11.27",
  "risc0-zkvm",
