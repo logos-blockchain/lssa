@@ -7,7 +7,10 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::{transaction::TransactionBody, utxo_commitment::UTXOCommitment};
+use crate::{
+    transaction::{AuthenticatedTransaction, SignedTransaction, TransactionBody},
+    utxo_commitment::UTXOCommitment,
+};
 
 use super::{hasher::OwnHasher, tree_leav_item::TreeLeavItem, TreeHashType};
 
@@ -81,7 +84,7 @@ impl<'de, Leav: TreeLeavItem + Clone + Deserialize<'de>> serde::Deserialize<'de>
     }
 }
 
-pub type PublicTransactionMerkleTree = HashStorageMerkleTree<TransactionBody>;
+pub type PublicTransactionMerkleTree = HashStorageMerkleTree<SignedTransaction>;
 
 pub type UTXOCommitmentsMerkleTree = HashStorageMerkleTree<UTXOCommitment>;
 
@@ -139,7 +142,7 @@ impl<Leav: TreeLeavItem + Clone> HashStorageMerkleTree<Leav> {
         }
     }
 
-    pub fn add_tx(&mut self, tx: Leav) {
+    pub fn add_tx(&mut self, tx: &Leav) {
         let last = self.leaves.len();
 
         self.leaves.insert(last, tx.clone());
@@ -266,7 +269,7 @@ mod tests {
 
         let mut tree = HashStorageMerkleTree::new(vec![tx1.clone()]);
 
-        tree.add_tx(tx2.clone());
+        tree.add_tx(&tx2);
         assert_eq!(tree.leaves.len(), 2);
         assert_eq!(tree.get_tx(tx2.hash()), Some(&tx2));
     }

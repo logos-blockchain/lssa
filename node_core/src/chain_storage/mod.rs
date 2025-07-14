@@ -127,8 +127,8 @@ impl NodeChainStore {
         let block_id = block.block_id;
 
         for tx in &block.transactions {
-            if !tx.execution_input.is_empty() {
-                let public_action = serde_json::from_slice::<ActionData>(&tx.execution_input);
+            if !tx.body.execution_input.is_empty() {
+                let public_action = serde_json::from_slice::<ActionData>(&tx.body.execution_input);
 
                 if let Ok(public_action) = public_action {
                     match public_action {
@@ -162,24 +162,25 @@ impl NodeChainStore {
             }
 
             self.utxo_commitments_store.add_tx_multiple(
-                tx.utxo_commitments_created_hashes
+                tx.body
+                    .utxo_commitments_created_hashes
                     .clone()
                     .into_iter()
                     .map(|hash| UTXOCommitment { hash })
                     .collect(),
             );
 
-            for nullifier in tx.nullifier_created_hashes.iter() {
+            for nullifier in tx.body.nullifier_created_hashes.iter() {
                 self.nullifier_store.insert(UTXONullifier {
                     utxo_hash: *nullifier,
                 });
             }
 
-            if !tx.encoded_data.is_empty() {
+            if !tx.body.encoded_data.is_empty() {
                 let ephemeral_public_key_sender =
-                    serde_json::from_slice::<AffinePoint>(&tx.ephemeral_pub_key)?;
+                    serde_json::from_slice::<AffinePoint>(&tx.body.ephemeral_pub_key)?;
 
-                for (ciphertext, nonce, tag) in tx.encoded_data.clone() {
+                for (ciphertext, nonce, tag) in tx.body.encoded_data.clone() {
                     let slice = nonce.as_slice();
                     let nonce =
                         accounts::key_management::constants_types::Nonce::clone_from_slice(slice);
@@ -204,7 +205,7 @@ impl NodeChainStore {
                 }
             }
 
-            self.pub_tx_store.add_tx(tx.clone());
+            self.pub_tx_store.add_tx(tx);
         }
 
         self.block_store.put_block_at_id(block)?;
@@ -278,7 +279,7 @@ mod tests {
     use accounts::account_core::Account;
     use common::block::{Block, Data};
     use common::merkle_tree_public::TreeHashType;
-    use common::transaction::{TransactionBody, TxKind};
+    use common::transaction::{SignaturePrivateKey, SignedTransaction, TransactionBody, TxKind};
     use secp256k1_zkp::Tweak;
     use std::path::PathBuf;
     use tempfile::tempdir;
@@ -300,10 +301,10 @@ mod tests {
         nullifier_created_hashes: Vec<[u8; 32]>,
         utxo_commitments_spent_hashes: Vec<[u8; 32]>,
         utxo_commitments_created_hashes: Vec<[u8; 32]>,
-    ) -> TransactionBody {
+    ) -> SignedTransaction {
         let mut rng = rand::thread_rng();
 
-        TransactionBody {
+        let body = TransactionBody {
             tx_kind: TxKind::Private,
             execution_input: vec![],
             execution_output: vec![],
@@ -318,7 +319,8 @@ mod tests {
             secret_r: [0; 32],
             sc_addr: "sc_addr".to_string(),
             state_changes: (serde_json::Value::Null, 0),
-        }
+        };
+        SignedTransaction::from_transaction_body(body, SignaturePrivateKey::ONE)
     }
 
     fn create_sample_block(block_id: u64, prev_block_id: u64) -> Block {
@@ -414,7 +416,7 @@ mod tests {
             store
                 .utxo_commitments_store
                 .add_tx_multiple(vec![UTXOCommitment { hash: [3u8; 32] }]);
-            store.pub_tx_store.add_tx(create_dummy_transaction(
+            store.pub_tx_store.add_tx(&create_dummy_transaction(
                 [12; 32],
                 vec![[9; 32]],
                 vec![[7; 32]],

@@ -312,42 +312,46 @@ impl JsonHandler {
 
                 ShowTransactionResponse {
                     hash: req.tx_hash,
-                    tx_kind: tx.tx_kind,
+                    tx_kind: tx.body.tx_kind,
                     public_input: if let Ok(action) =
-                        serde_json::from_slice::<ActionData>(&tx.execution_input)
+                        serde_json::from_slice::<ActionData>(&tx.body.execution_input)
                     {
                         action.into_hexed_print()
                     } else {
                         "".to_string()
                     },
                     public_output: if let Ok(action) =
-                        serde_json::from_slice::<ActionData>(&tx.execution_output)
+                        serde_json::from_slice::<ActionData>(&tx.body.execution_output)
                     {
                         action.into_hexed_print()
                     } else {
                         "".to_string()
                     },
                     utxo_commitments_created_hashes: tx
+                        .body
                         .utxo_commitments_created_hashes
                         .iter()
                         .map(|val| hex::encode(val.clone()))
                         .collect::<Vec<_>>(),
                     utxo_commitments_spent_hashes: tx
+                        .body
                         .utxo_commitments_spent_hashes
                         .iter()
                         .map(|val| hex::encode(val.clone()))
                         .collect::<Vec<_>>(),
                     utxo_nullifiers_created_hashes: tx
+                        .body
                         .nullifier_created_hashes
                         .iter()
                         .map(|val| hex::encode(val.clone()))
                         .collect::<Vec<_>>(),
                     encoded_data: tx
+                        .body
                         .encoded_data
                         .iter()
                         .map(|val| (hex::encode(val.0.clone()), hex::encode(val.1.clone())))
                         .collect::<Vec<_>>(),
-                    ephemeral_pub_key: hex::encode(tx.ephemeral_pub_key.clone()),
+                    ephemeral_pub_key: hex::encode(tx.body.ephemeral_pub_key.clone()),
                 }
             }
         };

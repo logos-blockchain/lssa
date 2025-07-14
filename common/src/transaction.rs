@@ -217,16 +217,16 @@ impl TransactionBody {
     }
 }
 
-type SignaturePrivateKey = Scalar;
+pub type SignaturePrivateKey = Scalar;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct TransactionSignature;
 
 type TransactionHash = TreeHashType;
 
 /// A transaction with a signature.
 /// Meant to be sent through the network to the sequencer
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SignedTransaction {
     pub body: TransactionBody,
     signature: TransactionSignature,
@@ -253,6 +253,7 @@ impl SignedTransaction {
 /// A transaction with a valid signature over the hash of its body.
 /// Can only be constructed from an `SignedTransaction`
 /// if the signature is valid
+#[derive(Clone)]
 pub struct AuthenticatedTransaction {
     hash: TransactionHash,
     signed_tx: SignedTransaction,

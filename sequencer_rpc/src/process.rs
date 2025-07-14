@@ -81,10 +81,7 @@ impl JsonHandler {
         {
             let mut state = self.sequencer_state.lock().await;
 
-            state.push_tx_into_mempool_pre_check(
-                send_tx_req.transaction.into(),
-                send_tx_req.tx_roots,
-            )?;
+            state.push_tx_into_mempool_pre_check(send_tx_req.transaction, send_tx_req.tx_roots)?;
         }
 
         let helperstruct = SendTxResponse {
