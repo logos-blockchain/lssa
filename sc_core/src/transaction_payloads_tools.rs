@@ -1,4 +1,4 @@
-use accounts::account_core::Account;
+use accounts::{account_core::Account, key_management::ephemeral_key_holder::EphemeralKeyHolder};
 use anyhow::Result;
 use common::transaction::{TransactionPayload, TxKind};
 use rand::thread_rng;
@@ -40,7 +40,7 @@ pub fn encode_utxos_to_receivers(
     let mut all_encoded_data = vec![];
 
     for (utxo, receiver) in utxos_receivers {
-        let ephm_key_holder = &receiver.produce_ephemeral_key_holder();
+        let ephm_key_holder = EphemeralKeyHolder::new_os_random();
 
         let encoded_data = Account::encrypt_data(
             &ephm_key_holder,

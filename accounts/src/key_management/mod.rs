@@ -2,7 +2,6 @@ use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
 use common::merkle_tree_public::TreeHashType;
 use constants_types::{CipherText, Nonce};
 use elliptic_curve::point::AffineCoordinates;
-use ephemeral_key_holder::EphemeralKeyHolder;
 use k256::AffinePoint;
 use log::info;
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
@@ -53,10 +52,6 @@ impl AddressKeyHolder {
         ephemeral_public_key_sender: AffinePoint,
     ) -> AffinePoint {
         (ephemeral_public_key_sender * self.utxo_secret_key_holder.viewing_secret_key).into()
-    }
-
-    pub fn produce_ephemeral_key_holder(&self) -> EphemeralKeyHolder {
-        EphemeralKeyHolder::new_os_random()
     }
 
     pub fn decrypt_data(
@@ -114,6 +109,8 @@ mod tests {
     use elliptic_curve::point::AffineCoordinates;
     use k256::{AffinePoint, ProjectivePoint, Scalar};
 
+    use crate::key_management::ephemeral_key_holder::EphemeralKeyHolder;
+
     use super::*;
 
     #[test]
@@ -136,7 +133,7 @@ mod tests {
 
         // Generate a random ephemeral public key sender
         let scalar = Scalar::random(&mut OsRng);
-        let ephemeral_public_key_sender = (ProjectivePoint::generator() * scalar).to_affine();
+        let ephemeral_public_key_sender = (ProjectivePoint::GENERATOR * scalar).to_affine();
 
         // Calculate shared secret
         let shared_secret =
@@ -151,9 +148,8 @@ mod tests {
         let address_key_holder = AddressKeyHolder::new_os_random();
 
         // Generate an ephemeral key and shared secret
-        let ephemeral_public_key_sender = address_key_holder
-            .produce_ephemeral_key_holder()
-            .generate_ephemeral_public_key();
+        let ephemeral_public_key_sender =
+            EphemeralKeyHolder::new_os_random().generate_ephemeral_public_key();
         let shared_secret =
             address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
 
