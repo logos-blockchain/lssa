@@ -226,40 +226,40 @@ impl TransactionBody {
     }
 }
 
-pub type SignaturePrivateKey = SigningKey;
-pub type SignaturePublicKey = VerifyingKey;
+type TransactionHash = [u8; 32];
 pub type TransactionSignature = Signature;
-
-type TransactionHash = TreeHashType;
+pub type SignaturePublicKey = VerifyingKey;
+pub type SignaturePrivateKey = SigningKey;
 
 /// A transaction with a signature.
 /// Meant to be sent through the network to the sequencer
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SignedTransaction {
     pub body: TransactionBody,
-    signature: (TransactionSignature, SignaturePublicKey),
+    signature: TransactionSignature,
+    public_key: VerifyingKey,
 }
 
 impl SignedTransaction {
     pub fn from_transaction_body(
         body: TransactionBody,
-        private_key: SignaturePrivateKey,
+        private_key: SigningKey,
     ) -> SignedTransaction {
         let hash = body.hash();
-        let signature: Signature = private_key.sign(&hash);
+        let signature: TransactionSignature = private_key.sign(&hash);
         let public_key = VerifyingKey::from(&private_key);
         Self {
             body,
-            signature: (signature, public_key),
+            signature,
+            public_key,
         }
     }
 
     pub fn into_authenticated(self) -> Result<AuthenticatedTransaction, TransactionSignatureError> {
         let hash = self.body.hash();
-        let (signature, public_key) = &self.signature;
 
-        public_key
-            .verify(&hash, signature)
+        self.public_key
+            .verify(&hash, &self.signature)
             .map_err(|_| TransactionSignatureError::InvalidSignature)?;
 
         Ok(AuthenticatedTransaction {
@@ -285,10 +285,6 @@ impl AuthenticatedTransaction {
 
     pub fn body(&self) -> &TransactionBody {
         &self.signed_tx.body
-    }
-
-    pub fn signature(&self) -> &TransactionSignature {
-        &self.signed_tx.signature.0
     }
 
     pub fn hash(&self) -> &TransactionHash {

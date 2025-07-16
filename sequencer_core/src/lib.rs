@@ -363,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn test_transaction_pre_check_fail_mempool_full() {
+    fn test_push_tx_into_mempool_fails_mempool_full() {
         let config = SequencerConfig {
             max_num_tx_in_block: 1,
             ..setup_sequencer_config()
@@ -381,7 +381,7 @@ mod tests {
         };
         sequencer.mempool.push_item(dummy_tx);
 
-        let result = sequencer.transaction_pre_check(tx, tx_roots);
+        let result = sequencer.push_tx_into_mempool_pre_check(tx, tx_roots);
 
         assert!(matches!(
             result,

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use common::{merkle_tree_public::TreeHashType, transaction::Tag};
-use k256::AffinePoint;
+use k256::{ecdsa::VerifyingKey, AffinePoint};
 use log::info;
 use serde::{Deserialize, Serialize};
 use utxo::utxo_core::UTXO;

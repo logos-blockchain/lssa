@@ -10,7 +10,7 @@ use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
 use serde::{Deserialize, Serialize};
 
 use crate::account_core::PublicKey;
-pub type PublicAccountSecretKey = [u8; 32];
+pub type PublicAccountSigningKey = [u8; 32];
 
 pub mod constants_types;
 pub mod ephemeral_key_holder;
@@ -23,7 +23,7 @@ pub struct AddressKeyHolder {
     #[allow(dead_code)]
     top_secret_key_holder: TopSecretKeyHolder,
     pub utxo_secret_key_holder: UTXOSecretKeyHolder,
-    pub pub_account_secret_key: PublicAccountSecretKey,
+    pub_account_signing_key: PublicAccountSigningKey,
     pub address: TreeHashType,
     pub nullifer_public_key: PublicKey,
     pub viewing_public_key: PublicKey,
@@ -54,12 +54,12 @@ impl AddressKeyHolder {
             address,
             nullifer_public_key,
             viewing_public_key,
-            pub_account_secret_key,
+            pub_account_signing_key: pub_account_secret_key,
         }
     }
 
-    pub fn pub_account_secret_key(&self) -> SigningKey {
-        let field_bytes = FieldBytes::from_slice(&self.pub_account_secret_key);
+    pub fn get_pub_account_signing_key(&self) -> SigningKey {
+        let field_bytes = FieldBytes::from_slice(&self.pub_account_signing_key);
         // TODO: remove unwrap
         SigningKey::from_bytes(&field_bytes).unwrap()
     }

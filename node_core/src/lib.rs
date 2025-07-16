@@ -264,8 +264,7 @@ impl NodeCore {
             sc_addr,
             state_changes,
         };
-        // TODO: Change to the correct key once established.
-        let key_to_sign_transaction = account.key_holder.pub_account_secret_key();
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok((
             SignedTransaction::from_transaction_body(transaction_body, key_to_sign_transaction),
@@ -362,8 +361,7 @@ impl NodeCore {
             sc_addr,
             state_changes,
         };
-        // TODO: Change to the correct key once established.
-        let key_to_sign_transaction = account.key_holder.pub_account_secret_key();
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok((
             SignedTransaction::from_transaction_body(transaction_body, key_to_sign_transaction),
@@ -480,8 +478,7 @@ impl NodeCore {
             state_changes,
         };
 
-        // TODO: Change to the correct key once established.
-        let key_to_sign_transaction = account.key_holder.pub_account_secret_key();
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok((
             SignedTransaction::from_transaction_body(transaction_body, key_to_sign_transaction),
@@ -627,8 +624,7 @@ impl NodeCore {
             state_changes,
         };
 
-        // TODO: Change to the correct key once established.
-        let key_to_sign_transaction = account.key_holder.pub_account_secret_key();
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok((
             SignedTransaction::from_transaction_body(transaction_body, key_to_sign_transaction),
@@ -758,8 +754,7 @@ impl NodeCore {
             state_changes,
         };
 
-        // TODO: Change to the correct key once established.
-        let key_to_sign_transaction = account.key_holder.pub_account_secret_key();
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok((
             SignedTransaction::from_transaction_body(transaction_body, key_to_sign_transaction),
@@ -850,8 +845,7 @@ impl NodeCore {
             state_changes,
         };
 
-        // TODO: Change to the correct key once established.
-        let key_to_sign_transaction = account.key_holder.pub_account_secret_key();
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok(SignedTransaction::from_transaction_body(
             transaction_body,
@@ -1493,8 +1487,7 @@ impl NodeCore {
             sc_addr,
             state_changes,
         };
-        // TODO: Change to the correct key once established.
-        let key_to_sign_transaction = account.key_holder.pub_account_secret_key();
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok((
             SignedTransaction::from_transaction_body(transaction_body, key_to_sign_transaction),
