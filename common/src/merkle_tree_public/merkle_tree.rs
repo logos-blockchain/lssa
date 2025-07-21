@@ -7,10 +7,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::{
-    transaction::Transaction,
-    utxo_commitment::UTXOCommitment,
-};
+use crate::{transaction::Transaction, utxo_commitment::UTXOCommitment};
 
 use super::{hasher::OwnHasher, tree_leav_item::TreeLeavItem, TreeHashType};
 

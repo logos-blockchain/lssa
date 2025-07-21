@@ -1,7 +1,7 @@
 use k256::ecdsa::{
-        signature::hazmat::{PrehashSigner, PrehashVerifier},
-        Signature, SigningKey, VerifyingKey,
-    };
+    signature::hazmat::{PrehashSigner, PrehashVerifier},
+    Signature, SigningKey, VerifyingKey,
+};
 use log::info;
 use secp256k1_zkp::{PedersenCommitment, Tweak};
 use serde::{Deserialize, Serialize};

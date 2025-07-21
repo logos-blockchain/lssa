@@ -2,7 +2,6 @@ use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
 use common::merkle_tree_public::TreeHashType;
 use constants_types::{CipherText, Nonce};
 use elliptic_curve::point::AffineCoordinates;
-use ephemeral_key_holder::EphemeralKeyHolder;
 use k256::{ecdsa::SigningKey, AffinePoint, FieldBytes};
 use log::info;
 use rand::{rngs::OsRng, RngCore};
