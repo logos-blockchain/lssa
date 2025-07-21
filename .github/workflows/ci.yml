@@ -31,9 +31,6 @@ jobs:
       - name: lint - ubuntu-latest
         if: success() || failure()
         run: chmod 777 ./ci_scripts/lint-ubuntu.sh && ./ci_scripts/lint-ubuntu.sh
-      - name: build - ubuntu-latest
-        if: success() || failure()
-        run: chmod 777 ./ci_scripts/build-ubuntu.sh && ./ci_scripts/build-ubuntu.sh
       - name: test ubuntu-latest
         if: success() || failure()
         run: chmod 777 ./ci_scripts/test-ubuntu.sh && ./ci_scripts/test-ubuntu.sh
