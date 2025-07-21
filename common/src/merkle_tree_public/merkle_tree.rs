@@ -8,7 +8,7 @@ use serde::{
 };
 
 use crate::{
-    transaction::{AuthenticatedTransaction, Transaction, TransactionBody},
+    transaction::Transaction,
     utxo_commitment::UTXOCommitment,
 };
 

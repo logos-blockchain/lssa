@@ -1,7 +1,6 @@
 use crate::block::Block;
 use crate::parse_request;
 use crate::transaction::Transaction;
-use crate::transaction::TransactionBody;
 
 use super::errors::RpcParseError;
 use super::parser::parse_params;

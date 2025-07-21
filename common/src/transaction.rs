@@ -1,17 +1,12 @@
-use k256::{
-    ecdsa::{
+use k256::ecdsa::{
         signature::hazmat::{PrehashSigner, PrehashVerifier},
         Signature, SigningKey, VerifyingKey,
-    },
-    EncodedPoint, Scalar,
-};
+    };
 use log::info;
 use secp256k1_zkp::{PedersenCommitment, Tweak};
-use serde::de::{Error as DeError, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use sha2::{digest::FixedOutput, Digest};
-use std::fmt;
 
 use crate::merkle_tree_public::TreeHashType;
 
@@ -156,7 +151,7 @@ impl ActionData {
                     .into_iter()
                     .map(|owned_utxo| owned_utxo.into())
                     .collect();
-                format!("Published utxos {:?}", pub_own_utxo)
+                format!("Published utxos {pub_own_utxo:?}")
             }
         }
     }
@@ -195,21 +190,21 @@ impl TransactionBody {
             "Transaction utxo_commitments_spent_hashes is {:?}",
             self.utxo_commitments_spent_hashes
                 .iter()
-                .map(|val| hex::encode(val.clone()))
+                .map(|val| hex::encode(*val))
                 .collect::<Vec<_>>()
         );
         info!(
             "Transaction utxo_commitments_created_hashes is {:?}",
             self.utxo_commitments_created_hashes
                 .iter()
-                .map(|val| hex::encode(val.clone()))
+                .map(|val| hex::encode(*val))
                 .collect::<Vec<_>>()
         );
         info!(
             "Transaction nullifier_created_hashes is {:?}",
             self.nullifier_created_hashes
                 .iter()
-                .map(|val| hex::encode(val.clone()))
+                .map(|val| hex::encode(*val))
                 .collect::<Vec<_>>()
         );
         info!(
