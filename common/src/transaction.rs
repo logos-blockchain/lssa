@@ -1,5 +1,5 @@
 use k256::ecdsa::{
-    signature::hazmat::{PrehashSigner, PrehashVerifier},
+    signature::{Signer, Verifier},
     Signature, SigningKey, VerifyingKey,
 };
 use log::info;
@@ -160,13 +160,17 @@ impl ActionData {
 impl TransactionBody {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
     pub fn hash(&self) -> TreeHashType {
+        let bytes_to_hash = self.to_bytes();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&bytes_to_hash);
+        TreeHashType::from(hasher.finalize_fixed())
+    }
+
+    fn to_bytes(&self) -> Vec<u8> {
         // TODO: Remove `unwrap` by implementing a `to_bytes` method
         // that deterministically encodes all transaction fields to bytes
         // and guarantees serialization will succeed.
-        let raw_data = serde_json::to_vec(&self).unwrap();
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(&raw_data);
-        TreeHashType::from(hasher.finalize_fixed())
+        serde_json::to_vec(&self).unwrap()
     }
 
     pub fn log(&self) {
@@ -239,8 +243,7 @@ impl Transaction {
     /// Returns a new transaction signed with the provided `private_key`.
     /// The signature is generated over the hash of the body as computed by `body.hash()`
     pub fn new(body: TransactionBody, private_key: SigningKey) -> Transaction {
-        let hash = body.hash();
-        let signature: TransactionSignature = private_key.sign_prehash(&hash).unwrap();
+        let signature: TransactionSignature = private_key.sign(&body.to_bytes());
         let public_key = VerifyingKey::from(&private_key);
         Self {
             body,
@@ -255,7 +258,7 @@ impl Transaction {
         let hash = self.body.hash();
 
         self.public_key
-            .verify_prehash(&hash, &self.signature)
+            .verify(&self.body.to_bytes(), &self.signature)
             .map_err(|_| TransactionSignatureError::InvalidSignature)?;
 
         Ok(AuthenticatedTransaction {
@@ -379,7 +382,7 @@ mod tests {
         assert!(authenticated_tx
             .transaction()
             .public_key
-            .verify_prehash(hash, &signature)
+            .verify(&transaction.body.to_bytes(), &signature)
             .is_ok());
     }
 
