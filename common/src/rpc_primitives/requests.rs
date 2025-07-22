@@ -39,6 +39,11 @@ pub struct GetAccountBalanceRequest {
     pub address: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetTransactionByHashRequest {
+    pub hash: String,
+}
+
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -46,6 +51,7 @@ parse_request!(GetBlockDataRequest);
 parse_request!(GetGenesisIdRequest);
 parse_request!(GetLastBlockRequest);
 parse_request!(GetAccountBalanceRequest);
+parse_request!(GetTransactionByHashRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -80,4 +86,9 @@ pub struct GetLastBlockResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountBalanceResponse {
     pub balance: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetTransactionByHashResponse {
+    pub transaction: Option<Transaction>,
 }

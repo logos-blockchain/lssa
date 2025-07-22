@@ -1,11 +1,17 @@
 use actix_web::Error as HttpError;
 use serde_json::Value;
 
-use common::rpc_primitives::{
-    errors::{RpcError, RpcParseError},
-    message::{Message, Request},
-    parser::RpcRequest,
-    requests::{GetAccountBalanceRequest, GetAccountBalanceResponse},
+use common::{
+    merkle_tree_public::TreeHashType,
+    rpc_primitives::{
+        errors::{RpcError, RpcParseError},
+        message::{Message, Request},
+        parser::RpcRequest,
+        requests::{
+            GetAccountBalanceRequest, GetAccountBalanceResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse,
+        },
+    },
 };
 
 use common::rpc_primitives::requests::{
@@ -23,6 +29,7 @@ pub const GET_BLOCK: &str = "get_block";
 pub const GET_GENESIS: &str = "get_genesis";
 pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
+pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -156,6 +163,21 @@ impl JsonHandler {
 
         respond(helperstruct)
     }
+    async fn process_get_transaction_by_hash(&self, request: Request) -> Result<Value, RpcErr> {
+        let get_transaction_req = GetTransactionByHashRequest::parse(Some(request.params))?;
+        let bytes: Vec<u8> = hex::decode(get_transaction_req.hash)
+            .map_err(|_| RpcParseError("invalid hash".to_string()))?;
+        let hash: TreeHashType = bytes
+            .try_into()
+            .map_err(|_| RpcParseError("invalid hash".to_string()))?;
+
+        let transaction = {
+            let state = self.sequencer_state.lock().await;
+            state.store.block_store.get_transaction_by_hash(hash)
+        };
+        let helperstruct = GetTransactionByHashResponse { transaction };
+        respond(helperstruct)
+    }
 
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
@@ -166,6 +188,7 @@ impl JsonHandler {
             GET_GENESIS => self.process_get_genesis(request).await,
             GET_LAST_BLOCK => self.process_get_last_block(request).await,
             GET_ACCOUNT_BALANCE => self.process_get_account_balance(request).await,
+            GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
@@ -308,6 +331,28 @@ mod tests {
             "jsonrpc": "2.0",
             "result": {
                 "balance": 100
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
+    async fn test_get_transaction_by_hash_for_non_existent_hash() {
+        let json_handler = json_handler_for_tests();
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_transaction_by_hash",
+            "params": { "hash": "cafe".repeat(16) },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "result": {
+                "transaction": Value::Null
             }
         });
 
