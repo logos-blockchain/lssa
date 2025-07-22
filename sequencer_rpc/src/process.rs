@@ -2,7 +2,7 @@ use actix_web::Error as HttpError;
 use serde_json::Value;
 
 use common::rpc_primitives::{
-    errors::RpcError,
+    errors::{RpcError, RpcParseError},
     message::{Message, Request},
     parser::RpcRequest,
     requests::{GetAccountBalanceRequest, GetAccountBalanceResponse},
@@ -137,13 +137,13 @@ impl JsonHandler {
     }
 
     /// Returns the balance of the account at the given address.
-    /// The address must be a valid hex string. If it's invalid or the account doesn't exist,
-    /// a balance of zero is returned.
+    /// The address must be a valid hex string. If the account doesn't exist, a balance of zero is returned.
     async fn process_get_account_balance(&self, request: Request) -> Result<Value, RpcErr> {
         let get_account_req = GetAccountBalanceRequest::parse(Some(request.params))?;
+        let address = hex::decode(get_account_req.address)
+            .map_err(|_| RpcParseError("invalid address".to_string()))?;
 
         let balance = {
-            let address = hex::decode(get_account_req.address).unwrap_or_default();
             let state = self.sequencer_state.lock().await;
             state
                 .store
@@ -248,7 +248,7 @@ mod tests {
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_account_balance",
-            "params": { "address": "cofe".repeat(16) },
+            "params": { "address": "efac".repeat(16) },
             "id": 1
         });
         let expected_response = serde_json::json!({
@@ -274,13 +274,21 @@ mod tests {
             "id": 1
         });
         let expected_response = serde_json::json!({
-            "id": 1,
             "jsonrpc": "2.0",
-            "result": {
-                "balance": 0
+            "id": 1,
+            "error": {
+                "code": -32700,
+                "message": "Parse error",
+                "name": "REQUEST_VALIDATION_ERROR",
+                "data": "invalid address",
+                "cause": {
+                    "name": "PARSE_ERROR",
+                    "info": {
+                        "error_message": "invalid address"
+                    }
+                }
             }
         });
-
         let response = call_rpc_handler_with_json(json_handler, request).await;
 
         assert_eq!(response, expected_response);
