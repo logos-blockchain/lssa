@@ -163,6 +163,9 @@ impl JsonHandler {
 
         respond(helperstruct)
     }
+
+    /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
+    /// The hash must be a valid hex string of the correct length.
     async fn process_get_transaction_by_hash(&self, request: Request) -> Result<Value, RpcErr> {
         let get_transaction_req = GetTransactionByHashRequest::parse(Some(request.params))?;
         let bytes: Vec<u8> = hex::decode(get_transaction_req.hash)
