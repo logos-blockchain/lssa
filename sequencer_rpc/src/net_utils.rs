@@ -53,7 +53,7 @@ pub fn new_http_server(
         polling_config,
         limits_config,
     } = config;
-    info!(target:NETWORK, "Starting http server at {}", addr);
+    info!(target:NETWORK, "Starting http server at {addr}");
     let handler = web::Data::new(JsonHandler {
         polling_config,
         sequencer_state: seuquencer_core.clone(),

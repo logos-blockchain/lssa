@@ -54,7 +54,7 @@ mod tests {
         let mut store = NodeAccountsStore::new();
 
         let account = create_sample_account(100);
-        let account_addr = account.address.clone();
+        let account_addr = account.address;
 
         store.register_account(account);
 
@@ -68,7 +68,7 @@ mod tests {
         let mut store = NodeAccountsStore::new();
 
         let account = create_sample_account(100);
-        let account_addr = account.address.clone();
+        let account_addr = account.address;
         store.register_account(account);
 
         assert_eq!(store.accounts.len(), 1);
@@ -94,8 +94,8 @@ mod tests {
         let account1 = create_sample_account(100);
         let account2 = create_sample_account(200);
 
-        let address_1 = account1.address.clone();
-        let address_2 = account2.address.clone();
+        let address_1 = account1.address;
+        let address_2 = account2.address;
 
         store.register_account(account1);
         store.register_account(account2);

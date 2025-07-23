@@ -9,6 +9,7 @@ pub mod gas_calculator;
 
 pub use test_methods;
 
+#[allow(clippy::result_large_err)]
 pub fn gas_limits_check<INP: Serialize>(
     input_buffer: INP,
     elf: &[u8],
@@ -31,6 +32,7 @@ pub fn gas_limits_check<INP: Serialize>(
     Ok(())
 }
 
+#[allow(clippy::result_large_err)]
 pub fn prove_mint_utxo(
     amount_to_mint: u128,
     owner: AccountAddress,
@@ -66,6 +68,7 @@ pub fn prove_mint_utxo(
     Ok((UTXO::create_utxo_from_payload(digest), receipt))
 }
 
+#[allow(clippy::result_large_err)]
 pub fn prove_send_utxo(
     spent_utxo: UTXO,
     owners_parts: Vec<(u128, AccountAddress)>,
@@ -118,6 +121,7 @@ pub fn prove_send_utxo(
     ))
 }
 
+#[allow(clippy::result_large_err)]
 pub fn prove_send_utxo_multiple_assets_one_receiver(
     spent_utxos: Vec<UTXO>,
     number_to_send: usize,
@@ -160,17 +164,18 @@ pub fn prove_send_utxo_multiple_assets_one_receiver(
         digest
             .0
             .into_iter()
-            .map(|payload| UTXO::create_utxo_from_payload(payload))
+            .map(UTXO::create_utxo_from_payload)
             .collect(),
         digest
             .1
             .into_iter()
-            .map(|payload| UTXO::create_utxo_from_payload(payload))
+            .map(UTXO::create_utxo_from_payload)
             .collect(),
         receipt,
     ))
 }
 
+#[allow(clippy::result_large_err)]
 pub fn prove_send_utxo_shielded(
     owner: AccountAddress,
     amount: u128,
@@ -226,6 +231,7 @@ pub fn prove_send_utxo_shielded(
     ))
 }
 
+#[allow(clippy::result_large_err)]
 pub fn prove_send_utxo_deshielded(
     spent_utxo: UTXO,
     owners_parts: Vec<(u128, AccountAddress)>,
@@ -278,6 +284,7 @@ pub fn prove_send_utxo_deshielded(
     ))
 }
 
+#[allow(clippy::result_large_err)]
 pub fn prove_mint_utxo_multiple_assets(
     amount_to_mint: u128,
     number_of_assets: usize,

@@ -145,8 +145,8 @@ mod tests {
 
     fn create_sample_block(block_id: u64, prev_block_id: u64) -> Block {
         Block {
-            block_id: block_id,
-            prev_block_id: prev_block_id,
+            block_id,
+            prev_block_id,
             prev_block_hash: [0; 32],
             hash: [1; 32],
             transactions: vec![],
@@ -211,7 +211,7 @@ mod tests {
 
         // The genesis block should be available on reload
         let result = node_store.get_block_at_id(0);
-        assert!(!result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]

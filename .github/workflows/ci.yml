@@ -14,35 +14,13 @@ on:
 name: General
 
 jobs:
-  build-ubuntu-latest:
+  ubuntu-latest-pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    name: build - ubuntu-latest
+    name: ubuntu-latest-pipeline
     steps:
       - uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-      - name: build - ubuntu-latest
-        if: success() || failure()
-        run: chmod 777 ./ci_scripts/build-ubuntu.sh && ./ci_scripts/build-ubuntu.sh
-
-
-  lint:
-    strategy:
-      matrix:
-        platform: [ ubuntu-latest ]
-    runs-on: ${{ matrix.platform }}
-    timeout-minutes: 60
-
-    name: lint - ${{ matrix.crate }} - ${{ matrix.platform }}
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -53,25 +31,6 @@ jobs:
       - name: lint - ubuntu-latest
         if: success() || failure()
         run: chmod 777 ./ci_scripts/lint-ubuntu.sh && ./ci_scripts/lint-ubuntu.sh
-
-
-  test:
-    strategy:
-      matrix:
-        platform: [ ubuntu-latest ]
-    runs-on: ${{ matrix.platform }}
-    timeout-minutes: 60
-
-    name: test - ${{ matrix.crate }} - ${{ matrix.platform }}
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
       - name: test ubuntu-latest
         if: success() || failure()
         run: chmod 777 ./ci_scripts/test-ubuntu.sh && ./ci_scripts/test-ubuntu.sh

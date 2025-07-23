@@ -1,6 +1,6 @@
 use accounts::{account_core::Account, key_management::ephemeral_key_holder::EphemeralKeyHolder};
 use anyhow::Result;
-use common::transaction::{Transaction, TxKind};
+use common::transaction::{TransactionBody, TxKind};
 use rand::thread_rng;
 use risc0_zkvm::Receipt;
 use secp256k1_zkp::{CommitmentSecrets, PedersenCommitment, Tweak};
@@ -15,8 +15,8 @@ pub fn create_public_transaction_payload(
     secret_r: [u8; 32],
     sc_addr: String,
     state_changes: (serde_json::Value, usize),
-) -> Transaction {
-    Transaction {
+) -> TransactionBody {
+    TransactionBody {
         tx_kind: TxKind::Public,
         execution_input,
         execution_output: vec![],
@@ -66,8 +66,7 @@ pub fn generate_nullifiers_spent_utxos(utxos_spent: Vec<(UTXO, &Account)>) -> Ve
                 .key_holder
                 .utxo_secret_key_holder
                 .nullifier_secret_key
-                .to_bytes()
-                .to_vec(),
+                .to_bytes(),
         );
 
         all_nullifiers.push(nullifier);
@@ -91,8 +90,7 @@ pub fn generate_secret_random_commitment(
                 .key_holder
                 .utxo_secret_key_holder
                 .viewing_secret_key
-                .to_bytes()
-                .to_vec(),
+                .to_bytes(),
         )?,
         generator_blinding_factor: Tweak::new(&mut thread_rng()),
     };

@@ -22,8 +22,7 @@ pub async fn setup_empty_sc_states(node: &NodeChainStore) -> Result<()> {
 
     let mint_utxo_addr_bytes: Vec<u8> = zkvm::test_methods::MINT_UTXO_ID
         .iter()
-        .map(|num| num.to_le_bytes())
-        .flatten()
+        .flat_map(|num| num.to_le_bytes())
         .collect();
     let mint_utxo_addr = hex::encode(mint_utxo_addr_bytes);
     node.block_store
@@ -32,8 +31,7 @@ pub async fn setup_empty_sc_states(node: &NodeChainStore) -> Result<()> {
 
     let single_utxo_transfer_addr_bytes: Vec<u8> = zkvm::test_methods::SEND_UTXO_ID
         .iter()
-        .map(|num| num.to_le_bytes())
-        .flatten()
+        .flat_map(|num| num.to_le_bytes())
         .collect();
     let single_utxo_transfer_addr = hex::encode(single_utxo_transfer_addr_bytes);
     node.block_store.put_sc_sc_state(
@@ -46,8 +44,7 @@ pub async fn setup_empty_sc_states(node: &NodeChainStore) -> Result<()> {
     let mint_utxo_multiple_assets_addr_bytes: Vec<u8> =
         zkvm::test_methods::MINT_UTXO_MULTIPLE_ASSETS_ID
             .iter()
-            .map(|num| num.to_le_bytes())
-            .flatten()
+            .flat_map(|num| num.to_le_bytes())
             .collect();
     let mint_utxo_multiple_assets_addr = hex::encode(mint_utxo_multiple_assets_addr_bytes);
     node.block_store.put_sc_sc_state(
@@ -60,8 +57,7 @@ pub async fn setup_empty_sc_states(node: &NodeChainStore) -> Result<()> {
     let multiple_assets_utxo_transfer_addr_bytes: Vec<u8> =
         zkvm::test_methods::SEND_UTXO_MULTIPLE_ASSETS_ID
             .iter()
-            .map(|num| num.to_le_bytes())
-            .flatten()
+            .flat_map(|num| num.to_le_bytes())
             .collect();
     let multiple_assets_utxo_transfer_addr = hex::encode(multiple_assets_utxo_transfer_addr_bytes);
     node.block_store.put_sc_sc_state(

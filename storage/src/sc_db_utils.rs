@@ -49,6 +49,7 @@ impl DataBlob {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DataBlobChangeVariant {
     Created {
@@ -145,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_produce_blob_from_fit_vec() {
-        let data = (0..0 + 255).collect();
+        let data = (0..255).collect();
         let blob = produce_blob_from_fit_vec(data);
         assert_eq!(blob.0[..4], [0, 1, 2, 3]);
     }

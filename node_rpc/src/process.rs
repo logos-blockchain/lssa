@@ -23,8 +23,7 @@ use crate::types::{
         ExecuteScenarioSplitResponse, ExecuteSubscenarioRequest, ExecuteSubscenarioResponse,
         ShowAccountPublicBalanceRequest, ShowAccountPublicBalanceResponse, ShowAccountUTXORequest,
         ShowAccountUTXOResponse, ShowTransactionRequest, ShowTransactionResponse,
-        UTXOShortEssentialStruct, WriteDepositPublicBalanceRequest,
-        WriteDepositPublicBalanceResponse, WriteMintPrivateUTXOMultipleAssetsRequest,
+        UTXOShortEssentialStruct, WriteMintPrivateUTXOMultipleAssetsRequest,
         WriteMintPrivateUTXOMultipleAssetsResponse, WriteMintPrivateUTXORequest,
         WriteMintPrivateUTXOResponse, WriteSendDeshieldedBalanceRequest,
         WriteSendDeshieldedUTXOResponse, WriteSendPrivateUTXORequest, WriteSendPrivateUTXOResponse,
@@ -42,7 +41,6 @@ pub const EXECUTE_SCENARIO_MULTIPLE_SEND: &str = "execute_scenario_multiple_send
 pub const SHOW_ACCOUNT_PUBLIC_BALANCE: &str = "show_account_public_balance";
 pub const SHOW_ACCOUNT_UTXO: &str = "show_account_utxo";
 pub const SHOW_TRANSACTION: &str = "show_transaction";
-pub const WRITE_DEPOSIT_PUBLIC_BALANCE: &str = "write_deposit_public_balance";
 pub const WRITE_MINT_UTXO: &str = "write_mint_utxo";
 pub const WRITE_MINT_UTXO_MULTIPLE_ASSETS: &str = "write_mint_utxo_multiple_assets";
 pub const WRITE_SEND_UTXO_PRIVATE: &str = "write_send_utxo_private";
@@ -90,14 +88,6 @@ impl JsonHandler {
                     .map_err(cast_common_execution_error_into_rpc_error)?,
                 3 => store
                     .subscenario_3()
-                    .await
-                    .map_err(cast_common_execution_error_into_rpc_error)?,
-                4 => store
-                    .subscenario_4()
-                    .await
-                    .map_err(cast_common_execution_error_into_rpc_error)?,
-                5 => store
-                    .subscenario_5()
                     .await
                     .map_err(cast_common_execution_error_into_rpc_error)?,
                 _ => return Err(RpcErr(RpcError::invalid_params("Scenario id not found"))),
@@ -312,74 +302,48 @@ impl JsonHandler {
 
                 ShowTransactionResponse {
                     hash: req.tx_hash,
-                    tx_kind: tx.tx_kind,
+                    tx_kind: tx.body().tx_kind,
                     public_input: if let Ok(action) =
-                        serde_json::from_slice::<ActionData>(&tx.execution_input)
+                        serde_json::from_slice::<ActionData>(&tx.body().execution_input)
                     {
                         action.into_hexed_print()
                     } else {
                         "".to_string()
                     },
                     public_output: if let Ok(action) =
-                        serde_json::from_slice::<ActionData>(&tx.execution_output)
+                        serde_json::from_slice::<ActionData>(&tx.body().execution_output)
                     {
                         action.into_hexed_print()
                     } else {
                         "".to_string()
                     },
                     utxo_commitments_created_hashes: tx
+                        .body()
                         .utxo_commitments_created_hashes
                         .iter()
-                        .map(|val| hex::encode(val.clone()))
+                        .map(hex::encode)
                         .collect::<Vec<_>>(),
                     utxo_commitments_spent_hashes: tx
+                        .body()
                         .utxo_commitments_spent_hashes
                         .iter()
-                        .map(|val| hex::encode(val.clone()))
+                        .map(hex::encode)
                         .collect::<Vec<_>>(),
                     utxo_nullifiers_created_hashes: tx
+                        .body()
                         .nullifier_created_hashes
                         .iter()
-                        .map(|val| hex::encode(val.clone()))
+                        .map(hex::encode)
                         .collect::<Vec<_>>(),
                     encoded_data: tx
+                        .body()
                         .encoded_data
                         .iter()
                         .map(|val| (hex::encode(val.0.clone()), hex::encode(val.1.clone())))
                         .collect::<Vec<_>>(),
-                    ephemeral_pub_key: hex::encode(tx.ephemeral_pub_key.clone()),
+                    ephemeral_pub_key: hex::encode(tx.body().ephemeral_pub_key.clone()),
                 }
             }
-        };
-
-        respond(helperstruct)
-    }
-
-    pub async fn process_write_deposit_public_balance(
-        &self,
-        request: Request,
-    ) -> Result<Value, RpcErr> {
-        let req = WriteDepositPublicBalanceRequest::parse(Some(request.params))?;
-
-        let acc_addr_hex_dec = hex::decode(req.account_addr.clone()).map_err(|_| {
-            RpcError::parse_error("Failed to decode account address from hex string".to_string())
-        })?;
-
-        let acc_addr: [u8; 32] = acc_addr_hex_dec.try_into().map_err(|_| {
-            RpcError::parse_error("Failed to parse account address from bytes".to_string())
-        })?;
-
-        {
-            let mut cover_guard = self.node_chain_store.lock().await;
-
-            cover_guard
-                .operate_account_deposit_public(acc_addr, req.amount as u128)
-                .await
-                .map_err(cast_common_execution_error_into_rpc_error)?;
-        };
-
-        let helperstruct = WriteDepositPublicBalanceResponse {
-            status: SUCCESS.to_string(),
         };
 
         respond(helperstruct)
@@ -529,7 +493,7 @@ impl JsonHandler {
             utxo_result: UTXOShortEssentialStruct {
                 hash: hex::encode(new_utxo_rec.hash),
                 asset: new_utxo_rec.asset.clone(),
-                commitment_hash: hex::encode(generate_commitments_helper(&vec![new_utxo_rec])[0]),
+                commitment_hash: hex::encode(generate_commitments_helper(&[new_utxo_rec])[0]),
             },
         };
 
@@ -582,7 +546,7 @@ impl JsonHandler {
             utxo_result: UTXOShortEssentialStruct {
                 hash: hex::encode(new_utxo_rec.hash),
                 asset: new_utxo_rec.asset.clone(),
-                commitment_hash: hex::encode(generate_commitments_helper(&vec![new_utxo_rec])[0]),
+                commitment_hash: hex::encode(generate_commitments_helper(&[new_utxo_rec])[0]),
             },
         };
 
@@ -777,9 +741,6 @@ impl JsonHandler {
             SHOW_ACCOUNT_PUBLIC_BALANCE => self.process_show_account_public_balance(request).await,
             SHOW_ACCOUNT_UTXO => self.process_show_account_utxo_request(request).await,
             SHOW_TRANSACTION => self.process_show_transaction(request).await,
-            WRITE_DEPOSIT_PUBLIC_BALANCE => {
-                self.process_write_deposit_public_balance(request).await
-            }
             WRITE_MINT_UTXO => self.process_write_mint_utxo(request).await,
             WRITE_MINT_UTXO_MULTIPLE_ASSETS => {
                 self.process_write_mint_utxo_multiple_assets(request).await

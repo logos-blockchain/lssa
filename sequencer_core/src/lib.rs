@@ -6,22 +6,22 @@ use common::{
     block::{Block, HashableBlockData},
     merkle_tree_public::TreeHashType,
     nullifier::UTXONullifier,
-    transaction::{Transaction, TxKind},
+    transaction::{AuthenticatedTransaction, Transaction, TransactionBody, TxKind},
     utxo_commitment::UTXOCommitment,
 };
 use config::SequencerConfig;
 use mempool::MemPool;
+use mempool_transaction::MempoolTransaction;
 use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
-use transaction_mempool::TransactionMempool;
 
 pub mod config;
+pub mod mempool_transaction;
 pub mod sequencer_store;
-pub mod transaction_mempool;
 
 pub struct SequencerCore {
     pub store: SequecerChainStore,
-    pub mempool: MemPool<TransactionMempool>,
+    pub mempool: MemPool<MempoolTransaction>,
     pub sequencer_config: SequencerConfig,
     pub chain_height: u64,
 }
@@ -36,6 +36,7 @@ pub enum TransactionMalformationErrorKind {
     MempoolFullForRound { tx: TreeHashType },
     ChainStateFurtherThanTransactionState { tx: TreeHashType },
     FailedToInsert { tx: TreeHashType, details: String },
+    InvalidSignature,
 }
 
 impl Display for TransactionMalformationErrorKind {
@@ -55,7 +56,7 @@ impl SequencerCore {
                 config.is_genesis_random,
                 &config.initial_accounts,
             ),
-            mempool: MemPool::<TransactionMempool>::default(),
+            mempool: MemPool::<MempoolTransaction>::default(),
             chain_height: config.genesis_id,
             sequencer_config: config,
         }
@@ -73,18 +74,23 @@ impl SequencerCore {
 
     pub fn transaction_pre_check(
         &mut self,
-        tx: &Transaction,
+        tx: Transaction,
         tx_roots: [[u8; 32]; 2],
-    ) -> Result<(), TransactionMalformationErrorKind> {
-        let Transaction {
+    ) -> Result<AuthenticatedTransaction, TransactionMalformationErrorKind> {
+        let tx = tx
+            .into_authenticated()
+            .map_err(|_| TransactionMalformationErrorKind::InvalidSignature)?;
+
+        let TransactionBody {
             tx_kind,
             ref execution_input,
             ref execution_output,
             ref utxo_commitments_created_hashes,
             ref nullifier_created_hashes,
             ..
-        } = tx;
-        let tx_hash = tx.hash();
+        } = tx.transaction().body();
+
+        let tx_hash = *tx.hash();
 
         let mempool_size = self.mempool.len();
 
@@ -133,73 +139,77 @@ impl SequencerCore {
 
         //Tree checks
         let tx_tree_check = self.store.pub_tx_store.get_tx(tx_hash).is_some();
-        let nullifier_tree_check = nullifier_created_hashes
-            .iter()
-            .map(|nullifier_hash| {
-                self.store.nullifier_store.contains(&UTXONullifier {
-                    utxo_hash: *nullifier_hash,
-                })
+        let nullifier_tree_check = nullifier_created_hashes.iter().any(|nullifier_hash| {
+            self.store.nullifier_store.contains(&UTXONullifier {
+                utxo_hash: *nullifier_hash,
             })
-            .any(|check| check);
-        let utxo_commitments_check = utxo_commitments_created_hashes
-            .iter()
-            .map(|utxo_commitment_hash| {
-                self.store
-                    .utxo_commitments_store
-                    .get_tx(*utxo_commitment_hash)
-                    .is_some()
-            })
-            .any(|check| check);
+        });
+        let utxo_commitments_check =
+            utxo_commitments_created_hashes
+                .iter()
+                .any(|utxo_commitment_hash| {
+                    self.store
+                        .utxo_commitments_store
+                        .get_tx(*utxo_commitment_hash)
+                        .is_some()
+                });
 
         if tx_tree_check {
             return Err(
-                TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: tx.hash() },
+                TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: *tx.hash() },
             );
         }
 
         if nullifier_tree_check {
             return Err(
-                TransactionMalformationErrorKind::NullifierAlreadyPresentInTree { tx: tx.hash() },
+                TransactionMalformationErrorKind::NullifierAlreadyPresentInTree { tx: *tx.hash() },
             );
         }
 
         if utxo_commitments_check {
             return Err(
                 TransactionMalformationErrorKind::UTXOCommitmentAlreadyPresentInTree {
-                    tx: tx.hash(),
+                    tx: *tx.hash(),
                 },
             );
         }
 
-        Ok(())
+        Ok(tx)
     }
 
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
-        item: TransactionMempool,
+        transaction: Transaction,
         tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
-        self.transaction_pre_check(&item.tx, tx_roots)?;
+        let mempool_size = self.mempool.len();
+        if mempool_size >= self.sequencer_config.max_num_tx_in_block {
+            return Err(TransactionMalformationErrorKind::MempoolFullForRound {
+                tx: transaction.body().hash(),
+            });
+        }
 
-        self.mempool.push_item(item);
+        let authenticated_tx = self.transaction_pre_check(transaction, tx_roots)?;
+
+        self.mempool.push_item(authenticated_tx.into());
 
         Ok(())
     }
 
     fn execute_check_transaction_on_state(
         &mut self,
-        tx: TransactionMempool,
+        mempool_tx: &MempoolTransaction,
     ) -> Result<(), TransactionMalformationErrorKind> {
-        let Transaction {
+        let TransactionBody {
             ref utxo_commitments_created_hashes,
             ref nullifier_created_hashes,
             ..
-        } = tx.tx;
+        } = mempool_tx.auth_tx.transaction().body();
 
         for utxo_comm in utxo_commitments_created_hashes {
             self.store
                 .utxo_commitments_store
-                .add_tx(UTXOCommitment { hash: *utxo_comm });
+                .add_tx(&UTXOCommitment { hash: *utxo_comm });
         }
 
         for nullifier in nullifier_created_hashes.iter() {
@@ -208,7 +218,9 @@ impl SequencerCore {
             });
         }
 
-        self.store.pub_tx_store.add_tx(tx.tx);
+        self.store
+            .pub_tx_store
+            .add_tx(mempool_tx.auth_tx.transaction());
 
         Ok(())
     }
@@ -226,7 +238,7 @@ impl SequencerCore {
             .pop_size(self.sequencer_config.max_num_tx_in_block);
 
         for tx in &transactions {
-            self.execute_check_transaction_on_state(tx.clone())?;
+            self.execute_check_transaction_on_state(tx)?;
         }
 
         let prev_block_hash = self
@@ -238,7 +250,10 @@ impl SequencerCore {
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
             prev_block_id: self.chain_height,
-            transactions: transactions.into_iter().map(|tx_mem| tx_mem.tx).collect(),
+            transactions: transactions
+                .into_iter()
+                .map(|tx_mem| tx_mem.auth_tx.transaction().clone())
+                .collect(),
             data: vec![],
             prev_block_hash,
         };
@@ -260,10 +275,10 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    use common::transaction::{Transaction, TxKind};
+    use common::transaction::{SignaturePrivateKey, Transaction, TransactionBody, TxKind};
+    use mempool_transaction::MempoolTransaction;
     use rand::Rng;
     use secp256k1_zkp::Tweak;
-    use transaction_mempool::TransactionMempool;
 
     fn setup_sequencer_config_variable_initial_accounts(
         initial_accounts: Vec<AccountInitialData>,
@@ -271,7 +286,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let random_u8: u8 = rng.gen();
 
-        let path_str = format!("/tmp/sequencer_{:?}", random_u8);
+        let path_str = format!("/tmp/sequencer_{random_u8:?}");
 
         SequencerConfig {
             home: PathBuf::from(path_str),
@@ -309,7 +324,7 @@ mod tests {
     ) -> Transaction {
         let mut rng = rand::thread_rng();
 
-        Transaction {
+        let body = TransactionBody {
             tx_kind: TxKind::Private,
             execution_input: vec![],
             execution_output: vec![],
@@ -324,13 +339,16 @@ mod tests {
             secret_r: [0; 32],
             sc_addr: "sc_addr".to_string(),
             state_changes: (serde_json::Value::Null, 0),
-        }
+        };
+        Transaction::new(body, SignaturePrivateKey::random(&mut rng))
     }
 
     fn common_setup(sequencer: &mut SequencerCore) {
         let tx = create_dummy_transaction(vec![[9; 32]], vec![[7; 32]], vec![[8; 32]]);
-        let tx_mempool = TransactionMempool { tx };
-        sequencer.mempool.push_item(tx_mempool);
+        let mempool_tx = MempoolTransaction {
+            auth_tx: tx.into_authenticated().unwrap(),
+        };
+        sequencer.mempool.push_item(mempool_tx);
 
         sequencer
             .produce_new_block_with_mempool_transactions()
@@ -346,18 +364,16 @@ mod tests {
         assert_eq!(sequencer.sequencer_config.max_num_tx_in_block, 10);
         assert_eq!(sequencer.sequencer_config.port, 8080);
 
-        let acc1_addr: [u8; 32] = hex::decode(
-            "bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117d09a8c".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
-        let acc2_addr: [u8; 32] = hex::decode(
-            "20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1e376f31".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
+        let acc1_addr: [u8; 32] =
+            hex::decode("bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117d09a8c")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let acc2_addr: [u8; 32] =
+            hex::decode("20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1e376f31")
+                .unwrap()
+                .try_into()
+                .unwrap();
 
         assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
         assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
@@ -400,18 +416,16 @@ mod tests {
         let config = setup_sequencer_config_variable_initial_accounts(initial_accounts);
         let sequencer = SequencerCore::start_from_config(config.clone());
 
-        let acc1_addr: [u8; 32] = hex::decode(
-            "bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117ffffff".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
-        let acc2_addr: [u8; 32] = hex::decode(
-            "20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1effffff".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
+        let acc1_addr: [u8; 32] =
+            hex::decode("bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117ffffff")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let acc2_addr: [u8; 32] =
+            hex::decode("20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1effffff")
+                .unwrap()
+                .try_into()
+                .unwrap();
 
         assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
         assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
@@ -456,13 +470,13 @@ mod tests {
 
         let tx = create_dummy_transaction(vec![[91; 32]], vec![[71; 32]], vec![[81; 32]]);
         let tx_roots = sequencer.get_tree_roots();
-        let result = sequencer.transaction_pre_check(&tx, tx_roots);
+        let result = sequencer.transaction_pre_check(tx, tx_roots);
 
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_transaction_pre_check_fail_mempool_full() {
+    fn test_push_tx_into_mempool_fails_mempool_full() {
         let config = SequencerConfig {
             max_num_tx_in_block: 1,
             ..setup_sequencer_config()
@@ -475,10 +489,12 @@ mod tests {
         let tx_roots = sequencer.get_tree_roots();
 
         // Fill the mempool
-        let dummy_tx = TransactionMempool { tx: tx.clone() };
+        let dummy_tx = MempoolTransaction {
+            auth_tx: tx.clone().into_authenticated().unwrap(),
+        };
         sequencer.mempool.push_item(dummy_tx);
 
-        let result = sequencer.transaction_pre_check(&tx, tx_roots);
+        let result = sequencer.push_tx_into_mempool_pre_check(tx, tx_roots);
 
         assert!(matches!(
             result,
@@ -495,9 +511,8 @@ mod tests {
 
         let tx = create_dummy_transaction(vec![[93; 32]], vec![[73; 32]], vec![[83; 32]]);
         let tx_roots = sequencer.get_tree_roots();
-        let tx_mempool = TransactionMempool { tx };
 
-        let result = sequencer.push_tx_into_mempool_pre_check(tx_mempool.clone(), tx_roots);
+        let result = sequencer.push_tx_into_mempool_pre_check(tx, tx_roots);
         assert!(result.is_ok());
         assert_eq!(sequencer.mempool.len(), 1);
     }
@@ -508,7 +523,9 @@ mod tests {
         let mut sequencer = SequencerCore::start_from_config(config);
 
         let tx = create_dummy_transaction(vec![[94; 32]], vec![[7; 32]], vec![[8; 32]]);
-        let tx_mempool = TransactionMempool { tx };
+        let tx_mempool = MempoolTransaction {
+            auth_tx: tx.into_authenticated().unwrap(),
+        };
         sequencer.mempool.push_item(tx_mempool);
 
         let block_id = sequencer.produce_new_block_with_mempool_transactions();

@@ -3,7 +3,7 @@ use std::sync::{
     Arc,
 };
 
-use common::ExecutionFailureKind;
+use common::{transaction::Transaction, ExecutionFailureKind};
 
 use accounts::{
     account_core::{Account, AccountAddress},
@@ -11,7 +11,7 @@ use accounts::{
 };
 use anyhow::Result;
 use chain_storage::NodeChainStore;
-use common::transaction::{Transaction, TxKind};
+use common::transaction::{TransactionBody, TxKind};
 use config::NodeConfig;
 use log::info;
 use sc_core::proofs_circuits::{
@@ -39,7 +39,7 @@ pub mod sequencer_client;
 fn vec_u8_to_vec_u64(bytes: Vec<u8>) -> Vec<u64> {
     // Pad with zeros to make sure it's a multiple of 8
     let mut padded = bytes.clone();
-    while padded.len() % 8 != 0 {
+    while !padded.len().is_multiple_of(8) {
         padded.push(0);
     }
 
@@ -214,12 +214,11 @@ impl NodeCore {
 
         let tag = account.make_tag();
 
-        let comm = generate_commitments(&vec![utxo]);
+        let comm = generate_commitments(&[utxo]);
 
         let mint_utxo_addr_bytes: Vec<u8> = zkvm::test_methods::MINT_UTXO_ID
             .iter()
-            .map(|num| num.to_le_bytes())
-            .flatten()
+            .flat_map(|num| num.to_le_bytes())
             .collect();
         let sc_addr = hex::encode(mint_utxo_addr_bytes);
 
@@ -247,31 +246,30 @@ impl NodeCore {
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
+        let transaction_body = TransactionBody {
+            tx_kind: TxKind::Private,
+            execution_input: vec![],
+            execution_output: vec![],
+            utxo_commitments_spent_hashes: vec![],
+            utxo_commitments_created_hashes: comm
+                .into_iter()
+                .map(|hash_data| hash_data.try_into().unwrap())
+                .collect(),
+            nullifier_created_hashes: vec![],
+            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt)
+                .unwrap(),
+            encoded_data: vec![(encoded_data.0, encoded_data.1.to_vec(), tag)],
+            ephemeral_pub_key: eph_pub_key.to_vec(),
+            commitment,
+            tweak,
+            secret_r,
+            sc_addr,
+            state_changes,
+        };
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
         Ok((
-            Transaction {
-                tx_kind: TxKind::Private,
-                execution_input: vec![],
-                execution_output: vec![],
-                utxo_commitments_spent_hashes: vec![],
-                utxo_commitments_created_hashes: comm
-                    .into_iter()
-                    .map(|hash_data| hash_data.try_into().unwrap())
-                    .collect(),
-                nullifier_created_hashes: vec![],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
-                    receipt,
-                )
-                .unwrap(),
-                encoded_data: vec![(encoded_data.0, encoded_data.1.to_vec(), tag)],
-                ephemeral_pub_key: eph_pub_key.to_vec(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-                state_changes,
-            }
-            .into(),
+            Transaction::new(transaction_body, key_to_sign_transaction),
             result_hash,
         ))
     }
@@ -315,8 +313,7 @@ impl NodeCore {
         let mint_multiple_utxo_addr_bytes: Vec<u8> =
             zkvm::test_methods::MINT_UTXO_MULTIPLE_ASSETS_ID
                 .iter()
-                .map(|num| num.to_le_bytes())
-                .flatten()
+                .flat_map(|num| num.to_le_bytes())
                 .collect();
         let sc_addr = hex::encode(mint_multiple_utxo_addr_bytes);
 
@@ -345,30 +342,30 @@ impl NodeCore {
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
-        Ok((
-            Transaction {
-                tx_kind: TxKind::Private,
-                execution_input: vec![],
-                execution_output: vec![],
-                utxo_commitments_spent_hashes: vec![],
-                utxo_commitments_created_hashes: comm
-                    .into_iter()
-                    .map(|hash_data| hash_data.try_into().unwrap())
-                    .collect(),
-                nullifier_created_hashes: vec![],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
-                    receipt,
-                )
+        let transaction_body = TransactionBody {
+            tx_kind: TxKind::Private,
+            execution_input: vec![],
+            execution_output: vec![],
+            utxo_commitments_spent_hashes: vec![],
+            utxo_commitments_created_hashes: comm
+                .into_iter()
+                .map(|hash_data| hash_data.try_into().unwrap())
+                .collect(),
+            nullifier_created_hashes: vec![],
+            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt)
                 .unwrap(),
-                encoded_data,
-                ephemeral_pub_key: eph_pub_key.to_vec(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-                state_changes,
-            }
-            .into(),
+            encoded_data,
+            ephemeral_pub_key: eph_pub_key.to_vec(),
+            commitment,
+            tweak,
+            secret_r,
+            sc_addr,
+            state_changes,
+        };
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+
+        Ok((
+            Transaction::new(transaction_body, key_to_sign_transaction),
             result_hashes,
         ))
     }
@@ -389,14 +386,13 @@ impl NodeCore {
                 .key_holder
                 .utxo_secret_key_holder
                 .nullifier_secret_key
-                .to_bytes()
-                .to_vec(),
+                .to_bytes(),
         );
 
         let (resulting_utxos, receipt) = prove_send_utxo(utxo, receivers)?;
         let utxo_hashes = resulting_utxos
             .iter()
-            .map(|(utxo, addr)| (addr.clone(), utxo.hash))
+            .map(|(utxo, addr)| (*addr, utxo.hash))
             .collect();
 
         let utxos: Vec<UTXO> = resulting_utxos
@@ -431,8 +427,7 @@ impl NodeCore {
 
         let send_utxo_addr_bytes: Vec<u8> = zkvm::test_methods::SEND_UTXO_ID
             .iter()
-            .map(|num| num.to_le_bytes())
-            .flatten()
+            .flat_map(|num| num.to_le_bytes())
             .collect();
         let sc_addr = hex::encode(send_utxo_addr_bytes);
 
@@ -461,30 +456,31 @@ impl NodeCore {
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
-        Ok((
-            Transaction {
-                tx_kind: TxKind::Private,
-                execution_input: vec![],
-                execution_output: vec![],
-                utxo_commitments_spent_hashes: vec![commitment_in],
-                utxo_commitments_created_hashes: commitments
-                    .into_iter()
-                    .map(|hash_data| hash_data.try_into().unwrap())
-                    .collect(),
-                nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
-                    receipt,
-                )
+        let transaction_body = TransactionBody {
+            tx_kind: TxKind::Private,
+            execution_input: vec![],
+            execution_output: vec![],
+            utxo_commitments_spent_hashes: vec![commitment_in],
+            utxo_commitments_created_hashes: commitments
+                .into_iter()
+                .map(|hash_data| hash_data.try_into().unwrap())
+                .collect(),
+            nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
+            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt)
                 .unwrap(),
-                encoded_data,
-                ephemeral_pub_key: eph_pub_key.to_vec(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-                state_changes,
-            }
-            .into(),
+            encoded_data,
+            ephemeral_pub_key: eph_pub_key.to_vec(),
+            commitment,
+            tweak,
+            secret_r,
+            sc_addr,
+            state_changes,
+        };
+
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+
+        Ok((
+            Transaction::new(transaction_body, key_to_sign_transaction),
             utxo_hashes,
         ))
     }
@@ -576,8 +572,7 @@ impl NodeCore {
         let send_multiple_utxo_addr_bytes: Vec<u8> =
             zkvm::test_methods::SEND_UTXO_MULTIPLE_ASSETS_ID
                 .iter()
-                .map(|num| num.to_le_bytes())
-                .flatten()
+                .flat_map(|num| num.to_le_bytes())
                 .collect();
         let sc_addr = hex::encode(send_multiple_utxo_addr_bytes);
 
@@ -606,30 +601,31 @@ impl NodeCore {
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
-        Ok((
-            Transaction {
-                tx_kind: TxKind::Private,
-                execution_input: vec![],
-                execution_output: vec![],
-                utxo_commitments_spent_hashes: commitments_in,
-                utxo_commitments_created_hashes: commitments
-                    .into_iter()
-                    .map(|hash_data| hash_data.try_into().unwrap())
-                    .collect(),
-                nullifier_created_hashes: nullifiers,
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
-                    receipt,
-                )
+        let transaction_body = TransactionBody {
+            tx_kind: TxKind::Private,
+            execution_input: vec![],
+            execution_output: vec![],
+            utxo_commitments_spent_hashes: commitments_in,
+            utxo_commitments_created_hashes: commitments
+                .into_iter()
+                .map(|hash_data| hash_data.try_into().unwrap())
+                .collect(),
+            nullifier_created_hashes: nullifiers,
+            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt)
                 .unwrap(),
-                encoded_data,
-                ephemeral_pub_key: eph_pub_key.to_vec(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-                state_changes,
-            }
-            .into(),
+            encoded_data,
+            ephemeral_pub_key: eph_pub_key.to_vec(),
+            commitment,
+            tweak,
+            secret_r,
+            sc_addr,
+            state_changes,
+        };
+
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+
+        Ok((
+            Transaction::new(transaction_body, key_to_sign_transaction),
             utxo_hashes_receiver,
             utxo_hashes_not_spent,
         ))
@@ -657,14 +653,13 @@ impl NodeCore {
                 .key_holder
                 .utxo_secret_key_holder
                 .nullifier_secret_key
-                .to_bytes()
-                .to_vec(),
+                .to_bytes(),
         );
 
         let (resulting_utxos, receipt) = prove_send_utxo_shielded(acc, balance as u128, receivers)?;
         let utxo_hashes = resulting_utxos
             .iter()
-            .map(|(utxo, addr)| (addr.clone(), utxo.hash))
+            .map(|(utxo, addr)| (*addr, utxo.hash))
             .collect();
 
         let utxos: Vec<UTXO> = resulting_utxos
@@ -699,8 +694,7 @@ impl NodeCore {
 
         let mint_utxo_addr_bytes: Vec<u8> = zkvm::test_methods::SEND_UTXO_ID
             .iter()
-            .map(|num| num.to_le_bytes())
-            .flatten()
+            .flat_map(|num| num.to_le_bytes())
             .collect();
         let sc_addr = hex::encode(mint_utxo_addr_bytes);
 
@@ -729,36 +723,37 @@ impl NodeCore {
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
+        let transaction_body = TransactionBody {
+            tx_kind: TxKind::Shielded,
+            execution_input: serde_json::to_vec(&ActionData::SendMoneyShieldedTx(
+                SendMoneyShieldedTx {
+                    acc_sender: acc,
+                    amount: balance as u128,
+                },
+            ))
+            .unwrap(),
+            execution_output: vec![],
+            utxo_commitments_spent_hashes: vec![],
+            utxo_commitments_created_hashes: commitments
+                .into_iter()
+                .map(|hash_data| hash_data.try_into().unwrap())
+                .collect(),
+            nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
+            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt)
+                .unwrap(),
+            encoded_data,
+            ephemeral_pub_key: eph_pub_key.to_vec(),
+            commitment,
+            tweak,
+            secret_r,
+            sc_addr,
+            state_changes,
+        };
+
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+
         Ok((
-            Transaction {
-                tx_kind: TxKind::Shielded,
-                execution_input: serde_json::to_vec(&ActionData::SendMoneyShieldedTx(
-                    SendMoneyShieldedTx {
-                        acc_sender: acc,
-                        amount: balance as u128,
-                    },
-                ))
-                .unwrap(),
-                execution_output: vec![],
-                utxo_commitments_spent_hashes: vec![],
-                utxo_commitments_created_hashes: commitments
-                    .into_iter()
-                    .map(|hash_data| hash_data.try_into().unwrap())
-                    .collect(),
-                nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
-                    receipt,
-                )
-                .unwrap(),
-                encoded_data,
-                ephemeral_pub_key: eph_pub_key.to_vec(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-                state_changes,
-            }
-            .into(),
+            Transaction::new(transaction_body, key_to_sign_transaction),
             utxo_hashes,
         ))
     }
@@ -785,16 +780,14 @@ impl NodeCore {
                 .key_holder
                 .utxo_secret_key_holder
                 .nullifier_secret_key
-                .to_bytes()
-                .to_vec(),
+                .to_bytes(),
         );
 
         let (resulting_balances, receipt) = prove_send_utxo_deshielded(utxo, receivers)?;
 
         let send_utxo_addr_bytes: Vec<u8> = zkvm::test_methods::SEND_UTXO_ID
             .iter()
-            .map(|num| num.to_le_bytes())
-            .flatten()
+            .flat_map(|num| num.to_le_bytes())
             .collect();
         let sc_addr = hex::encode(send_utxo_addr_bytes);
 
@@ -823,7 +816,7 @@ impl NodeCore {
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
-        Ok(Transaction {
+        let transaction_body = TransactionBody {
             tx_kind: TxKind::Deshielded,
             execution_input: serde_json::to_vec(&ActionData::SendMoneyDeshieldedTx(
                 SendMoneyDeshieldedTx {
@@ -844,8 +837,11 @@ impl NodeCore {
             secret_r,
             sc_addr,
             state_changes,
-        }
-        .into())
+        };
+
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+
+        Ok(Transaction::new(transaction_body, key_to_sign_transaction))
     }
 
     pub async fn send_private_mint_tx(
@@ -858,10 +854,10 @@ impl NodeCore {
 
         let point_before_prove = std::time::Instant::now();
         let (tx, utxo_hash) = self.mint_utxo_private(acc, amount).await?;
-        tx.log();
+        tx.body().log();
         let point_after_prove = std::time::Instant::now();
 
-        let commitment_generated_hash = tx.utxo_commitments_created_hashes[0];
+        let commitment_generated_hash = tx.body().utxo_commitments_created_hashes[0];
 
         let timedelta = (point_after_prove - point_before_prove).as_millis();
         info!("Mint utxo proof spent {timedelta:?} milliseconds");
@@ -886,10 +882,10 @@ impl NodeCore {
         let (tx, utxo_hashes) = self
             .mint_utxo_multiple_assets_private(acc, amount, number_of_assets)
             .await?;
-        tx.log();
+        tx.body().log();
         let point_after_prove = std::time::Instant::now();
 
-        let commitment_generated_hashes = tx.utxo_commitments_created_hashes.clone();
+        let commitment_generated_hashes = tx.body().utxo_commitments_created_hashes.clone();
 
         let timedelta = (point_after_prove - point_before_prove).as_millis();
         info!("Mint utxo proof spent {timedelta:?} milliseconds");
@@ -901,50 +897,50 @@ impl NodeCore {
         ))
     }
 
-    pub async fn send_public_deposit(
-        &self,
-        acc: AccountAddress,
-        amount: u128,
-    ) -> Result<SendTxResponse, ExecutionFailureKind> {
-        //Considering proof time, needs to be done before proof
-        let tx_roots = self.get_roots().await;
-
-        let public_context = {
-            let read_guard = self.storage.read().await;
-
-            read_guard.produce_context(acc)
-        };
-
-        let (tweak, secret_r, commitment) = pedersen_commitment_vec(
-            //Will not panic, as public context is serializable
-            public_context.produce_u64_list_from_context().unwrap(),
-        );
-
-        let sc_addr = hex::encode([0; 32]);
-
-        //Sc does not change its state
-        let state_changes: Vec<DataBlobChangeVariant> = vec![];
-        let new_len = 0;
-        let state_changes = (serde_json::to_value(state_changes).unwrap(), new_len);
-
-        let tx: Transaction =
-            sc_core::transaction_payloads_tools::create_public_transaction_payload(
-                serde_json::to_vec(&ActionData::MintMoneyPublicTx(MintMoneyPublicTx {
-                    acc,
-                    amount,
-                }))
-                .unwrap(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-                state_changes,
-            )
-            .into();
-        tx.log();
-
-        Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
-    }
+    // pub async fn send_public_deposit(
+    //     &self,
+    //     acc: AccountAddress,
+    //     amount: u128,
+    // ) -> Result<SendTxResponse, ExecutionFailureKind> {
+    //     //Considering proof time, needs to be done before proof
+    //     let tx_roots = self.get_roots().await;
+    //
+    //     let public_context = {
+    //         let read_guard = self.storage.read().await;
+    //
+    //         read_guard.produce_context(acc)
+    //     };
+    //
+    //     let (tweak, secret_r, commitment) = pedersen_commitment_vec(
+    //         //Will not panic, as public context is serializable
+    //         public_context.produce_u64_list_from_context().unwrap(),
+    //     );
+    //
+    //     let sc_addr = hex::encode([0; 32]);
+    //
+    //     //Sc does not change its state
+    //     let state_changes: Vec<DataBlobChangeVariant> = vec![];
+    //     let new_len = 0;
+    //     let state_changes = (serde_json::to_value(state_changes).unwrap(), new_len);
+    //
+    //     let tx: TransactionBody =
+    //         sc_core::transaction_payloads_tools::create_public_transaction_payload(
+    //             serde_json::to_vec(&ActionData::MintMoneyPublicTx(MintMoneyPublicTx {
+    //                 acc,
+    //                 amount,
+    //             }))
+    //             .unwrap(),
+    //             commitment,
+    //             tweak,
+    //             secret_r,
+    //             sc_addr,
+    //             state_changes,
+    //         )
+    //         .into();
+    //     tx.log();
+    //
+    //     Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
+    // }
 
     pub async fn send_private_send_tx(
         &self,
@@ -959,7 +955,7 @@ impl NodeCore {
         let (tx, utxo_hashes) = self
             .transfer_utxo_private(utxo, comm_hash, receivers)
             .await?;
-        tx.log();
+        tx.body().log();
         let point_after_prove = std::time::Instant::now();
 
         let timedelta = (point_after_prove - point_before_prove).as_millis();
@@ -985,7 +981,7 @@ impl NodeCore {
         let (tx, utxo_hashes_received, utxo_hashes_not_spent) = self
             .transfer_utxo_multiple_assets_private(utxos, comm_hashes, number_to_send, receiver)
             .await?;
-        tx.log();
+        tx.body().log();
         let point_after_prove = std::time::Instant::now();
 
         let timedelta = (point_after_prove - point_before_prove).as_millis();
@@ -1011,7 +1007,7 @@ impl NodeCore {
         let (tx, utxo_hashes) = self
             .transfer_balance_shielded(acc, amount, receivers)
             .await?;
-        tx.log();
+        tx.body().log();
         let point_after_prove = std::time::Instant::now();
 
         let timedelta = (point_after_prove - point_before_prove).as_millis();
@@ -1036,7 +1032,7 @@ impl NodeCore {
         let tx = self
             .transfer_utxo_deshielded(utxo, comm_gen_hash, receivers)
             .await?;
-        tx.log();
+        tx.body().log();
         let point_after_prove = std::time::Instant::now();
 
         let timedelta = (point_after_prove - point_before_prove).as_millis();
@@ -1170,46 +1166,46 @@ impl NodeCore {
         Ok(())
     }
 
-    pub async fn operate_account_deposit_public(
-        &mut self,
-        acc_addr: AccountAddress,
-        amount: u128,
-    ) -> Result<(), ExecutionFailureKind> {
-        let old_balance = {
-            let acc_map_read_guard = self.storage.read().await;
-
-            let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
-
-            acc.balance
-        };
-
-        info!(
-            "Balance of {:?} now is {old_balance:?}",
-            hex::encode(acc_addr)
-        );
-
-        let resp = self.send_public_deposit(acc_addr, amount).await?;
-        info!("Response for public deposit is {resp:?}");
-
-        info!("Awaiting new blocks");
-        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
-
-        let new_balance = {
-            let acc_map_read_guard = self.storage.read().await;
-
-            let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
-
-            acc.balance
-        };
-
-        info!(
-            "Balance of {:?} now is {new_balance:?}, delta is {:?}",
-            hex::encode(acc_addr),
-            new_balance - old_balance
-        );
-
-        Ok(())
-    }
+    // pub async fn operate_account_deposit_public(
+    //     &mut self,
+    //     acc_addr: AccountAddress,
+    //     amount: u128,
+    // ) -> Result<(), ExecutionFailureKind> {
+    //     let old_balance = {
+    //         let acc_map_read_guard = self.storage.read().await;
+    //
+    //         let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
+    //
+    //         acc.balance
+    //     };
+    //
+    //     info!(
+    //         "Balance of {:?} now is {old_balance:?}",
+    //         hex::encode(acc_addr)
+    //     );
+    //
+    //     let resp = self.send_public_deposit(acc_addr, amount).await?;
+    //     info!("Response for public deposit is {resp:?}");
+    //
+    //     info!("Awaiting new blocks");
+    //     tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+    //
+    //     let new_balance = {
+    //         let acc_map_read_guard = self.storage.read().await;
+    //
+    //         let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
+    //
+    //         acc.balance
+    //     };
+    //
+    //     info!(
+    //         "Balance of {:?} now is {new_balance:?}, delta is {:?}",
+    //         hex::encode(acc_addr),
+    //         new_balance - old_balance
+    //     );
+    //
+    //     Ok(())
+    // }
 
     pub async fn operate_account_send_shielded_one_receiver(
         &mut self,
@@ -1375,14 +1371,13 @@ impl NodeCore {
                 .key_holder
                 .utxo_secret_key_holder
                 .nullifier_secret_key
-                .to_bytes()
-                .to_vec(),
+                .to_bytes(),
         );
 
         let (resulting_utxos, receipt) = prove_send_utxo(utxo, receivers)?;
         let utxo_hashes = resulting_utxos
             .iter()
-            .map(|(utxo, addr)| (addr.clone(), utxo.hash))
+            .map(|(utxo, addr)| (*addr, utxo.hash))
             .collect();
 
         let utxos: Vec<UTXO> = resulting_utxos
@@ -1431,8 +1426,7 @@ impl NodeCore {
 
         let send_utxo_addr_bytes: Vec<u8> = zkvm::test_methods::SEND_UTXO_ID
             .iter()
-            .map(|num| num.to_le_bytes())
-            .flatten()
+            .flat_map(|num| num.to_le_bytes())
             .collect();
         let sc_addr = hex::encode(send_utxo_addr_bytes);
 
@@ -1461,31 +1455,31 @@ impl NodeCore {
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
-        Ok((
-            Transaction {
-                tx_kind: TxKind::Shielded,
-                execution_input: vec![],
-                execution_output: serde_json::to_vec(&publication).unwrap(),
-                utxo_commitments_spent_hashes: vec![commitment_in],
-                utxo_commitments_created_hashes: commitments
-                    .clone()
-                    .into_iter()
-                    .map(|hash_data| hash_data.try_into().unwrap())
-                    .collect(),
-                nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
-                execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(
-                    receipt,
-                )
+        let transaction_body = TransactionBody {
+            tx_kind: TxKind::Shielded,
+            execution_input: vec![],
+            execution_output: serde_json::to_vec(&publication).unwrap(),
+            utxo_commitments_spent_hashes: vec![commitment_in],
+            utxo_commitments_created_hashes: commitments
+                .clone()
+                .into_iter()
+                .map(|hash_data| hash_data.try_into().unwrap())
+                .collect(),
+            nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
+            execution_proof_private: sc_core::transaction_payloads_tools::encode_receipt(receipt)
                 .unwrap(),
-                encoded_data,
-                ephemeral_pub_key: eph_pub_key.to_vec(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-                state_changes,
-            }
-            .into(),
+            encoded_data,
+            ephemeral_pub_key: eph_pub_key.to_vec(),
+            commitment,
+            tweak,
+            secret_r,
+            sc_addr,
+            state_changes,
+        };
+        let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+
+        Ok((
+            Transaction::new(transaction_body, key_to_sign_transaction),
             utxo_hashes,
         ))
     }
@@ -1505,13 +1499,13 @@ impl NodeCore {
         let (tx, utxo_hashes) = self
             .split_utxo(utxo, comm_hash, receivers, visibility_list)
             .await?;
-        tx.log();
+        tx.body().log();
         let point_after_prove = std::time::Instant::now();
 
         let timedelta = (point_after_prove - point_before_prove).as_millis();
         info!("Send private utxo proof spent {timedelta:?} milliseconds");
 
-        let commitments = tx.utxo_commitments_created_hashes.clone();
+        let commitments = tx.body().utxo_commitments_created_hashes.clone();
 
         Ok((
             self.sequencer_client.send_tx(tx, tx_roots).await?,
@@ -1531,10 +1525,7 @@ impl NodeCore {
             .send_split_tx(
                 utxo.clone(),
                 comm_gen_hash,
-                addrs_receivers
-                    .clone()
-                    .map(|addr| (utxo.amount / 3, addr))
-                    .to_vec(),
+                addrs_receivers.map(|addr| (utxo.amount / 3, addr)).to_vec(),
                 visibility_list,
             )
             .await?;
@@ -1585,20 +1576,8 @@ impl NodeCore {
         Ok(())
     }
 
-    ///Deposit balance, make it private
-    pub async fn subscenario_2(&mut self) -> Result<(), ExecutionFailureKind> {
-        let acc_addr = self.create_new_account().await;
-
-        self.operate_account_deposit_public(acc_addr, 100).await?;
-
-        self.operate_account_send_shielded_one_receiver(acc_addr, acc_addr, 100)
-            .await?;
-
-        Ok(())
-    }
-
     ///Mint utxo, privately send it to another user
-    pub async fn subscenario_3(&mut self) -> Result<(), ExecutionFailureKind> {
+    pub async fn subscenario_2(&mut self) -> Result<(), ExecutionFailureKind> {
         let acc_addr = self.create_new_account().await;
         let acc_addr_rec = self.create_new_account().await;
 
@@ -1610,21 +1589,8 @@ impl NodeCore {
         Ok(())
     }
 
-    ///Deposit balance, shielded send it to another user
-    pub async fn subscenario_4(&mut self) -> Result<(), ExecutionFailureKind> {
-        let acc_addr = self.create_new_account().await;
-        let acc_addr_rec = self.create_new_account().await;
-
-        self.operate_account_deposit_public(acc_addr, 100).await?;
-
-        self.operate_account_send_shielded_one_receiver(acc_addr, acc_addr_rec, 100)
-            .await?;
-
-        Ok(())
-    }
-
     ///Mint utxo, deshielded send it to another user
-    pub async fn subscenario_5(&mut self) -> Result<(), ExecutionFailureKind> {
+    pub async fn subscenario_3(&mut self) -> Result<(), ExecutionFailureKind> {
         let acc_addr = self.create_new_account().await;
         let acc_addr_rec = self.create_new_account().await;
 

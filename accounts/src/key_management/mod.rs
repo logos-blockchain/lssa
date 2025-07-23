@@ -2,12 +2,14 @@ use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
 use common::merkle_tree_public::TreeHashType;
 use constants_types::{CipherText, Nonce};
 use elliptic_curve::point::AffineCoordinates;
-use k256::AffinePoint;
+use k256::{ecdsa::SigningKey, AffinePoint, FieldBytes};
 use log::info;
+use rand::{rngs::OsRng, RngCore};
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
 use serde::{Deserialize, Serialize};
 
 use crate::account_core::PublicKey;
+pub type PublicAccountSigningKey = [u8; 32];
 
 pub mod constants_types;
 pub mod ephemeral_key_holder;
@@ -20,6 +22,7 @@ pub struct AddressKeyHolder {
     #[allow(dead_code)]
     top_secret_key_holder: TopSecretKeyHolder,
     pub utxo_secret_key_holder: UTXOSecretKeyHolder,
+    pub_account_signing_key: PublicAccountSigningKey,
     pub address: TreeHashType,
     pub nullifer_public_key: PublicKey,
     pub viewing_public_key: PublicKey,
@@ -38,13 +41,27 @@ impl AddressKeyHolder {
         let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
         let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
 
+        let pub_account_signing_key = {
+            let mut bytes = [0; 32];
+            OsRng.fill_bytes(&mut bytes);
+            bytes
+        };
+
         Self {
             top_secret_key_holder,
             utxo_secret_key_holder,
             address,
             nullifer_public_key,
             viewing_public_key,
+            pub_account_signing_key,
         }
+    }
+
+    /// Returns the signing key for public transaction signatures
+    pub fn get_pub_account_signing_key(&self) -> SigningKey {
+        let field_bytes = FieldBytes::from_slice(&self.pub_account_signing_key);
+        // TODO: remove unwrap
+        SigningKey::from_bytes(field_bytes).unwrap()
     }
 
     pub fn calculate_shared_secret_receiver(
@@ -166,7 +183,7 @@ mod tests {
             .decrypt_data(
                 ephemeral_public_key_sender,
                 CipherText::from(ciphertext),
-                nonce.clone(),
+                *nonce,
             )
             .unwrap();
 
@@ -186,7 +203,7 @@ mod tests {
         assert!(!Into::<bool>::into(
             address_key_holder.viewing_public_key.is_identity()
         ));
-        assert!(address_key_holder.address.as_slice().len() > 0); // Assume TreeHashType has non-zero length for a valid address
+        assert!(!address_key_holder.address.as_slice().is_empty()); // Assume TreeHashType has non-zero length for a valid address
     }
 
     #[test]
@@ -228,7 +245,7 @@ mod tests {
             .decrypt_data(
                 ephemeral_public_key_sender,
                 CipherText::from(ciphertext.clone()),
-                incorrect_nonce.clone(),
+                *incorrect_nonce,
             )
             .unwrap();
 
@@ -264,7 +281,7 @@ mod tests {
             .decrypt_data(
                 ephemeral_public_key_sender,
                 CipherText::from(corrupted_ciphertext),
-                nonce.clone(),
+                *nonce,
             )
             .unwrap();
 
@@ -297,12 +314,22 @@ mod tests {
             .decrypt_data(
                 ephemeral_public_key_sender,
                 CipherText::from(ciphertext),
-                nonce.clone(),
+                *nonce,
             )
             .unwrap();
 
         // Verify the decrypted data matches the original plaintext
         assert_eq!(decrypted_data, plaintext);
+    }
+
+    #[test]
+    fn test_get_public_account_signing_key() {
+        let address_key_holder = AddressKeyHolder::new_os_random();
+        let signing_key = address_key_holder.get_pub_account_signing_key();
+        assert_eq!(
+            signing_key.to_bytes().as_slice(),
+            address_key_holder.pub_account_signing_key
+        );
     }
 
     #[test]

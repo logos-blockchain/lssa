@@ -58,7 +58,7 @@ impl UTXO {
     }
     pub fn create_utxo_from_payload(payload_with_asset: UTXOPayload) -> Self {
         let mut hasher = sha2::Sha256::new();
-        hasher.update(&payload_with_asset.to_bytes());
+        hasher.update(payload_with_asset.to_bytes());
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
         Self {
