@@ -52,10 +52,10 @@ pub fn generate_commitments(input_utxos: &[UTXO]) -> Vec<Vec<u8>> {
 ///
 /// ToDo: Solve it in more scalable way
 pub fn validate_in_commitments_tree(
-    in_commitment: &Vec<u8>,
+    in_commitment: &[u8],
     commitment_tree: &UTXOCommitmentsMerkleTree,
 ) -> bool {
-    let alighned_hash: [u8; 32] = in_commitment.clone().try_into().unwrap();
+    let alighned_hash: [u8; 32] = in_commitment.try_into().unwrap();
 
     commitment_tree.get_proof(alighned_hash).is_some()
 }
@@ -75,7 +75,7 @@ pub fn private_circuit(
 ) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
     assert!(check_balances_private(input_utxos, output_utxos));
 
-    let in_commitments = generate_commitments(&input_utxos);
+    let in_commitments = generate_commitments(input_utxos);
 
     let mut in_nullifiers = vec![];
 
@@ -104,7 +104,7 @@ pub fn private_circuit(
         assert!(!public_context.nullifiers_set.contains(&nullifier));
     }
 
-    (in_nullifiers, generate_commitments(&output_utxos))
+    (in_nullifiers, generate_commitments(output_utxos))
 }
 
 /// Check balances DE
@@ -124,7 +124,7 @@ pub fn deshielded_circuit(
 ) -> Vec<Vec<u8>> {
     assert!(check_balances_de(input_utxos, output_balance));
 
-    let in_commitments = generate_commitments(&input_utxos);
+    let in_commitments = generate_commitments(input_utxos);
 
     let mut in_nullifiers = vec![];
 

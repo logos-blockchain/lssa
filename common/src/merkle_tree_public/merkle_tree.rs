@@ -140,7 +140,7 @@ impl<Leav: TreeLeavItem + Clone> HashStorageMerkleTree<Leav> {
         }
     }
 
-    pub fn add_tx(&mut self, tx: Leav) {
+    pub fn add_tx(&mut self, tx: &Leav) {
         let last = self.leaves.len();
 
         self.leaves.insert(last, tx.clone());
@@ -267,7 +267,7 @@ mod tests {
 
         let mut tree = HashStorageMerkleTree::new(vec![tx1.clone()]);
 
-        tree.add_tx(tx2.clone());
+        tree.add_tx(&tx2);
         assert_eq!(tree.leaves.len(), 2);
         assert_eq!(tree.get_tx(tx2.hash()), Some(&tx2));
     }

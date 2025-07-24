@@ -8,7 +8,7 @@ pub trait TreeLeavItem {
 
 impl TreeLeavItem for Transaction {
     fn hash(&self) -> TreeHashType {
-        self.hash()
+        self.body().hash()
     }
 }
 

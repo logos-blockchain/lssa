@@ -77,16 +77,11 @@ impl PublicSCContext {
 
         //`ToDo` Replace with `next_chunk` usage, when feature stabilizes in Rust
         for i in 0..=(ser_data.len() / 8) {
-            let next_chunk: Vec<u8>;
-
-            if (i + 1) * 8 < ser_data.len() {
-                next_chunk = ser_data[(i * 8)..((i + 1) * 8)].iter().cloned().collect();
+            let next_chunk: Vec<u8> = if (i + 1) * 8 < ser_data.len() {
+                ser_data[(i * 8)..((i + 1) * 8)].to_vec()
             } else {
-                next_chunk = ser_data[(i * 8)..(ser_data.len())]
-                    .iter()
-                    .cloned()
-                    .collect();
-            }
+                ser_data[(i * 8)..(ser_data.len())].to_vec()
+            };
 
             u64_list.push(PublicSCContext::produce_u64_from_fit_vec(next_chunk));
         }

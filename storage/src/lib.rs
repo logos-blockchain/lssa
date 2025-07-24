@@ -316,7 +316,7 @@ impl RocksDBIO {
         let cf_sc = self.sc_column();
 
         let sc_addr_loc = format!("{sc_addr:?}{SC_LEN_SUFFIX}");
-        let sc_len_addr = sc_addr_loc.as_str().as_bytes();
+        let sc_len_addr = sc_addr_loc.as_bytes();
 
         self.db
             .put_cf(&cf_sc, sc_len_addr, length.to_be_bytes())
@@ -360,7 +360,7 @@ impl RocksDBIO {
         let cf_sc = self.sc_column();
         let sc_addr_loc = format!("{sc_addr:?}{SC_LEN_SUFFIX}");
 
-        let sc_len_addr = sc_addr_loc.as_str().as_bytes();
+        let sc_len_addr = sc_addr_loc.as_bytes();
 
         let sc_len = self
             .db
@@ -379,11 +379,11 @@ impl RocksDBIO {
     ///Get full sc state from DB
     pub fn get_sc_sc_state(&self, sc_addr: &str) -> DbResult<Vec<DataBlob>> {
         let cf_sc = self.sc_column();
-        let sc_len = self.get_sc_sc_state_len(&sc_addr)?;
+        let sc_len = self.get_sc_sc_state_len(sc_addr)?;
         let mut data_blob_list = vec![];
 
         for id in 0..sc_len {
-            let blob_addr = produce_address_for_data_blob_at_id(&sc_addr, id);
+            let blob_addr = produce_address_for_data_blob_at_id(sc_addr, id);
 
             let blob = self
                 .db
@@ -541,7 +541,7 @@ impl RocksDBIO {
 
 ///Creates address for sc data blob at corresponding id
 fn produce_address_for_data_blob_at_id(sc_addr: &str, id: usize) -> Vec<u8> {
-    let mut prefix_bytes: Vec<u8> = sc_addr.as_bytes().iter().cloned().collect();
+    let mut prefix_bytes: Vec<u8> = sc_addr.as_bytes().to_vec();
 
     let id_bytes = id.to_be_bytes();
 

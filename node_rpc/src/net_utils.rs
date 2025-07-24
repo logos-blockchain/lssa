@@ -53,7 +53,7 @@ pub fn new_http_server(
         polling_config,
         limits_config,
     } = config;
-    info!(target:"network", "Starting http server at {}", addr);
+    info!(target:"network", "Starting http server at {addr}");
     let handler = web::Data::new(JsonHandler {
         polling_config,
         node_core_config: node_config,

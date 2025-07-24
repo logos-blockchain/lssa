@@ -85,6 +85,11 @@ impl SequencerAccountsStore {
     pub fn len(&self) -> usize {
         self.accounts.len()
     }
+
+    ///Is accounts store empty
+    pub fn is_empty(&self) -> bool {
+        self.accounts.is_empty()
+    }
 }
 
 impl Default for SequencerAccountsStore {
@@ -212,5 +217,12 @@ mod tests {
         let acc_balance = seq_acc_store.get_account_balance(&[9; 32]);
 
         assert!(acc_balance.is_none());
+    }
+
+    #[test]
+    fn account_sequencer_store_is_empty_test() {
+        let seq_acc_store = SequencerAccountsStore::default();
+
+        assert!(seq_acc_store.is_empty());
     }
 }

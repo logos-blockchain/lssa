@@ -56,7 +56,7 @@ impl SequecerBlockStore {
         let block = block_id.map(|&id| self.get_block_at_id(id));
         if let Some(Ok(block)) = block {
             for transaction in block.transactions.into_iter() {
-                if transaction.hash() == hash {
+                if transaction.body().hash() == hash {
                     return Some(transaction);
                 }
             }
@@ -69,17 +69,18 @@ fn block_to_transactions_map(block: &Block) -> HashMap<TreeHashType, u64> {
     block
         .transactions
         .iter()
-        .map(|transaction| (transaction.hash(), block.block_id))
+        .map(|transaction| (transaction.body().hash(), block.block_id))
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use common::transaction::{SignaturePrivateKey, TransactionBody};
     use tempfile::tempdir;
 
     fn create_dummy_block_with_transaction(block_id: u64) -> (Block, Transaction) {
-        let tx = Transaction {
+        let body = TransactionBody {
             tx_kind: common::transaction::TxKind::Public,
             execution_input: Default::default(),
             execution_output: Default::default(),
@@ -95,6 +96,7 @@ mod tests {
             sc_addr: Default::default(),
             state_changes: Default::default(),
         };
+        let tx = Transaction::new(body, SignaturePrivateKey::from_slice(&[1; 32]).unwrap());
         (
             Block {
                 block_id,
@@ -125,12 +127,12 @@ mod tests {
             SequecerBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
         let (block, tx) = create_dummy_block_with_transaction(1);
         // Try retrieve a tx that's not in the chain yet.
-        let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
+        let retrieved_tx = node_store.get_transaction_by_hash(tx.body().hash());
         assert_eq!(None, retrieved_tx);
         // Add the block with the transaction
         node_store.put_block_at_id(block).unwrap();
         // Try again
-        let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
+        let retrieved_tx = node_store.get_transaction_by_hash(tx.body().hash());
         assert_eq!(Some(tx), retrieved_tx);
     }
 }

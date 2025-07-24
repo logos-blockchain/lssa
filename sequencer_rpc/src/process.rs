@@ -85,10 +85,7 @@ impl JsonHandler {
         {
             let mut state = self.sequencer_state.lock().await;
 
-            state.push_tx_into_mempool_pre_check(
-                send_tx_req.transaction.into(),
-                send_tx_req.tx_roots,
-            )?;
+            state.push_tx_into_mempool_pre_check(send_tx_req.transaction, send_tx_req.tx_roots)?;
         }
 
         let helperstruct = SendTxResponse {
@@ -202,10 +199,12 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{rpc_handler, JsonHandler};
-    use common::{rpc_primitives::RpcPollingConfig, transaction::Transaction};
+    use common::{
+        rpc_primitives::RpcPollingConfig,
+        transaction::{SignaturePrivateKey, Transaction, TransactionBody},
+    };
     use sequencer_core::{
         config::{AccountInitialData, SequencerConfig},
-        transaction_mempool::TransactionMempool,
         SequencerCore,
     };
     use serde_json::Value;
@@ -241,7 +240,7 @@ mod tests {
     fn json_handler_for_tests() -> JsonHandler {
         let config = sequencer_config_for_tests();
         let mut sequencer_core = SequencerCore::start_from_config(config);
-        let tx = Transaction {
+        let tx_body = TransactionBody {
             tx_kind: common::transaction::TxKind::Public,
             execution_input: Default::default(),
             execution_output: Default::default(),
@@ -257,9 +256,10 @@ mod tests {
             sc_addr: Default::default(),
             state_changes: Default::default(),
         };
+        let tx = Transaction::new(tx_body, SignaturePrivateKey::from_slice(&[1; 32]).unwrap());
 
         sequencer_core
-            .push_tx_into_mempool_pre_check(TransactionMempool { tx }, [[0; 32]; 2])
+            .push_tx_into_mempool_pre_check(tx, [[0; 32]; 2])
             .unwrap();
         sequencer_core
             .produce_new_block_with_mempool_transactions()
@@ -443,20 +443,24 @@ mod tests {
             "jsonrpc": "2.0",
             "result": {
                 "transaction": {
-                    "commitment": [],
-                    "encoded_data": [],
-                    "ephemeral_pub_key": [],
-                    "execution_input": [],
-                    "execution_output": [],
-                    "execution_proof_private": "",
-                    "nullifier_created_hashes": [],
-                    "sc_addr": "",
-                    "secret_r": vec![0; 32],
-                    "state_changes": [null, 0],
-                    "tweak": "0".repeat(64),
-                    "tx_kind": "Public",
-                    "utxo_commitments_created_hashes": [],
-                    "utxo_commitments_spent_hashes": []
+                    "body": {
+                        "commitment": [],
+                        "encoded_data": [],
+                        "ephemeral_pub_key": [],
+                        "execution_input": [],
+                        "execution_output": [],
+                        "execution_proof_private": "",
+                        "nullifier_created_hashes": [],
+                        "sc_addr": "",
+                        "secret_r": vec![0; 32],
+                        "state_changes": [null, 0],
+                        "tweak": "0".repeat(64),
+                        "tx_kind": "Public",
+                        "utxo_commitments_created_hashes": [],
+                        "utxo_commitments_spent_hashes": []
+                    },
+                    "public_key": "3056301006072A8648CE3D020106052B8104000A034200041B84C5567B126440995D3ED5AABA0565D71E1834604819FF9C17F5E9D5DD078F70BEAF8F588B541507FED6A642C5AB42DFDF8120A7F639DE5122D47A69A8E8D1",
+                    "signature": "28CB6CA744864340A3441CB48D5700690F90130DE0760EE5C640F85F4285C5FD2BD7D0E270EC2AC82E4124999E63659AA9C33CF378F959EDF4E50F2626EA3B99"
                 }
             }
         });
