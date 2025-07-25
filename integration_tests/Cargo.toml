@@ -1,0 +1,44 @@
+[package]
+name = "integration_tests"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+env_logger.workspace = true
+log.workspace = true
+serde.workspace = true
+actix.workspace = true
+
+actix-web.workspace = true
+tokio.workspace = true
+toml.workspace = true
+
+[dependencies.clap]
+features = ["derive", "env"]
+workspace = true
+
+[dependencies.sequencer_rpc]
+path = "../sequencer_rpc"
+
+[dependencies.sequencer_core]
+path = "../sequencer_core"
+
+[dependencies.sequencer_runner]
+path = "../sequencer_runner"
+
+[dependencies.node_rpc]
+path = "../node_rpc"
+
+[dependencies.node_core]
+path = "../node_core"
+
+[dependencies.node_runner]
+path = "../node_runner"
+
+[dependencies.common]
+path = "../common"
+
+[dependencies.accounts]
+path = "../accounts"

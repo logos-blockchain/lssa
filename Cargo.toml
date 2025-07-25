@@ -17,6 +17,7 @@ members = [
   "sequencer_core",
   "common",
   "sc_core",
+  "integration_tests",
 ]
 
 [workspace.dependencies]
