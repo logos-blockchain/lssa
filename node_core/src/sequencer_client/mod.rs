@@ -1,8 +1,8 @@
-use accounts::account_core::Account;
+use accounts::account_core::{Account, AccountForSerialization};
 use anyhow::Result;
 use common::rpc_primitives::requests::{
     GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
-    RegisterAccountRequest, RegisterAccountResponse,
+    GetInitialTestnetAccountsRequest, RegisterAccountRequest, RegisterAccountResponse,
 };
 use common::transaction::Transaction;
 use common::{SequencerClientError, SequencerRpcError};
@@ -114,6 +114,23 @@ impl SequencerClient {
 
         let resp = self
             .call_method_with_payload("get_genesis", req)
+            .await
+            .unwrap();
+
+        let resp_deser = serde_json::from_value(resp).unwrap();
+
+        Ok(resp_deser)
+    }
+
+    pub async fn get_initial_testnet_accounts(
+        &self,
+    ) -> Result<Vec<AccountForSerialization>, SequencerClientError> {
+        let acc_req = GetInitialTestnetAccountsRequest {};
+
+        let req = serde_json::to_value(acc_req).unwrap();
+
+        let resp = self
+            .call_method_with_payload("get_initial_testnet_accounts", req)
             .await
             .unwrap();
 

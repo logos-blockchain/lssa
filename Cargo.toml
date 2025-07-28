@@ -45,6 +45,7 @@ tempfile = "3.14.0"
 light-poseidon = "0.3.0"
 ark-bn254 = "0.5.0"
 ark-ff = "0.5.0"
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
 rocksdb = { version = "0.21.0", default-features = false, features = [
   "snappy",

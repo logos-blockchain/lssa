@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 pub mod block;
 pub mod commitment;
+pub mod execution_input;
 pub mod merkle_tree_public;
 pub mod nullifier;
 pub mod rpc_primitives;

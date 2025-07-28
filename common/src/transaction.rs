@@ -235,8 +235,8 @@ pub type SignaturePrivateKey = SigningKey;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Transaction {
     body: TransactionBody,
-    signature: TransactionSignature,
-    public_key: VerifyingKey,
+    pub signature: TransactionSignature,
+    pub public_key: VerifyingKey,
 }
 
 impl Transaction {

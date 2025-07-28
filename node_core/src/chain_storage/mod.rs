@@ -5,6 +5,7 @@ use anyhow::Result;
 use block_store::NodeBlockStore;
 use common::{
     block::Block,
+    execution_input::PublicNativeTokenSend,
     merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
     nullifier::UTXONullifier,
     utxo_commitment::UTXOCommitment,
@@ -157,6 +158,20 @@ impl NodeChainStore {
                             }
                         }
                         _ => {}
+                    }
+                } else {
+                    let native_transfer =
+                        serde_json::from_slice::<PublicNativeTokenSend>(&tx.body().execution_input);
+
+                    if let Ok(transfer) = native_transfer {
+                        if let Some(acc_sender) = self.acc_map.get_mut(&transfer.from) {
+                            //Can panic, we depend on sequencer maintaining chain consistency here
+                            acc_sender.balance -= transfer.balance_to_move;
+
+                            if let Some(acc_rec) = self.acc_map.get_mut(&transfer.to) {
+                                acc_rec.balance += transfer.balance_to_move;
+                            }
+                        }
                     }
                 }
             }

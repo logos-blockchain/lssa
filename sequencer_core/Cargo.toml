@@ -13,6 +13,7 @@ serde.workspace = true
 rand.workspace = true
 elliptic-curve.workspace = true
 k256.workspace = true
+tiny-keccak.workspace = true
 tempfile.workspace = true
 
 [dependencies.storage]

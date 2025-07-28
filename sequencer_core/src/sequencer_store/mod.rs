@@ -1,5 +1,6 @@
 use std::{collections::HashSet, path::Path};
 
+use accounts::account_core::AccountForSerialization;
 use accounts_store::SequencerAccountsStore;
 use block_store::SequecerBlockStore;
 use common::{
@@ -8,8 +9,6 @@ use common::{
     nullifier::UTXONullifier,
 };
 use rand::{rngs::OsRng, RngCore};
-
-use crate::config::AccountInitialData;
 
 pub mod accounts_store;
 pub mod block_store;
@@ -27,24 +26,14 @@ impl SequecerChainStore {
         home_dir: &Path,
         genesis_id: u64,
         is_genesis_random: bool,
-        initial_accounts: &[AccountInitialData],
+        initial_accounts: &[AccountForSerialization],
     ) -> Self {
-        let acc_data_decoded: Vec<([u8; 32], u64)> = initial_accounts
+        let accs_pregenerated: Vec<_> = initial_accounts
             .iter()
-            .map(|acc_data| {
-                (
-                    //ToDo: Handle this error for direct error message
-                    //Failure to produce account address is critical, so error handling is needed only for clarity
-                    hex::decode(acc_data.addr.clone())
-                        .unwrap()
-                        .try_into()
-                        .unwrap(),
-                    acc_data.balance,
-                )
-            })
+            .map(|acc| (acc.address, acc.balance))
             .collect();
 
-        let acc_store = SequencerAccountsStore::new(&acc_data_decoded);
+        let acc_store = SequencerAccountsStore::new(&accs_pregenerated);
         let nullifier_store = HashSet::new();
         let utxo_commitments_store = UTXOCommitmentsMerkleTree::new(vec![]);
         let pub_tx_store = PublicTransactionMerkleTree::new(vec![]);

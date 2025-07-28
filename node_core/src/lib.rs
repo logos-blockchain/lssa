@@ -3,7 +3,9 @@ use std::sync::{
     Arc,
 };
 
-use common::{transaction::Transaction, ExecutionFailureKind};
+use common::{
+    execution_input::PublicNativeTokenSend, transaction::Transaction, ExecutionFailureKind,
+};
 
 use accounts::{
     account_core::{Account, AccountAddress},
@@ -101,7 +103,14 @@ impl NodeCore {
 
         let genesis_block = client.get_block(genesis_id.genesis_id).await?.block;
 
+        let initial_accounts_ser = client.get_initial_testnet_accounts().await?;
+        let initial_accounts: Vec<Account> =
+            initial_accounts_ser.into_iter().map(Into::into).collect();
+
         let (mut storage, mut chain_height) = NodeChainStore::new(config.clone(), genesis_block)?;
+        for acc in initial_accounts {
+            storage.acc_map.insert(acc.address, acc);
+        }
 
         pre_start::setup_empty_sc_states(&storage).await?;
 
@@ -941,6 +950,70 @@ impl NodeCore {
     //
     //     Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
     // }
+
+    // ToDo: Currently untested due to need for end-to-end integration tests.
+    // Add integration tests to cover this functionality
+    pub async fn send_public_native_token_transfer(
+        &self,
+        from: AccountAddress,
+        to: AccountAddress,
+        balance_to_move: u64,
+    ) -> Result<SendTxResponse, ExecutionFailureKind> {
+        let tx_roots = self.get_roots().await;
+
+        let public_context = {
+            let read_guard = self.storage.read().await;
+
+            read_guard.produce_context(from)
+        };
+
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(
+            //Will not panic, as public context is serializable
+            public_context.produce_u64_list_from_context().unwrap(),
+        );
+
+        let sc_addr = hex::encode([0; 32]);
+
+        //Native contract does not change its state
+        let state_changes: Vec<DataBlobChangeVariant> = vec![];
+        let new_len = 0;
+        let state_changes = (serde_json::to_value(state_changes).unwrap(), new_len);
+
+        let tx: TransactionBody =
+            sc_core::transaction_payloads_tools::create_public_transaction_payload(
+                serde_json::to_vec(&PublicNativeTokenSend {
+                    from,
+                    to,
+                    balance_to_move,
+                })
+                .unwrap(),
+                commitment,
+                tweak,
+                secret_r,
+                sc_addr,
+                state_changes,
+            );
+        tx.log();
+
+        {
+            let read_guard = self.storage.read().await;
+
+            let account = read_guard.acc_map.get(&from);
+
+            if let Some(account) = account {
+                let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+
+                let signed_transaction = Transaction::new(tx, key_to_sign_transaction);
+
+                Ok(self
+                    .sequencer_client
+                    .send_tx(signed_transaction, tx_roots)
+                    .await?)
+            } else {
+                Err(ExecutionFailureKind::AmountMismatchError)
+            }
+        }
+    }
 
     pub async fn send_private_send_tx(
         &self,

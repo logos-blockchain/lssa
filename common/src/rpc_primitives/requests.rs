@@ -35,6 +35,9 @@ pub struct GetGenesisIdRequest {}
 pub struct GetLastBlockRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GetInitialTestnetAccountsRequest {}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountBalanceRequest {
     pub address: String,
 }
@@ -50,6 +53,7 @@ parse_request!(SendTxRequest);
 parse_request!(GetBlockDataRequest);
 parse_request!(GetGenesisIdRequest);
 parse_request!(GetLastBlockRequest);
+parse_request!(GetInitialTestnetAccountsRequest);
 parse_request!(GetAccountBalanceRequest);
 parse_request!(GetTransactionByHashRequest);
 
