@@ -1,4 +1,4 @@
-use accounts::account_core::AccountAddress;
+use accounts::account_core::address::AccountAddress;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

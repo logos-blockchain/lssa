@@ -1,5 +1,5 @@
 use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
-use common::merkle_tree_public::TreeHashType;
+use common::{merkle_tree_public::TreeHashType, transaction::SignaturePublicKey};
 use constants_types::{CipherText, Nonce};
 use elliptic_curve::point::AffineCoordinates;
 use k256::{ecdsa::SigningKey, AffinePoint, FieldBytes};
@@ -24,7 +24,6 @@ pub struct AddressKeyHolder {
     top_secret_key_holder: TopSecretKeyHolder,
     pub utxo_secret_key_holder: UTXOSecretKeyHolder,
     pub_account_signing_key: PublicAccountSigningKey,
-    pub address: TreeHashType,
     pub nullifer_public_key: PublicKey,
     pub viewing_public_key: PublicKey,
 }
@@ -47,21 +46,9 @@ impl AddressKeyHolder {
             bytes
         };
 
-        //Address is a Keccak(verification_key)
-        let field_bytes = FieldBytes::from_slice(&pub_account_signing_key);
-        let signing_key = SigningKey::from_bytes(field_bytes).unwrap();
-
-        let verifying_key = signing_key.verifying_key();
-
-        let mut address = [0; 32];
-        let mut keccak_hasher = Keccak::v256();
-        keccak_hasher.update(&verifying_key.to_sec1_bytes());
-        keccak_hasher.finalize(&mut address);
-
         Self {
             top_secret_key_holder,
             utxo_secret_key_holder,
-            address,
             nullifer_public_key,
             viewing_public_key,
             pub_account_signing_key,
@@ -214,7 +201,6 @@ mod tests {
         assert!(!Into::<bool>::into(
             address_key_holder.viewing_public_key.is_identity()
         ));
-        assert!(!address_key_holder.address.as_slice().is_empty()); // Assume TreeHashType has non-zero length for a valid address
     }
 
     #[test]
@@ -341,21 +327,6 @@ mod tests {
             signing_key.to_bytes().as_slice(),
             address_key_holder.pub_account_signing_key
         );
-    }
-
-    #[test]
-    fn test_address_key_equal_keccak_pub_sign_key() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
-        let signing_key = address_key_holder.get_pub_account_signing_key();
-
-        let verifying_key = signing_key.verifying_key();
-
-        let mut address = [0; 32];
-        let mut keccak_hasher = Keccak::v256();
-        keccak_hasher.update(&verifying_key.to_sec1_bytes());
-        keccak_hasher.finalize(&mut address);
-
-        assert_eq!(address, address_key_holder.address);
     }
 
     #[test]

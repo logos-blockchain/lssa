@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use accounts::account_core::AccountAddress;
+use accounts::account_core::address::{self, AccountAddress};
 use anyhow::Result;
 use common::{
     block::{Block, HashableBlockData},
@@ -15,7 +15,6 @@ use mempool::MemPool;
 use mempool_transaction::MempoolTransaction;
 use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
-use tiny_keccak::{Hasher, Keccak};
 
 pub mod config;
 pub mod mempool_transaction;
@@ -147,13 +146,10 @@ impl SequencerCore {
         if let Ok(native_transfer_action) =
             serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
         {
-            let mut output = [0; 32];
-            let mut keccak_hasher = Keccak::v256();
-            keccak_hasher.update(&tx.transaction().public_key.to_sec1_bytes());
-            keccak_hasher.finalize(&mut output);
+            let signer_address = address::from_public_key(&tx.transaction().public_key);
 
             //Correct sender check
-            if native_transfer_action.from != output {
+            if native_transfer_action.from != signer_address {
                 return Err(TransactionMalformationErrorKind::IncorrectSender);
             }
         }
@@ -232,10 +228,7 @@ impl SequencerCore {
         let tx_hash = *mempool_tx.auth_tx.hash();
 
         // Nonce check
-        let mut signer_addres = [0; 32];
-        let mut keccak_hasher = Keccak::v256();
-        keccak_hasher.update(&mempool_tx.auth_tx.transaction().public_key.to_sec1_bytes());
-        keccak_hasher.finalize(&mut signer_addres);
+        let signer_addres = address::from_public_key(&mempool_tx.auth_tx.transaction().public_key);
         if self.store.acc_store.get_account_nonce(&signer_addres) != *nonce {
             return Err(TransactionMalformationErrorKind::NonceMismatch { tx: tx_hash });
         }

@@ -8,7 +8,7 @@ use common::{
 };
 
 use accounts::{
-    account_core::{Account, AccountAddress},
+    account_core::{address::AccountAddress, Account},
     key_management::ephemeral_key_holder::EphemeralKeyHolder,
 };
 use anyhow::Result;
