@@ -26,10 +26,6 @@ impl AccountPublicData {
             nonce: 0,
         }
     }
-
-    fn nonce(&self) -> u64 {
-        self.nonce
-    }
 }
 
 #[derive(Debug, Clone)]
