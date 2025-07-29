@@ -28,7 +28,7 @@ pub struct SequencerCore {
     pub chain_height: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TransactionMalformationErrorKind {
     PublicTransactionChangedPrivateData { tx: TreeHashType },
     PrivateTransactionChangedPublicData { tx: TreeHashType },
@@ -143,7 +143,7 @@ impl SequencerCore {
             _ => {}
         };
 
-        //Correct sender check
+        //Native transfers checks
         if let Ok(native_transfer_action) =
             serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
         {
@@ -152,6 +152,7 @@ impl SequencerCore {
             keccak_hasher.update(&tx.transaction().public_key.to_sec1_bytes());
             keccak_hasher.finalize(&mut output);
 
+            //Correct sender check
             if native_transfer_action.from != output {
                 return Err(TransactionMalformationErrorKind::IncorrectSender);
             }
@@ -239,7 +240,7 @@ impl SequencerCore {
             return Err(TransactionMalformationErrorKind::NonceMismatch { tx: tx_hash });
         }
 
-        //Balance check
+        //Balance move
         if let Ok(native_transfer_action) =
             serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
         {
@@ -252,21 +253,21 @@ impl SequencerCore {
                 .acc_store
                 .get_account_balance(&native_transfer_action.to);
 
-            if from_balance >= native_transfer_action.balance_to_move {
-                self.store.acc_store.set_account_balance(
-                    &native_transfer_action.from,
-                    from_balance - native_transfer_action.balance_to_move,
-                );
-                self.store.acc_store.set_account_balance(
-                    &native_transfer_action.to,
-                    to_balance + native_transfer_action.balance_to_move,
-                );
-
-                // Update nonce
-                let _new_nonce = self.store.acc_store.increase_nonce(&signer_addres);
-            } else {
+            //Balance check
+            if from_balance < native_transfer_action.balance_to_move {
                 return Err(TransactionMalformationErrorKind::BalanceMismatch { tx: tx_hash });
             }
+
+            self.store.acc_store.set_account_balance(
+                &native_transfer_action.from,
+                from_balance - native_transfer_action.balance_to_move,
+            );
+            self.store.acc_store.set_account_balance(
+                &native_transfer_action.to,
+                to_balance + native_transfer_action.balance_to_move,
+            );
+
+            self.store.acc_store.increase_nonce(&signer_addres);
         }
 
         for utxo_comm in utxo_commitments_created_hashes {
@@ -300,9 +301,16 @@ impl SequencerCore {
             .mempool
             .pop_size(self.sequencer_config.max_num_tx_in_block);
 
-        for tx in &transactions {
-            self.execute_check_transaction_on_state(tx);
-        }
+        let valid_transactions = transactions
+            .into_iter()
+            .filter_map(|mempool_tx| {
+                if self.execute_check_transaction_on_state(&mempool_tx).is_ok() {
+                    Some(mempool_tx.auth_tx.into_transaction())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let prev_block_hash = self
             .store
@@ -313,10 +321,7 @@ impl SequencerCore {
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
             prev_block_id: self.chain_height,
-            transactions: transactions
-                .into_iter()
-                .map(|tx_mem| tx_mem.auth_tx.transaction().clone())
-                .collect(),
+            transactions: valid_transactions,
             data: vec![],
             prev_block_hash,
         };
@@ -333,17 +338,19 @@ impl SequencerCore {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::AccountInitialData;
+
     use super::*;
     use std::path::PathBuf;
 
-    use accounts::account_core::AccountForSerialization;
     use common::transaction::{SignaturePrivateKey, Transaction, TransactionBody, TxKind};
+    use k256::{ecdsa::SigningKey, FieldBytes};
     use mempool_transaction::MempoolTransaction;
     use rand::Rng;
     use secp256k1_zkp::Tweak;
 
     fn setup_sequencer_config_variable_initial_accounts(
-        initial_accounts: Vec<AccountForSerialization>,
+        initial_accounts: Vec<AccountInitialData>,
     ) -> SequencerConfig {
         let mut rng = rand::thread_rng();
         let random_u8: u8 = rng.gen();
@@ -363,241 +370,25 @@ mod tests {
     }
 
     fn setup_sequencer_config() -> SequencerConfig {
-        let initial_acc1 = serde_json::from_str(r#"{
-            "address": [
-                244,
-                55,
-                238,
-                205,
-                74,
-                115,
-                179,
-                192,
-                65,
-                186,
-                166,
-                169,
-                221,
-                45,
-                6,
-                57,
-                200,
-                65,
-                195,
-                70,
-                118,
-                252,
-                206,
-                100,
-                215,
-                250,
-                72,
-                230,
-                19,
-                71,
-                217,
-                249
-            ],
-            "balance": 10,
-            "key_holder": {
-                "address": [
-                    244,
-                    55,
-                    238,
-                    205,
-                    74,
-                    115,
-                    179,
-                    192,
-                    65,
-                    186,
-                    166,
-                    169,
-                    221,
-                    45,
-                    6,
-                    57,
-                    200,
-                    65,
-                    195,
-                    70,
-                    118,
-                    252,
-                    206,
-                    100,
-                    215,
-                    250,
-                    72,
-                    230,
-                    19,
-                    71,
-                    217,
-                    249
-                ],
-                "nullifer_public_key": "03A340BECA9FAAB444CED0140681D72EA1318B5C611704FEE017DA9836B17DB718",
-                "pub_account_signing_key": [
-                    244,
-                    88,
-                    134,
-                    61,
-                    35,
-                    209,
-                    229,
-                    101,
-                    85,
-                    35,
-                    140,
-                    140,
-                    192,
-                    226,
-                    83,
-                    83,
-                    190,
-                    189,
-                    110,
-                    8,
-                    89,
-                    127,
-                    147,
-                    142,
-                    157,
-                    204,
-                    51,
-                    109,
-                    189,
-                    92,
-                    144,
-                    68
-                ],
-                "top_secret_key_holder": {
-                    "secret_spending_key": "7BC46784DB1BC67825D8F029436846712BFDF9B5D79EA3AB11D39A52B9B229D4"
-                },
-                "utxo_secret_key_holder": {
-                    "nullifier_secret_key": "BB54A8D3C9C51B82C431082D1845A74677B0EF829A11B517E1D9885DE3139506",
-                    "viewing_secret_key": "AD923E92F6A5683E30140CEAB2702AFB665330C1EE4EFA70FAF29767B6B52BAF"
-                },
-                "viewing_public_key": "0361220C5D277E7A1709340FD31A52600C1432B9C45B9BCF88A43581D58824A8B6"
-            },
-            "utxos": {}
-        }"#).unwrap();
+        let acc1_addr = vec![
+            13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
+            68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 85, 42, 215,
+        ];
 
-        let initial_acc2 = serde_json::from_str(r#"{
-            "address": [
-                72,
-                169,
-                70,
-                237,
-                1,
-                96,
-                35,
-                157,
-                25,
-                15,
-                83,
-                18,
-                52,
-                206,
-                202,
-                63,
-                48,
-                59,
-                173,
-                76,
-                78,
-                7,
-                254,
-                229,
-                28,
-                45,
-                194,
-                79,
-                6,
-                89,
-                58,
-                85
-            ],
-            "balance": 100,
-            "key_holder": {
-                "address": [
-                    72,
-                    169,
-                    70,
-                    237,
-                    1,
-                    96,
-                    35,
-                    157,
-                    25,
-                    15,
-                    83,
-                    18,
-                    52,
-                    206,
-                    202,
-                    63,
-                    48,
-                    59,
-                    173,
-                    76,
-                    78,
-                    7,
-                    254,
-                    229,
-                    28,
-                    45,
-                    194,
-                    79,
-                    6,
-                    89,
-                    58,
-                    85
-                ],
-                "nullifer_public_key": "02172F50274DE67C4087C344F5D58E11DF761D90285B095060E0994FAA6BCDE271",
-                "pub_account_signing_key": [
-                    136,
-                    105,
-                    9,
-                    53,
-                    180,
-                    145,
-                    64,
-                    5,
-                    235,
-                    174,
-                    62,
-                    211,
-                    206,
-                    116,
-                    185,
-                    24,
-                    214,
-                    62,
-                    244,
-                    64,
-                    224,
-                    59,
-                    120,
-                    150,
-                    30,
-                    249,
-                    160,
-                    46,
-                    189,
-                    254,
-                    47,
-                    244
-                ],
-                "top_secret_key_holder": {
-                    "secret_spending_key": "80A186737C8D38B4288A03F0F589957D9C040D79C19F3E0CC4BA80F8494E5179"
-                },
-                "utxo_secret_key_holder": {
-                    "nullifier_secret_key": "746928E63F0984F6F4818933493CE9C067562D9CB932FDC06D82C86CDF6D7122",
-                    "viewing_secret_key": "89176CF4BC9E673807643FD52110EF99D4894335AFB10D881AC0B5041FE1FCB7"
-                },
-                "viewing_public_key": "026072A8F83FEC3472E30CDD4767683F30B91661D25B1040AD9A5FC2E01D659F99"
-            },
-            "utxos": {}
-        }"#).unwrap();
+        let acc2_addr = vec![
+            151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
+            135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 44, 243, 100,
+        ];
+
+        let initial_acc1 = AccountInitialData {
+            addr: hex::encode(acc1_addr),
+            balance: 10000,
+        };
+
+        let initial_acc2 = AccountInitialData {
+            addr: hex::encode(acc2_addr),
+            balance: 20000,
+        };
 
         let initial_accounts = vec![initial_acc1, initial_acc2];
 
@@ -631,6 +422,61 @@ mod tests {
         Transaction::new(body, SignaturePrivateKey::random(&mut rng))
     }
 
+    fn create_dummy_transaction_native_token_transfer(
+        from: [u8; 32],
+        nonce: u64,
+        to: [u8; 32],
+        balance_to_move: u64,
+        signing_key: SigningKey,
+    ) -> Transaction {
+        let mut rng = rand::thread_rng();
+
+        let native_token_transfer = PublicNativeTokenSend {
+            from,
+            to,
+            balance_to_move,
+        };
+
+        let body = TransactionBody {
+            tx_kind: TxKind::Public,
+            execution_input: serde_json::to_vec(&native_token_transfer).unwrap(),
+            execution_output: vec![],
+            utxo_commitments_spent_hashes: vec![],
+            utxo_commitments_created_hashes: vec![],
+            nullifier_created_hashes: vec![],
+            execution_proof_private: "".to_string(),
+            encoded_data: vec![],
+            ephemeral_pub_key: vec![10, 11, 12],
+            commitment: vec![],
+            tweak: Tweak::new(&mut rng),
+            secret_r: [0; 32],
+            sc_addr: "sc_addr".to_string(),
+            state_changes: (serde_json::Value::Null, 0),
+            nonce,
+        };
+        Transaction::new(body, signing_key)
+    }
+
+    fn create_signing_key_for_account1() -> SigningKey {
+        let pub_sign_key_acc1 = [
+            133, 143, 177, 187, 252, 66, 237, 236, 234, 252, 244, 138, 5, 151, 3, 99, 217, 231,
+            112, 217, 77, 211, 58, 218, 176, 68, 99, 53, 152, 228, 198, 190,
+        ];
+
+        let field_bytes = FieldBytes::from_slice(&pub_sign_key_acc1);
+        SigningKey::from_bytes(field_bytes).unwrap()
+    }
+
+    fn create_signing_key_for_account2() -> SigningKey {
+        let pub_sign_key_acc2 = [
+            54, 90, 62, 225, 71, 225, 228, 148, 143, 53, 210, 23, 137, 158, 171, 156, 48, 7, 139,
+            52, 117, 242, 214, 7, 99, 29, 122, 184, 59, 116, 144, 107,
+        ];
+
+        let field_bytes = FieldBytes::from_slice(&pub_sign_key_acc2);
+        SigningKey::from_bytes(field_bytes).unwrap()
+    }
+
     fn common_setup(sequencer: &mut SequencerCore) {
         let tx = create_dummy_transaction(vec![[9; 32]], vec![[7; 32]], vec![[8; 32]]);
         let mempool_tx = MempoolTransaction {
@@ -652,259 +498,49 @@ mod tests {
         assert_eq!(sequencer.sequencer_config.max_num_tx_in_block, 10);
         assert_eq!(sequencer.sequencer_config.port, 8080);
 
-        let acc1_addr = config.initial_accounts[0].address;
-        let acc2_addr = config.initial_accounts[1].address;
+        let acc1_addr = hex::decode(config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2_addr = hex::decode(config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
         assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
 
         assert_eq!(
-            10,
+            10000,
             sequencer.store.acc_store.get_account_balance(&acc1_addr)
         );
         assert_eq!(
-            100,
+            20000,
             sequencer.store.acc_store.get_account_balance(&acc2_addr)
         );
     }
 
     #[test]
     fn test_start_different_intial_accounts_balances() {
-        let initial_acc1 = serde_json::from_str(r#"{
-            "address": [
-                244,
-                55,
-                238,
-                205,
-                74,
-                115,
-                179,
-                192,
-                65,
-                186,
-                166,
-                169,
-                221,
-                45,
-                6,
-                57,
-                200,
-                65,
-                195,
-                70,
-                118,
-                252,
-                206,
-                100,
-                215,
-                250,
-                72,
-                230,
-                19,
-                71,
-                217,
-                249
-            ],
-            "balance": 1000,
-            "key_holder": {
-                "address": [
-                    244,
-                    55,
-                    238,
-                    205,
-                    74,
-                    115,
-                    179,
-                    192,
-                    65,
-                    186,
-                    166,
-                    169,
-                    221,
-                    45,
-                    6,
-                    57,
-                    200,
-                    65,
-                    195,
-                    70,
-                    118,
-                    252,
-                    206,
-                    100,
-                    215,
-                    250,
-                    72,
-                    230,
-                    19,
-                    71,
-                    217,
-                    249
-                ],
-                "nullifer_public_key": "03A340BECA9FAAB444CED0140681D72EA1318B5C611704FEE017DA9836B17DB718",
-                "pub_account_signing_key": [
-                    244,
-                    88,
-                    134,
-                    61,
-                    35,
-                    209,
-                    229,
-                    101,
-                    85,
-                    35,
-                    140,
-                    140,
-                    192,
-                    226,
-                    83,
-                    83,
-                    190,
-                    189,
-                    110,
-                    8,
-                    89,
-                    127,
-                    147,
-                    142,
-                    157,
-                    204,
-                    51,
-                    109,
-                    189,
-                    92,
-                    144,
-                    68
-                ],
-                "top_secret_key_holder": {
-                    "secret_spending_key": "7BC46784DB1BC67825D8F029436846712BFDF9B5D79EA3AB11D39A52B9B229D4"
-                },
-                "utxo_secret_key_holder": {
-                    "nullifier_secret_key": "BB54A8D3C9C51B82C431082D1845A74677B0EF829A11B517E1D9885DE3139506",
-                    "viewing_secret_key": "AD923E92F6A5683E30140CEAB2702AFB665330C1EE4EFA70FAF29767B6B52BAF"
-                },
-                "viewing_public_key": "0361220C5D277E7A1709340FD31A52600C1432B9C45B9BCF88A43581D58824A8B6"
-            },
-            "utxos": {}
-        }"#).unwrap();
+        let acc1_addr = vec![
+            13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
+            68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 42, 42, 42,
+        ];
 
-        let initial_acc2 = serde_json::from_str(r#"{
-            "address": [
-                72,
-                169,
-                70,
-                237,
-                1,
-                96,
-                35,
-                157,
-                25,
-                15,
-                83,
-                18,
-                52,
-                206,
-                202,
-                63,
-                48,
-                59,
-                173,
-                76,
-                78,
-                7,
-                254,
-                229,
-                28,
-                45,
-                194,
-                79,
-                6,
-                89,
-                58,
-                85
-            ],
-            "balance": 1000,
-            "key_holder": {
-                "address": [
-                    72,
-                    169,
-                    70,
-                    237,
-                    1,
-                    96,
-                    35,
-                    157,
-                    25,
-                    15,
-                    83,
-                    18,
-                    52,
-                    206,
-                    202,
-                    63,
-                    48,
-                    59,
-                    173,
-                    76,
-                    78,
-                    7,
-                    254,
-                    229,
-                    28,
-                    45,
-                    194,
-                    79,
-                    6,
-                    89,
-                    58,
-                    85
-                ],
-                "nullifer_public_key": "02172F50274DE67C4087C344F5D58E11DF761D90285B095060E0994FAA6BCDE271",
-                "pub_account_signing_key": [
-                    136,
-                    105,
-                    9,
-                    53,
-                    180,
-                    145,
-                    64,
-                    5,
-                    235,
-                    174,
-                    62,
-                    211,
-                    206,
-                    116,
-                    185,
-                    24,
-                    214,
-                    62,
-                    244,
-                    64,
-                    224,
-                    59,
-                    120,
-                    150,
-                    30,
-                    249,
-                    160,
-                    46,
-                    189,
-                    254,
-                    47,
-                    244
-                ],
-                "top_secret_key_holder": {
-                    "secret_spending_key": "80A186737C8D38B4288A03F0F589957D9C040D79C19F3E0CC4BA80F8494E5179"
-                },
-                "utxo_secret_key_holder": {
-                    "nullifier_secret_key": "746928E63F0984F6F4818933493CE9C067562D9CB932FDC06D82C86CDF6D7122",
-                    "viewing_secret_key": "89176CF4BC9E673807643FD52110EF99D4894335AFB10D881AC0B5041FE1FCB7"
-                },
-                "viewing_public_key": "026072A8F83FEC3472E30CDD4767683F30B91661D25B1040AD9A5FC2E01D659F99"
-            },
-            "utxos": {}
-        }"#).unwrap();
+        let acc2_addr = vec![
+            151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
+            135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 42, 42, 42,
+        ];
+
+        let initial_acc1 = AccountInitialData {
+            addr: hex::encode(acc1_addr),
+            balance: 10000,
+        };
+
+        let initial_acc2 = AccountInitialData {
+            addr: hex::encode(acc2_addr),
+            balance: 20000,
+        };
 
         let initial_accounts = vec![initial_acc1, initial_acc2];
 
@@ -913,8 +549,14 @@ mod tests {
         let config = setup_sequencer_config_variable_initial_accounts(initial_accounts);
         let sequencer = SequencerCore::start_from_config(config.clone());
 
-        let acc1_addr = config.initial_accounts[0].address;
-        let acc2_addr = config.initial_accounts[1].address;
+        let acc1_addr = hex::decode(config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2_addr = hex::decode(config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
         assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
@@ -922,11 +564,11 @@ mod tests {
         assert_eq!(sequencer.store.acc_store.len(), intial_accounts_len);
 
         assert_eq!(
-            1000,
+            10000,
             sequencer.store.acc_store.get_account_balance(&acc1_addr)
         );
         assert_eq!(
-            1000,
+            20000,
             sequencer.store.acc_store.get_account_balance(&acc2_addr)
         );
     }
@@ -954,6 +596,124 @@ mod tests {
         let result = sequencer.transaction_pre_check(tx, tx_roots);
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_transaction_pre_check_native_transfer_valid() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let acc1 = hex::decode(sequencer.sequencer_config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2 = hex::decode(sequencer.sequencer_config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let sign_key1 = create_signing_key_for_account1();
+
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 10, sign_key1);
+        let tx_roots = sequencer.get_tree_roots();
+        let result = sequencer.transaction_pre_check(tx, tx_roots);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_transaction_pre_check_native_transfer_other_signature() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let acc1 = hex::decode(sequencer.sequencer_config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2 = hex::decode(sequencer.sequencer_config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let sign_key2 = create_signing_key_for_account2();
+
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 10, sign_key2);
+        let tx_roots = sequencer.get_tree_roots();
+        let result = sequencer.transaction_pre_check(tx, tx_roots);
+
+        assert_eq!(
+            result.err().unwrap(),
+            TransactionMalformationErrorKind::IncorrectSender
+        );
+    }
+
+    #[test]
+    fn test_transaction_pre_check_native_transfer_sent_too_much() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let acc1 = hex::decode(sequencer.sequencer_config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2 = hex::decode(sequencer.sequencer_config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let sign_key1 = create_signing_key_for_account1();
+
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 10000000, sign_key1);
+        let tx_roots = sequencer.get_tree_roots();
+        let result = sequencer.transaction_pre_check(tx, tx_roots);
+
+        //Passed pre-check
+        assert!(result.is_ok());
+
+        let result = sequencer.execute_check_transaction_on_state(&result.unwrap().into());
+        let is_failed_at_balance_mismatch = matches!(
+            result.err().unwrap(),
+            TransactionMalformationErrorKind::BalanceMismatch { tx: _ }
+        );
+
+        assert!(is_failed_at_balance_mismatch);
+    }
+
+    #[test]
+    fn test_transaction_execute_native_transfer() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let acc1 = hex::decode(sequencer.sequencer_config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2 = hex::decode(sequencer.sequencer_config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let sign_key1 = create_signing_key_for_account1();
+
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 100, sign_key1);
+
+        sequencer
+            .execute_check_transaction_on_state(&tx.into_authenticated().unwrap().into())
+            .unwrap();
+
+        let bal_from = sequencer.store.acc_store.get_account_balance(&acc1);
+        let bal_to = sequencer.store.acc_store.get_account_balance(&acc2);
+
+        assert_eq!(bal_from, 9900);
+        assert_eq!(bal_to, 20100);
     }
 
     #[test]
@@ -1020,7 +780,20 @@ mod tests {
         let config = setup_sequencer_config();
         let mut sequencer = SequencerCore::start_from_config(config);
 
-        let tx = create_dummy_transaction(vec![[94; 32]], vec![[7; 32]], vec![[8; 32]]);
+        common_setup(&mut sequencer);
+
+        let acc1 = hex::decode(sequencer.sequencer_config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2 = hex::decode(sequencer.sequencer_config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let sign_key1 = create_signing_key_for_account1();
+
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 100, sign_key1);
 
         // The transaction should be included the first time
         let tx_mempool_original = MempoolTransaction {

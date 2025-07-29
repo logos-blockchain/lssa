@@ -486,7 +486,7 @@ impl NodeCore {
             secret_r,
             sc_addr,
             state_changes,
-            nonce: 1
+            nonce: 1,
         };
 
         let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
@@ -761,7 +761,7 @@ impl NodeCore {
             secret_r,
             sc_addr,
             state_changes,
-            nonce: 1
+            nonce: 1,
         };
 
         let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
@@ -851,7 +851,7 @@ impl NodeCore {
             secret_r,
             sc_addr,
             state_changes,
-            nonce: 1
+            nonce: 1,
         };
 
         let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();

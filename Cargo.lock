@@ -19,6 +19,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tiny-keccak",
  "utxo",
 ]
 

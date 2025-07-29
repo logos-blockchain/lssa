@@ -7,6 +7,7 @@ use log::info;
 use rand::{rngs::OsRng, RngCore};
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
 use serde::{Deserialize, Serialize};
+use tiny_keccak::{Hasher, Keccak};
 
 use crate::account_core::PublicKey;
 pub type PublicAccountSigningKey = [u8; 32];
@@ -15,7 +16,7 @@ pub mod constants_types;
 pub mod ephemeral_key_holder;
 pub mod secret_holders;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 ///Entrypoint to key management
 pub struct AddressKeyHolder {
     //Will be useful in future
@@ -37,7 +38,6 @@ impl AddressKeyHolder {
 
         let utxo_secret_key_holder = top_secret_key_holder.produce_utxo_secret_holder();
 
-        let address = utxo_secret_key_holder.generate_address();
         let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
         let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
 
@@ -46,6 +46,17 @@ impl AddressKeyHolder {
             OsRng.fill_bytes(&mut bytes);
             bytes
         };
+
+        //Address is a Keccak(verification_key)
+        let field_bytes = FieldBytes::from_slice(&pub_account_signing_key);
+        let signing_key = SigningKey::from_bytes(field_bytes).unwrap();
+
+        let verifying_key = signing_key.verifying_key();
+
+        let mut address = [0; 32];
+        let mut keccak_hasher = Keccak::v256();
+        keccak_hasher.update(&verifying_key.to_sec1_bytes());
+        keccak_hasher.finalize(&mut address);
 
         Self {
             top_secret_key_holder,
@@ -333,15 +344,46 @@ mod tests {
     }
 
     #[test]
+    fn test_address_key_equal_keccak_pub_sign_key() {
+        let address_key_holder = AddressKeyHolder::new_os_random();
+        let signing_key = address_key_holder.get_pub_account_signing_key();
+
+        let verifying_key = signing_key.verifying_key();
+
+        let mut address = [0; 32];
+        let mut keccak_hasher = Keccak::v256();
+        keccak_hasher.update(&verifying_key.to_sec1_bytes());
+        keccak_hasher.finalize(&mut address);
+
+        assert_eq!(address, address_key_holder.address);
+    }
+
+    #[test]
     fn key_generation_test() {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
         let utxo_secret_key_holder = top_secret_key_holder.produce_utxo_secret_holder();
 
-        let address = utxo_secret_key_holder.generate_address();
         let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
         let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
+
+        let pub_account_signing_key = {
+            let mut bytes = [0; 32];
+            OsRng.fill_bytes(&mut bytes);
+            bytes
+        };
+
+        //Address is a Keccak(verification_key)
+        let field_bytes = FieldBytes::from_slice(&pub_account_signing_key);
+        let signing_key = SigningKey::from_bytes(field_bytes).unwrap();
+
+        let verifying_key = signing_key.verifying_key();
+
+        let mut address = [0; 32];
+        let mut keccak_hasher = Keccak::v256();
+        keccak_hasher.update(&verifying_key.to_sec1_bytes());
+        keccak_hasher.finalize(&mut address);
 
         println!("======Prerequisites======");
         println!();
