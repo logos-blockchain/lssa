@@ -1,5 +1,5 @@
-use accounts::account_core::AccountForSerialization;
 use actix_web::Error as HttpError;
+use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
 
 use common::{
@@ -149,13 +149,13 @@ impl JsonHandler {
         let _get_initial_testnet_accounts_request =
             GetInitialTestnetAccountsRequest::parse(Some(request.params))?;
 
-        let accounts_for_serialization: Vec<AccountForSerialization> = {
+        let initial_accounts: Vec<AccountInitialData> = {
             let state = self.sequencer_state.lock().await;
 
             state.sequencer_config.initial_accounts.clone()
         };
 
-        respond(accounts_for_serialization)
+        respond(initial_accounts)
     }
 
     /// Returns the balance of the account at the given address.
@@ -217,12 +217,14 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{rpc_handler, JsonHandler};
-    use accounts::account_core::Account;
     use common::{
         rpc_primitives::RpcPollingConfig,
         transaction::{SignaturePrivateKey, Transaction, TransactionBody},
     };
-    use sequencer_core::{config::SequencerConfig, SequencerCore};
+    use sequencer_core::{
+        config::{AccountInitialData, SequencerConfig},
+        SequencerCore,
+    };
     use serde_json::Value;
     use tempfile::tempdir;
     use tokio::sync::Mutex;
@@ -230,241 +232,25 @@ mod tests {
     fn sequencer_config_for_tests() -> SequencerConfig {
         let tempdir = tempdir().unwrap();
         let home = tempdir.path().to_path_buf();
-        let initial_acc1 = serde_json::from_str(r#"{
-            "address": [
-                244,
-                55,
-                238,
-                205,
-                74,
-                115,
-                179,
-                192,
-                65,
-                186,
-                166,
-                169,
-                221,
-                45,
-                6,
-                57,
-                200,
-                65,
-                195,
-                70,
-                118,
-                252,
-                206,
-                100,
-                215,
-                250,
-                72,
-                230,
-                19,
-                71,
-                217,
-                249
-            ],
-            "balance": 100,
-            "key_holder": {
-                "address": [
-                    244,
-                    55,
-                    238,
-                    205,
-                    74,
-                    115,
-                    179,
-                    192,
-                    65,
-                    186,
-                    166,
-                    169,
-                    221,
-                    45,
-                    6,
-                    57,
-                    200,
-                    65,
-                    195,
-                    70,
-                    118,
-                    252,
-                    206,
-                    100,
-                    215,
-                    250,
-                    72,
-                    230,
-                    19,
-                    71,
-                    217,
-                    249
-                ],
-                "nullifer_public_key": "03A340BECA9FAAB444CED0140681D72EA1318B5C611704FEE017DA9836B17DB718",
-                "pub_account_signing_key": [
-                    244,
-                    88,
-                    134,
-                    61,
-                    35,
-                    209,
-                    229,
-                    101,
-                    85,
-                    35,
-                    140,
-                    140,
-                    192,
-                    226,
-                    83,
-                    83,
-                    190,
-                    189,
-                    110,
-                    8,
-                    89,
-                    127,
-                    147,
-                    142,
-                    157,
-                    204,
-                    51,
-                    109,
-                    189,
-                    92,
-                    144,
-                    68
-                ],
-                "top_secret_key_holder": {
-                    "secret_spending_key": "7BC46784DB1BC67825D8F029436846712BFDF9B5D79EA3AB11D39A52B9B229D4"
-                },
-                "utxo_secret_key_holder": {
-                    "nullifier_secret_key": "BB54A8D3C9C51B82C431082D1845A74677B0EF829A11B517E1D9885DE3139506",
-                    "viewing_secret_key": "AD923E92F6A5683E30140CEAB2702AFB665330C1EE4EFA70FAF29767B6B52BAF"
-                },
-                "viewing_public_key": "0361220C5D277E7A1709340FD31A52600C1432B9C45B9BCF88A43581D58824A8B6"
-            },
-            "utxos": {}
-        }"#).unwrap();
+        let acc1_addr = vec![
+            13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
+            68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 85, 42, 215,
+        ];
 
-        let initial_acc2 = serde_json::from_str(r#"{
-            "address": [
-                72,
-                169,
-                70,
-                237,
-                1,
-                96,
-                35,
-                157,
-                25,
-                15,
-                83,
-                18,
-                52,
-                206,
-                202,
-                63,
-                48,
-                59,
-                173,
-                76,
-                78,
-                7,
-                254,
-                229,
-                28,
-                45,
-                194,
-                79,
-                6,
-                89,
-                58,
-                85
-            ],
-            "balance": 200,
-            "key_holder": {
-                "address": [
-                    72,
-                    169,
-                    70,
-                    237,
-                    1,
-                    96,
-                    35,
-                    157,
-                    25,
-                    15,
-                    83,
-                    18,
-                    52,
-                    206,
-                    202,
-                    63,
-                    48,
-                    59,
-                    173,
-                    76,
-                    78,
-                    7,
-                    254,
-                    229,
-                    28,
-                    45,
-                    194,
-                    79,
-                    6,
-                    89,
-                    58,
-                    85
-                ],
-                "nullifer_public_key": "02172F50274DE67C4087C344F5D58E11DF761D90285B095060E0994FAA6BCDE271",
-                "pub_account_signing_key": [
-                    136,
-                    105,
-                    9,
-                    53,
-                    180,
-                    145,
-                    64,
-                    5,
-                    235,
-                    174,
-                    62,
-                    211,
-                    206,
-                    116,
-                    185,
-                    24,
-                    214,
-                    62,
-                    244,
-                    64,
-                    224,
-                    59,
-                    120,
-                    150,
-                    30,
-                    249,
-                    160,
-                    46,
-                    189,
-                    254,
-                    47,
-                    244
-                ],
-                "top_secret_key_holder": {
-                    "secret_spending_key": "80A186737C8D38B4288A03F0F589957D9C040D79C19F3E0CC4BA80F8494E5179"
-                },
-                "utxo_secret_key_holder": {
-                    "nullifier_secret_key": "746928E63F0984F6F4818933493CE9C067562D9CB932FDC06D82C86CDF6D7122",
-                    "viewing_secret_key": "89176CF4BC9E673807643FD52110EF99D4894335AFB10D881AC0B5041FE1FCB7"
-                },
-                "viewing_public_key": "026072A8F83FEC3472E30CDD4767683F30B91661D25B1040AD9A5FC2E01D659F99"
-            },
-            "utxos": {}
-        }"#).unwrap();
+        let acc2_addr = vec![
+            151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
+            135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 44, 243, 100,
+        ];
+
+        let initial_acc1 = AccountInitialData {
+            addr: hex::encode(acc1_addr),
+            balance: 10000,
+        };
+
+        let initial_acc2 = AccountInitialData {
+            addr: hex::encode(acc2_addr),
+            balance: 20000,
+        };
 
         let initial_accounts = vec![initial_acc1, initial_acc2];
 
@@ -480,16 +266,12 @@ mod tests {
         }
     }
 
-    fn json_handler_for_tests() -> (JsonHandler, Vec<Account>) {
+    fn json_handler_for_tests() -> (JsonHandler, Vec<AccountInitialData>) {
         let config = sequencer_config_for_tests();
 
         let mut sequencer_core = SequencerCore::start_from_config(config);
-        let initial_accounts = sequencer_core
-            .sequencer_config
-            .initial_accounts
-            .iter()
-            .map(|acc_ser| acc_ser.clone().into())
-            .collect();
+
+        let initial_accounts = sequencer_core.sequencer_config.initial_accounts.clone();
 
         let tx_body = TransactionBody {
             tx_kind: common::transaction::TxKind::Public,
@@ -620,7 +402,7 @@ mod tests {
     async fn test_get_account_balance_for_existing_account() {
         let (json_handler, initial_accounts) = json_handler_for_tests();
 
-        let acc1_addr = hex::encode(initial_accounts[0].address);
+        let acc1_addr = initial_accounts[0].addr.clone();
 
         let request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -632,7 +414,7 @@ mod tests {
             "id": 1,
             "jsonrpc": "2.0",
             "result": {
-                "balance": 100
+                "balance": 10000
             }
         });
 

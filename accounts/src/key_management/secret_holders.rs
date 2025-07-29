@@ -98,16 +98,4 @@ impl UTXOSecretKeyHolder {
     pub fn generate_viewing_public_key(&self) -> AffinePoint {
         (AffinePoint::GENERATOR * self.viewing_secret_key).into()
     }
-
-    pub fn generate_address(&self) -> TreeHashType {
-        let npk = self.generate_nullifier_public_key();
-        let vpk = self.generate_viewing_public_key();
-
-        let mut hasher = sha2::Sha256::new();
-
-        hasher.update(serde_json::to_vec(&npk).unwrap());
-        hasher.update(serde_json::to_vec(&vpk).unwrap());
-
-        <TreeHashType>::from(hasher.finalize_fixed())
-    }
 }

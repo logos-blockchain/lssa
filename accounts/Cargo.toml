@@ -16,6 +16,7 @@ elliptic-curve.workspace = true
 hex.workspace = true
 aes-gcm.workspace = true
 lazy_static.workspace = true
+tiny-keccak.workspace = true
 
 [dependencies.utxo]
 path = "../utxo"

@@ -67,18 +67,22 @@ impl SequencerAccountsStore {
     ///Update `account_addr` balance,
     ///
     /// returns 0, if account address not found, otherwise returns previous balance
+    ///
+    /// Also, if account was not previously found, sets it with zero balance
     pub fn set_account_balance(&mut self, account_addr: &AccountAddress, new_balance: u64) -> u64 {
         let acc_data = self.accounts.get_mut(account_addr);
 
-        acc_data
-            .map(|data| {
-                let old_balance = data.balance;
+        if let Some(acc_data) = acc_data {
+            let old_balance = acc_data.balance;
 
-                data.balance = new_balance;
+            acc_data.balance = new_balance;
 
-                old_balance
-            })
-            .unwrap_or(0)
+            old_balance
+        } else {
+            self.register_account(*account_addr);
+
+            0
+        }
     }
 
     ///Remove account from storage
@@ -240,5 +244,16 @@ mod tests {
         let seq_acc_store = SequencerAccountsStore::default();
 
         assert!(seq_acc_store.is_empty());
+    }
+
+    #[test]
+    fn account_sequencer_store_set_balance_to_unknown_account() {
+        let mut seq_acc_store = SequencerAccountsStore::default();
+
+        let ret = seq_acc_store.set_account_balance(&[1; 32], 100);
+
+        assert_eq!(ret, 0);
+        assert!(seq_acc_store.contains_account(&[1; 32]));
+        assert_eq!(seq_acc_store.get_account_balance(&[1; 32]), 0);
     }
 }

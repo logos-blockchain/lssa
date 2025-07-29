@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use accounts::account_core::Account;
 use serde::{Deserialize, Serialize};
 use zkvm::gas_calculator::GasCalculator;
 
@@ -51,4 +52,6 @@ pub struct NodeConfig {
     pub gas_config: GasConfig,
     ///Frequency of snapshots
     pub shapshot_frequency_in_blocks: u64,
+    ///Initial accounts for wallet
+    pub initial_accounts: Vec<Account>,
 }
