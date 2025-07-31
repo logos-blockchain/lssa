@@ -1,4 +1,4 @@
-use accounts::account_core::AccountAddress;
+use accounts::account_core::address::AccountAddress;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -7,18 +7,24 @@ use std::collections::HashMap;
 pub(crate) struct AccountPublicData {
     pub balance: u64,
     pub address: AccountAddress,
+    nonce: u64,
 }
 
 impl AccountPublicData {
     pub fn new(address: AccountAddress) -> Self {
         Self {
             balance: 0,
+            nonce: 0,
             address,
         }
     }
 
     fn new_with_balance(address: AccountAddress, balance: u64) -> Self {
-        Self { balance, address }
+        Self {
+            balance,
+            address,
+            nonce: 0,
+        }
     }
 }
 
@@ -64,6 +70,13 @@ impl SequencerAccountsStore {
             .unwrap_or(0)
     }
 
+    pub fn get_account_nonce(&self, account_addr: &AccountAddress) -> u64 {
+        self.accounts
+            .get(account_addr)
+            .map(|acc| acc.nonce)
+            .unwrap_or(0)
+    }
+
     ///Update `account_addr` balance,
     ///
     /// returns 0, if account address not found, otherwise returns previous balance
@@ -82,6 +95,20 @@ impl SequencerAccountsStore {
             self.register_account(*account_addr);
 
             0
+        }
+    }
+
+    ///Update `account_addr` nonce,
+    ///
+    /// Returns previous nonce
+    pub fn increase_nonce(&mut self, account_addr: &AccountAddress) -> u64 {
+        if let Some(acc_data) = self.accounts.get_mut(account_addr) {
+            let old_nonce = acc_data.nonce;
+            acc_data.nonce += 1;
+            old_nonce
+        } else {
+            self.register_account(*account_addr);
+            self.increase_nonce(account_addr)
         }
     }
 
@@ -131,11 +158,25 @@ mod tests {
     }
 
     #[test]
+    fn test_zero_nonce_account_data_creation() {
+        let new_acc = AccountPublicData::new([1; 32]);
+
+        assert_eq!(new_acc.nonce, 0);
+    }
+
+    #[test]
     fn test_non_zero_balance_account_data_creation() {
         let new_acc = AccountPublicData::new_with_balance([1; 32], 10);
 
         assert_eq!(new_acc.balance, 10);
         assert_eq!(new_acc.address, [1; 32]);
+    }
+
+    #[test]
+    fn test_zero_nonce_account_data_creation_with_balance() {
+        let new_acc = AccountPublicData::new_with_balance([1; 32], 10);
+
+        assert_eq!(new_acc.nonce, 0);
     }
 
     #[test]
@@ -255,5 +296,15 @@ mod tests {
         assert_eq!(ret, 0);
         assert!(seq_acc_store.contains_account(&[1; 32]));
         assert_eq!(seq_acc_store.get_account_balance(&[1; 32]), 0);
+    }
+
+    #[test]
+    fn test_increase_nonce() {
+        let mut account_store = SequencerAccountsStore::default();
+        let address = [1; 32];
+        let first_nonce = account_store.increase_nonce(&address);
+        assert_eq!(first_nonce, 0);
+        let second_nonce = account_store.increase_nonce(&address);
+        assert_eq!(second_nonce, 1);
     }
 }

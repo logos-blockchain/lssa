@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use accounts::account_core::{Account, AccountAddress};
+use accounts::account_core::{address::AccountAddress, Account};
 use anyhow::Result;
 use block_store::NodeBlockStore;
 use common::{
@@ -342,40 +342,6 @@ mod tests {
             ],
             "balance": 100,
             "key_holder": {
-                "address": [
-                    244,
-                    55,
-                    238,
-                    205,
-                    74,
-                    115,
-                    179,
-                    192,
-                    65,
-                    186,
-                    166,
-                    169,
-                    221,
-                    45,
-                    6,
-                    57,
-                    200,
-                    65,
-                    195,
-                    70,
-                    118,
-                    252,
-                    206,
-                    100,
-                    215,
-                    250,
-                    72,
-                    230,
-                    19,
-                    71,
-                    217,
-                    249
-                ],
                 "nullifer_public_key": "03A340BECA9FAAB444CED0140681D72EA1318B5C611704FEE017DA9836B17DB718",
                 "pub_account_signing_key": [
                     244,
@@ -460,40 +426,6 @@ mod tests {
             ],
             "balance": 200,
             "key_holder": {
-                "address": [
-                    72,
-                    169,
-                    70,
-                    237,
-                    1,
-                    96,
-                    35,
-                    157,
-                    25,
-                    15,
-                    83,
-                    18,
-                    52,
-                    206,
-                    202,
-                    63,
-                    48,
-                    59,
-                    173,
-                    76,
-                    78,
-                    7,
-                    254,
-                    229,
-                    28,
-                    45,
-                    194,
-                    79,
-                    6,
-                    89,
-                    58,
-                    85
-                ],
                 "nullifer_public_key": "02172F50274DE67C4087C344F5D58E11DF761D90285B095060E0994FAA6BCDE271",
                 "pub_account_signing_key": [
                     136,

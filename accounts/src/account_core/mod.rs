@@ -7,14 +7,18 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use utxo::utxo_core::UTXO;
 
-use crate::key_management::{
-    constants_types::{CipherText, Nonce},
-    ephemeral_key_holder::EphemeralKeyHolder,
-    AddressKeyHolder,
+pub mod address;
+
+use crate::{
+    account_core::address::AccountAddress,
+    key_management::{
+        constants_types::{CipherText, Nonce},
+        ephemeral_key_holder::EphemeralKeyHolder,
+        AddressKeyHolder,
+    },
 };
 
 pub type PublicKey = AffinePoint;
-pub type AccountAddress = TreeHashType;
 
 #[derive(Clone, Debug)]
 pub struct Account {
@@ -113,7 +117,8 @@ impl AccountPublicMask {
 impl Account {
     pub fn new() -> Self {
         let key_holder = AddressKeyHolder::new_os_random();
-        let address = key_holder.address;
+        let public_key = *key_holder.get_pub_account_signing_key().verifying_key();
+        let address = address::from_public_key(&public_key);
         let balance = 0;
         let utxos = HashMap::new();
 
@@ -127,7 +132,8 @@ impl Account {
 
     pub fn new_with_balance(balance: u64) -> Self {
         let key_holder = AddressKeyHolder::new_os_random();
-        let address = key_holder.address;
+        let public_key = *key_holder.get_pub_account_signing_key().verifying_key();
+        let address = address::from_public_key(&public_key);
         let utxos = HashMap::new();
 
         Self {
@@ -228,7 +234,6 @@ mod tests {
         let account = Account::new();
 
         assert_eq!(account.balance, 0);
-        assert!(account.key_holder.address != [0u8; 32]); // Check if the address is not empty
     }
 
     #[test]

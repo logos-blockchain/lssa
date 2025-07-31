@@ -8,7 +8,7 @@ use common::{
 };
 
 use accounts::{
-    account_core::{Account, AccountAddress},
+    account_core::{address::AccountAddress, Account},
     key_management::ephemeral_key_holder::EphemeralKeyHolder,
 };
 use anyhow::Result;
@@ -956,6 +956,7 @@ impl NodeCore {
     pub async fn send_public_native_token_transfer(
         &self,
         from: AccountAddress,
+        nonce: u64,
         to: AccountAddress,
         balance_to_move: u64,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
@@ -983,6 +984,7 @@ impl NodeCore {
             sc_core::transaction_payloads_tools::create_public_transaction_payload(
                 serde_json::to_vec(&PublicNativeTokenSend {
                     from,
+                    nonce,
                     to,
                     balance_to_move,
                 })

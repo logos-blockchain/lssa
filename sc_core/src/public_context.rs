@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use accounts::account_core::{AccountAddress, AccountPublicMask};
+use accounts::account_core::{address::AccountAddress, AccountPublicMask};
 use common::merkle_tree_public::{merkle_tree::UTXOCommitmentsMerkleTree, TreeHashType};
 use serde::{ser::SerializeStruct, Serialize};
 

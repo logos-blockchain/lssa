@@ -1,4 +1,4 @@
-use accounts::account_core::{Account, AccountAddress};
+use accounts::account_core::{address::AccountAddress, Account};
 use std::collections::HashMap;
 
 pub struct NodeAccountsStore {

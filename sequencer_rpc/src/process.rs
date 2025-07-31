@@ -274,7 +274,7 @@ mod tests {
         let initial_accounts = sequencer_core.sequencer_config.initial_accounts.clone();
 
         let tx_body = TransactionBody {
-            tx_kind: common::transaction::TxKind::Public,
+            tx_kind: common::transaction::TxKind::Shielded,
             execution_input: Default::default(),
             execution_output: Default::default(),
             utxo_commitments_spent_hashes: Default::default(),
@@ -499,9 +499,10 @@ mod tests {
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_transaction_by_hash",
-            "params": { "hash": "ca8e38269c0137d27cbe7c55d240a834b46e86e236578b9a1a3a25b3dabc5709" },
+            "params": { "hash": "a5210ef33912a448cfe6eda43878c144df81f7bdf51d19b5ddf97be11806a6ed"},
             "id": 1
         });
+
         let expected_response = serde_json::json!({
             "id": 1,
             "jsonrpc": "2.0",
@@ -519,12 +520,12 @@ mod tests {
                         "secret_r": vec![0; 32],
                         "state_changes": [null, 0],
                         "tweak": "0".repeat(64),
-                        "tx_kind": "Public",
+                        "tx_kind": "Shielded",
                         "utxo_commitments_created_hashes": [],
-                        "utxo_commitments_spent_hashes": []
+                        "utxo_commitments_spent_hashes": [],
                     },
                     "public_key": "3056301006072A8648CE3D020106052B8104000A034200041B84C5567B126440995D3ED5AABA0565D71E1834604819FF9C17F5E9D5DD078F70BEAF8F588B541507FED6A642C5AB42DFDF8120A7F639DE5122D47A69A8E8D1",
-                    "signature": "28CB6CA744864340A3441CB48D5700690F90130DE0760EE5C640F85F4285C5FD2BD7D0E270EC2AC82E4124999E63659AA9C33CF378F959EDF4E50F2626EA3B99"
+                    "signature": "A4E0D6A25BE829B006124F0DFD766427967AA3BEA96C29219E79BB2CC871891F384748C27E28718A4450AA78709FBF1A57DB33BCD575A2C819D2A439C2D878E6"
                 }
             }
         });

@@ -1,4 +1,4 @@
-use accounts::account_core::AccountAddress;
+use accounts::account_core::address::AccountAddress;
 use common::ExecutionFailureKind;
 use rand::{rngs::OsRng, RngCore};
 use risc0_zkvm::{default_executor, default_prover, sha::Digest, ExecutorEnv, Receipt};

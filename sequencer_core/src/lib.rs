@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use accounts::account_core::AccountAddress;
+use accounts::account_core::address::{self, AccountAddress};
 use anyhow::Result;
 use common::{
     block::{Block, HashableBlockData},
@@ -15,7 +15,6 @@ use mempool::MemPool;
 use mempool_transaction::MempoolTransaction;
 use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
-use tiny_keccak::{Hasher, Keccak};
 
 pub mod config;
 pub mod mempool_transaction;
@@ -41,6 +40,7 @@ pub enum TransactionMalformationErrorKind {
     InvalidSignature,
     IncorrectSender,
     BalanceMismatch { tx: TreeHashType },
+    NonceMismatch { tx: TreeHashType },
     FailedToDecode { tx: TreeHashType },
 }
 
@@ -146,13 +146,10 @@ impl SequencerCore {
         if let Ok(native_transfer_action) =
             serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
         {
-            let mut output = [0; 32];
-            let mut keccak_hasher = Keccak::v256();
-            keccak_hasher.update(&tx.transaction().public_key.to_sec1_bytes());
-            keccak_hasher.finalize(&mut output);
+            let signer_address = address::from_public_key(&tx.transaction().public_key);
 
             //Correct sender check
-            if native_transfer_action.from != output {
+            if native_transfer_action.from != signer_address {
                 return Err(TransactionMalformationErrorKind::IncorrectSender);
             }
         }
@@ -233,6 +230,15 @@ impl SequencerCore {
         if let Ok(native_transfer_action) =
             serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
         {
+            // Nonce check
+            let signer_addres =
+                address::from_public_key(&mempool_tx.auth_tx.transaction().public_key);
+            if self.store.acc_store.get_account_nonce(&signer_addres)
+                != native_transfer_action.nonce
+            {
+                return Err(TransactionMalformationErrorKind::NonceMismatch { tx: tx_hash });
+            }
+
             let from_balance = self
                 .store
                 .acc_store
@@ -255,6 +261,8 @@ impl SequencerCore {
                 &native_transfer_action.to,
                 to_balance + native_transfer_action.balance_to_move,
             );
+
+            self.store.acc_store.increase_nonce(&signer_addres);
         }
 
         for utxo_comm in utxo_commitments_created_hashes {
@@ -288,9 +296,16 @@ impl SequencerCore {
             .mempool
             .pop_size(self.sequencer_config.max_num_tx_in_block);
 
-        for tx in &transactions {
-            self.execute_check_transaction_on_state(tx)?;
-        }
+        let valid_transactions = transactions
+            .into_iter()
+            .filter_map(|mempool_tx| {
+                if self.execute_check_transaction_on_state(&mempool_tx).is_ok() {
+                    Some(mempool_tx.auth_tx.into_transaction())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let prev_block_hash = self
             .store
@@ -301,10 +316,7 @@ impl SequencerCore {
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
             prev_block_id: self.chain_height,
-            transactions: transactions
-                .into_iter()
-                .map(|tx_mem| tx_mem.auth_tx.transaction().clone())
-                .collect(),
+            transactions: valid_transactions,
             data: vec![],
             prev_block_hash,
         };
@@ -313,9 +325,9 @@ impl SequencerCore {
 
         self.store.block_store.put_block_at_id(block)?;
 
-        self.chain_height += 1;
+        self.chain_height = new_block_height;
 
-        Ok(self.chain_height - 1)
+        Ok(self.chain_height)
     }
 }
 
@@ -324,24 +336,20 @@ mod tests {
     use crate::config::AccountInitialData;
 
     use super::*;
-    use std::path::PathBuf;
 
     use common::transaction::{SignaturePrivateKey, Transaction, TransactionBody, TxKind};
     use k256::{ecdsa::SigningKey, FieldBytes};
     use mempool_transaction::MempoolTransaction;
-    use rand::Rng;
     use secp256k1_zkp::Tweak;
 
     fn setup_sequencer_config_variable_initial_accounts(
         initial_accounts: Vec<AccountInitialData>,
     ) -> SequencerConfig {
-        let mut rng = rand::thread_rng();
-        let random_u8: u8 = rng.gen();
-
-        let path_str = format!("/tmp/sequencer_{random_u8:?}");
+        let tempdir = tempfile::tempdir().unwrap();
+        let home = tempdir.path().to_path_buf();
 
         SequencerConfig {
-            home: PathBuf::from(path_str),
+            home,
             override_rust_log: Some("info".to_string()),
             genesis_id: 1,
             is_genesis_random: false,
@@ -406,6 +414,7 @@ mod tests {
 
     fn create_dummy_transaction_native_token_transfer(
         from: [u8; 32],
+        nonce: u64,
         to: [u8; 32],
         balance_to_move: u64,
         signing_key: SigningKey,
@@ -414,6 +423,7 @@ mod tests {
 
         let native_token_transfer = PublicNativeTokenSend {
             from,
+            nonce,
             to,
             balance_to_move,
         };
@@ -596,7 +606,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = create_dummy_transaction_native_token_transfer(acc1, acc2, 10, sign_key1);
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 10, sign_key1);
         let tx_roots = sequencer.get_tree_roots();
         let result = sequencer.transaction_pre_check(tx, tx_roots);
 
@@ -621,7 +631,7 @@ mod tests {
 
         let sign_key2 = create_signing_key_for_account2();
 
-        let tx = create_dummy_transaction_native_token_transfer(acc1, acc2, 10, sign_key2);
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 10, sign_key2);
         let tx_roots = sequencer.get_tree_roots();
         let result = sequencer.transaction_pre_check(tx, tx_roots);
 
@@ -649,7 +659,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = create_dummy_transaction_native_token_transfer(acc1, acc2, 10000000, sign_key1);
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 10000000, sign_key1);
         let tx_roots = sequencer.get_tree_roots();
         let result = sequencer.transaction_pre_check(tx, tx_roots);
 
@@ -683,7 +693,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = create_dummy_transaction_native_token_transfer(acc1, acc2, 100, sign_key1);
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 100, sign_key1);
 
         sequencer
             .execute_check_transaction_on_state(&tx.into_authenticated().unwrap().into())
@@ -742,6 +752,7 @@ mod tests {
     fn test_produce_new_block_with_mempool_transactions() {
         let config = setup_sequencer_config();
         let mut sequencer = SequencerCore::start_from_config(config);
+        let genesis_height = sequencer.chain_height;
 
         let tx = create_dummy_transaction(vec![[94; 32]], vec![[7; 32]], vec![[8; 32]]);
         let tx_mempool = MempoolTransaction {
@@ -751,6 +762,102 @@ mod tests {
 
         let block_id = sequencer.produce_new_block_with_mempool_transactions();
         assert!(block_id.is_ok());
-        assert_eq!(block_id.unwrap(), 1);
+        assert_eq!(block_id.unwrap(), genesis_height + 1);
+    }
+
+    #[test]
+    fn test_replay_transactions_are_rejected_in_the_same_block() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let acc1 = hex::decode(sequencer.sequencer_config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2 = hex::decode(sequencer.sequencer_config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let sign_key1 = create_signing_key_for_account1();
+
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 100, sign_key1);
+
+        let tx_mempool_original = MempoolTransaction {
+            auth_tx: tx.clone().into_authenticated().unwrap(),
+        };
+        let tx_mempool_replay = MempoolTransaction {
+            auth_tx: tx.clone().into_authenticated().unwrap(),
+        };
+
+        // Pushing two copies of the same tx to the mempool
+        sequencer.mempool.push_item(tx_mempool_original);
+        sequencer.mempool.push_item(tx_mempool_replay);
+
+        // Create block
+        let current_height = sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        let block = sequencer
+            .store
+            .block_store
+            .get_block_at_id(current_height)
+            .unwrap();
+
+        // Only one should be included in the block
+        assert_eq!(block.transactions, vec![tx.clone()]);
+    }
+
+    #[test]
+    fn test_replay_transactions_are_rejected_in_different_blocks() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let acc1 = hex::decode(sequencer.sequencer_config.initial_accounts[0].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let acc2 = hex::decode(sequencer.sequencer_config.initial_accounts[1].addr.clone())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let sign_key1 = create_signing_key_for_account1();
+
+        let tx = create_dummy_transaction_native_token_transfer(acc1, 0, acc2, 100, sign_key1);
+
+        // The transaction should be included the first time
+        let tx_mempool_original = MempoolTransaction {
+            auth_tx: tx.clone().into_authenticated().unwrap(),
+        };
+        sequencer.mempool.push_item(tx_mempool_original);
+        let current_height = sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        let block = sequencer
+            .store
+            .block_store
+            .get_block_at_id(current_height)
+            .unwrap();
+        assert_eq!(block.transactions, vec![tx.clone()]);
+
+        // Add same transaction should fail
+        let tx_mempool_replay = MempoolTransaction {
+            auth_tx: tx.into_authenticated().unwrap(),
+        };
+        sequencer.mempool.push_item(tx_mempool_replay);
+        let current_height = sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        let block = sequencer
+            .store
+            .block_store
+            .get_block_at_id(current_height)
+            .unwrap();
+        assert!(block.transactions.is_empty());
     }
 }

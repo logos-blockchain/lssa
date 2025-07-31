@@ -1,5 +1,4 @@
 use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
-use common::merkle_tree_public::TreeHashType;
 use constants_types::{CipherText, Nonce};
 use elliptic_curve::point::AffineCoordinates;
 use k256::{ecdsa::SigningKey, AffinePoint, FieldBytes};
@@ -7,7 +6,6 @@ use log::info;
 use rand::{rngs::OsRng, RngCore};
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
 use serde::{Deserialize, Serialize};
-use tiny_keccak::{Hasher, Keccak};
 
 use crate::account_core::PublicKey;
 pub type PublicAccountSigningKey = [u8; 32];
@@ -19,12 +17,9 @@ pub mod secret_holders;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 ///Entrypoint to key management
 pub struct AddressKeyHolder {
-    //Will be useful in future
-    #[allow(dead_code)]
     top_secret_key_holder: TopSecretKeyHolder,
     pub utxo_secret_key_holder: UTXOSecretKeyHolder,
     pub_account_signing_key: PublicAccountSigningKey,
-    pub address: TreeHashType,
     pub nullifer_public_key: PublicKey,
     pub viewing_public_key: PublicKey,
 }
@@ -47,21 +42,9 @@ impl AddressKeyHolder {
             bytes
         };
 
-        //Address is a Keccak(verification_key)
-        let field_bytes = FieldBytes::from_slice(&pub_account_signing_key);
-        let signing_key = SigningKey::from_bytes(field_bytes).unwrap();
-
-        let verifying_key = signing_key.verifying_key();
-
-        let mut address = [0; 32];
-        let mut keccak_hasher = Keccak::v256();
-        keccak_hasher.update(&verifying_key.to_sec1_bytes());
-        keccak_hasher.finalize(&mut address);
-
         Self {
             top_secret_key_holder,
             utxo_secret_key_holder,
-            address,
             nullifer_public_key,
             viewing_public_key,
             pub_account_signing_key,
@@ -137,7 +120,7 @@ mod tests {
     use elliptic_curve::point::AffineCoordinates;
     use k256::{AffinePoint, ProjectivePoint, Scalar};
 
-    use crate::key_management::ephemeral_key_holder::EphemeralKeyHolder;
+    use crate::{account_core::address, key_management::ephemeral_key_holder::EphemeralKeyHolder};
 
     use super::*;
 
@@ -214,7 +197,6 @@ mod tests {
         assert!(!Into::<bool>::into(
             address_key_holder.viewing_public_key.is_identity()
         ));
-        assert!(!address_key_holder.address.as_slice().is_empty()); // Assume TreeHashType has non-zero length for a valid address
     }
 
     #[test]
@@ -344,21 +326,6 @@ mod tests {
     }
 
     #[test]
-    fn test_address_key_equal_keccak_pub_sign_key() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
-        let signing_key = address_key_holder.get_pub_account_signing_key();
-
-        let verifying_key = signing_key.verifying_key();
-
-        let mut address = [0; 32];
-        let mut keccak_hasher = Keccak::v256();
-        keccak_hasher.update(&verifying_key.to_sec1_bytes());
-        keccak_hasher.finalize(&mut address);
-
-        assert_eq!(address, address_key_holder.address);
-    }
-
-    #[test]
     fn key_generation_test() {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
@@ -380,10 +347,7 @@ mod tests {
 
         let verifying_key = signing_key.verifying_key();
 
-        let mut address = [0; 32];
-        let mut keccak_hasher = Keccak::v256();
-        keccak_hasher.update(&verifying_key.to_sec1_bytes());
-        keccak_hasher.finalize(&mut address);
+        let address = address::from_public_key(verifying_key);
 
         println!("======Prerequisites======");
         println!();

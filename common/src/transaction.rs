@@ -288,6 +288,10 @@ impl AuthenticatedTransaction {
         &self.transaction
     }
 
+    pub fn into_transaction(self) -> Transaction {
+        self.transaction
+    }
+
     /// Returns the precomputed hash over the body of the transaction
     pub fn hash(&self) -> &TransactionHash {
         &self.hash
@@ -417,5 +421,12 @@ mod tests {
         let transaction = test_transaction();
         let authenticated_tx = transaction.clone().into_authenticated().unwrap();
         assert_eq!(authenticated_tx.hash(), &transaction.body.hash());
+    }
+
+    #[test]
+    fn test_authenticated_transaction_into_transaction() {
+        let transaction = test_transaction();
+        let authenticated_tx = transaction.clone().into_authenticated().unwrap();
+        assert_eq!(authenticated_tx.into_transaction(), transaction);
     }
 }
