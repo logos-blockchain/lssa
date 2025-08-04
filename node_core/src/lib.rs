@@ -947,8 +947,6 @@ impl NodeCore {
     //     Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
     // }
 
-    // ToDo: Currently untested due to need for end-to-end integration tests.
-    // Add integration tests to cover this functionality
     pub async fn send_public_native_token_transfer(
         &self,
         from: AccountAddress,

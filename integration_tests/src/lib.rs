@@ -120,7 +120,7 @@ pub async fn test_success(wrapped_node_core: Arc<Mutex<NodeCore>>) {
     let guard = wrapped_node_core.lock().await;
 
     let _res = guard
-        .send_public_native_token_transfer(acc_sender, acc_receiver, 100)
+        .send_public_native_token_transfer(acc_sender, 0, acc_receiver, 100)
         .await
         .unwrap();
 
@@ -157,7 +157,7 @@ pub async fn test_success_move_to_another_account(wrapped_node_core: Arc<Mutex<N
     let guard = wrapped_node_core.lock().await;
 
     let _res = guard
-        .send_public_native_token_transfer(acc_sender, acc_receiver_new_acc, 100)
+        .send_public_native_token_transfer(acc_sender, 0, acc_receiver_new_acc, 100)
         .await
         .unwrap();
 
@@ -192,7 +192,7 @@ pub async fn test_failure(wrapped_node_core: Arc<Mutex<NodeCore>>) {
     let guard = wrapped_node_core.lock().await;
 
     let _res = guard
-        .send_public_native_token_transfer(acc_sender, acc_receiver, 100000)
+        .send_public_native_token_transfer(acc_sender, 0, acc_receiver, 100000)
         .await
         .unwrap();
 
