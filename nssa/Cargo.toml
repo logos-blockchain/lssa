@@ -1,0 +1,8 @@
+[package]
+name = "nssa"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+risc0-zkvm = "2.2"
+program-methods = { path = "program_methods" }

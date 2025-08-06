@@ -18,6 +18,7 @@ members = [
   "common",
   "sc_core",
   "integration_tests",
+  "nssa",
 ]
 
 [workspace.dependencies]
