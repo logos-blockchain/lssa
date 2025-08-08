@@ -149,6 +149,7 @@ pub enum Command {
         #[arg(long)]
         amount: u64,
     },
+    DumpAccountsOnDisc,
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -176,6 +177,9 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
                 .await?;
 
             info!("Results of tx send is {res:#?}");
+        }
+        Command::DumpAccountsOnDisc => {
+            info!("Accounts stored at path");
         }
     }
 
