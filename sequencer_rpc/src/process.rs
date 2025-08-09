@@ -18,7 +18,8 @@ use common::{
 
 use common::rpc_primitives::requests::{
     GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
-    GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse, SendTxRequest, SendTxResponse,
+    GetLastBlockRequest, GetLastBlockResponse, HelloRequest, HelloResponse, SendTxRequest,
+    SendTxResponse,
 };
 
 use super::{respond, types::err_rpc::RpcErr, JsonHandler};
@@ -203,7 +204,7 @@ mod tests {
 
     use crate::{rpc_handler, JsonHandler};
     use common::rpc_primitives::RpcPollingConfig;
-    
+
     use sequencer_core::{
         config::{AccountInitialData, SequencerConfig},
         SequencerCore,
@@ -260,19 +261,15 @@ mod tests {
         let mut sequencer_core = SequencerCore::start_from_config(config);
         let initial_accounts = sequencer_core.sequencer_config.initial_accounts.clone();
 
-        let from = nssa::Address::new([1; 32]);
         let signing_key = nssa::PrivateKey::new(1);
-        let to = nssa::Address::new([2; 32]);
         let balance_to_move = 10;
-
-        let addresses = vec![from, to];
-        let nonces = vec![0];
-        let program_id = nssa::AUTHENTICATED_TRANSFER_PROGRAM.id();
-        let message =
-            nssa::public_transaction::Message::new(program_id, addresses, nonces, balance_to_move);
-        let witness_set =
-            nssa::public_transaction::WitnessSet::for_message(&message, &[&signing_key]);
-        let tx = nssa::PublicTransaction::new(message, witness_set);
+        let tx = common::test_utils::create_transaction_native_token_transfer(
+            [1; 32],
+            0,
+            [2; 32],
+            balance_to_move,
+            signing_key,
+        );
 
         sequencer_core
             .push_tx_into_mempool_pre_check(tx.clone())
@@ -501,7 +498,7 @@ mod tests {
                         ],
                         "instruction_data": 10,
                         "nonces": [0],
-                        "program_id": nssa::AUTHENTICATED_TRANSFER_PROGRAM.id(),
+                        "program_id": nssa::program::AUTHENTICATED_TRANSFER_PROGRAM.id(),
                     },
                     "witness_set": {
                         "signatures_and_public_keys": [

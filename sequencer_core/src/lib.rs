@@ -369,7 +369,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key1,
         );
         let result = sequencer.transaction_pre_check(tx);
@@ -395,7 +395,7 @@ mod tests {
 
         let sign_key2 = create_signing_key_for_account2();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key2,
         );
 
@@ -405,7 +405,10 @@ mod tests {
         // Signature is not from sender. Execution fails
         let result = sequencer.execute_check_transaction_on_state(tx);
 
-        assert!(matches!(result, Err(nssa::error::NssaError::ProgramExecutionFailed(_))));
+        assert!(matches!(
+            result,
+            Err(nssa::error::NssaError::ProgramExecutionFailed(_))
+        ));
     }
 
     #[test]
@@ -426,7 +429,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10000000, sign_key1,
         );
         // let tx_roots = sequencer.get_tree_roots();
@@ -462,7 +465,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 100, sign_key1,
         );
 
@@ -553,7 +556,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 100, sign_key1,
         );
 
@@ -595,7 +598,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 100, sign_key1,
         );
 

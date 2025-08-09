@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-
 //Requests
 
 #[derive(Serialize, Deserialize, Debug)]

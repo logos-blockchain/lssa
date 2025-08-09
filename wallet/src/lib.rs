@@ -86,7 +86,7 @@ impl NodeCore {
             if let Some(account) = account {
                 let addresses = vec![nssa::Address::new(from), nssa::Address::new(to)];
                 let nonces = vec![nonce];
-                let program_id = nssa::AUTHENTICATED_TRANSFER_PROGRAM.id();
+                let program_id = nssa::program::AUTHENTICATED_TRANSFER_PROGRAM.id();
                 let message = nssa::public_transaction::Message::new(
                     program_id,
                     addresses,

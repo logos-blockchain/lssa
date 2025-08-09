@@ -1,7 +1,4 @@
-use nssa_core::{
-    account::Nonce,
-    program::ProgramId,
-};
+use nssa_core::{account::Nonce, program::ProgramId};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, digest::FixedOutput};
 

@@ -76,7 +76,7 @@ fn block_to_transactions_map(block: &Block) -> HashMap<TreeHashType, u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use tempfile::tempdir;
     //
     // fn create_dummy_block_with_transaction(block_id: u64) -> (Block, nssa::PublicTransaction) {

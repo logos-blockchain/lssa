@@ -1,5 +1,7 @@
 use crate::{
-    AUTHENTICATED_TRANSFER_PROGRAM, Program, address::Address, error::NssaError,
+    address::Address,
+    error::NssaError,
+    program::{AUTHENTICATED_TRANSFER_PROGRAM, Program},
     public_transaction::PublicTransaction,
 };
 use nssa_core::{
@@ -21,7 +23,7 @@ impl V01State {
             .map(|(address_value, balance)| {
                 let account = Account {
                     balance,
-                    program_owner: AUTHENTICATED_TRANSFER_PROGRAM.id,
+                    program_owner: AUTHENTICATED_TRANSFER_PROGRAM.id(),
                     ..Account::default()
                 };
                 let address = Address::new(address_value);
@@ -30,7 +32,7 @@ impl V01State {
             .collect();
 
         let builtin_programs = HashMap::from([(
-            AUTHENTICATED_TRANSFER_PROGRAM.id,
+            AUTHENTICATED_TRANSFER_PROGRAM.id(),
             AUTHENTICATED_TRANSFER_PROGRAM,
         )]);
 
@@ -155,7 +157,7 @@ mod tests {
     ) -> PublicTransaction {
         let addresses = vec![from, to];
         let nonces = vec![nonce];
-        let program_id = AUTHENTICATED_TRANSFER_PROGRAM.id;
+        let program_id = AUTHENTICATED_TRANSFER_PROGRAM.id();
         let message = public_transaction::Message::new(program_id, addresses, nonces, balance);
         let witness_set = public_transaction::WitnessSet::for_message(&message, &[&from_key]);
         PublicTransaction::new(message, witness_set)
