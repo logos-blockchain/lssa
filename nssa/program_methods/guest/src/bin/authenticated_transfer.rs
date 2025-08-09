@@ -9,17 +9,21 @@ fn main() {
     let input_accounts: Vec<AccountWithMetadata> = env::read();
     let balance_to_move: u128 = env::read();
 
-    // Unpack sender and receiver
-    assert_eq!(input_accounts.len(), 2);
-    let [sender, receiver] = input_accounts
-        .try_into()
-        .unwrap_or_else(|_| panic!("Bad input"));
+    // Continue only if input_accounts is an array of two elements
+    let [sender, receiver] = match input_accounts.try_into() {
+        Ok(array) => array,
+        Err(_) => return, // silently return on bad input
+    };
 
-    // Check sender has authorized this operation
-    assert!(sender.is_authorized);
+    // Continue only if the sender has authorized this operation
+    if !sender.is_authorized {
+        return;
+    }
 
-    // Check sender has enough balance
-    assert!(sender.account.balance >= balance_to_move);
+    // Continue only if the sender has enough balance
+    if sender.account.balance < balance_to_move {
+        return;
+    }
 
     // Create accounts post states, with updated balances
     let mut sender_post = sender.account.clone();
