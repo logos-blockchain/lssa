@@ -1,4 +1,3 @@
-
 use crate::account::{Account, AccountWithMetadata};
 
 pub type ProgramId = [u32; 8];
@@ -19,26 +18,26 @@ pub fn validate_constraints(
     pre_states: &[AccountWithMetadata],
     post_states: &[Account],
     executing_program_id: ProgramId,
-) -> Result<(), ()> {
+) -> bool {
     // 1. Lengths must match
     if pre_states.len() != post_states.len() {
-        return Err(());
+        return false;
     }
 
     for (pre, post) in pre_states.iter().zip(post_states) {
         // 2. Nonce must remain unchanged
         if pre.account.nonce != post.nonce {
-            return Err(());
+            return false;
         }
 
         // 3. Ownership change only allowed from default accounts
         if pre.account.program_owner != post.program_owner && pre.account != Account::default() {
-            return Err(());
+            return false;
         }
 
         // 4. Decreasing balance only allowed if owned by executing program
         if post.balance < pre.account.balance && pre.account.program_owner != executing_program_id {
-            return Err(());
+            return false;
         }
 
         // 5. Data changes only allowed if owned by executing program
@@ -46,7 +45,7 @@ pub fn validate_constraints(
             && (executing_program_id != pre.account.program_owner
                 || executing_program_id != post.program_owner)
         {
-            return Err(());
+            return false;
         }
     }
 
@@ -54,8 +53,8 @@ pub fn validate_constraints(
     let total_balance_pre_states: u128 = pre_states.iter().map(|pre| pre.account.balance).sum();
     let total_balance_post_states: u128 = post_states.iter().map(|post| post.balance).sum();
     if total_balance_pre_states != total_balance_post_states {
-        return Err(());
+        return false;
     }
 
-    Ok(())
+    true
 }

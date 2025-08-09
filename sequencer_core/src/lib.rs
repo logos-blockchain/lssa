@@ -94,7 +94,7 @@ impl SequencerCore {
     fn execute_check_transaction_on_state(
         &mut self,
         tx: nssa::PublicTransaction,
-    ) -> Result<nssa::PublicTransaction, ()> {
+    ) -> Result<nssa::PublicTransaction, nssa::error::NssaError> {
         self.store.state.transition_from_public_transaction(&tx)?;
 
         Ok(tx)
@@ -405,7 +405,7 @@ mod tests {
         // Signature is not from sender. Execution fails
         let result = sequencer.execute_check_transaction_on_state(tx);
 
-        assert!(matches!(result, Err(())));
+        assert!(matches!(result, Err(nssa::error::NssaError::ProgramExecutionFailed(_))));
     }
 
     #[test]
@@ -438,8 +438,7 @@ mod tests {
         let result = sequencer.execute_check_transaction_on_state(result.unwrap());
         let is_failed_at_balance_mismatch = matches!(
             result.err().unwrap(),
-            // TransactionMalformationErrorKind::BalanceMismatch { tx: _ }
-            ()
+            nssa::error::NssaError::ProgramExecutionFailed(_)
         );
 
         assert!(is_failed_at_balance_mismatch);

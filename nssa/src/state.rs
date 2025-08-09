@@ -1,5 +1,5 @@
 use crate::{
-    AUTHENTICATED_TRANSFER_PROGRAM, address::Address, execute_public,
+    AUTHENTICATED_TRANSFER_PROGRAM, address::Address, error::NssaError, execute_public,
     public_transaction::PublicTransaction,
 };
 use nssa_core::{
@@ -40,10 +40,11 @@ impl V01State {
         }
     }
 
-    pub fn transition_from_public_transaction(&mut self, tx: &PublicTransaction) -> Result<(), ()> {
-        let state_diff = self
-            .execute_and_verify_public_transaction(tx)
-            .map_err(|_| ())?;
+    pub fn transition_from_public_transaction(
+        &mut self,
+        tx: &PublicTransaction,
+    ) -> Result<(), NssaError> {
+        let state_diff = self.execute_and_verify_public_transaction(tx)?;
 
         for (address, post) in state_diff.into_iter() {
             let current_account = self.get_account_by_address_mut(address);
@@ -71,17 +72,21 @@ impl V01State {
     fn execute_and_verify_public_transaction(
         &mut self,
         tx: &PublicTransaction,
-    ) -> Result<HashMap<Address, Account>, ()> {
+    ) -> Result<HashMap<Address, Account>, NssaError> {
         let message = tx.message();
         let witness_set = tx.witness_set();
 
         // All addresses must be different
         if message.addresses.iter().collect::<HashSet<_>>().len() != message.addresses.len() {
-            return Err(());
+            return Err(NssaError::InvalidInput(
+                "Duplicate addresses found in message".into(),
+            ));
         }
 
         if message.nonces.len() != witness_set.signatures_and_public_keys.len() {
-            return Err(());
+            return Err(NssaError::InvalidInput(
+                "Mismatch between number of nonces and signatures/public keys".into(),
+            ));
         }
 
         let mut authorized_addresses = Vec::new();
@@ -92,14 +97,16 @@ impl V01State {
         {
             // Check the signature is valid
             if !signature.is_valid_for(message, public_key) {
-                return Err(());
+                return Err(NssaError::InvalidInput(
+                    "Invalid signature for given message and public key".into(),
+                ));
             }
 
             // Check the nonce corresponds to the current nonce on the public state.
             let address = Address::from_public_key(public_key);
             let current_nonce = self.get_account_by_address(&address).nonce;
             if current_nonce != *nonce {
-                return Err(());
+                return Err(NssaError::InvalidInput("Nonce mismatch".into()));
             }
 
             authorized_addresses.push(address);
@@ -118,19 +125,16 @@ impl V01State {
         // Check the `program_id` corresponds to a built-in program
         // Only allowed program so far is the authenticated transfer program
         let Some(program) = self.builtin_programs.get(&message.program_id) else {
-            return Err(());
+            return Err(NssaError::InvalidInput("Unknown program".into()));
         };
 
         // // Execute program
-        let post_states =
-            execute_public(&pre_states, message.instruction_data, program).map_err(|_| ())?;
+        let post_states = execute_public(&pre_states, message.instruction_data, program)?;
 
         // Verify execution corresponds to a well-behaved program.
         // See the # Programs section for the definition of the `validate_constraints` method.
-        validate_constraints(&pre_states, &post_states, message.program_id).map_err(|_| ())?;
-
-        if post_states.len() != message.addresses.len() {
-            return Err(());
+        if !validate_constraints(&pre_states, &post_states, message.program_id) {
+            return Err(NssaError::InvalidProgramBehavior);
         }
 
         Ok(message.addresses.iter().cloned().zip(post_states).collect())

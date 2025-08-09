@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+thiserror = "2.0.12"
 risc0-zkvm = "2.3.1"
 nssa-core = { path = "core"}
 program-methods = { path = "program_methods" }
