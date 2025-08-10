@@ -10,7 +10,7 @@ fn test_program_should_fail_if_modifies_nonces() {
     let mut state = V01State::new_with_genesis_accounts(&initial_data).with_test_programs();
     let addresses = vec![Address::new([1; 32])];
     let program_id = Program::nonce_changer_program().id();
-    let message = public_transaction::Message::new(program_id, addresses, vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, addresses, vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -25,7 +25,7 @@ fn test_program_should_fail_if_output_accounts_exceed_inputs() {
     let mut state = V01State::new_with_genesis_accounts(&initial_data).with_test_programs();
     let addresses = vec![Address::new([1; 32])];
     let program_id = Program::extra_output_program().id();
-    let message = public_transaction::Message::new(program_id, addresses, vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, addresses, vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -40,7 +40,7 @@ fn test_program_should_fail_with_missing_output_accounts() {
     let mut state = V01State::new_with_genesis_accounts(&initial_data).with_test_programs();
     let addresses = vec![Address::new([1; 32]), Address::new([2; 32])];
     let program_id = Program::missing_output_program().id();
-    let message = public_transaction::Message::new(program_id, addresses, vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, addresses, vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -61,7 +61,7 @@ fn test_program_should_fail_if_modifies_program_owner_with_only_non_default_prog
     assert_eq!(account.nonce, Account::default().nonce);
     assert_eq!(account.data, Account::default().data);
     let program_id = Program::program_owner_changer().id();
-    let message = public_transaction::Message::new(program_id, vec![address], vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, vec![address], vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -84,7 +84,7 @@ fn test_program_should_fail_if_modifies_program_owner_with_only_non_default_bala
     assert_eq!(account.nonce, Account::default().nonce);
     assert_eq!(account.data, Account::default().data);
     let program_id = Program::program_owner_changer().id();
-    let message = public_transaction::Message::new(program_id, vec![address], vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, vec![address], vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -107,7 +107,7 @@ fn test_program_should_fail_if_modifies_program_owner_with_only_non_default_nonc
     assert_ne!(account.nonce, Account::default().nonce);
     assert_eq!(account.data, Account::default().data);
     let program_id = Program::program_owner_changer().id();
-    let message = public_transaction::Message::new(program_id, vec![address], vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, vec![address], vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -130,7 +130,7 @@ fn test_program_should_fail_if_modifies_program_owner_with_only_non_default_data
     assert_eq!(account.nonce, Account::default().nonce);
     assert_ne!(account.data, Account::default().data);
     let program_id = Program::program_owner_changer().id();
-    let message = public_transaction::Message::new(program_id, vec![address], vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, vec![address], vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -147,7 +147,6 @@ fn test_program_should_fail_if_transfers_balance_from_non_owned_account() {
     let receiver_address = Address::new([2; 32]);
     let balance_to_move: u128 = 1;
     let program_id = Program::simple_balance_transfer().id();
-    let instruction_data = Program::serialize_instruction_data(balance_to_move).unwrap();
     assert_ne!(
         state.get_account_by_address(&sender_address).program_owner,
         program_id
@@ -156,13 +155,12 @@ fn test_program_should_fail_if_transfers_balance_from_non_owned_account() {
         program_id,
         vec![sender_address, receiver_address],
         vec![],
-        instruction_data,
+        balance_to_move,
     );
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
     let result = state.transition_from_public_transaction(&tx);
-    println!("{:?}", result);
 
     assert!(matches!(result, Err(NssaError::InvalidProgramBehavior)));
 }
@@ -180,7 +178,7 @@ fn test_program_should_fail_if_modifies_data_of_non_owned_account() {
         state.get_account_by_address(&address).program_owner,
         program_id
     );
-    let message = public_transaction::Message::new(program_id, vec![address], vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, vec![address], vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -196,7 +194,7 @@ fn test_program_should_fail_if_does_not_preserve_total_balance_by_minting() {
     let address = Address::new([1; 32]);
     let program_id = Program::minter().id();
 
-    let message = public_transaction::Message::new(program_id, vec![address], vec![], vec![]);
+    let message = public_transaction::Message::new(program_id, vec![address], vec![], ());
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
@@ -217,12 +215,11 @@ fn test_program_should_fail_if_does_not_preserve_total_balance_by_burning() {
         state.get_account_by_address(&address).program_owner,
         program_id
     );
-    let balance_to_burn = 1;
+    let balance_to_burn: u128 = 1;
     assert!(state.get_account_by_address(&address).balance > balance_to_burn);
 
-    let instruction_data = Program::serialize_instruction_data(balance_to_burn).unwrap();
     let message =
-        public_transaction::Message::new(program_id, vec![address], vec![], instruction_data);
+        public_transaction::Message::new(program_id, vec![address], vec![], balance_to_burn);
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
     let result = state.transition_from_public_transaction(&tx);

@@ -1,10 +1,10 @@
 use nssa_core::program::read_nssa_inputs;
 use risc0_zkvm::guest::env;
 
-type InstructionData = ();
+type Instruction = ();
 
 fn main() {
-    let (input_accounts, _) = read_nssa_inputs::<InstructionData>();
+    let (input_accounts, _) = read_nssa_inputs::<Instruction>();
 
     let [pre1, _] = match input_accounts.try_into() {
         Ok(array) => array,

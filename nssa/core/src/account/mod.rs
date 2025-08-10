@@ -44,7 +44,7 @@ mod tests {
     fn test_empty_data_account_data_creation() {
         let new_acc = Account::default();
 
-        assert_eq!(new_acc.data, vec![]);
+        assert!(new_acc.data.is_empty());
     }
 
     #[test]

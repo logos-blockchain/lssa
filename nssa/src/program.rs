@@ -4,7 +4,7 @@ use nssa_core::{
 };
 use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID};
 use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, default_executor, serde::to_vec};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::error::NssaError;
 

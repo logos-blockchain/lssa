@@ -496,7 +496,7 @@ mod tests {
                             { "value": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
                             { "value": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] }
                         ],
-                        "instruction_data": 10,
+                        "instruction_data": [10, 0, 0, 0],
                         "nonces": [0],
                         "program_id": nssa::program::Program::authenticated_transfer_program().id(),
                     },
