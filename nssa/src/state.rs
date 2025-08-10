@@ -149,6 +149,35 @@ impl V01State {
         self.insert_program(Program::nonce_changer_program());
         self.insert_program(Program::extra_output_program());
         self.insert_program(Program::missing_output_program());
+        self.insert_program(Program::program_owner_changer());
+        self
+    }
+
+    pub fn with_non_default_accounts_but_default_program_owners(mut self) -> Self {
+        let account_with_default_values_except_balance = Account {
+            balance: 100,
+            ..Account::default()
+        };
+        let account_with_default_values_except_nonce = Account {
+            nonce: 37,
+            ..Account::default()
+        };
+        let account_with_default_values_except_data = Account {
+            data: vec![0xca, 0xfe],
+            ..Account::default()
+        };
+        self.public_state.insert(
+            Address::new([255; 32]),
+            account_with_default_values_except_balance,
+        );
+        self.public_state.insert(
+            Address::new([254; 32]),
+            account_with_default_values_except_nonce,
+        );
+        self.public_state.insert(
+            Address::new([253; 32]),
+            account_with_default_values_except_data,
+        );
         self
     }
 }

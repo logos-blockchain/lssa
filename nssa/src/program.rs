@@ -105,4 +105,14 @@ impl Program {
             elf: MISSING_OUTPUT_ELF,
         }
     }
+
+    /// A program that changes the program owner of an account to [0, 1, 2, 3, 4, 5, 6, 7]
+    pub fn program_owner_changer() -> Self {
+        use test_program_methods::{PROGRAM_OWNER_CHANGER_ELF, PROGRAM_OWNER_CHANGER_ID};
+
+        Program {
+            id: PROGRAM_OWNER_CHANGER_ID,
+            elf: PROGRAM_OWNER_CHANGER_ELF,
+        }
+    }
 }
