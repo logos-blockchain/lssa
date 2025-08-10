@@ -18,7 +18,7 @@ impl Program {
         self.id
     }
 
-    pub fn serialize_instruction_data<T: Serialize>(
+    pub fn serialize_instruction<T: Serialize>(
         instruction_data: T,
     ) -> Result<InstructionData, NssaError> {
         to_vec(&instruction_data)

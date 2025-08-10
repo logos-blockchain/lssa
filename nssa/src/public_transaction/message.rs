@@ -21,7 +21,7 @@ impl Message {
         nonces: Vec<Nonce>,
         instruction: T,
     ) -> Self {
-        let instruction_data = Program::serialize_instruction_data(instruction).unwrap();
+        let instruction_data = Program::serialize_instruction(instruction).unwrap();
         Self {
             program_id,
             addresses,
