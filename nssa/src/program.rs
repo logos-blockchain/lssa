@@ -1,9 +1,10 @@
 use nssa_core::{
     account::{Account, AccountWithMetadata},
-    program::{DEFAULT_PROGRAM_ID, ProgramId},
+    program::{DEFAULT_PROGRAM_ID, InstructionData, ProgramId},
 };
 use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID};
-use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, default_executor};
+use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, default_executor, serde::to_vec};
+use serde::{Deserialize, Serialize};
 
 use crate::error::NssaError;
 
@@ -17,10 +18,17 @@ impl Program {
         self.id
     }
 
+    pub fn serialize_instruction_data<T: Serialize>(
+        instruction_data: T,
+    ) -> Result<InstructionData, NssaError> {
+        to_vec(&instruction_data)
+            .map_err(|e| NssaError::InstructionDataSerializationError(e.to_string()))
+    }
+
     pub(crate) fn execute(
         &self,
         pre_states: &[AccountWithMetadata],
-        instruction_data: u128,
+        instruction_data: &InstructionData,
     ) -> Result<Vec<Account>, NssaError> {
         // Write inputs to the program
         let mut env_builder = ExecutorEnv::builder();
@@ -52,15 +60,12 @@ impl Program {
     /// Writes inputs to `env_builder` in the order expected by the programs
     fn write_inputs(
         pre_states: &[AccountWithMetadata],
-        instruction_data: u128,
+        instruction_data: &[u32],
         env_builder: &mut ExecutorEnvBuilder,
     ) -> Result<(), NssaError> {
         let pre_states = pre_states.to_vec();
         env_builder
-            .write(&pre_states)
-            .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
-        env_builder
-            .write(&instruction_data)
+            .write(&(pre_states, instruction_data))
             .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
         Ok(())
     }

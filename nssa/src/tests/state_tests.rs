@@ -14,7 +14,8 @@ fn transfer_transaction(
     let addresses = vec![from, to];
     let nonces = vec![nonce];
     let program_id = Program::authenticated_transfer_program().id();
-    let message = public_transaction::Message::new(program_id, addresses, nonces, balance);
+    let instruction_data = Program::serialize_instruction_data(&balance).unwrap();
+    let message = public_transaction::Message::new(program_id, addresses, nonces, instruction_data);
     let witness_set = public_transaction::WitnessSet::for_message(&message, &[&from_key]);
     PublicTransaction::new(message, witness_set)
 }

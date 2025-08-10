@@ -1,8 +1,17 @@
 use crate::account::{Account, AccountWithMetadata};
+use risc0_zkvm::serde::Deserializer;
+use risc0_zkvm::{DeserializeOwned, guest::env};
 
 pub type ProgramId = [u32; 8];
+pub type InstructionData = Vec<u32>;
 pub const DEFAULT_PROGRAM_ID: ProgramId = [0; 8];
 
+pub fn read_nssa_inputs<T: DeserializeOwned>() -> (Vec<AccountWithMetadata>, T) {
+    let pre_states: Vec<AccountWithMetadata> = env::read();
+    let words: InstructionData = env::read();
+    let instruction_data = T::deserialize(&mut Deserializer::new(words.as_ref())).unwrap();
+    (pre_states, instruction_data)
+}
 /// Validates well-behaved program execution
 ///
 /// # Parameters

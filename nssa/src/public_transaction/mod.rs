@@ -108,7 +108,7 @@ impl PublicTransaction {
         };
 
         // // Execute program
-        let post_states = program.execute(&pre_states, message.instruction_data)?;
+        let post_states = program.execute(&pre_states, &message.instruction_data)?;
 
         // Verify execution corresponds to a well-behaved program.
         // See the # Programs section for the definition of the `validate_execution` method.

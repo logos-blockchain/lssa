@@ -1,9 +1,10 @@
-use nssa_core::account::AccountWithMetadata;
+use nssa_core::program::read_nssa_inputs;
 use risc0_zkvm::guest::env;
 
+type InstructionData = ();
+
 fn main() {
-    let input_accounts: Vec<AccountWithMetadata> = env::read();
-    let _instruction_data: u128 = env::read();
+    let (input_accounts, _) = read_nssa_inputs::<InstructionData>();
 
     let [pre] = match input_accounts.try_into() {
         Ok(array) => array,

@@ -10,4 +10,7 @@ pub enum NssaError {
 
     #[error("Program violated execution rules")]
     InvalidProgramBehavior,
+
+    #[error("Serialization error: {0}")]
+    InstructionDataSerializationError(String),
 }
