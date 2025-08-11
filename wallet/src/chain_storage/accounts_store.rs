@@ -1,11 +1,11 @@
 use accounts::account_core::{address::AccountAddress, Account};
 use std::collections::HashMap;
 
-pub struct NodeAccountsStore {
+pub struct WalletAccountsStore {
     pub accounts: HashMap<AccountAddress, Account>,
 }
 
-impl NodeAccountsStore {
+impl WalletAccountsStore {
     pub fn new() -> Self {
         Self {
             accounts: HashMap::new(),
@@ -21,7 +21,7 @@ impl NodeAccountsStore {
     }
 }
 
-impl Default for NodeAccountsStore {
+impl Default for WalletAccountsStore {
     fn default() -> Self {
         Self::new()
     }
@@ -45,13 +45,13 @@ mod tests {
 
     #[test]
     fn test_create_empty_store() {
-        let store = NodeAccountsStore::new();
+        let store = WalletAccountsStore::new();
         assert!(store.accounts.is_empty());
     }
 
     #[test]
     fn test_register_account() {
-        let mut store = NodeAccountsStore::new();
+        let mut store = WalletAccountsStore::new();
 
         let account = create_sample_account(100);
         let account_addr = account.address;
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn test_unregister_account() {
-        let mut store = NodeAccountsStore::new();
+        let mut store = WalletAccountsStore::new();
 
         let account = create_sample_account(100);
         let account_addr = account.address;
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_unregister_nonexistent_account() {
-        let mut store = NodeAccountsStore::new();
+        let mut store = WalletAccountsStore::new();
 
         let account_addr: [u8; 32] = pad_to_32("nonexistent".to_string().as_bytes());
         store.unregister_account(account_addr);
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn test_register_multiple_accounts() {
-        let mut store = NodeAccountsStore::new();
+        let mut store = WalletAccountsStore::new();
 
         let account1 = create_sample_account(100);
         let account2 = create_sample_account(200);

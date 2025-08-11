@@ -88,7 +88,7 @@ impl JsonHandler {
         {
             let mut state = self.sequencer_state.lock().await;
 
-            state.push_tx_into_mempool_pre_check(send_tx_req.transaction, send_tx_req.tx_roots)?;
+            state.push_tx_into_mempool_pre_check(send_tx_req.transaction)?;
         }
 
         let helperstruct = SendTxResponse {
@@ -290,9 +290,7 @@ mod tests {
         };
         let tx = Transaction::new(tx_body, SignaturePrivateKey::from_slice(&[1; 32]).unwrap());
 
-        sequencer_core
-            .push_tx_into_mempool_pre_check(tx, [[0; 32]; 2])
-            .unwrap();
+        sequencer_core.push_tx_into_mempool_pre_check(tx).unwrap();
         sequencer_core
             .produce_new_block_with_mempool_transactions()
             .unwrap();

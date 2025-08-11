@@ -80,7 +80,6 @@ impl SequencerCore {
     pub fn transaction_pre_check(
         &mut self,
         tx: Transaction,
-        tx_roots: [[u8; 32]; 2],
     ) -> Result<AuthenticatedTransaction, TransactionMalformationErrorKind> {
         let tx = tx
             .into_authenticated()
@@ -101,16 +100,6 @@ impl SequencerCore {
 
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
             return Err(TransactionMalformationErrorKind::MempoolFullForRound { tx: tx_hash });
-        }
-
-        let curr_sequencer_roots = self.get_tree_roots();
-
-        if tx_roots != curr_sequencer_roots {
-            return Err(
-                TransactionMalformationErrorKind::ChainStateFurtherThanTransactionState {
-                    tx: tx_hash,
-                },
-            );
         }
 
         //Sanity check
@@ -197,7 +186,6 @@ impl SequencerCore {
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
         transaction: Transaction,
-        tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
         let mempool_size = self.mempool.len();
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
@@ -206,7 +194,7 @@ impl SequencerCore {
             });
         }
 
-        let authenticated_tx = self.transaction_pre_check(transaction, tx_roots)?;
+        let authenticated_tx = self.transaction_pre_check(transaction)?;
 
         self.mempool.push_item(authenticated_tx.into());
 
@@ -526,8 +514,8 @@ mod tests {
             vec![[71; 32]],
             vec![[81; 32]],
         );
-        let tx_roots = sequencer.get_tree_roots();
-        let result = sequencer.transaction_pre_check(tx, tx_roots);
+
+        let result = sequencer.transaction_pre_check(tx);
 
         assert!(result.is_ok());
     }
@@ -553,8 +541,8 @@ mod tests {
         let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key1,
         );
-        let tx_roots = sequencer.get_tree_roots();
-        let result = sequencer.transaction_pre_check(tx, tx_roots);
+
+        let result = sequencer.transaction_pre_check(tx);
 
         assert!(result.is_ok());
     }
@@ -580,8 +568,8 @@ mod tests {
         let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key2,
         );
-        let tx_roots = sequencer.get_tree_roots();
-        let result = sequencer.transaction_pre_check(tx, tx_roots);
+
+        let result = sequencer.transaction_pre_check(tx);
 
         assert_eq!(
             result.err().unwrap(),
@@ -610,8 +598,8 @@ mod tests {
         let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
             acc1, 0, acc2, 10000000, sign_key1,
         );
-        let tx_roots = sequencer.get_tree_roots();
-        let result = sequencer.transaction_pre_check(tx, tx_roots);
+
+        let result = sequencer.transaction_pre_check(tx);
 
         //Passed pre-check
         assert!(result.is_ok());
@@ -673,7 +661,6 @@ mod tests {
             vec![[72; 32]],
             vec![[82; 32]],
         );
-        let tx_roots = sequencer.get_tree_roots();
 
         // Fill the mempool
         let dummy_tx = MempoolTransaction {
@@ -681,7 +668,7 @@ mod tests {
         };
         sequencer.mempool.push_item(dummy_tx);
 
-        let result = sequencer.push_tx_into_mempool_pre_check(tx, tx_roots);
+        let result = sequencer.push_tx_into_mempool_pre_check(tx);
 
         assert!(matches!(
             result,
@@ -701,9 +688,8 @@ mod tests {
             vec![[73; 32]],
             vec![[83; 32]],
         );
-        let tx_roots = sequencer.get_tree_roots();
 
-        let result = sequencer.push_tx_into_mempool_pre_check(tx, tx_roots);
+        let result = sequencer.push_tx_into_mempool_pre_check(tx);
         assert!(result.is_ok());
         assert_eq!(sequencer.mempool.len(), 1);
     }

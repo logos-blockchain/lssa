@@ -1,15 +1,12 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use accounts::account_core::{address::AccountAddress, Account};
 use anyhow::Result;
-use common::{
-    merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
-    nullifier::UTXONullifier,
-};
+use common::merkle_tree_public::merkle_tree::UTXOCommitmentsMerkleTree;
 use sc_core::public_context::PublicSCContext;
 use serde::{Deserialize, Serialize};
 
-use crate::config::NodeConfig;
+use crate::config::WalletConfig;
 
 pub mod accounts_store;
 
@@ -39,27 +36,21 @@ impl From<AccMap> for HashMap<[u8; 32], Account> {
     }
 }
 
-pub struct NodeChainStore {
+pub struct WalletChainStore {
     pub acc_map: HashMap<AccountAddress, Account>,
-    pub nullifier_store: HashSet<UTXONullifier>,
     pub utxo_commitments_store: UTXOCommitmentsMerkleTree,
-    pub pub_tx_store: PublicTransactionMerkleTree,
-    pub node_config: NodeConfig,
+    pub wallet_config: WalletConfig,
 }
 
-impl NodeChainStore {
-    pub fn new(config: NodeConfig) -> Result<Self> {
+impl WalletChainStore {
+    pub fn new(config: WalletConfig) -> Result<Self> {
         let acc_map = HashMap::new();
-        let nullifier_store = HashSet::new();
         let utxo_commitments_store = UTXOCommitmentsMerkleTree::new(vec![]);
-        let pub_tx_store = PublicTransactionMerkleTree::new(vec![]);
 
         Ok(Self {
             acc_map,
-            nullifier_store,
             utxo_commitments_store,
-            pub_tx_store,
-            node_config: config,
+            wallet_config: config,
         })
     }
 
@@ -75,12 +66,6 @@ impl NodeChainStore {
             caller_balance: self.acc_map.get(&caller).unwrap().balance,
             account_masks,
             comitment_store_root: self.utxo_commitments_store.get_root().unwrap_or([0; 32]),
-            pub_tx_store_root: self.pub_tx_store.get_root().unwrap_or([0; 32]),
-            nullifiers_set: self
-                .nullifier_store
-                .iter()
-                .map(|item| item.utxo_hash)
-                .collect(),
             commitments_tree: self.utxo_commitments_store.clone(),
         }
     }
@@ -267,8 +252,8 @@ mod tests {
         initial_accounts
     }
 
-    fn create_sample_node_config(home: PathBuf) -> NodeConfig {
-        NodeConfig {
+    fn create_sample_wallet_config(home: PathBuf) -> WalletConfig {
+        WalletConfig {
             home,
             override_rust_log: None,
             sequencer_addr: "http://127.0.0.1".to_string(),
@@ -282,12 +267,11 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let path = temp_dir.path();
 
-        let config = create_sample_node_config(path.to_path_buf());
+        let config = create_sample_wallet_config(path.to_path_buf());
 
-        let store = NodeChainStore::new(config.clone()).unwrap();
+        let store = WalletChainStore::new(config.clone()).unwrap();
 
         assert!(store.acc_map.is_empty());
-        assert!(store.nullifier_store.is_empty());
         assert_eq!(
             store.utxo_commitments_store.get_root().unwrap_or([0; 32]),
             [0; 32]

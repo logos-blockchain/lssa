@@ -66,20 +66,21 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
     sequencer_loop_handle.abort();
     seq_http_server_handle.stop(true).await;
 
-    //At this point all of the references to node_core and sequencer_core must be lost.
+    //At this point all of the references to sequencer_core must be lost.
     //So they are dropped and tempdirs will be dropped too,
 }
 
 pub async fn test_success() {
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
+        nonce: 0,
         to: ACC_RECEIVER.to_string(),
         amount: 100,
     };
 
-    let node_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().unwrap();
 
-    let seq_client = SequencerClient::new(node_config.sequencer_addr.clone()).unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -110,13 +111,14 @@ pub async fn test_success_move_to_another_account() {
 
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
+        nonce: 0,
         to: hex_acc_receiver_new_acc.clone(),
         amount: 100,
     };
 
-    let node_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().unwrap();
 
-    let seq_client = SequencerClient::new(node_config.sequencer_addr.clone()).unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -145,13 +147,14 @@ pub async fn test_success_move_to_another_account() {
 pub async fn test_failure() {
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
+        nonce: 0,
         to: ACC_RECEIVER.to_string(),
         amount: 1000000,
     };
 
-    let node_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().unwrap();
 
-    let seq_client = SequencerClient::new(node_config.sequencer_addr.clone()).unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
     wallet::execute_subcommand(command).await.unwrap();
 

@@ -9,9 +9,9 @@ use common::{
 
 use accounts::account_core::{address::AccountAddress, Account};
 use anyhow::Result;
-use chain_storage::NodeChainStore;
+use chain_storage::WalletChainStore;
 use common::transaction::TransactionBody;
-use config::NodeConfig;
+use config::WalletConfig;
 use log::info;
 use sc_core::proofs_circuits::pedersen_commitment_vec;
 use tokio::sync::RwLock;
@@ -26,19 +26,18 @@ pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
 pub mod chain_storage;
 pub mod config;
 pub mod helperfunctions;
-pub mod requests_structs;
 
-pub struct NodeCore {
-    pub storage: Arc<RwLock<NodeChainStore>>,
-    pub node_config: NodeConfig,
+pub struct WalletCore {
+    pub storage: Arc<RwLock<WalletChainStore>>,
+    pub wallet_config: WalletConfig,
     pub sequencer_client: Arc<SequencerClient>,
 }
 
-impl NodeCore {
-    pub async fn start_from_config_update_chain(config: NodeConfig) -> Result<Self> {
+impl WalletCore {
+    pub async fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
         let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
 
-        let mut storage = NodeChainStore::new(config.clone())?;
+        let mut storage = WalletChainStore::new(config.clone())?;
         for acc in config.clone().initial_accounts {
             storage.acc_map.insert(acc.address, acc);
         }
@@ -47,17 +46,9 @@ impl NodeCore {
 
         Ok(Self {
             storage: wrapped_storage,
-            node_config: config.clone(),
+            wallet_config: config.clone(),
             sequencer_client: client.clone(),
         })
-    }
-
-    pub async fn get_roots(&self) -> [[u8; 32]; 2] {
-        let storage = self.storage.read().await;
-        [
-            storage.utxo_commitments_store.get_root().unwrap_or([0; 32]),
-            storage.pub_tx_store.get_root().unwrap_or([0; 32]),
-        ]
     }
 
     pub async fn create_new_account(&mut self) -> AccountAddress {
@@ -82,8 +73,6 @@ impl NodeCore {
         to: AccountAddress,
         balance_to_move: u64,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
-        let tx_roots = self.get_roots().await;
-
         let public_context = {
             let read_guard = self.storage.read().await;
 
@@ -123,10 +112,7 @@ impl NodeCore {
 
                 let signed_transaction = Transaction::new(tx, key_to_sign_transaction);
 
-                Ok(self
-                    .sequencer_client
-                    .send_tx(signed_transaction, tx_roots)
-                    .await?)
+                Ok(self.sequencer_client.send_tx(signed_transaction).await?)
             } else {
                 Err(ExecutionFailureKind::AmountMismatchError)
             }
@@ -142,6 +128,9 @@ pub enum Command {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
+        ///nonce - u64 integer
+        #[arg(long)]
+        nonce: u64,
         ///to - valid 32 byte hex string
         #[arg(long)]
         to: String,
@@ -162,17 +151,21 @@ pub struct Args {
 
 pub async fn execute_subcommand(command: Command) -> Result<()> {
     match command {
-        Command::SendNativeTokenTransfer { from, to, amount } => {
-            let node_config = fetch_config()?;
+        Command::SendNativeTokenTransfer {
+            from,
+            nonce,
+            to,
+            amount,
+        } => {
+            let wallet_config = fetch_config()?;
 
             let from = produce_account_addr_from_hex(from)?;
             let to = produce_account_addr_from_hex(to)?;
 
-            let wallet_core = NodeCore::start_from_config_update_chain(node_config).await?;
+            let wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
-            //ToDo: Nonce management
             let res = wallet_core
-                .send_public_native_token_transfer(from, 0, to, amount)
+                .send_public_native_token_transfer(from, nonce, to, amount)
                 .await?;
 
             info!("Results of tx send is {res:#?}");

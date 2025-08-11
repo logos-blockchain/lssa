@@ -98,12 +98,6 @@ pub fn private_circuit(
         ));
     }
 
-    for nullifier in in_nullifiers.iter() {
-        let nullifier: [u8; 32] = nullifier.clone().try_into().unwrap();
-
-        assert!(!public_context.nullifiers_set.contains(&nullifier));
-    }
-
     (in_nullifiers, generate_commitments(output_utxos))
 }
 
@@ -145,12 +139,6 @@ pub fn deshielded_circuit(
             &in_commitment,
             &public_context.commitments_tree,
         ));
-    }
-
-    for nullifier in in_nullifiers.iter() {
-        let nullifier: [u8; 32] = nullifier.clone().try_into().unwrap();
-
-        assert!(!public_context.nullifiers_set.contains(&nullifier));
     }
 
     in_nullifiers

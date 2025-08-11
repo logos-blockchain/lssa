@@ -37,7 +37,7 @@ impl From<GasConfig> for zkvm::gas_calculator::GasCalculator {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeConfig {
+pub struct WalletConfig {
     ///Home dir of sequencer storage
     pub home: PathBuf,
     ///Override rust log (env var logging level)

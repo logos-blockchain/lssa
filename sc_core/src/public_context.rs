@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use accounts::account_core::{address::AccountAddress, AccountPublicMask};
 use common::merkle_tree_public::{merkle_tree::UTXOCommitmentsMerkleTree, TreeHashType};
@@ -20,9 +20,7 @@ pub struct PublicSCContext {
     pub caller_balance: u64,
     pub account_masks: BTreeMap<AccountAddress, AccountPublicMask>,
     pub comitment_store_root: TreeHashType,
-    pub pub_tx_store_root: TreeHashType,
     pub commitments_tree: UTXOCommitmentsMerkleTree,
-    pub nullifiers_set: HashSet<[u8; 32]>,
 }
 
 impl Serialize for PublicSCContext {
@@ -44,9 +42,7 @@ impl Serialize for PublicSCContext {
         s.serialize_field(ACCOUNT_MASKS_KEYS_SORTED, &account_masks_keys)?;
         s.serialize_field(ACCOUNT_MASKS_VALUES_SORTED, &account_mask_values)?;
         s.serialize_field(COMMITMENT_STORE_ROOT, &self.comitment_store_root)?;
-        s.serialize_field(PUT_TX_STORE_ROOT, &self.pub_tx_store_root)?;
         s.serialize_field(COMMITMENT_TREE, &self.commitments_tree)?;
-        s.serialize_field(NULLIFIERS_SET, &self.nullifiers_set)?;
 
         s.end()
     }
@@ -100,12 +96,9 @@ mod tests {
     fn create_test_context() -> PublicSCContext {
         let caller_address = [1; 32];
         let comitment_store_root = [3; 32];
-        let pub_tx_store_root = [4; 32];
 
         let commitments_tree =
             UTXOCommitmentsMerkleTree::new(vec![UTXOCommitment { hash: [5; 32] }]);
-        let mut nullifiers_set = HashSet::new();
-        nullifiers_set.insert([6; 32]);
 
         let mut account_masks = BTreeMap::new();
 
@@ -122,9 +115,7 @@ mod tests {
             caller_balance: 100,
             account_masks,
             comitment_store_root,
-            pub_tx_store_root,
             commitments_tree,
-            nullifiers_set,
         }
     }
 
