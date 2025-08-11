@@ -79,12 +79,12 @@ impl WalletCore {
                 let addresses = vec![nssa::Address::new(from), nssa::Address::new(to)];
                 let nonces = vec![nonce];
                 let program_id = nssa::program::Program::authenticated_transfer_program().id();
-                let message = nssa::public_transaction::Message::new(
+                let message = nssa::public_transaction::Message::try_new(
                     program_id,
                     addresses,
                     nonces,
                     balance_to_move,
-                );
+                ).unwrap();
 
                 let signing_key = account.key_holder.get_pub_account_signing_key();
                 let witness_set =

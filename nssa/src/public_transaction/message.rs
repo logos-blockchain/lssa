@@ -4,7 +4,7 @@ use nssa_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{Address, program::Program};
+use crate::{Address, error::NssaError, program::Program};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Message {
@@ -15,18 +15,18 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn new<T: Serialize>(
+    pub fn try_new<T: Serialize>(
         program_id: ProgramId,
         addresses: Vec<Address>,
         nonces: Vec<Nonce>,
         instruction: T,
-    ) -> Self {
-        let instruction_data = Program::serialize_instruction(instruction).unwrap();
-        Self {
+    ) -> Result<Self, NssaError> {
+        let instruction_data = Program::serialize_instruction(instruction)?;
+        Ok(Self {
             program_id,
             addresses,
             nonces,
             instruction_data,
-        }
+        })
     }
 }

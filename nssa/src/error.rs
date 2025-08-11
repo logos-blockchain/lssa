@@ -12,5 +12,5 @@ pub enum NssaError {
     InvalidProgramBehavior,
 
     #[error("Serialization error: {0}")]
-    InstructionDataSerializationError(String),
+    InstructionSerializationError(String),
 }
