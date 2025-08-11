@@ -115,6 +115,7 @@ mod tests {
                 249
             ],
             "balance": 100,
+            "nonce": 0,
             "key_holder": {
                 "nullifer_public_key": "03A340BECA9FAAB444CED0140681D72EA1318B5C611704FEE017DA9836B17DB718",
                 "pub_account_signing_key": [
@@ -199,6 +200,7 @@ mod tests {
                 85
             ],
             "balance": 200,
+            "nonce": 0,
             "key_holder": {
                 "nullifer_public_key": "02172F50274DE67C4087C344F5D58E11DF761D90285B095060E0994FAA6BCDE271",
                 "pub_account_signing_key": [

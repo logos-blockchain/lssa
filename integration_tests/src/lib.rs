@@ -180,6 +180,72 @@ pub async fn test_failure() {
     info!("Success!");
 }
 
+pub async fn test_success_two_transactions() {
+    let command = Command::SendNativeTokenTransfer {
+        from: ACC_SENDER.to_string(),
+        nonce: 0,
+        to: ACC_RECEIVER.to_string(),
+        amount: 100,
+    };
+
+    let wallet_config = fetch_config().unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    info!("Checking correct balance move");
+    let acc_1_balance = seq_client
+        .get_account_balance(ACC_SENDER.to_string())
+        .await
+        .unwrap();
+    let acc_2_balance = seq_client
+        .get_account_balance(ACC_RECEIVER.to_string())
+        .await
+        .unwrap();
+
+    info!("Balance of sender : {acc_1_balance:#?}");
+    info!("Balance of receiver : {acc_2_balance:#?}");
+
+    assert_eq!(acc_1_balance.balance, 9900);
+    assert_eq!(acc_2_balance.balance, 20100);
+
+    info!("First TX Success!");
+
+    let command = Command::SendNativeTokenTransfer {
+        from: ACC_SENDER.to_string(),
+        nonce: 1,
+        to: ACC_RECEIVER.to_string(),
+        amount: 100,
+    };
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    info!("Checking correct balance move");
+    let acc_1_balance = seq_client
+        .get_account_balance(ACC_SENDER.to_string())
+        .await
+        .unwrap();
+    let acc_2_balance = seq_client
+        .get_account_balance(ACC_RECEIVER.to_string())
+        .await
+        .unwrap();
+
+    info!("Balance of sender : {acc_1_balance:#?}");
+    info!("Balance of receiver : {acc_2_balance:#?}");
+
+    assert_eq!(acc_1_balance.balance, 9800);
+    assert_eq!(acc_2_balance.balance, 20200);
+
+    info!("Second TX Success!");
+}
+
 macro_rules! test_cleanup_wrap {
     ($home_dir:ident, $test_func:ident) => {{
         let res = pre_test($home_dir.clone()).await.unwrap();
@@ -212,10 +278,14 @@ pub async fn main_tests_runner() -> Result<()> {
         "test_failure" => {
             test_cleanup_wrap!(home_dir, test_failure);
         }
+        "test_success_two_transactions" => {
+            test_cleanup_wrap!(home_dir, test_success_two_transactions);
+        }
         "all" => {
             test_cleanup_wrap!(home_dir, test_success_move_to_another_account);
             test_cleanup_wrap!(home_dir, test_success);
             test_cleanup_wrap!(home_dir, test_failure);
+            test_cleanup_wrap!(home_dir, test_success_two_transactions);
         }
         _ => {
             anyhow::bail!("Unknown test name");
