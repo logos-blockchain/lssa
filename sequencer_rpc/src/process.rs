@@ -72,10 +72,7 @@ impl JsonHandler {
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
-        let tx = {
-            let mut cursor: Cursor<&[u8]> = Cursor::new(&send_tx_req.transaction);
-            nssa::PublicTransaction::from_cursor(&mut cursor)
-        };
+        let tx = nssa::PublicTransaction::from_bytes(&send_tx_req.transaction);
 
         {
             let mut state = self.sequencer_state.lock().await;

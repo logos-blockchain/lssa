@@ -11,6 +11,7 @@ use sha2::{Digest, digest::FixedOutput};
 
 use crate::{V01State, address::Address, error::NssaError};
 
+mod encoding;
 mod message;
 mod witness_set;
 
@@ -47,20 +48,6 @@ impl PublicTransaction {
         }
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = self.message.message_to_bytes();
-        bytes.extend_from_slice(&self.witness_set.to_bytes());
-        bytes
-    }
-
-    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Self {
-        let message = Message::from_cursor(cursor);
-        let witness_set = WitnessSet::from_cursor(cursor);
-        Self {
-            message,
-            witness_set,
-        }
-    }
 
     pub fn hash(&self) -> [u8; 32] {
         let bytes = self.to_bytes();
@@ -145,7 +132,7 @@ mod tests {
     };
 
     #[test]
-    fn test() {
+    fn test_to_bytes() {
         let key1 = PrivateKey::try_new([1; 32]).unwrap();
         let key2 = PrivateKey::try_new([2; 32]).unwrap();
         let addr1 = Address::from_public_key(&PublicKey::new(&key1));
