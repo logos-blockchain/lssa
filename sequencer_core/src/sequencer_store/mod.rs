@@ -49,7 +49,6 @@ impl SequecerChainStore {
             block_id: genesis_id,
             prev_block_id: genesis_id.saturating_sub(1),
             transactions: vec![],
-            data: data.to_vec(),
             prev_block_hash,
         };
 

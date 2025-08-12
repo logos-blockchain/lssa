@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
-    pub transaction: nssa::PublicTransaction,
+    pub transaction: Vec<u8>,
 }
 
 //Responses

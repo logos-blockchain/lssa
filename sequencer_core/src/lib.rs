@@ -120,7 +120,6 @@ impl SequencerCore {
             block_id: new_block_height,
             prev_block_id: self.chain_height,
             transactions: valid_transactions,
-            data: vec![],
             prev_block_hash,
         };
 

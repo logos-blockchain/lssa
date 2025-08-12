@@ -91,7 +91,7 @@ impl SequencerClient {
         &self,
         transaction: nssa::PublicTransaction,
     ) -> Result<SendTxResponse, SequencerClientError> {
-        let tx_req = SendTxRequest { transaction };
+        let tx_req = SendTxRequest { transaction: transaction.to_bytes() };
 
         let req = serde_json::to_value(tx_req)?;
 

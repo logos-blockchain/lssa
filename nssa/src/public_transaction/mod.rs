@@ -47,16 +47,15 @@ impl PublicTransaction {
         }
     }
 
-    fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = self.message.message_to_bytes();
         bytes.extend_from_slice(&self.witness_set.to_bytes());
         bytes
     }
 
-    fn from_bytes(bytes: &[u8]) -> Self {
-        let mut cursor = Cursor::new(bytes);
-        let message = Message::from_cursor(&mut cursor);
-        let witness_set = WitnessSet::from_cursor(&mut cursor);
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Self {
+        let message = Message::from_cursor(cursor);
+        let witness_set = WitnessSet::from_cursor(cursor);
         Self {
             message,
             witness_set,
@@ -137,6 +136,8 @@ impl PublicTransaction {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use crate::{
         Address, PrivateKey, PublicTransaction, PublicKey,
         program::Program,
@@ -163,7 +164,8 @@ mod tests {
         let tx = PublicTransaction::new(message, witness_set);
 
         let bytes = tx.to_bytes();
-        let recov_tx = PublicTransaction::from_bytes(&bytes);
+        let mut cursor: Cursor<&[u8]> = Cursor::new(&bytes);
+        let recov_tx = PublicTransaction::from_cursor(&mut cursor);
         assert_eq!(tx, recov_tx);
     }
 }

@@ -11,20 +11,16 @@ use crate::block::{Block, HashableBlockData};
 /// `prev_hash` - hash of previous block, provide None for genesis
 ///
 /// `transactions` - vector of `Transaction` objects
-///
-/// `additional_data` - vector with additional data
 pub fn produce_dummy_block(
     id: u64,
     prev_hash: Option<[u8; 32]>,
     transactions: Vec<nssa::PublicTransaction>,
-    additional_data: Vec<u8>,
 ) -> Block {
     let block_data = HashableBlockData {
         block_id: id,
         prev_block_id: id.saturating_sub(1),
         prev_block_hash: prev_hash.unwrap_or_default(),
         transactions,
-        data: additional_data,
     };
 
     block_data.into()

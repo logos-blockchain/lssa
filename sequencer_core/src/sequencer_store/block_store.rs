@@ -89,14 +89,13 @@ mod tests {
             prev_block_hash: [0; 32],
             hash: [1; 32],
             transactions: vec![],
-            data: vec![],
         };
         // Start an empty node store
         let mut node_store =
             SequecerBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
-        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()], vec![]);
+        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
 
         // Try retrieve a tx that's not in the chain yet.
         let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());

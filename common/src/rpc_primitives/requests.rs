@@ -17,7 +17,7 @@ pub struct RegisterAccountRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
-    pub transaction: nssa::PublicTransaction,
+    pub transaction: Vec<u8>
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -71,7 +71,7 @@ pub struct SendTxResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetBlockDataResponse {
-    pub block: Block,
+    pub block: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -91,5 +91,5 @@ pub struct GetAccountBalanceResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetTransactionByHashResponse {
-    pub transaction: Option<nssa::PublicTransaction>,
+    pub transaction: Option<String>,
 }

@@ -1,9 +1,13 @@
+use std::io::Cursor;
+
 use actix_web::Error as HttpError;
+use base64::{engine::general_purpose, Engine};
 use nssa;
 use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
 
 use common::{
+    block::HashableBlockData,
     merkle_tree_public::TreeHashType,
     rpc_primitives::{
         errors::RpcError,
@@ -68,11 +72,15 @@ impl JsonHandler {
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
+        let tx = {
+            let mut cursor: Cursor<&[u8]> = Cursor::new(&send_tx_req.transaction);
+            nssa::PublicTransaction::from_cursor(&mut cursor)
+        };
 
         {
             let mut state = self.sequencer_state.lock().await;
 
-            state.push_tx_into_mempool_pre_check(send_tx_req.transaction)?;
+            state.push_tx_into_mempool_pre_check(tx)?;
         }
 
         let helperstruct = SendTxResponse {
@@ -94,7 +102,9 @@ impl JsonHandler {
                 .get_block_at_id(get_block_req.block_id)?
         };
 
-        let helperstruct = GetBlockDataResponse { block };
+        let helperstruct = GetBlockDataResponse {
+            block: HashableBlockData::from(block).to_bytes(),
+        };
 
         respond(helperstruct)
     }
@@ -177,9 +187,16 @@ impl JsonHandler {
 
         let transaction = {
             let state = self.sequencer_state.lock().await;
-            state.store.block_store.get_transaction_by_hash(hash)
+            state
+                .store
+                .block_store
+                .get_transaction_by_hash(hash)
+                .map(|tx| tx.to_bytes())
         };
-        let helperstruct = GetTransactionByHashResponse { transaction };
+        let base64_encoded = transaction.map(|tx| general_purpose::STANDARD.encode(tx));
+        let helperstruct = GetTransactionByHashResponse {
+            transaction: base64_encoded,
+        };
         respond(helperstruct)
     }
 
@@ -217,15 +234,13 @@ mod tests {
         let tempdir = tempdir().unwrap();
         let home = tempdir.path().to_path_buf();
         let acc1_addr = vec![
-            // 13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
-            // 68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 85, 42, 215,
-            1; 32
+            27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30, 24,
+            52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
         ];
 
         let acc2_addr = vec![
-            // 151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
-            // 135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 44, 243, 100,
-            2; 32
+            77, 75, 108, 209, 54, 16, 50, 202, 155, 210, 174, 185, 217, 0, 170, 77, 69, 217, 234,
+            216, 10, 201, 66, 51, 116, 196, 81, 167, 37, 77, 7, 102,
         ];
 
         let initial_acc1 = AccountInitialData {
@@ -264,7 +279,10 @@ mod tests {
         let signing_key = nssa::PrivateKey::try_new([1; 32]).unwrap();
         let balance_to_move = 10;
         let tx = common::test_utils::create_transaction_native_token_transfer(
-            [1; 32],
+            [
+                27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30,
+                24, 52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
+            ],
             0,
             [2; 32],
             balance_to_move,
@@ -490,25 +508,9 @@ mod tests {
             "id": 1,
             "jsonrpc": "2.0",
             "result": {
-                "transaction": {
-                    "message": {
-                        "addresses": [
-                            { "value": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
-                            { "value": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] }
-                        ],
-                        "instruction_data": [10, 0, 0, 0],
-                        "nonces": [0],
-                        "program_id": nssa::program::Program::authenticated_transfer_program().id(),
-                    },
-                    "witness_set": {
-                        "signatures_and_public_keys": [
-                            [1, 1]
-                        ]
-                    }
-                }
+                "transaction": "TlNTQS92MC4xL1R4TWVzc2FnZTYHPd+eRGuYF2kuC9CQp8t7bp1UuMIyqCp4yOzP4zCBAgAAABuExVZ7EmRAmV0+1aq6BWXXHhg0YEgZ/5wX9enV3QePAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIBAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAKAAAAAAAAAAAAAAAAAAAAAQAAAKvsz0Lg2apthMPOsOhYarLVuZmMeUYDneKtr95L7Ia6C+Z3/dw3CAtb2wIa4/Ow5JwatpstOGwC9uS2mySzf9UbhMVWexJkQJldPtWqugVl1x4YNGBIGf+cF/Xp1d0Hjw==",
             }
         });
-
         let response = call_rpc_handler_with_json(json_handler, request).await;
 
         assert_eq!(response, expected_response);
