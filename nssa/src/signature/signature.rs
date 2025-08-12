@@ -1,10 +1,10 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::io::{Cursor, Read};
 
 use crate::{PrivateKey, PublicKey, error::NssaError, public_transaction::Message};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
-    value: [u8; 64],
+    pub(crate) value: [u8; 64],
 }
 
 impl Signature {
@@ -27,30 +27,11 @@ impl Signature {
     }
 }
 
-impl Serialize for Signature {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serialize as a slice
-        serializer.serialize_bytes(&self.value)
-    }
-}
-
-impl<'de> Deserialize<'de> for Signature {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let bytes: &[u8] = Deserialize::deserialize(deserializer)?;
-        if bytes.len() != 64 {
-            return Err(serde::de::Error::invalid_length(
-                bytes.len(),
-                &"expected 64 bytes",
-            ));
-        }
+impl Signature {
+    // TODO: remove unwraps and return Result
+    pub(crate) fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Self {
         let mut value = [0u8; 64];
-        value.copy_from_slice(bytes);
-        Ok(Signature { value })
+        cursor.read_exact(&mut value).unwrap();
+        Self { value }
     }
 }

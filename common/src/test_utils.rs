@@ -34,7 +34,7 @@ pub fn produce_dummy_empty_transaction() -> nssa::PublicTransaction {
     let program_id = nssa::program::Program::authenticated_transfer_program().id();
     let addresses = vec![];
     let nonces = vec![];
-    let instruction_data = 0;
+    let instruction_data: u128 = 0;
     let message =
         nssa::public_transaction::Message::try_new(program_id, addresses, nonces, instruction_data).unwrap();
     let private_key = nssa::PrivateKey::try_new([1; 32]).unwrap();

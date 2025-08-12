@@ -1,10 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Cursor,
+};
 
 use nssa_core::{
     account::{Account, AccountWithMetadata},
     program::validate_execution,
 };
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, digest::FixedOutput};
 
 use crate::{V01State, address::Address, error::NssaError};
@@ -15,7 +17,7 @@ mod witness_set;
 pub use message::Message;
 pub use witness_set::WitnessSet;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicTransaction {
     message: Message,
     witness_set: WitnessSet,
@@ -45,8 +47,24 @@ impl PublicTransaction {
         }
     }
 
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = self.message.message_to_bytes();
+        bytes.extend_from_slice(&self.witness_set.to_bytes());
+        bytes
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut cursor = Cursor::new(bytes);
+        let message = Message::from_cursor(&mut cursor);
+        let witness_set = WitnessSet::from_cursor(&mut cursor);
+        Self {
+            message,
+            witness_set,
+        }
+    }
+
     pub fn hash(&self) -> [u8; 32] {
-        let bytes = serde_cbor::to_vec(&self).unwrap();
+        let bytes = self.to_bytes();
         let mut hasher = sha2::Sha256::new();
         hasher.update(&bytes);
         hasher.finalize_fixed().into()
@@ -114,5 +132,38 @@ impl PublicTransaction {
         }
 
         Ok(message.addresses.iter().cloned().zip(post_states).collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Address, PrivateKey, PublicTransaction, PublicKey,
+        program::Program,
+        public_transaction::{Message, WitnessSet},
+    };
+
+    #[test]
+    fn test() {
+        let key1 = PrivateKey::try_new([1; 32]).unwrap();
+        let key2 = PrivateKey::try_new([2; 32]).unwrap();
+        let addr1 = Address::from_public_key(&PublicKey::new(&key1));
+        let addr2 = Address::from_public_key(&PublicKey::new(&key2));
+        let nonces = vec![5, 99];
+        let instruction = 1337;
+        let message = Message::try_new(
+            Program::authenticated_transfer_program().id(),
+            vec![addr1, addr2],
+            nonces,
+            instruction,
+        )
+        .unwrap();
+
+        let witness_set = WitnessSet::for_message(&message, &[&key1, &key2]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let bytes = tx.to_bytes();
+        let recov_tx = PublicTransaction::from_bytes(&bytes);
+        assert_eq!(tx, recov_tx);
     }
 }

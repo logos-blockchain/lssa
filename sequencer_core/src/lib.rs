@@ -102,10 +102,13 @@ impl SequencerCore {
             .mempool
             .pop_size(self.sequencer_config.max_num_tx_in_block);
 
-        let valid_transactions = transactions
+        println!("##");
+        println!("{:?}", transactions.len());
+        let valid_transactions: Vec<_> = transactions
             .into_iter()
             .filter_map(|tx| self.execute_check_transaction_on_state(tx).ok())
             .collect();
+        println!("{:?}", valid_transactions.len());
 
         let prev_block_hash = self
             .store
@@ -157,15 +160,13 @@ mod tests {
 
     fn setup_sequencer_config() -> SequencerConfig {
         let acc1_addr = vec![
-            // 13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
-            // 68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 85, 42, 215,
-            1; 32
+            27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30, 24,
+            52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
         ];
 
         let acc2_addr = vec![
-            // 151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
-            // 135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 44, 243, 100,
-            2; 32
+            77, 75, 108, 209, 54, 16, 50, 202, 155, 210, 174, 185, 217, 0, 170, 77, 69, 217, 234,
+            216, 10, 201, 66, 51, 116, 196, 81, 167, 37, 77, 7, 102,
         ];
 
         let initial_acc1 = AccountInitialData {
@@ -236,13 +237,13 @@ mod tests {
     #[test]
     fn test_start_different_intial_accounts_balances() {
         let acc1_addr = vec![
-            13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
-            68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 42, 42, 42,
+            27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30, 24,
+            52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
         ];
 
         let acc2_addr = vec![
-            151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
-            135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 42, 42, 42,
+            77, 75, 108, 209, 54, 16, 50, 202, 155, 210, 174, 185, 217, 0, 170, 77, 69, 217, 234,
+            216, 10, 201, 66, 51, 116, 196, 81, 167, 37, 77, 7, 102,
         ];
 
         let initial_acc1 = AccountInitialData {
