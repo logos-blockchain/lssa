@@ -37,7 +37,8 @@ impl PublicTransaction {
 
     pub(crate) fn signer_addresses(&self) -> Vec<Address> {
         self.witness_set
-            .iter_signatures()
+            .signatures_and_public_keys()
+            .iter()
             .map(|(_, public_key)| Address::from_public_key(public_key))
             .collect()
     }
@@ -115,7 +116,7 @@ impl PublicTransaction {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use sha2::{Digest, digest::FixedOutput};
 
     use crate::{

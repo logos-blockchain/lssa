@@ -92,9 +92,9 @@ impl Message {
 impl WitnessSet {
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        let size = self.signatures_and_public_keys.len() as u32;
+        let size = self.signatures_and_public_keys().len() as u32;
         bytes.extend_from_slice(&size.to_le_bytes());
-        for (signature, public_key) in &self.signatures_and_public_keys {
+        for (signature, public_key) in self.signatures_and_public_keys() {
             bytes.extend_from_slice(signature.to_bytes());
             bytes.extend_from_slice(public_key.to_bytes());
         }
