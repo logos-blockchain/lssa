@@ -73,11 +73,6 @@ impl V01State {
     pub(crate) fn builtin_programs(&self) -> &HashMap<ProgramId, Program> {
         &self.builtin_programs
     }
-
-    #[cfg(test)]
-    pub fn force_insert_account(&mut self, address: Address, account: Account) {
-        self.public_state.insert(address, account);
-    }
 }
 
 #[cfg(test)]
@@ -283,6 +278,10 @@ mod tests {
     }
 
     impl V01State {
+        pub fn force_insert_account(&mut self, address: Address, account: Account) {
+            self.public_state.insert(address, account);
+        }
+
         /// Include test programs in the builtin programs map
         pub fn with_test_programs(mut self) -> Self {
             self.insert_program(Program::nonce_changer_program());

@@ -24,3 +24,13 @@ impl PrivateKey {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_value_getter() {
+        let key = PrivateKey::try_new([1; 32]).unwrap();
+        assert_eq!(key.value(), &key.0);
+    }
+}
