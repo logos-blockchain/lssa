@@ -112,15 +112,6 @@ impl WalletCore {
         }
     }
 
-    ///Helperfunction to increment nonces for all given accounts
-    fn increment_nonces(&mut self, accounts_to_increment_nonces: &[AccountAddress]) {
-        for acc_addr in accounts_to_increment_nonces {
-            if let Some(acc) = self.storage.acc_map.get_mut(acc_addr) {
-                acc.nonce += 1;
-            }
-        }
-    }
-
     ///Dumps all accounts from acc_map at `path`
     ///
     ///Currently storing everything in one file
@@ -198,7 +189,7 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
             let from = produce_account_addr_from_hex(from)?;
             let to = produce_account_addr_from_hex(to)?;
 
-            let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
+            let wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
             let res = wallet_core
                 .send_public_native_token_transfer(from, nonce, to, amount)
@@ -207,7 +198,6 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
             info!("Results of tx send is {res:#?}");
 
             //ToDo: Insert transaction polling logic here
-            wallet_core.increment_nonces(&[from, to]);
 
             let acc_storage_path = wallet_core.store_present_accounts_at_home()?;
 
