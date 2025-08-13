@@ -7,5 +7,4 @@ edition = "2021"
 
 [dependencies]
 risc0-zkvm = { version = "2.3.1", default-features = false, features = ['std'] }
-nssa-core = {path = "../../core"}
-
+nssa-core = { path = "../../core" }

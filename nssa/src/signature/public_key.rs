@@ -15,7 +15,7 @@ impl PublicKey {
         Self(value)
     }
 
-    pub fn try_new(value: [u8; 32]) -> Result<Self, NssaError> {
+    pub(super) fn try_new(value: [u8; 32]) -> Result<Self, NssaError> {
         // Check point is valid
         let _ = secp256k1::XOnlyPublicKey::from_byte_array(value)
             .map_err(|_| NssaError::InvalidPublicKey)?;
