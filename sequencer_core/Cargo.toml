@@ -28,6 +28,9 @@ path = "../accounts"
 [dependencies.common]
 path = "../common"
 
+[dependencies.nssa]
+path = "../nssa"
+
 [dependencies.secp256k1-zkp]
 workspace = true
 features = ["std", "rand-std", "rand", "serde", "global-context"]

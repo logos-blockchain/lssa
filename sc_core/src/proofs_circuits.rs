@@ -1,5 +1,6 @@
 use bincode;
 use common::merkle_tree_public::merkle_tree::UTXOCommitmentsMerkleTree;
+use nssa::Address;
 use rand::{thread_rng, RngCore};
 use secp256k1_zkp::{CommitmentSecrets, Generator, PedersenCommitment, Tag, Tweak, SECP256K1};
 use sha2::{Digest, Sha256};
@@ -82,7 +83,7 @@ pub fn private_circuit(
     for in_utxo in input_utxos {
         let nullifier_public_key = public_context
             .account_masks
-            .get(&in_utxo.owner)
+            .get(&Address::new(in_utxo.owner))
             .unwrap()
             .nullifier_public_key;
 
@@ -125,7 +126,7 @@ pub fn deshielded_circuit(
     for in_utxo in input_utxos {
         let nullifier_public_key = public_context
             .account_masks
-            .get(&in_utxo.owner)
+            .get(&Address::new(in_utxo.owner))
             .unwrap()
             .nullifier_public_key;
 

@@ -1,14 +1,10 @@
 use std::collections::VecDeque;
 
-use mempoolitem::MemPoolItem;
-
-pub mod mempoolitem;
-
-pub struct MemPool<Item: MemPoolItem> {
+pub struct MemPool<Item> {
     items: VecDeque<Item>,
 }
 
-impl<Item: MemPoolItem> MemPool<Item> {
+impl<Item> MemPool<Item> {
     pub fn new() -> Self {
         Self {
             items: VecDeque::new(),
@@ -55,7 +51,7 @@ impl<Item: MemPoolItem> MemPool<Item> {
     }
 }
 
-impl<Item: MemPoolItem> Default for MemPool<Item> {
+impl<Item> Default for MemPool<Item> {
     fn default() -> Self {
         Self::new()
     }
@@ -72,14 +68,6 @@ mod tests {
     #[derive(Debug, PartialEq, Eq)]
     pub struct TestItem {
         id: ItemId,
-    }
-
-    impl MemPoolItem for TestItem {
-        type Identifier = ItemId;
-
-        fn identifier(&self) -> Self::Identifier {
-            self.id
-        }
     }
 
     fn test_item_with_id(id: u64) -> TestItem {

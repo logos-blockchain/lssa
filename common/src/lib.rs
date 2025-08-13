@@ -65,7 +65,7 @@ pub enum ExecutionFailureKind {
     #[error("Failed prove execution err: {0:?}")]
     ProveError(anyhow::Error),
     #[error("Failed to decode data from VM: {0:?}")]
-    DecodeError(#[from] risc0_zkvm::serde::Error),
+    DecodeError(String),
     #[error("Inputs amounts does not match outputs")]
     AmountMismatchError,
     #[error("Sequencer client error: {0:?}")]

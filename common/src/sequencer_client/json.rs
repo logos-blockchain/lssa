@@ -1,12 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::transaction::Transaction;
-
 //Requests
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
-    pub transaction: Transaction,
+    pub transaction: Vec<u8>,
 }
 
 //Responses

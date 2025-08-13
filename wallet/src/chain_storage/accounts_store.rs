@@ -1,8 +1,9 @@
-use accounts::account_core::{address::AccountAddress, Account};
+use accounts::account_core::Account;
+use nssa::Address;
 use std::collections::HashMap;
 
 pub struct WalletAccountsStore {
-    pub accounts: HashMap<AccountAddress, Account>,
+    pub accounts: HashMap<Address, Account>,
 }
 
 impl WalletAccountsStore {
@@ -16,7 +17,7 @@ impl WalletAccountsStore {
         self.accounts.insert(account.address, account);
     }
 
-    pub fn unregister_account(&mut self, account_addr: AccountAddress) {
+    pub fn unregister_account(&mut self, account_addr: Address) {
         self.accounts.remove(&account_addr);
     }
 }
@@ -82,7 +83,7 @@ mod tests {
         let mut store = WalletAccountsStore::new();
 
         let account_addr: [u8; 32] = pad_to_32("nonexistent".to_string().as_bytes());
-        store.unregister_account(account_addr);
+        store.unregister_account(Address::new(account_addr));
 
         assert!(store.accounts.is_empty());
     }

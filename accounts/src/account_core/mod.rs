@@ -4,18 +4,14 @@ use anyhow::Result;
 use common::{merkle_tree_public::TreeHashType, transaction::Tag};
 use k256::AffinePoint;
 use log::info;
+use nssa::Address;
 use serde::{Deserialize, Serialize};
 use utxo::utxo_core::UTXO;
 
-pub mod address;
-
-use crate::{
-    account_core::address::AccountAddress,
-    key_management::{
-        constants_types::{CipherText, Nonce},
-        ephemeral_key_holder::EphemeralKeyHolder,
-        AddressKeyHolder,
-    },
+use crate::key_management::{
+    constants_types::{CipherText, Nonce},
+    ephemeral_key_holder::EphemeralKeyHolder,
+    AddressKeyHolder,
 };
 
 pub type PublicKey = AffinePoint;
@@ -23,7 +19,7 @@ pub type PublicKey = AffinePoint;
 #[derive(Clone, Debug)]
 pub struct Account {
     pub key_holder: AddressKeyHolder,
-    pub address: AccountAddress,
+    pub address: Address,
     pub balance: u64,
     pub nonce: u64,
     pub utxos: HashMap<TreeHashType, UTXO>,
@@ -32,7 +28,7 @@ pub struct Account {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AccountForSerialization {
     pub key_holder: AddressKeyHolder,
-    pub address: AccountAddress,
+    pub address: Address,
     pub balance: u64,
     pub nonce: u64,
     pub utxos: HashMap<String, UTXO>,
@@ -99,7 +95,7 @@ impl<'de> Deserialize<'de> for Account {
 pub struct AccountPublicMask {
     pub nullifier_public_key: AffinePoint,
     pub viewing_public_key: AffinePoint,
-    pub address: AccountAddress,
+    pub address: Address,
     pub balance: u64,
 }
 
@@ -114,15 +110,16 @@ impl AccountPublicMask {
     }
 
     pub fn make_tag(&self) -> Tag {
-        self.address[0]
+        self.address.tag()
     }
 }
 
 impl Account {
     pub fn new() -> Self {
         let key_holder = AddressKeyHolder::new_os_random();
-        let public_key = *key_holder.get_pub_account_signing_key().verifying_key();
-        let address = address::from_public_key(&public_key);
+        let public_key =
+            nssa::PublicKey::new_from_private_key(key_holder.get_pub_account_signing_key());
+        let address = nssa::Address::from(&public_key);
         let balance = 0;
         let nonce = 0;
         let utxos = HashMap::new();
@@ -138,9 +135,9 @@ impl Account {
 
     pub fn new_with_balance(balance: u64) -> Self {
         let key_holder = AddressKeyHolder::new_os_random();
-        let public_key = *key_holder.get_pub_account_signing_key().verifying_key();
-        let address = address::from_public_key(&public_key);
-        let nonce = 0;
+        let public_key =
+            nssa::PublicKey::new_from_private_key(key_holder.get_pub_account_signing_key());
+        let address = nssa::Address::from(&public_key);
         let utxos = HashMap::new();
 
         Self {
@@ -191,7 +188,7 @@ impl Account {
         privacy_flag: bool,
     ) -> Result<()> {
         let asset_utxo = UTXO::new(
-            self.address,
+            *self.address.value(),
             serde_json::to_vec(&asset)?,
             amount,
             privacy_flag,
@@ -209,7 +206,7 @@ impl Account {
     }
 
     pub fn make_tag(&self) -> Tag {
-        self.address[0]
+        self.address.tag()
     }
 
     ///Produce account public mask
@@ -247,8 +244,8 @@ mod tests {
     #[test]
     fn test_add_new_utxo_outputs() {
         let mut account = Account::new();
-        let utxo1 = generate_dummy_utxo(account.address, 100);
-        let utxo2 = generate_dummy_utxo(account.address, 200);
+        let utxo1 = generate_dummy_utxo(*account.address.value(), 100);
+        let utxo2 = generate_dummy_utxo(*account.address.value(), 200);
 
         let result = account.add_new_utxo_outputs(vec![utxo1.clone(), utxo2.clone()]);
 

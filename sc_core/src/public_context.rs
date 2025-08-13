@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use accounts::account_core::{address::AccountAddress, AccountPublicMask};
+use accounts::account_core::AccountPublicMask;
 use common::merkle_tree_public::{merkle_tree::UTXOCommitmentsMerkleTree, TreeHashType};
+use nssa::Address;
 use serde::{ser::SerializeStruct, Serialize};
 
 pub const PUBLIC_SC_CONTEXT: &str = "PublicSCContext";
@@ -16,9 +17,9 @@ pub const NULLIFIERS_SET: &str = "nullifiers_set";
 
 ///Strucutre, representing context, given to a smart contract on a call
 pub struct PublicSCContext {
-    pub caller_address: AccountAddress,
+    pub caller_address: Address,
     pub caller_balance: u64,
-    pub account_masks: BTreeMap<AccountAddress, AccountPublicMask>,
+    pub account_masks: BTreeMap<Address, AccountPublicMask>,
     pub comitment_store_root: TreeHashType,
     pub commitments_tree: UTXOCommitmentsMerkleTree,
 }
@@ -28,7 +29,12 @@ impl Serialize for PublicSCContext {
     where
         S: serde::Serializer,
     {
-        let mut account_masks_keys: Vec<[u8; 32]> = self.account_masks.keys().cloned().collect();
+        let mut account_masks_keys: Vec<[u8; 32]> = self
+            .account_masks
+            .keys()
+            .cloned()
+            .map(|addr| *addr.value())
+            .collect();
         account_masks_keys.sort();
 
         let mut account_mask_values: Vec<AccountPublicMask> =
@@ -94,7 +100,7 @@ mod tests {
     use super::*;
 
     fn create_test_context() -> PublicSCContext {
-        let caller_address = [1; 32];
+        let caller_address = Address::new([1; 32]);
         let comitment_store_root = [3; 32];
 
         let commitments_tree =

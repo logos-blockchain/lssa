@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use common::block::Block;
+use common::block::{Block, HashableBlockData};
 use error::DbError;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
@@ -242,12 +242,7 @@ impl RocksDBIO {
             .put_cf(
                 &cf_block,
                 block.block_id.to_be_bytes(),
-                serde_json::to_vec(&block).map_err(|serr| {
-                    DbError::serde_cast_message(
-                        serr,
-                        Some("Block Serialization failed".to_string()),
-                    )
-                })?,
+                HashableBlockData::from(block).to_bytes(),
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
         Ok(())
@@ -261,9 +256,7 @@ impl RocksDBIO {
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
         if let Some(data) = res {
-            Ok(serde_json::from_slice::<Block>(&data).map_err(|serr| {
-                DbError::serde_cast_message(serr, Some("Block Deserialization failed".to_string()))
-            })?)
+            Ok(HashableBlockData::from_bytes(&data).into())
         } else {
             Err(DbError::db_interaction_error(
                 "Block on this id not found".to_string(),

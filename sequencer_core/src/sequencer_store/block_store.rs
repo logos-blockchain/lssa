@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{block::Block, merkle_tree_public::TreeHashType, transaction::Transaction};
+use common::{block::Block, merkle_tree_public::TreeHashType};
 use storage::RocksDBIO;
 
 pub struct SequecerBlockStore {
@@ -51,12 +51,12 @@ impl SequecerBlockStore {
     }
 
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
-    pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<Transaction> {
+    pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<nssa::PublicTransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
         let block = block_id.map(|&id| self.get_block_at_id(id));
         if let Some(Ok(block)) = block {
             for transaction in block.transactions.into_iter() {
-                if transaction.body().hash() == hash {
+                if transaction.hash() == hash {
                     return Some(transaction);
                 }
             }
@@ -69,13 +69,14 @@ fn block_to_transactions_map(block: &Block) -> HashMap<TreeHashType, u64> {
     block
         .transactions
         .iter()
-        .map(|transaction| (transaction.body().hash(), block.block_id))
+        .map(|transaction| (transaction.hash(), block.block_id))
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use tempfile::tempdir;
 
     #[test]
@@ -88,22 +89,21 @@ mod tests {
             prev_block_hash: [0; 32],
             hash: [1; 32],
             transactions: vec![],
-            data: vec![],
         };
         // Start an empty node store
         let mut node_store =
             SequecerBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
-        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()], vec![]);
+        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
 
         // Try retrieve a tx that's not in the chain yet.
-        let retrieved_tx = node_store.get_transaction_by_hash(tx.body().hash());
+        let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(None, retrieved_tx);
         // Add the block with the transaction
         node_store.put_block_at_id(block).unwrap();
         // Try again
-        let retrieved_tx = node_store.get_transaction_by_hash(tx.body().hash());
+        let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(Some(tx), retrieved_tx);
     }
 }

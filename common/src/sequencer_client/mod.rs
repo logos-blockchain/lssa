@@ -8,7 +8,6 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::sequencer_client::json::AccountInitialData;
-use crate::transaction::Transaction;
 use crate::{SequencerClientError, SequencerRpcError};
 
 pub mod json;
@@ -90,9 +89,11 @@ impl SequencerClient {
     ///Send transaction to sequencer
     pub async fn send_tx(
         &self,
-        transaction: Transaction,
+        transaction: nssa::PublicTransaction,
     ) -> Result<SendTxResponse, SequencerClientError> {
-        let tx_req = SendTxRequest { transaction };
+        let tx_req = SendTxRequest {
+            transaction: transaction.to_bytes(),
+        };
 
         let req = serde_json::to_value(tx_req)?;
 

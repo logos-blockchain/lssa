@@ -1,0 +1,21 @@
+[package]
+name = "nssa"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2.0.12"
+risc0-zkvm = "2.3.1"
+nssa-core = { path = "core" }
+program-methods = { path = "program_methods" }
+serde = "1.0.219"
+sha2 = "0.10.9"
+secp256k1 = "0.31.1"
+rand = "0.8"
+hex = "0.4.3"
+anyhow.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+test-program-methods = { path = "test_program_methods" }
+

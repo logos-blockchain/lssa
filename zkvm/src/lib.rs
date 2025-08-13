@@ -1,5 +1,5 @@
-use accounts::account_core::address::AccountAddress;
 use common::ExecutionFailureKind;
+use nssa::Address;
 use rand::{rngs::OsRng, RngCore};
 use risc0_zkvm::{default_executor, default_prover, sha::Digest, ExecutorEnv, Receipt};
 use serde::Serialize;
@@ -35,7 +35,7 @@ pub fn gas_limits_check<INP: Serialize>(
 #[allow(clippy::result_large_err)]
 pub fn prove_mint_utxo(
     amount_to_mint: u128,
-    owner: AccountAddress,
+    owner: Address,
 ) -> Result<(UTXO, Receipt), ExecutionFailureKind> {
     let mut builder = ExecutorEnv::builder();
 
@@ -63,7 +63,10 @@ pub fn prove_mint_utxo(
         .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: UTXOPayload = receipt.journal.decode()?;
+    let digest: UTXOPayload = receipt
+        .journal
+        .decode()
+        .map_err(|e| ExecutionFailureKind::DecodeError(e.to_string()))?;
 
     Ok((UTXO::create_utxo_from_payload(digest), receipt))
 }
@@ -71,8 +74,8 @@ pub fn prove_mint_utxo(
 #[allow(clippy::result_large_err)]
 pub fn prove_send_utxo(
     spent_utxo: UTXO,
-    owners_parts: Vec<(u128, AccountAddress)>,
-) -> Result<(Vec<(UTXO, AccountAddress)>, Receipt), ExecutionFailureKind> {
+    owners_parts: Vec<(u128, Address)>,
+) -> Result<(Vec<(UTXO, Address)>, Receipt), ExecutionFailureKind> {
     let cumulative_spent = owners_parts.iter().fold(0, |acc, item| acc + item.0);
 
     if cumulative_spent != spent_utxo.amount {
@@ -110,7 +113,10 @@ pub fn prove_send_utxo(
         .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode()?;
+    let digest: Vec<(UTXOPayload, Address)> = receipt
+        .journal
+        .decode()
+        .map_err(|e| ExecutionFailureKind::DecodeError(e.to_string()))?;
 
     Ok((
         digest
@@ -125,7 +131,7 @@ pub fn prove_send_utxo(
 pub fn prove_send_utxo_multiple_assets_one_receiver(
     spent_utxos: Vec<UTXO>,
     number_to_send: usize,
-    receiver: AccountAddress,
+    receiver: Address,
 ) -> Result<(Vec<UTXO>, Vec<UTXO>, Receipt), ExecutionFailureKind> {
     if number_to_send > spent_utxos.len() {
         return Err(ExecutionFailureKind::AmountMismatchError);
@@ -158,7 +164,10 @@ pub fn prove_send_utxo_multiple_assets_one_receiver(
         .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: (Vec<UTXOPayload>, Vec<UTXOPayload>) = receipt.journal.decode()?;
+    let digest: (Vec<UTXOPayload>, Vec<UTXOPayload>) = receipt
+        .journal
+        .decode()
+        .map_err(|e| ExecutionFailureKind::DecodeError(e.to_string()))?;
 
     Ok((
         digest
@@ -177,17 +186,17 @@ pub fn prove_send_utxo_multiple_assets_one_receiver(
 
 #[allow(clippy::result_large_err)]
 pub fn prove_send_utxo_shielded(
-    owner: AccountAddress,
+    owner: Address,
     amount: u128,
-    owners_parts: Vec<(u128, AccountAddress)>,
-) -> Result<(Vec<(UTXO, AccountAddress)>, Receipt), ExecutionFailureKind> {
+    owners_parts: Vec<(u128, Address)>,
+) -> Result<(Vec<(UTXO, Address)>, Receipt), ExecutionFailureKind> {
     let cumulative_spent = owners_parts.iter().fold(0, |acc, item| acc + item.0);
 
     if cumulative_spent != amount {
         return Err(ExecutionFailureKind::AmountMismatchError);
     }
 
-    let temp_utxo_to_spend = UTXO::new(owner, vec![], amount, true);
+    let temp_utxo_to_spend = UTXO::new(*owner.value(), vec![], amount, true);
     let utxo_payload = temp_utxo_to_spend.into_payload();
 
     let mut builder = ExecutorEnv::builder();
@@ -220,7 +229,10 @@ pub fn prove_send_utxo_shielded(
         .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode()?;
+    let digest: Vec<(UTXOPayload, Address)> = receipt
+        .journal
+        .decode()
+        .map_err(|e| ExecutionFailureKind::DecodeError(e.to_string()))?;
 
     Ok((
         digest
@@ -234,8 +246,8 @@ pub fn prove_send_utxo_shielded(
 #[allow(clippy::result_large_err)]
 pub fn prove_send_utxo_deshielded(
     spent_utxo: UTXO,
-    owners_parts: Vec<(u128, AccountAddress)>,
-) -> Result<(Vec<(u128, AccountAddress)>, Receipt), ExecutionFailureKind> {
+    owners_parts: Vec<(u128, Address)>,
+) -> Result<(Vec<(u128, Address)>, Receipt), ExecutionFailureKind> {
     let cumulative_spent = owners_parts.iter().fold(0, |acc, item| acc + item.0);
 
     if cumulative_spent != spent_utxo.amount {
@@ -273,7 +285,10 @@ pub fn prove_send_utxo_deshielded(
         .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<(UTXOPayload, AccountAddress)> = receipt.journal.decode()?;
+    let digest: Vec<(UTXOPayload, Address)> = receipt
+        .journal
+        .decode()
+        .map_err(|e| ExecutionFailureKind::DecodeError(e.to_string()))?;
 
     Ok((
         digest
@@ -288,7 +303,7 @@ pub fn prove_send_utxo_deshielded(
 pub fn prove_mint_utxo_multiple_assets(
     amount_to_mint: u128,
     number_of_assets: usize,
-    owner: AccountAddress,
+    owner: Address,
 ) -> Result<(Vec<UTXO>, Receipt), ExecutionFailureKind> {
     let mut builder = ExecutorEnv::builder();
 
@@ -313,7 +328,10 @@ pub fn prove_mint_utxo_multiple_assets(
         .map_err(ExecutionFailureKind::prove_error)?
         .receipt;
 
-    let digest: Vec<UTXOPayload> = receipt.journal.decode()?;
+    let digest: Vec<UTXOPayload> = receipt
+        .journal
+        .decode()
+        .map_err(|e| ExecutionFailureKind::DecodeError(e.to_string()))?;
 
     Ok((
         digest
@@ -326,7 +344,7 @@ pub fn prove_mint_utxo_multiple_assets(
 
 pub fn execute_mint_utxo(
     amount_to_mint: u128,
-    owner: AccountAddress,
+    owner: Address,
     randomness: [u8; 32],
 ) -> anyhow::Result<UTXO> {
     let mut builder = ExecutorEnv::builder();
@@ -348,8 +366,8 @@ pub fn execute_mint_utxo(
 
 pub fn execute_send_utxo(
     spent_utxo: UTXO,
-    owners_parts: Vec<(u128, AccountAddress)>,
-) -> anyhow::Result<(UTXO, Vec<(UTXO, AccountAddress)>)> {
+    owners_parts: Vec<(u128, Address)>,
+) -> anyhow::Result<(UTXO, Vec<(UTXO, Address)>)> {
     let mut builder = ExecutorEnv::builder();
 
     let utxo_payload = spent_utxo.into_payload();
@@ -372,7 +390,7 @@ pub fn execute_send_utxo(
 
     let receipt = executor.execute(env, test_methods::SEND_UTXO_ELF)?;
 
-    let digest: (UTXOPayload, Vec<(UTXOPayload, AccountAddress)>) = receipt.journal.decode()?;
+    let digest: (UTXOPayload, Vec<(UTXOPayload, Address)>) = receipt.journal.decode()?;
 
     Ok((
         UTXO::create_utxo_from_payload(digest.0),
@@ -554,29 +572,29 @@ mod tests {
 
     #[test]
     fn test_execute_mint_utxo() {
-        let owner = AccountAddress::default();
+        let owner = Address::default();
         let amount = 123456789;
         let mut randomness = [0u8; 32];
         OsRng.fill_bytes(&mut randomness);
 
         let utxo_exec = execute_mint_utxo(amount, owner, randomness).expect("execution failed");
         assert_eq!(utxo_exec.amount, amount);
-        assert_eq!(utxo_exec.owner, owner);
+        assert_eq!(utxo_exec.owner, *owner.value());
     }
 
     #[test]
     fn test_prove_mint_utxo() {
-        let owner = AccountAddress::default();
+        let owner = Address::default();
         let amount = 123456789;
 
         let (utxo, _) = prove_mint_utxo(amount, owner).expect("proof failed");
         assert_eq!(utxo.amount, amount);
-        assert_eq!(utxo.owner, owner);
+        assert_eq!(utxo.owner, *owner.value());
     }
 
     #[test]
     fn test_prove_send_utxo() {
-        let owner = AccountAddress::default();
+        let owner = Address::default();
         let amount = 100;
         let (input_utxo, _) = prove_mint_utxo(amount, owner).expect("mint failed");
 
@@ -590,7 +608,7 @@ mod tests {
 
     #[test]
     fn test_prove_send_utxo_deshielded() {
-        let owner = AccountAddress::default();
+        let owner = Address::default();
         let amount = 100;
         let (utxo, _) = prove_mint_utxo(amount, owner).unwrap();
         let parts = vec![(60, owner), (40, owner)];
@@ -604,7 +622,7 @@ mod tests {
 
     #[test]
     fn test_prove_send_utxo_shielded() {
-        let owner = AccountAddress::default();
+        let owner = Address::default();
         let amount = 100;
         let parts = vec![(60, owner), (40, owner)];
 
@@ -617,8 +635,8 @@ mod tests {
 
     #[test]
     fn test_prove_send_utxo_multiple_assets_one_receiver() {
-        let owner = AccountAddress::default();
-        let receiver = AccountAddress::default();
+        let owner = Address::default();
+        let receiver = Address::default();
 
         let utxos = vec![
             prove_mint_utxo(100, owner).unwrap().0,

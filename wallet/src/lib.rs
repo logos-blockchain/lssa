@@ -1,19 +1,17 @@
 use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use common::{
-    execution_input::PublicNativeTokenSend,
     sequencer_client::{json::SendTxResponse, SequencerClient},
-    transaction::Transaction,
     ExecutionFailureKind,
 };
 
-use accounts::account_core::{address::AccountAddress, Account};
+use accounts::account_core::Account;
 use anyhow::Result;
 use chain_storage::WalletChainStore;
-use common::transaction::TransactionBody;
 use config::WalletConfig;
 use log::info;
-use sc_core::proofs_circuits::pedersen_commitment_vec;
+use nssa::Address;
+use tokio::sync::RwLock;
 
 use clap::{Parser, Subcommand};
 
@@ -56,7 +54,7 @@ impl WalletCore {
         })
     }
 
-    pub async fn create_new_account(&mut self) -> AccountAddress {
+    pub async fn create_new_account(&mut self) -> Address {
         let account = Account::new();
         account.log();
 
@@ -69,54 +67,38 @@ impl WalletCore {
 
     pub async fn send_public_native_token_transfer(
         &self,
-        from: AccountAddress,
-        nonce: u64,
-        to: AccountAddress,
-        balance_to_move: u64,
+        from: Address,
+        nonce: u128,
+        to: Address,
+        balance_to_move: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
-        let public_context = self.storage.produce_context(from);
-
-        let (tweak, secret_r, commitment) = pedersen_commitment_vec(
-            //Will not panic, as public context is serializable
-            public_context.produce_u64_list_from_context().unwrap(),
-        );
-
-        let sc_addr = hex::encode([0; 32]);
-
-        let tx: TransactionBody =
-            sc_core::transaction_payloads_tools::create_public_transaction_payload(
-                serde_json::to_vec(&PublicNativeTokenSend {
-                    from,
-                    nonce,
-                    to,
-                    balance_to_move,
-                })
-                .unwrap(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-            );
-        tx.log();
-
-        let account = self.storage.acc_map.get(&from);
+        {
+            let read_guard = self.storage.read().await;
 
         if let Some(account) = account {
             let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
-            let signed_transaction = Transaction::new(tx, key_to_sign_transaction);
+            if let Some(account) = account {
+                let addresses = vec![from, to];
+                let nonces = vec![nonce];
+                let program_id = nssa::program::Program::authenticated_transfer_program().id();
+                let message = nssa::public_transaction::Message::try_new(
+                    program_id,
+                    addresses,
+                    nonces,
+                    balance_to_move,
+                )
+                .unwrap();
 
-            Ok(self.sequencer_client.send_tx(signed_transaction).await?)
-        } else {
-            Err(ExecutionFailureKind::AmountMismatchError)
-        }
-    }
+                let signing_key = account.key_holder.get_pub_account_signing_key();
+                let witness_set =
+                    nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
 
-    ///Helperfunction to increment nonces for all given accounts
-    fn increment_nonces(&mut self, accounts_to_increment_nonces: &[AccountAddress]) {
-        for acc_addr in accounts_to_increment_nonces {
-            if let Some(acc) = self.storage.acc_map.get_mut(acc_addr) {
-                acc.nonce += 1;
+                let tx = nssa::PublicTransaction::new(message, witness_set);
+
+                Ok(self.sequencer_client.send_tx(tx).await?)
+            } else {
+                Err(ExecutionFailureKind::AmountMismatchError)
             }
         }
     }
@@ -158,15 +140,15 @@ pub enum Command {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
-        ///nonce - u64 integer
+        ///nonce - u128 integer
         #[arg(long)]
-        nonce: u64,
+        nonce: u128,
         ///to - valid 32 byte hex string
         #[arg(long)]
         to: String,
         ///amount - amount of balance to move
         #[arg(long)]
-        amount: u64,
+        amount: u128,
     },
     ///Dump accounts at destination
     DumpAccountsOnDisc {

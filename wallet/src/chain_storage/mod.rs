@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
-use accounts::account_core::{address::AccountAddress, Account};
+use accounts::account_core::Account;
 use anyhow::Result;
 use common::merkle_tree_public::merkle_tree::UTXOCommitmentsMerkleTree;
+use nssa::Address;
 use sc_core::public_context::PublicSCContext;
 use serde::{Deserialize, Serialize};
 
@@ -37,7 +38,7 @@ impl From<AccMap> for HashMap<[u8; 32], Account> {
 }
 
 pub struct WalletChainStore {
-    pub acc_map: HashMap<AccountAddress, Account>,
+    pub acc_map: HashMap<Address, Account>,
     pub utxo_commitments_store: UTXOCommitmentsMerkleTree,
     pub wallet_config: WalletConfig,
 }
@@ -54,7 +55,7 @@ impl WalletChainStore {
         })
     }
 
-    pub fn produce_context(&self, caller: AccountAddress) -> PublicSCContext {
+    pub fn produce_context(&self, caller: Address) -> PublicSCContext {
         let mut account_masks = BTreeMap::new();
 
         for (acc_addr, acc) in &self.acc_map {
@@ -80,78 +81,12 @@ mod tests {
 
     fn create_initial_accounts() -> Vec<Account> {
         let initial_acc1 = serde_json::from_str(r#"{
-            "address": [
-                244,
-                55,
-                238,
-                205,
-                74,
-                115,
-                179,
-                192,
-                65,
-                186,
-                166,
-                169,
-                221,
-                45,
-                6,
-                57,
-                200,
-                65,
-                195,
-                70,
-                118,
-                252,
-                206,
-                100,
-                215,
-                250,
-                72,
-                230,
-                19,
-                71,
-                217,
-                249
-            ],
+            "address": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
             "balance": 100,
             "nonce": 0,
             "key_holder": {
                 "nullifer_public_key": "03A340BECA9FAAB444CED0140681D72EA1318B5C611704FEE017DA9836B17DB718",
-                "pub_account_signing_key": [
-                    244,
-                    88,
-                    134,
-                    61,
-                    35,
-                    209,
-                    229,
-                    101,
-                    85,
-                    35,
-                    140,
-                    140,
-                    192,
-                    226,
-                    83,
-                    83,
-                    190,
-                    189,
-                    110,
-                    8,
-                    89,
-                    127,
-                    147,
-                    142,
-                    157,
-                    204,
-                    51,
-                    109,
-                    189,
-                    92,
-                    144,
-                    68
-                ],
+                "pub_account_signing_key": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 "top_secret_key_holder": {
                     "secret_spending_key": "7BC46784DB1BC67825D8F029436846712BFDF9B5D79EA3AB11D39A52B9B229D4"
                 },
@@ -165,78 +100,12 @@ mod tests {
         }"#).unwrap();
 
         let initial_acc2 = serde_json::from_str(r#"{
-            "address": [
-                72,
-                169,
-                70,
-                237,
-                1,
-                96,
-                35,
-                157,
-                25,
-                15,
-                83,
-                18,
-                52,
-                206,
-                202,
-                63,
-                48,
-                59,
-                173,
-                76,
-                78,
-                7,
-                254,
-                229,
-                28,
-                45,
-                194,
-                79,
-                6,
-                89,
-                58,
-                85
-            ],
+            "address": "4d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766",
             "balance": 200,
             "nonce": 0,
             "key_holder": {
                 "nullifer_public_key": "02172F50274DE67C4087C344F5D58E11DF761D90285B095060E0994FAA6BCDE271",
-                "pub_account_signing_key": [
-                    136,
-                    105,
-                    9,
-                    53,
-                    180,
-                    145,
-                    64,
-                    5,
-                    235,
-                    174,
-                    62,
-                    211,
-                    206,
-                    116,
-                    185,
-                    24,
-                    214,
-                    62,
-                    244,
-                    64,
-                    224,
-                    59,
-                    120,
-                    150,
-                    30,
-                    249,
-                    160,
-                    46,
-                    189,
-                    254,
-                    47,
-                    244
-                ],
+                "pub_account_signing_key": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
                 "top_secret_key_holder": {
                     "secret_spending_key": "80A186737C8D38B4288A03F0F589957D9C040D79C19F3E0CC4BA80F8494E5179"
                 },

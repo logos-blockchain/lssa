@@ -1,0 +1,206 @@
+use nssa_core::{
+    account::{Account, AccountWithMetadata},
+    program::{DEFAULT_PROGRAM_ID, InstructionData, ProgramId},
+};
+use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID};
+use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, default_executor, serde::to_vec};
+use serde::Serialize;
+
+use crate::error::NssaError;
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Program {
+    id: ProgramId,
+    elf: &'static [u8],
+}
+
+impl Program {
+    pub fn id(&self) -> ProgramId {
+        self.id
+    }
+
+    pub fn serialize_instruction<T: Serialize>(
+        instruction: T,
+    ) -> Result<InstructionData, NssaError> {
+        to_vec(&instruction).map_err(|e| NssaError::InstructionSerializationError(e.to_string()))
+    }
+
+    pub(crate) fn execute(
+        &self,
+        pre_states: &[AccountWithMetadata],
+        instruction_data: &InstructionData,
+    ) -> Result<Vec<Account>, NssaError> {
+        // Write inputs to the program
+        let mut env_builder = ExecutorEnv::builder();
+        Self::write_inputs(pre_states, instruction_data, &mut env_builder)?;
+        let env = env_builder.build().unwrap();
+
+        // Execute the program (without proving)
+        let executor = default_executor();
+        let session_info = executor
+            .execute(env, self.elf)
+            .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
+
+        // Get outputs
+        let mut post_states: Vec<Account> = session_info
+            .journal
+            .decode()
+            .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
+
+        // Claim any output account with default program owner field
+        for account in post_states.iter_mut() {
+            if account.program_owner == DEFAULT_PROGRAM_ID {
+                account.program_owner = self.id;
+            }
+        }
+
+        Ok(post_states)
+    }
+
+    /// Writes inputs to `env_builder` in the order expected by the programs
+    fn write_inputs(
+        pre_states: &[AccountWithMetadata],
+        instruction_data: &[u32],
+        env_builder: &mut ExecutorEnvBuilder,
+    ) -> Result<(), NssaError> {
+        let pre_states = pre_states.to_vec();
+        env_builder
+            .write(&(pre_states, instruction_data))
+            .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
+        Ok(())
+    }
+
+    pub fn authenticated_transfer_program() -> Self {
+        Self {
+            id: AUTHENTICATED_TRANSFER_ID,
+            elf: AUTHENTICATED_TRANSFER_ELF,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nssa_core::account::{Account, AccountWithMetadata};
+
+    use crate::program::Program;
+
+    impl Program {
+        /// A program that changes the nonce of an account
+        pub fn nonce_changer_program() -> Self {
+            use test_program_methods::{NONCE_CHANGER_ELF, NONCE_CHANGER_ID};
+
+            Program {
+                id: NONCE_CHANGER_ID,
+                elf: NONCE_CHANGER_ELF,
+            }
+        }
+
+        /// A program that produces more output accounts than the inputs it received
+        pub fn extra_output_program() -> Self {
+            use test_program_methods::{EXTRA_OUTPUT_ELF, EXTRA_OUTPUT_ID};
+
+            Program {
+                id: EXTRA_OUTPUT_ID,
+                elf: EXTRA_OUTPUT_ELF,
+            }
+        }
+
+        /// A program that produces less output accounts than the inputs it received
+        pub fn missing_output_program() -> Self {
+            use test_program_methods::{MISSING_OUTPUT_ELF, MISSING_OUTPUT_ID};
+
+            Program {
+                id: MISSING_OUTPUT_ID,
+                elf: MISSING_OUTPUT_ELF,
+            }
+        }
+
+        /// A program that changes the program owner of an account to [0, 1, 2, 3, 4, 5, 6, 7]
+        pub fn program_owner_changer() -> Self {
+            use test_program_methods::{PROGRAM_OWNER_CHANGER_ELF, PROGRAM_OWNER_CHANGER_ID};
+
+            Program {
+                id: PROGRAM_OWNER_CHANGER_ID,
+                elf: PROGRAM_OWNER_CHANGER_ELF,
+            }
+        }
+
+        /// A program that transfers balance without caring about authorizations
+        pub fn simple_balance_transfer() -> Self {
+            use test_program_methods::{SIMPLE_BALANCE_TRANSFER_ELF, SIMPLE_BALANCE_TRANSFER_ID};
+
+            Program {
+                id: SIMPLE_BALANCE_TRANSFER_ID,
+                elf: SIMPLE_BALANCE_TRANSFER_ELF,
+            }
+        }
+
+        /// A program that modifies the data of an account
+        pub fn data_changer() -> Self {
+            use test_program_methods::{DATA_CHANGER_ELF, DATA_CHANGER_ID};
+
+            Program {
+                id: DATA_CHANGER_ID,
+                elf: DATA_CHANGER_ELF,
+            }
+        }
+
+        /// A program that mints balance
+        pub fn minter() -> Self {
+            use test_program_methods::{MINTER_ELF, MINTER_ID};
+
+            Program {
+                id: MINTER_ID,
+                elf: MINTER_ELF,
+            }
+        }
+
+        /// A program that burns balance
+        pub fn burner() -> Self {
+            use test_program_methods::{BURNER_ELF, BURNER_ID};
+
+            Program {
+                id: BURNER_ID,
+                elf: BURNER_ELF,
+            }
+        }
+    }
+
+    #[test]
+    fn test_program_execution() {
+        let program = Program::simple_balance_transfer();
+        let balance_to_move: u128 = 11223344556677;
+        let instruction_data = Program::serialize_instruction(balance_to_move).unwrap();
+        let sender = AccountWithMetadata {
+            account: Account {
+                balance: 77665544332211,
+                ..Account::default()
+            },
+            is_authorized: false,
+        };
+        let recipient = AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: false,
+        };
+
+        let expected_sender_post = Account {
+            balance: 77665544332211 - balance_to_move,
+            program_owner: program.id(),
+            ..Account::default()
+        };
+        let expected_recipient_post = Account {
+            balance: balance_to_move,
+            // Program claims the account since the pre_state has default prorgam owner
+            program_owner: program.id(),
+            ..Account::default()
+        };
+        let [sender_post, recipient_post] = program
+            .execute(&[sender, recipient], &instruction_data)
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        assert_eq!(sender_post, expected_sender_post);
+        assert_eq!(recipient_post, expected_recipient_post);
+    }
+}

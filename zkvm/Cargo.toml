@@ -12,7 +12,7 @@ serde.workspace = true
 thiserror.workspace = true
 rand.workspace = true
 
-risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.3" }
+risc0-zkvm = "2.3.1"
 test-methods = { path = "test_methods" }
 
 [dependencies.accounts]
@@ -23,6 +23,9 @@ path = "../utxo"
 
 [dependencies.common]
 path = "../common"
+
+[dependencies.nssa]
+path = "../nssa"
 
 [features]
 cuda = ["risc0-zkvm/cuda"]

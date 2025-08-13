@@ -9,7 +9,6 @@ thiserror.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 reqwest.workspace = true
-risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.3" }
 k256.workspace = true
 rand.workspace = true
 
@@ -22,3 +21,6 @@ hex.workspace = true
 [dependencies.secp256k1-zkp]
 workspace = true
 features = ["std", "rand-std", "rand", "serde", "global-context"]
+
+[dependencies.nssa]
+path = "../nssa"
