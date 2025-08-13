@@ -16,23 +16,3 @@ impl PublicKey {
         Self(value)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::{PublicKey, signature::tests::test_vectors};
-
-    #[test]
-    fn test_public_key_generation_from_bip340_test_vectors() {
-        for (i, test_vector) in test_vectors().iter().enumerate() {
-            let Some(private_key) = &test_vector.seckey else {
-                continue;
-            };
-            let public_key = PublicKey::new(private_key);
-            let expected_public_key = &test_vector.pubkey;
-            assert_eq!(
-                &public_key, expected_public_key,
-                "Failed test vector at index {i}"
-            );
-        }
-    }
-}

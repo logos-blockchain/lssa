@@ -4,6 +4,59 @@ use crate::{
     Address, PublicTransaction, V01State, error::NssaError, program::Program, public_transaction,
 };
 
+impl V01State {
+    /// Include test programs in the builtin programs map
+    pub fn with_test_programs(mut self) -> Self {
+        self.insert_program(Program::nonce_changer_program());
+        self.insert_program(Program::extra_output_program());
+        self.insert_program(Program::missing_output_program());
+        self.insert_program(Program::program_owner_changer());
+        self.insert_program(Program::simple_balance_transfer());
+        self.insert_program(Program::data_changer());
+        self.insert_program(Program::minter());
+        self.insert_program(Program::burner());
+        self
+    }
+
+    pub fn with_non_default_accounts_but_default_program_owners(mut self) -> Self {
+        let account_with_default_values_except_balance = Account {
+            balance: 100,
+            ..Account::default()
+        };
+        let account_with_default_values_except_nonce = Account {
+            nonce: 37,
+            ..Account::default()
+        };
+        let account_with_default_values_except_data = Account {
+            data: vec![0xca, 0xfe],
+            ..Account::default()
+        };
+        self.force_insert_account(
+            Address::new([255; 32]),
+            account_with_default_values_except_balance,
+        );
+        self.force_insert_account(
+            Address::new([254; 32]),
+            account_with_default_values_except_nonce,
+        );
+        self.force_insert_account(
+            Address::new([253; 32]),
+            account_with_default_values_except_data,
+        );
+        self
+    }
+
+    pub fn with_account_owned_by_burner_program(mut self) -> Self {
+        let account = Account {
+            program_owner: Program::burner().id(),
+            balance: 100,
+            ..Default::default()
+        };
+        self.force_insert_account(Address::new([252; 32]), account);
+        self
+    }
+}
+
 #[test]
 fn test_program_should_fail_if_modifies_nonces() {
     let initial_data = [([1; 32], 100)];
