@@ -1,5 +1,6 @@
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
+use accounts::account_core::Account;
 use anyhow::Result;
 use nssa::{address::HexString, Address};
 

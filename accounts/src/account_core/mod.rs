@@ -21,7 +21,6 @@ pub struct Account {
     pub key_holder: AddressKeyHolder,
     pub address: Address,
     pub balance: u64,
-    pub nonce: u64,
     pub utxos: HashMap<TreeHashType, UTXO>,
 }
 
@@ -30,7 +29,6 @@ pub struct AccountForSerialization {
     pub key_holder: AddressKeyHolder,
     pub address: Address,
     pub balance: u64,
-    pub nonce: u64,
     pub utxos: HashMap<String, UTXO>,
 }
 
@@ -40,7 +38,6 @@ impl From<Account> for AccountForSerialization {
             key_holder: value.key_holder,
             address: value.address,
             balance: value.balance,
-            nonce: value.nonce,
             utxos: value
                 .utxos
                 .into_iter()
@@ -56,7 +53,6 @@ impl From<AccountForSerialization> for Account {
             key_holder: value.key_holder,
             address: value.address,
             balance: value.balance,
-            nonce: value.nonce,
             utxos: value
                 .utxos
                 .into_iter()
@@ -121,14 +117,12 @@ impl Account {
             nssa::PublicKey::new_from_private_key(key_holder.get_pub_account_signing_key());
         let address = nssa::Address::from(&public_key);
         let balance = 0;
-        let nonce = 0;
         let utxos = HashMap::new();
 
         Self {
             key_holder,
             address,
             balance,
-            nonce,
             utxos,
         }
     }
@@ -144,7 +138,6 @@ impl Account {
             key_holder,
             address,
             balance,
-            nonce,
             utxos,
         }
     }

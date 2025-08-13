@@ -118,7 +118,7 @@ impl<'de> Deserialize<'de> for HexString {
         let str_cand = deserializer.deserialize_string(HexStringVisitor)?;
 
         let hex_string =
-            HexString::try_from(str_cand.as_str()).map_err(|err| serde::de::Error::custom(err))?;
+            HexString::try_from(str_cand.as_str()).map_err(serde::de::Error::custom)?;
 
         Ok(hex_string)
     }
@@ -224,9 +224,7 @@ mod tests {
 
         let addr_for_tests = Address::new([42; 32]);
 
-        let ser2_str = Ser3 {
-            f1: addr_for_tests,
-        };
+        let ser2_str = Ser3 { f1: addr_for_tests };
 
         let ser1_str: Ser3 = serde_json::from_str(raw_json).unwrap();
 

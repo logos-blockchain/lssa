@@ -11,7 +11,6 @@ use chain_storage::WalletChainStore;
 use config::WalletConfig;
 use log::info;
 use nssa::Address;
-use tokio::sync::RwLock;
 
 use clap::{Parser, Subcommand};
 
@@ -43,6 +42,9 @@ impl WalletCore {
 
         //Persistent accounts take precedence for initial accounts
         let persistent_accounts = fetch_persistent_accounts()?;
+
+        info!("Fetched persistent accoounts {persistent_accounts:#?}");
+
         for acc in persistent_accounts {
             storage.acc_map.insert(acc.address, acc);
         }
@@ -72,34 +74,29 @@ impl WalletCore {
         to: Address,
         balance_to_move: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
-        {
-            let read_guard = self.storage.read().await;
+        let account = self.storage.acc_map.get(&from);
 
         if let Some(account) = account {
-            let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+            let addresses = vec![from, to];
+            let nonces = vec![nonce];
+            let program_id = nssa::program::Program::authenticated_transfer_program().id();
+            let message = nssa::public_transaction::Message::try_new(
+                program_id,
+                addresses,
+                nonces,
+                balance_to_move,
+            )
+            .unwrap();
 
-            if let Some(account) = account {
-                let addresses = vec![from, to];
-                let nonces = vec![nonce];
-                let program_id = nssa::program::Program::authenticated_transfer_program().id();
-                let message = nssa::public_transaction::Message::try_new(
-                    program_id,
-                    addresses,
-                    nonces,
-                    balance_to_move,
-                )
-                .unwrap();
+            let signing_key = account.key_holder.get_pub_account_signing_key();
+            let witness_set =
+                nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
 
-                let signing_key = account.key_holder.get_pub_account_signing_key();
-                let witness_set =
-                    nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
+            let tx = nssa::PublicTransaction::new(message, witness_set);
 
-                let tx = nssa::PublicTransaction::new(message, witness_set);
-
-                Ok(self.sequencer_client.send_tx(tx).await?)
-            } else {
-                Err(ExecutionFailureKind::AmountMismatchError)
-            }
+            Ok(self.sequencer_client.send_tx(tx).await?)
+        } else {
+            Err(ExecutionFailureKind::AmountMismatchError)
         }
     }
 
@@ -180,7 +177,7 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
             let from = produce_account_addr_from_hex(from)?;
             let to = produce_account_addr_from_hex(to)?;
 
-            let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
+            let wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
             let res = wallet_core
                 .send_public_native_token_transfer(from, nonce, to, amount)
@@ -189,7 +186,6 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
             info!("Results of tx send is {res:#?}");
 
             //ToDo: Insert transaction polling logic here
-            wallet_core.increment_nonces(&[from, to]);
 
             let acc_storage_path = wallet_core.store_present_accounts_at_home()?;
 

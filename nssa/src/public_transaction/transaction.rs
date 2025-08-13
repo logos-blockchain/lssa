@@ -224,7 +224,7 @@ pub mod tests {
         let instruction = 1337;
         let message = Message::try_new(
             Program::authenticated_transfer_program().id(),
-            vec![addr1.clone(), addr1],
+            vec![addr1, addr1],
             nonces,
             instruction,
         )

@@ -18,4 +18,3 @@ serde_json.workspace = true
 
 [dev-dependencies]
 test-program-methods = { path = "test_program_methods" }
-

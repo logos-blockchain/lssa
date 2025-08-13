@@ -197,7 +197,7 @@ mod tests {
         assert_eq!(state.get_account_by_address(&to), Account::default());
         let balance_to_move = 5;
 
-        let tx = transfer_transaction(from.clone(), key, 0, to.clone(), balance_to_move);
+        let tx = transfer_transaction(from, key, 0, to, balance_to_move);
         state.transition_from_public_transaction(&tx).unwrap();
 
         assert_eq!(state.get_account_by_address(&from).balance, 95);
@@ -218,7 +218,7 @@ mod tests {
         let balance_to_move = 101;
         assert!(state.get_account_by_address(&from).balance < balance_to_move);
 
-        let tx = transfer_transaction(from.clone(), from_key, 0, to.clone(), balance_to_move);
+        let tx = transfer_transaction(from, from_key, 0, to, balance_to_move);
         let result = state.transition_from_public_transaction(&tx);
 
         assert!(matches!(result, Err(NssaError::ProgramExecutionFailed(_))));
@@ -242,7 +242,7 @@ mod tests {
         assert_ne!(state.get_account_by_address(&to), Account::default());
         let balance_to_move = 8;
 
-        let tx = transfer_transaction(from.clone(), from_key, 0, to.clone(), balance_to_move);
+        let tx = transfer_transaction(from, from_key, 0, to, balance_to_move);
         state.transition_from_public_transaction(&tx).unwrap();
 
         assert_eq!(state.get_account_by_address(&from).balance, 192);
@@ -262,10 +262,10 @@ mod tests {
         let address3 = Address::new([3; 32]);
         let balance_to_move = 5;
 
-        let tx = transfer_transaction(address1.clone(), key1, 0, address2.clone(), balance_to_move);
+        let tx = transfer_transaction(address1, key1, 0, address2, balance_to_move);
         state.transition_from_public_transaction(&tx).unwrap();
         let balance_to_move = 3;
-        let tx = transfer_transaction(address2.clone(), key2, 0, address3.clone(), balance_to_move);
+        let tx = transfer_transaction(address2, key2, 0, address3, balance_to_move);
         state.transition_from_public_transaction(&tx).unwrap();
 
         assert_eq!(state.get_account_by_address(&address1).balance, 95);
