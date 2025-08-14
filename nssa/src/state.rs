@@ -1,14 +1,31 @@
 use crate::{
-    address::Address, error::NssaError, program::Program, public_transaction::PublicTransaction,
+    address::Address, error::NssaError,
+    privacy_preserving_transaction::PrivacyPreservingTransaction, program::Program,
+    public_transaction::PublicTransaction,
 };
 use nssa_core::{
-    account::Account,
+    account::{Account, Commitment, Nullifier},
     program::{DEFAULT_PROGRAM_ID, ProgramId},
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+struct CommitmentSet(HashSet<Commitment>);
+
+impl CommitmentSet {
+    fn extend(&mut self, commitments: &[Commitment]) {
+        self.0.extend(commitments)
+    }
+
+    fn set_commitment(&self) -> [u8; 32] {
+        // TODO: implement
+        [0; 32]
+    }
+}
+type NullifierSet = HashSet<Nullifier>;
 
 pub struct V01State {
     public_state: HashMap<Address, Account>,
+    private_state: (CommitmentSet, NullifierSet),
     builtin_programs: HashMap<ProgramId, Program>,
 }
 
@@ -31,6 +48,7 @@ impl V01State {
 
         let mut this = Self {
             public_state,
+            private_state: (CommitmentSet(HashSet::new()), NullifierSet::new()),
             builtin_programs: HashMap::new(),
         };
 
@@ -64,6 +82,34 @@ impl V01State {
             current_account.nonce += 1;
         }
 
+        Ok(())
+    }
+
+    pub fn transition_from_privacy_preserving_transaction(
+        &mut self,
+        tx: &PrivacyPreservingTransaction,
+    ) -> Result<(), NssaError> {
+        // 1. Verify the transaction satisfies acceptance criteria
+        let public_state_diff = tx.validate(self)?;
+        let message = tx.message();
+
+        // 2. Add new commitments
+        self.private_state.0.extend(message.new_commitments);
+
+        // 3. Add new nullifiers
+        self.private_state.1.extend(message.new_nullifiers);
+
+        // 4. Update public accounts
+        for (address, post) in public_state_diff.into_iter() {
+            let current_account = self.get_account_by_address_mut(address);
+            *current_account = post;
+        }
+
+        // // 5. Increment nonces
+        for address in tx.signer_addresses() {
+            let current_account = self.get_account_by_address_mut(address);
+            current_account.nonce += 1;
+        }
         Ok(())
     }
 

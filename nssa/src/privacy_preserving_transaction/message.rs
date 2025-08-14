@@ -7,10 +7,10 @@ struct EncryptedAccountData;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Message {
-    public_addresses: Vec<Address>,
-    nonces: Vec<Nonce>,
-    public_post_states: Vec<Account>,
-    encrypted_private_post_states: Vec<EncryptedAccountData>,
-    new_commitments: Vec<Commitment>,
-    new_nullifiers: Vec<Nullifier>,
+    pub(crate) public_addresses: Vec<Address>,
+    pub(crate) nonces: Vec<Nonce>,
+    pub(crate) public_post_states: Vec<Account>,
+    pub(crate) encrypted_private_post_states: Vec<EncryptedAccountData>,
+    pub(crate) new_commitments: Vec<Commitment>,
+    pub(crate) new_nullifiers: Vec<Nullifier>,
 }
