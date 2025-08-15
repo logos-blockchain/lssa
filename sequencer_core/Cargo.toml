@@ -22,8 +22,8 @@ path = "../storage"
 [dependencies.mempool]
 path = "../mempool"
 
-[dependencies.accounts]
-path = "../accounts"
+[dependencies.key_protocol]
+path = "../key_protocol"
 
 [dependencies.common]
 path = "../common"

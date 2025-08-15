@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use accounts::account_core::Account;
+//TODO: NOT USER DATA, ACCOUNT
+use key_protocol::key_protocol_core::NSSAUserData;
 use anyhow::Result;
 use common::merkle_tree_public::merkle_tree::UTXOCommitmentsMerkleTree;
 use nssa::Address;
@@ -12,11 +13,11 @@ pub mod accounts_store;
 
 #[derive(Deserialize, Serialize)]
 pub struct AccMap {
-    pub acc_map: HashMap<String, Account>,
+    pub acc_map: HashMap<String, NSSAUserData>,
 }
 
-impl From<HashMap<[u8; 32], Account>> for AccMap {
-    fn from(value: HashMap<[u8; 32], Account>) -> Self {
+impl From<HashMap<[u8; 32], NSSAUserData>> for AccMap {
+    fn from(value: HashMap<[u8; 32], NSSAUserData>) -> Self {
         AccMap {
             acc_map: value
                 .into_iter()
@@ -26,7 +27,7 @@ impl From<HashMap<[u8; 32], Account>> for AccMap {
     }
 }
 
-impl From<AccMap> for HashMap<[u8; 32], Account> {
+impl From<AccMap> for HashMap<[u8; 32], NSSAUserData> {
     fn from(value: AccMap) -> Self {
         value
             .acc_map
@@ -37,7 +38,7 @@ impl From<AccMap> for HashMap<[u8; 32], Account> {
 }
 
 pub struct WalletChainStore {
-    pub acc_map: HashMap<Address, Account>,
+    pub acc_map: HashMap<Address, NSSAUserData>,
     pub utxo_commitments_store: UTXOCommitmentsMerkleTree,
     pub wallet_config: WalletConfig,
 }
@@ -58,11 +59,11 @@ impl WalletChainStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use accounts::account_core::Account;
+    use key_protocol::key_protocol_core::NSSAUserData;
     use std::path::PathBuf;
     use tempfile::tempdir;
 
-    fn create_initial_accounts() -> Vec<Account> {
+    fn create_initial_accounts() -> Vec<NSSAUserData> {
         let initial_acc1 = serde_json::from_str(r#"{
             "address": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
             "balance": 100,

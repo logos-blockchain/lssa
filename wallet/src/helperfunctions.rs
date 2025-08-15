@@ -1,6 +1,6 @@
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
-use accounts::account_core::Account;
+use key_protocol::key_protocol_core::NSSAUserData;
 use anyhow::Result;
 use nssa::Address;
 
@@ -28,7 +28,9 @@ pub fn produce_account_addr_from_hex(hex_str: String) -> Result<Address> {
 ///Fetch list of accounts stored at `NSSA_WALLET_HOME_DIR/curr_accounts.json`
 ///
 /// If file not present, it is considered as empty list of persistent accounts
-pub fn fetch_persistent_accounts() -> Result<Vec<Account>> {
+/// 
+/// ToDo: NOT USER DATA, ACCOUNT
+pub fn fetch_persistent_accounts() -> Result<Vec<NSSAUserData>> {
     let home = get_home()?;
     let accs_path = home.join("curr_accounts.json");
 

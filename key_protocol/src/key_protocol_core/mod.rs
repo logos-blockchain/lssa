@@ -1,83 +1,68 @@
-use std::collections::HashMap;
-
 use anyhow::Result;
-use common::{merkle_tree_public::TreeHashType, transaction::Tag};
+use common::transaction::Tag;
 use k256::AffinePoint;
 use log::info;
 use nssa::Address;
 use serde::{Deserialize, Serialize};
-use utxo::utxo_core::UTXO;
 
 use crate::key_management::{
     constants_types::{CipherText, Nonce},
     ephemeral_key_holder::EphemeralKeyHolder,
-    AddressKeyHolder,
+    KeyChain,
 };
 
 pub type PublicKey = AffinePoint;
 
 #[derive(Clone, Debug)]
-pub struct Account {
-    pub key_holder: AddressKeyHolder,
+pub struct NSSAUserData {
+    pub key_holder: KeyChain,
     pub address: Address,
     pub balance: u64,
-    pub utxos: HashMap<TreeHashType, UTXO>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AccountForSerialization {
-    pub key_holder: AddressKeyHolder,
+pub struct NSSAUserDataForSerialization {
+    pub key_holder: KeyChain,
     pub address: Address,
     pub balance: u64,
-    pub utxos: HashMap<String, UTXO>,
 }
 
-impl From<Account> for AccountForSerialization {
-    fn from(value: Account) -> Self {
-        AccountForSerialization {
+impl From<NSSAUserData> for NSSAUserDataForSerialization {
+    fn from(value: NSSAUserData) -> Self {
+        NSSAUserDataForSerialization {
             key_holder: value.key_holder,
             address: value.address,
             balance: value.balance,
-            utxos: value
-                .utxos
-                .into_iter()
-                .map(|(key, val)| (hex::encode(key), val))
-                .collect(),
         }
     }
 }
 
-impl From<AccountForSerialization> for Account {
-    fn from(value: AccountForSerialization) -> Self {
-        Account {
+impl From<NSSAUserDataForSerialization> for NSSAUserData {
+    fn from(value: NSSAUserDataForSerialization) -> Self {
+        NSSAUserData {
             key_holder: value.key_holder,
             address: value.address,
             balance: value.balance,
-            utxos: value
-                .utxos
-                .into_iter()
-                .map(|(key, val)| (hex::decode(key).unwrap().try_into().unwrap(), val))
-                .collect(),
         }
     }
 }
 
-impl Serialize for Account {
+impl Serialize for NSSAUserData {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let account_for_serialization: AccountForSerialization = From::from(self.clone());
+        let account_for_serialization: NSSAUserDataForSerialization = From::from(self.clone());
         account_for_serialization.serialize(serializer)
     }
 }
 
-impl<'de> Deserialize<'de> for Account {
+impl<'de> Deserialize<'de> for NSSAUserData {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let account_for_serialization = <AccountForSerialization>::deserialize(deserializer)?;
+        let account_for_serialization = <NSSAUserDataForSerialization>::deserialize(deserializer)?;
         Ok(account_for_serialization.into())
     }
 }
@@ -88,21 +73,21 @@ impl<'de> Deserialize<'de> for Account {
 ///
 /// Main usage is to encode data for other account
 #[derive(Serialize, Clone)]
-pub struct AccountPublicMask {
+pub struct NSSAUserDataPublicMask {
     pub nullifier_public_key: AffinePoint,
     pub viewing_public_key: AffinePoint,
     pub address: Address,
     pub balance: u64,
 }
 
-impl AccountPublicMask {
+impl NSSAUserDataPublicMask {
     pub fn encrypt_data(
         ephemeral_key_holder: &EphemeralKeyHolder,
         viewing_public_key_receiver: AffinePoint,
         data: &[u8],
     ) -> (CipherText, Nonce) {
-        //Using of parent Account fuction
-        Account::encrypt_data(ephemeral_key_holder, viewing_public_key_receiver, data)
+        //Using of parent NSSAUserData fuction
+        NSSAUserData::encrypt_data(ephemeral_key_holder, viewing_public_key_receiver, data)
     }
 
     pub fn make_tag(&self) -> Tag {
@@ -110,35 +95,31 @@ impl AccountPublicMask {
     }
 }
 
-impl Account {
+impl NSSAUserData {
     pub fn new() -> Self {
-        let key_holder = AddressKeyHolder::new_os_random();
+        let key_holder = KeyChain::new_os_random();
         let public_key =
             nssa::PublicKey::new_from_private_key(key_holder.get_pub_account_signing_key());
         let address = nssa::Address::from(&public_key);
         let balance = 0;
-        let utxos = HashMap::new();
 
         Self {
             key_holder,
             address,
             balance,
-            utxos,
         }
     }
 
     pub fn new_with_balance(balance: u64) -> Self {
-        let key_holder = AddressKeyHolder::new_os_random();
+        let key_holder = KeyChain::new_os_random();
         let public_key =
             nssa::PublicKey::new_from_private_key(key_holder.get_pub_account_signing_key());
         let address = nssa::Address::from(&public_key);
-        let utxos = HashMap::new();
 
         Self {
             key_holder,
             address,
             balance,
-            utxos,
         }
     }
 
@@ -160,42 +141,14 @@ impl Account {
             .decrypt_data(ephemeral_public_key_sender, ciphertext, nonce)
     }
 
-    pub fn add_new_utxo_outputs(&mut self, utxos: Vec<UTXO>) -> Result<()> {
-        for utxo in utxos {
-            if self.utxos.contains_key(&utxo.hash) {
-                return Err(anyhow::anyhow!("UTXO already exists"));
-            }
-            self.utxos.insert(utxo.hash, utxo);
-        }
-        Ok(())
-    }
-
     pub fn update_public_balance(&mut self, new_balance: u64) {
         self.balance = new_balance;
     }
 
-    pub fn add_asset<Asset: Serialize>(
-        &mut self,
-        asset: Asset,
-        amount: u128,
-        privacy_flag: bool,
-    ) -> Result<()> {
-        let asset_utxo = UTXO::new(
-            *self.address.value(),
-            serde_json::to_vec(&asset)?,
-            amount,
-            privacy_flag,
-        );
-
-        self.utxos.insert(asset_utxo.hash, asset_utxo);
-
-        Ok(())
-    }
-
     pub fn log(&self) {
         info!("Keys generated");
-        info!("Account address is {:?}", hex::encode(self.address));
-        info!("Account balance is {:?}", self.balance);
+        info!("NSSAUserData address is {:?}", hex::encode(self.address));
+        info!("NSSAUserData balance is {:?}", self.balance);
     }
 
     pub fn make_tag(&self) -> Tag {
@@ -203,8 +156,8 @@ impl Account {
     }
 
     ///Produce account public mask
-    pub fn make_account_public_mask(&self) -> AccountPublicMask {
-        AccountPublicMask {
+    pub fn make_account_public_mask(&self) -> NSSAUserDataPublicMask {
+        NSSAUserDataPublicMask {
             nullifier_public_key: self.key_holder.nullifer_public_key,
             viewing_public_key: self.key_holder.viewing_public_key,
             address: self.address,
@@ -213,7 +166,7 @@ impl Account {
     }
 }
 
-impl Default for Account {
+impl Default for NSSAUserData {
     fn default() -> Self {
         Self::new()
     }
@@ -223,52 +176,24 @@ impl Default for Account {
 mod tests {
     use super::*;
 
-    fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> UTXO {
-        UTXO::new(address, vec![], amount, false)
-    }
-
     #[test]
     fn test_new_account() {
-        let account = Account::new();
+        let account = NSSAUserData::new();
 
         assert_eq!(account.balance, 0);
     }
 
     #[test]
-    fn test_add_new_utxo_outputs() {
-        let mut account = Account::new();
-        let utxo1 = generate_dummy_utxo(*account.address.value(), 100);
-        let utxo2 = generate_dummy_utxo(*account.address.value(), 200);
-
-        let result = account.add_new_utxo_outputs(vec![utxo1.clone(), utxo2.clone()]);
-
-        assert!(result.is_ok());
-        assert_eq!(account.utxos.len(), 2);
-    }
-
-    #[test]
     fn test_update_public_balance() {
-        let mut account = Account::new();
+        let mut account = NSSAUserData::new();
         account.update_public_balance(500);
 
         assert_eq!(account.balance, 500);
     }
 
     #[test]
-    fn test_add_asset() {
-        let mut account = Account::new();
-        let asset = "dummy_asset";
-        let amount = 1000u128;
-
-        let result = account.add_asset(asset, amount, false);
-
-        assert!(result.is_ok());
-        assert_eq!(account.utxos.len(), 1);
-    }
-
-    #[test]
     fn accounts_accounts_mask_tag_consistency() {
-        let account = Account::new();
+        let account = NSSAUserData::new();
 
         let account_mask = account.make_account_public_mask();
 

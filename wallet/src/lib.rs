@@ -5,7 +5,7 @@ use common::{
     ExecutionFailureKind,
 };
 
-use accounts::account_core::Account;
+use key_protocol::key_protocol_core::NSSAUserData;
 use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
@@ -54,7 +54,7 @@ impl WalletCore {
     }
 
     pub async fn create_new_account(&mut self) -> Address {
-        let account = Account::new();
+        let account = NSSAUserData::new();
         account.log();
 
         let addr = account.address;

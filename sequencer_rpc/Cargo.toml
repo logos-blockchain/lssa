@@ -22,8 +22,8 @@ tokio.workspace = true
 [dependencies.mempool]
 path = "../mempool"
 
-[dependencies.accounts]
-path = "../accounts"
+[dependencies.key_protocol]
+path = "../key_protocol"
 
 [dependencies.sequencer_core]
 path = "../sequencer_core"

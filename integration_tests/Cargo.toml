@@ -36,5 +36,5 @@ path = "../wallet"
 [dependencies.common]
 path = "../common"
 
-[dependencies.accounts]
-path = "../accounts"
+[dependencies.key_protocol]
+path = "../key_protocol"

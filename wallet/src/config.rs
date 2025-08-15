@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use accounts::account_core::Account;
+use key_protocol::key_protocol_core::NSSAUserData;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,5 +32,7 @@ pub struct WalletConfig {
     ///Sequencer polling duration for new blocks in seconds
     pub seq_poll_timeout_secs: u64,
     ///Initial accounts for wallet
-    pub initial_accounts: Vec<Account>,
+    /// 
+    /// TODO: NOT USRE DATA, ACCOUNT
+    pub initial_accounts: Vec<NSSAUserData>,
 }

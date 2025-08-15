@@ -7,7 +7,7 @@ use rand::{rngs::OsRng, Rng};
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
 use serde::{Deserialize, Serialize};
 
-use crate::account_core::PublicKey;
+use crate::key_protocol_core::PublicKey;
 pub type PublicAccountSigningKey = [u8; 32];
 use nssa::{self};
 
@@ -17,7 +17,7 @@ pub mod secret_holders;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 ///Entrypoint to key management
-pub struct AddressKeyHolder {
+pub struct KeyChain {
     top_secret_key_holder: TopSecretKeyHolder,
     pub utxo_secret_key_holder: UTXOSecretKeyHolder,
     pub_account_signing_key: nssa::PrivateKey,
@@ -25,7 +25,7 @@ pub struct AddressKeyHolder {
     pub viewing_public_key: PublicKey,
 }
 
-impl AddressKeyHolder {
+impl KeyChain {
     pub fn new_os_random() -> Self {
         //Currently dropping SeedHolder at the end of initialization.
         //Now entirely sure if we need it in the future.
@@ -127,8 +127,8 @@ mod tests {
 
     #[test]
     fn test_new_os_random() {
-        // Ensure that a new AddressKeyHolder instance can be created without errors.
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        // Ensure that a new KeyChain instance can be created without errors.
+        let address_key_holder = KeyChain::new_os_random();
 
         // Check that key holder fields are initialized with expected types
         assert!(!Into::<bool>::into(
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_calculate_shared_secret_receiver() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        let address_key_holder = KeyChain::new_os_random();
 
         // Generate a random ephemeral public key sender
         let scalar = Scalar::random(&mut OsRng);
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_decrypt_data() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        let address_key_holder = KeyChain::new_os_random();
 
         // Generate an ephemeral key and shared secret
         let ephemeral_public_key_sender =
@@ -188,8 +188,8 @@ mod tests {
 
     #[test]
     fn test_new_os_random_initialization() {
-        // Ensure that AddressKeyHolder is initialized correctly
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        // Ensure that KeyChain is initialized correctly
+        let address_key_holder = KeyChain::new_os_random();
 
         // Check that key holder fields are initialized with expected types and values
         assert!(!Into::<bool>::into(
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_calculate_shared_secret_with_identity_point() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        let address_key_holder = KeyChain::new_os_random();
 
         // Use identity point as ephemeral public key
         let identity_point = AffinePoint::identity();
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_decrypt_data_with_incorrect_nonce() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        let address_key_holder = KeyChain::new_os_random();
 
         // Generate ephemeral public key and shared secret
         let scalar = Scalar::random(OsRng);
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_decrypt_data_with_incorrect_ciphertext() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        let address_key_holder = KeyChain::new_os_random();
 
         // Generate ephemeral public key and shared secret
         let scalar = Scalar::random(OsRng);
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_encryption_decryption_round_trip() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        let address_key_holder = KeyChain::new_os_random();
 
         // Generate ephemeral key and shared secret
         let scalar = Scalar::random(OsRng);
@@ -303,7 +303,7 @@ mod tests {
             .encrypt(nonce, plaintext.as_ref())
             .expect("encryption failure");
 
-        // Decrypt the data using the `AddressKeyHolder` instance
+        // Decrypt the data using the `KeyChain` instance
         let decrypted_data = address_key_holder
             .decrypt_data(
                 ephemeral_public_key_sender,
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_get_public_account_signing_key() {
-        let address_key_holder = AddressKeyHolder::new_os_random();
+        let address_key_holder = KeyChain::new_os_random();
         let signing_key = address_key_holder.get_pub_account_signing_key();
         assert_eq!(signing_key, &address_key_holder.pub_account_signing_key);
     }

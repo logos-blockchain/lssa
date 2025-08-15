@@ -1,9 +1,10 @@
-use accounts::account_core::Account;
+//TODO: NOT NSSA USER DATA, ACCOUNT
+use key_protocol::key_protocol_core::NSSAUserData;
 use nssa::Address;
 use std::collections::HashMap;
 
 pub struct WalletAccountsStore {
-    pub accounts: HashMap<Address, Account>,
+    pub accounts: HashMap<Address, NSSAUserData>,
 }
 
 impl WalletAccountsStore {
@@ -13,7 +14,7 @@ impl WalletAccountsStore {
         }
     }
 
-    pub fn register_account(&mut self, account: Account) {
+    pub fn register_account(&mut self, account: NSSAUserData) {
         self.accounts.insert(account.address, account);
     }
 
@@ -31,10 +32,10 @@ impl Default for WalletAccountsStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use accounts::account_core::Account;
+    use key_protocol::key_protocol_core::NSSAUserData;
     /// Helper function to create a sample account
-    fn create_sample_account(balance: u64) -> Account {
-        Account::new_with_balance(balance)
+    fn create_sample_account(balance: u64) -> NSSAUserData {
+        NSSAUserData::new_with_balance(balance)
     }
 
     fn pad_to_32(slice: &[u8]) -> [u8; 32] {
