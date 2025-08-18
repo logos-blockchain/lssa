@@ -12,8 +12,6 @@ use serde::Serialize;
 
 use crate::error::NssaError;
 
-pub type Proof = Vec<u8>;
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Program {
     id: ProgramId,
@@ -23,6 +21,10 @@ pub struct Program {
 impl Program {
     pub fn id(&self) -> ProgramId {
         self.id
+    }
+
+    pub(crate) fn elf(&self) -> &'static [u8] {
+        self.elf
     }
 
     pub fn serialize_instruction<T: Serialize>(
@@ -58,30 +60,8 @@ impl Program {
         Ok(post_states)
     }
 
-    /// Executes and proves the program `P`.
-    /// Returns the proof
-    pub(crate) fn execute_and_prove(
-        &self,
-        pre_states: &[AccountWithMetadata],
-        instruction_data: &InstructionData,
-    ) -> Result<(Proof, ProgramOutput), NssaError> {
-        // Write inputs to the program
-        let mut env_builder = ExecutorEnv::builder();
-        Self::write_inputs(pre_states, instruction_data, &mut env_builder)?;
-        let env = env_builder.build().unwrap();
-
-        // Prove the program
-        let prover = default_prover();
-        let prove_info = prover
-            .prove(env, self.elf)
-            .map_err(|e| NssaError::ProgramProveFailed(e.to_string()))?;
-        let proof = borsh::to_vec(&prove_info.receipt.inner).unwrap();
-        let program_output = prove_info.receipt.journal.decode().unwrap();
-        Ok((proof, program_output))
-    }
-
     /// Writes inputs to `env_builder` in the order expected by the programs
-    fn write_inputs(
+    pub(crate) fn write_inputs(
         pre_states: &[AccountWithMetadata],
         instruction_data: &[u32],
         env_builder: &mut ExecutorEnvBuilder,
@@ -226,48 +206,5 @@ mod tests {
 
         assert_eq!(sender_post, expected_sender_post);
         assert_eq!(recipient_post, expected_recipient_post);
-    }
-
-    #[test]
-    fn test_program_execute_and_prove() {
-        let program = Program::simple_balance_transfer();
-        let balance_to_move: u128 = 11223344556677;
-        let instruction_data = Program::serialize_instruction(balance_to_move).unwrap();
-        let sender = AccountWithMetadata {
-            account: Account {
-                balance: 77665544332211,
-                ..Account::default()
-            },
-            is_authorized: false,
-        };
-        let recipient = AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: false,
-        };
-
-        let expected_sender_post = Account {
-            balance: 77665544332211 - balance_to_move,
-            ..Account::default()
-        };
-        let expected_recipient_post = Account {
-            balance: balance_to_move,
-            ..Account::default()
-        };
-
-        let (proof, program_output) = program
-            .execute_and_prove(&[sender, recipient], &instruction_data)
-            .unwrap();
-
-        let ProgramOutput { post_states, .. } = program_output.clone();
-        let [sender_post, recipient_post] = post_states.try_into().unwrap();
-
-        assert_eq!(sender_post, expected_sender_post);
-        assert_eq!(recipient_post, expected_recipient_post);
-
-        let journal = program_output.to_bytes().unwrap();
-        let inner: InnerReceipt = borsh::from_slice(&proof).unwrap();
-        let receipt = Receipt::new(inner, journal);
-
-        receipt.verify(program.id()).unwrap();
     }
 }

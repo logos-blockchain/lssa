@@ -36,4 +36,10 @@ pub enum NssaError {
 
     #[error("Core error")]
     Core(#[from] nssa_core::error::NssaCoreError),
+
+    #[error("Program output deserialization error: {0}")]
+    ProgramOutputDeserializationError(String),
+
+    #[error("Circuit output deserialization error: {0}")]
+    CircuitOutputDeserializationError(String),
 }

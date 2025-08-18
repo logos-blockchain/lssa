@@ -1,6 +1,6 @@
 use crate::{
-    PrivateKey, PublicKey, Signature, privacy_preserving_transaction::message::Message,
-    program::Proof,
+    PrivateKey, PublicKey, Signature,
+    privacy_preserving_transaction::{circuit::Proof, message::Message},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

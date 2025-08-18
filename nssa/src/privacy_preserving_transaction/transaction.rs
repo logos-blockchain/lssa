@@ -4,7 +4,7 @@ use nssa_core::account::{Account, AccountWithMetadata};
 use nssa_core::{CommitmentSetDigest, EncryptedAccountData};
 
 use crate::error::NssaError;
-use crate::program::Proof;
+use crate::privacy_preserving_transaction::circuit::Proof;
 use crate::{Address, V01State};
 
 use super::message::Message;

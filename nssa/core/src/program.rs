@@ -21,20 +21,6 @@ pub struct ProgramOutput {
     pub post_states: Vec<Account>,
 }
 
-#[cfg(feature = "host")]
-impl ProgramOutput {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, NssaCoreError> {
-        use risc0_zkvm::serde::to_vec;
-
-        let mut result = Vec::new();
-        let b = to_vec(self).map_err(|e| NssaCoreError::DeserializationError(e.to_string()))?;
-        for word in &b {
-            result.extend_from_slice(&word.to_le_bytes());
-        }
-        Ok(result)
-    }
-}
-
 pub fn read_nssa_inputs<T: DeserializeOwned>() -> ProgramInput<T> {
     let pre_states: Vec<AccountWithMetadata> = env::read();
     let words: InstructionData = env::read();
@@ -102,61 +88,4 @@ pub fn validate_execution(
     }
 
     true
-}
-
-#[cfg(test)]
-mod tests {
-    use risc0_zkvm::Journal;
-
-    use crate::{
-        account::{Account, AccountWithMetadata},
-        program::ProgramOutput,
-    };
-
-    #[test]
-    fn test_program_output_to_bytes_is_compatible_with_journal_decode() {
-        let account_pre1 = Account {
-            program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
-            balance: 1112223333444455556666,
-            data: b"test data 1".to_vec(),
-            nonce: 3344556677889900,
-        };
-        let account_pre2 = Account {
-            program_owner: [9, 8, 7, 6, 5, 4, 3, 2],
-            balance: 18446744073709551615,
-            data: b"test data 2".to_vec(),
-            nonce: 3344556677889901,
-        };
-        let account_post1 = Account {
-            program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
-            balance: 1,
-            data: b"other test data 1".to_vec(),
-            nonce: 113,
-        };
-        let account_post2 = Account {
-            program_owner: [9, 8, 7, 6, 5, 4, 3, 2],
-            balance: 2,
-            data: b"other test data 2".to_vec(),
-            nonce: 112,
-        };
-
-        let program_output = ProgramOutput {
-            pre_states: vec![
-                AccountWithMetadata {
-                    account: account_pre1,
-                    is_authorized: true,
-                },
-                AccountWithMetadata {
-                    account: account_pre2,
-                    is_authorized: false,
-                },
-            ],
-            post_states: vec![account_post1, account_post2],
-        };
-
-        let bytes = program_output.to_bytes().unwrap();
-        let journal = Journal::new(bytes);
-        let decoded_program_output: ProgramOutput = journal.decode().unwrap();
-        assert_eq!(program_output, decoded_program_output);
-    }
 }

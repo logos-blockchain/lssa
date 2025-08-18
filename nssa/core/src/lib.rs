@@ -100,4 +100,3 @@ pub struct PrivacyPreservingCircuitOutput {
     pub new_nullifiers: Vec<Nullifier>,
     pub commitment_set_digest: CommitmentSetDigest,
 }
-
