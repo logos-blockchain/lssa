@@ -12,7 +12,7 @@ pub struct Commitment(pub(super) [u8; 32]);
 impl Commitment {
     pub fn new(Npk: &NullifierPublicKey, account: &Account) -> Self {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(&Npk.to_bytes());
+        bytes.extend_from_slice(&Npk.to_byte_array());
         bytes.extend_from_slice(&account.to_bytes());
         Self(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
     }

@@ -20,14 +20,14 @@ impl Account {
 }
 
 impl Commitment {
-    pub(crate) fn to_bytes(&self) -> [u8; 32] {
+    pub(crate) fn to_byte_array(&self) -> [u8; 32] {
         self.0
     }
 }
 
 
 impl NullifierPublicKey {
-    pub(crate) fn to_bytes(&self) -> [u8; 32] {
+    pub(crate) fn to_byte_array(&self) -> [u8; 32] {
         self.0
     }
 }
