@@ -132,4 +132,43 @@ mod tests {
         assert_eq!(tree.capacity, 4);
         assert_eq!(tree.length, 4);
     }
+
+    #[test]
+    fn test_merkle_tree_3() {
+        let values = vec![[1; 32], [2; 32], [3; 32]];
+        let tree = MerkleTree::new(values);
+        let expected_root = [
+            200, 211, 216, 210, 177, 63, 39, 206, 236, 205, 198, 153, 17, 152, 113, 249, 243, 46,
+            167, 237, 134, 255, 69, 208, 173, 17, 247, 123, 40, 205, 117, 104,
+        ];
+
+        assert_eq!(tree.root(), expected_root);
+        assert_eq!(*tree.index_map.get(&[1; 32]).unwrap(), 0);
+        assert_eq!(*tree.index_map.get(&[2; 32]).unwrap(), 1);
+        assert_eq!(*tree.index_map.get(&[3; 32]).unwrap(), 2);
+        assert!(tree.index_map.get(&[0; 32]).is_none());
+        assert_eq!(tree.capacity, 4);
+        assert_eq!(tree.length, 3);
+    }
+
+    #[test]
+    fn test_merkle_tree_4() {
+        let values = vec![[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
+        let tree = MerkleTree::new(values);
+        let expected_root = [
+            239, 65, 138, 237, 90, 162, 7, 2, 212, 217, 76, 146, 218, 121, 164, 1, 47, 46, 54, 241,
+            0, 139, 253, 179, 205, 30, 56, 116, 157, 202, 36, 153,
+        ];
+
+        assert_eq!(tree.root(), expected_root);
+        assert_eq!(*tree.index_map.get(&[11; 32]).unwrap(), 0);
+        assert_eq!(*tree.index_map.get(&[12; 32]).unwrap(), 1);
+        assert_eq!(*tree.index_map.get(&[13; 32]).unwrap(), 2);
+        assert_eq!(*tree.index_map.get(&[14; 32]).unwrap(), 3);
+        assert_eq!(*tree.index_map.get(&[15; 32]).unwrap(), 4);
+        assert_eq!(tree.capacity, 8);
+        assert_eq!(tree.length, 5);
+    }
 }
+
+//
