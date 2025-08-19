@@ -7,7 +7,8 @@ edition = "2024"
 risc0-zkvm = "2.3.1"
 serde = { version = "1.0", default-features = false }
 thiserror = { version = "2.0.12", optional = true }
+bytemuck = { version = "1.13", optional = true }
 
 [features]
 default = []
-host = ["thiserror"]
+host = ["thiserror", "bytemuck"]

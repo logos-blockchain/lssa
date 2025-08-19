@@ -107,12 +107,7 @@ pub struct PrivacyPreservingCircuitOutput {
 #[cfg(feature = "host")]
 impl PrivacyPreservingCircuitOutput {
     pub fn to_bytes(&self) -> Vec<u8> {
-        let words = to_vec(&self).unwrap();
-        let mut result = Vec::with_capacity(4 * words.len());
-        for word in &words {
-            result.extend_from_slice(&word.to_le_bytes());
-        }
-        result
+        bytemuck::cast_slice(&to_vec(&self).unwrap()).to_vec()
     }
 }
 

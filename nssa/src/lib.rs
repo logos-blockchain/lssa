@@ -5,6 +5,7 @@ pub mod program;
 pub mod public_transaction;
 mod signature;
 mod state;
+mod merkle_tree;
 
 pub use address::Address;
 pub use public_transaction::PublicTransaction;
