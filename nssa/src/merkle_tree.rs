@@ -25,12 +25,23 @@ pub struct MerkleTree {
     index_map: HashMap<Value, usize>,
     node_map: HashMap<usize, Node>,
     capacity: usize,
-    length: usize,
 }
 
 impl MerkleTree {
     pub fn root(&self) -> Node {
-        *self.node_map.get(&0).unwrap()
+        let root_index = self.root_index();
+        *self.get_node(&root_index)
+    }
+
+    fn root_index(&self) -> usize {
+        let total_levels = self.capacity.trailing_zeros() as usize;
+        let used_levels = self.size().trailing_zeros() as usize;
+        let diff = total_levels - used_levels;
+        if diff == 0 { 0 } else { (1 << diff) - 1 }
+    }
+
+    fn size(&self) -> usize {
+        self.values.len().next_power_of_two()
     }
 
     fn get_node(&self, index: &usize) -> &Node {
@@ -52,13 +63,11 @@ impl MerkleTree {
 
     pub fn with_capacity(capacity: usize) -> Self {
         let capacity = capacity.next_power_of_two();
-        let length = 0;
         Self {
-            values: Vec::new(),
-            index_map: HashMap::new(),
-            node_map: HashMap::new(),
+            values: Vec::with_capacity(capacity),
+            index_map: HashMap::with_capacity(capacity),
+            node_map: HashMap::with_capacity(capacity << 1),
             capacity,
-            length,
         }
     }
 
@@ -75,22 +84,22 @@ impl MerkleTree {
             return false;
         }
 
-        if self.capacity == self.length {
+        if self.capacity == self.values.len() {
             self.extend_capacity();
         }
 
-        let new_index = self.length;
+        let new_index = self.values.len();
         self.values.push(value);
         self.index_map.insert(value, new_index);
-        self.length += 1;
 
         let base_length = self.capacity;
         let mut layer_node = hash_value(&value);
         let mut layer_index = new_index + base_length - 1;
         self.node_map.insert(layer_index, layer_node);
 
-        let mut layer = self.capacity.trailing_zeros();
-        while layer > 0 {
+        let mut layer = 0;
+        let mut top_layer = self.size().trailing_zeros();
+        while layer < top_layer {
             let is_left_child = layer_index & 1 == 1;
 
             let (parent_index, new_parent_node) = if is_left_child {
@@ -107,7 +116,7 @@ impl MerkleTree {
 
             self.set_node(parent_index, new_parent_node);
 
-            layer -= 1;
+            layer += 1;
             layer_index = parent_index;
             layer_node = new_parent_node
         }
@@ -154,7 +163,6 @@ mod tests {
         assert_eq!(*tree.index_map.get(&[3; 32]).unwrap(), 2);
         assert_eq!(*tree.index_map.get(&[4; 32]).unwrap(), 3);
         assert_eq!(tree.capacity, 4);
-        assert_eq!(tree.length, 4);
     }
 
     #[test]
@@ -173,7 +181,6 @@ mod tests {
         assert_eq!(*tree.index_map.get(&[3; 32]).unwrap(), 2);
         assert_eq!(*tree.index_map.get(&[0; 32]).unwrap(), 3);
         assert_eq!(tree.capacity, 4);
-        assert_eq!(tree.length, 4);
     }
 
     #[test]
@@ -192,7 +199,6 @@ mod tests {
         assert_eq!(*tree.index_map.get(&[3; 32]).unwrap(), 2);
         assert!(tree.index_map.get(&[0; 32]).is_none());
         assert_eq!(tree.capacity, 4);
-        assert_eq!(tree.length, 3);
     }
 
     #[test]
@@ -212,7 +218,6 @@ mod tests {
         assert_eq!(*tree.index_map.get(&[14; 32]).unwrap(), 3);
         assert_eq!(*tree.index_map.get(&[15; 32]).unwrap(), 4);
         assert_eq!(tree.capacity, 8);
-        assert_eq!(tree.length, 5);
     }
 
     #[test]
@@ -238,14 +243,12 @@ mod tests {
         assert_eq!(*tree.index_map.get(&[14; 32]).unwrap(), 3);
         assert_eq!(*tree.index_map.get(&[15; 32]).unwrap(), 4);
         assert_eq!(tree.capacity, 8);
-        assert_eq!(tree.length, 5);
     }
 
     #[test]
     fn test_with_capacity_4() {
         let tree = MerkleTree::with_capacity(4);
 
-        assert_eq!(tree.length, 0);
         assert!(tree.index_map.is_empty());
         assert!(tree.node_map.is_empty());
         for i in 3..7 {
@@ -261,7 +264,6 @@ mod tests {
     fn test_with_capacity_5() {
         let tree = MerkleTree::with_capacity(5);
 
-        assert_eq!(tree.length, 0);
         assert!(tree.index_map.is_empty());
         assert!(tree.node_map.is_empty());
         for i in 7..15 {
@@ -274,6 +276,43 @@ mod tests {
             assert_eq!(*tree.get_node(&i), default_values::DEFAULT_VALUES[2])
         }
         assert_eq!(*tree.get_node(&0), default_values::DEFAULT_VALUES[3])
+    }
+
+    #[test]
+    fn test_with_capacity_6() {
+        let mut tree = MerkleTree::with_capacity(100);
+
+        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32]];
+
+        let expected_root = [
+            72, 199, 63, 120, 33, 165, 138, 141, 42, 112, 62, 91, 57, 197, 113, 192, 170, 32, 207,
+            20, 171, 205, 10, 248, 242, 185, 85, 188, 32, 41, 152, 222,
+        ];
+
+        tree.insert(values[0]);
+        tree.insert(values[1]);
+        tree.insert(values[2]);
+        tree.insert(values[3]);
+
+        assert_eq!(tree.root(), expected_root);
+    }
+
+    #[test]
+    fn test_with_capacity_7() {
+        let mut tree = MerkleTree::with_capacity(599);
+
+        let values = vec![[1; 32], [2; 32], [3; 32]];
+
+        let expected_root = [
+            200, 211, 216, 210, 177, 63, 39, 206, 236, 205, 198, 153, 17, 152, 113, 249, 243, 46,
+            167, 237, 134, 255, 69, 208, 173, 17, 247, 123, 40, 205, 117, 104,
+        ];
+
+        tree.insert(values[0]);
+        tree.insert(values[1]);
+        tree.insert(values[2]);
+
+        assert_eq!(tree.root(), expected_root);
     }
 
     #[test]
