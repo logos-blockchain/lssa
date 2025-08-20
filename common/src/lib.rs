@@ -65,9 +65,11 @@ pub enum ExecutionFailureKind {
     #[error("Failed prove execution err: {0:?}")]
     ProveError(anyhow::Error),
     #[error("Failed to decode data from VM: {0:?}")]
-    DecodeError(#[from] risc0_zkvm::serde::Error),
+    DecodeError(String),
     #[error("Inputs amounts does not match outputs")]
     AmountMismatchError,
+    #[error("Accounts key not found")]
+    KeyNotFoundError,
     #[error("Sequencer client error: {0:?}")]
     SequencerClientError(#[from] SequencerClientError),
     #[error("Insufficient gas for operation")]

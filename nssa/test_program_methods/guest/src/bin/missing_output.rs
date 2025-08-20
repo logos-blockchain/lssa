@@ -1,0 +1,17 @@
+use nssa_core::program::read_nssa_inputs;
+use risc0_zkvm::guest::env;
+
+type Instruction = ();
+
+fn main() {
+    let (input_accounts, _) = read_nssa_inputs::<Instruction>();
+
+    let [pre1, _] = match input_accounts.try_into() {
+        Ok(array) => array,
+        Err(_) => return,
+    };
+
+    let account_pre1 = pre1.account;
+
+    env::commit(&vec![account_pre1]);
+}

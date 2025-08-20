@@ -1,11 +1,6 @@
-use k256::ecdsa::SigningKey;
-use secp256k1_zkp::Tweak;
+use nssa;
 
-use crate::{
-    block::{Block, HashableBlockData},
-    execution_input::PublicNativeTokenSend,
-    transaction::{SignaturePrivateKey, Transaction, TransactionBody, TxKind},
-};
+use crate::block::{Block, HashableBlockData};
 
 //Dummy producers
 
@@ -16,100 +11,47 @@ use crate::{
 /// `prev_hash` - hash of previous block, provide None for genesis
 ///
 /// `transactions` - vector of `Transaction` objects
-///
-/// `additional_data` - vector with additional data
 pub fn produce_dummy_block(
     id: u64,
     prev_hash: Option<[u8; 32]>,
-    transactions: Vec<Transaction>,
-    additional_data: Vec<u8>,
+    transactions: Vec<nssa::PublicTransaction>,
 ) -> Block {
     let block_data = HashableBlockData {
         block_id: id,
         prev_block_id: id.saturating_sub(1),
         prev_block_hash: prev_hash.unwrap_or_default(),
         transactions,
-        data: additional_data,
     };
 
     block_data.into()
 }
 
-pub fn produce_dummy_empty_transaction() -> Transaction {
-    let body = TransactionBody {
-        tx_kind: TxKind::Public,
-        execution_input: Default::default(),
-        execution_output: Default::default(),
-        utxo_commitments_spent_hashes: Default::default(),
-        utxo_commitments_created_hashes: Default::default(),
-        nullifier_created_hashes: Default::default(),
-        execution_proof_private: Default::default(),
-        encoded_data: Default::default(),
-        ephemeral_pub_key: Default::default(),
-        commitment: Default::default(),
-        tweak: Default::default(),
-        secret_r: Default::default(),
-        sc_addr: Default::default(),
-    };
-
-    Transaction::new(body, SignaturePrivateKey::from_slice(&[1; 32]).unwrap())
+pub fn produce_dummy_empty_transaction() -> nssa::PublicTransaction {
+    let program_id = nssa::program::Program::authenticated_transfer_program().id();
+    let addresses = vec![];
+    let nonces = vec![];
+    let instruction_data: u128 = 0;
+    let message =
+        nssa::public_transaction::Message::try_new(program_id, addresses, nonces, instruction_data)
+            .unwrap();
+    let private_key = nssa::PrivateKey::try_new([1; 32]).unwrap();
+    let witness_set = nssa::public_transaction::WitnessSet::for_message(&message, &[&private_key]);
+    nssa::PublicTransaction::new(message, witness_set)
 }
 
-pub fn create_dummy_private_transaction_random_signer(
-    nullifier_created_hashes: Vec<[u8; 32]>,
-    utxo_commitments_spent_hashes: Vec<[u8; 32]>,
-    utxo_commitments_created_hashes: Vec<[u8; 32]>,
-) -> Transaction {
-    let mut rng = rand::thread_rng();
-
-    let body = TransactionBody {
-        tx_kind: TxKind::Private,
-        execution_input: vec![],
-        execution_output: vec![],
-        utxo_commitments_spent_hashes,
-        utxo_commitments_created_hashes,
-        nullifier_created_hashes,
-        execution_proof_private: "dummy_proof".to_string(),
-        encoded_data: vec![],
-        ephemeral_pub_key: vec![10, 11, 12],
-        commitment: vec![],
-        tweak: Tweak::new(&mut rng),
-        secret_r: [0; 32],
-        sc_addr: "sc_addr".to_string(),
-    };
-    Transaction::new(body, SignaturePrivateKey::random(&mut rng))
-}
-
-pub fn create_dummy_transaction_native_token_transfer(
+pub fn create_transaction_native_token_transfer(
     from: [u8; 32],
-    nonce: u64,
+    nonce: u128,
     to: [u8; 32],
-    balance_to_move: u64,
-    signing_key: SigningKey,
-) -> Transaction {
-    let mut rng = rand::thread_rng();
-
-    let native_token_transfer = PublicNativeTokenSend {
-        from,
-        nonce,
-        to,
-        balance_to_move,
-    };
-
-    let body = TransactionBody {
-        tx_kind: TxKind::Public,
-        execution_input: serde_json::to_vec(&native_token_transfer).unwrap(),
-        execution_output: vec![],
-        utxo_commitments_spent_hashes: vec![],
-        utxo_commitments_created_hashes: vec![],
-        nullifier_created_hashes: vec![],
-        execution_proof_private: "".to_string(),
-        encoded_data: vec![],
-        ephemeral_pub_key: vec![10, 11, 12],
-        commitment: vec![],
-        tweak: Tweak::new(&mut rng),
-        secret_r: [0; 32],
-        sc_addr: "sc_addr".to_string(),
-    };
-    Transaction::new(body, signing_key)
+    balance_to_move: u128,
+    signing_key: nssa::PrivateKey,
+) -> nssa::PublicTransaction {
+    let addresses = vec![nssa::Address::new(from), nssa::Address::new(to)];
+    let nonces = vec![nonce];
+    let program_id = nssa::program::Program::authenticated_transfer_program().id();
+    let message =
+        nssa::public_transaction::Message::try_new(program_id, addresses, nonces, balance_to_move)
+            .unwrap();
+    let witness_set = nssa::public_transaction::WitnessSet::for_message(&message, &[&signing_key]);
+    nssa::PublicTransaction::new(message, witness_set)
 }

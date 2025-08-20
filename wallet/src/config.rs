@@ -1,8 +1,12 @@
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use accounts::account_core::Account;
-use serde::{Deserialize, Serialize};
-use zkvm::gas_calculator::GasCalculator;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitialAccountData {
+    pub address: nssa::Address,
+    pub account: nssa_core::account::Account,
+    pub pub_sign_key: nssa::PrivateKey,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GasConfig {
@@ -22,20 +26,6 @@ pub struct GasConfig {
     pub gas_limit_runtime: u64,
 }
 
-impl From<GasConfig> for zkvm::gas_calculator::GasCalculator {
-    fn from(value: GasConfig) -> Self {
-        GasCalculator::new(
-            value.gas_fee_per_byte_deploy,
-            value.gas_fee_per_input_buffer_runtime,
-            value.gas_fee_per_byte_runtime,
-            value.gas_cost_runtime,
-            value.gas_cost_deploy,
-            value.gas_limit_deploy,
-            value.gas_limit_runtime,
-        )
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletConfig {
     ///Home dir of sequencer storage
@@ -47,5 +37,5 @@ pub struct WalletConfig {
     ///Sequencer polling duration for new blocks in seconds
     pub seq_poll_timeout_secs: u64,
     ///Initial accounts for wallet
-    pub initial_accounts: Vec<Account>,
+    pub initial_accounts: Vec<InitialAccountData>,
 }

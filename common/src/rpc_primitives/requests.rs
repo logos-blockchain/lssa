@@ -1,6 +1,4 @@
-use crate::block::Block;
 use crate::parse_request;
-use crate::transaction::Transaction;
 
 use super::errors::RpcParseError;
 use super::parser::parse_params;
@@ -18,7 +16,7 @@ pub struct RegisterAccountRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
-    pub transaction: Transaction,
+    pub transaction: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -72,7 +70,7 @@ pub struct SendTxResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetBlockDataResponse {
-    pub block: Block,
+    pub block: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -87,10 +85,10 @@ pub struct GetLastBlockResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountBalanceResponse {
-    pub balance: u64,
+    pub balance: u128,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetTransactionByHashResponse {
-    pub transaction: Option<Transaction>,
+    pub transaction: Option<String>,
 }

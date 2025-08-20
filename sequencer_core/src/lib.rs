@@ -1,28 +1,18 @@
 use std::fmt::Display;
 
-use accounts::account_core::address::{self, AccountAddress};
 use anyhow::Result;
-use common::{
-    block::HashableBlockData,
-    execution_input::PublicNativeTokenSend,
-    merkle_tree_public::TreeHashType,
-    nullifier::UTXONullifier,
-    transaction::{AuthenticatedTransaction, Transaction, TransactionBody, TxKind},
-    utxo_commitment::UTXOCommitment,
-};
+use common::{block::HashableBlockData, merkle_tree_public::TreeHashType};
 use config::SequencerConfig;
 use mempool::MemPool;
-use mempool_transaction::MempoolTransaction;
 use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
 
 pub mod config;
-pub mod mempool_transaction;
 pub mod sequencer_store;
 
 pub struct SequencerCore {
     pub store: SequecerChainStore,
-    pub mempool: MemPool<MempoolTransaction>,
+    pub mempool: MemPool<nssa::PublicTransaction>,
     pub sequencer_config: SequencerConfig,
     pub chain_height: u64,
 }
@@ -34,7 +24,7 @@ pub enum TransactionMalformationErrorKind {
     TxHashAlreadyPresentInTree { tx: TreeHashType },
     NullifierAlreadyPresentInTree { tx: TreeHashType },
     UTXOCommitmentAlreadyPresentInTree { tx: TreeHashType },
-    MempoolFullForRound { tx: TreeHashType },
+    MempoolFullForRound,
     ChainStateFurtherThanTransactionState { tx: TreeHashType },
     FailedToInsert { tx: TreeHashType, details: String },
     InvalidSignature,
@@ -61,219 +51,47 @@ impl SequencerCore {
                 config.is_genesis_random,
                 &config.initial_accounts,
             ),
-            mempool: MemPool::<MempoolTransaction>::default(),
+            mempool: MemPool::default(),
             chain_height: config.genesis_id,
             sequencer_config: config,
         }
     }
 
-    pub fn get_tree_roots(&self) -> [[u8; 32]; 2] {
-        [
-            self.store
-                .utxo_commitments_store
-                .get_root()
-                .unwrap_or([0; 32]),
-            self.store.pub_tx_store.get_root().unwrap_or([0; 32]),
-        ]
-    }
-
     pub fn transaction_pre_check(
         &mut self,
-        tx: Transaction,
-    ) -> Result<AuthenticatedTransaction, TransactionMalformationErrorKind> {
-        let tx = tx
-            .into_authenticated()
-            .map_err(|_| TransactionMalformationErrorKind::InvalidSignature)?;
-
-        let TransactionBody {
-            tx_kind,
-            ref execution_input,
-            ref execution_output,
-            ref utxo_commitments_created_hashes,
-            ref nullifier_created_hashes,
-            ..
-        } = tx.transaction().body();
-
-        let tx_hash = *tx.hash();
-
-        let mempool_size = self.mempool.len();
-
-        if mempool_size >= self.sequencer_config.max_num_tx_in_block {
-            return Err(TransactionMalformationErrorKind::MempoolFullForRound { tx: tx_hash });
+        tx: nssa::PublicTransaction,
+    ) -> Result<nssa::PublicTransaction, TransactionMalformationErrorKind> {
+        // Stateless checks here
+        if tx.witness_set().is_valid_for(tx.message()) {
+            Ok(tx)
+        } else {
+            Err(TransactionMalformationErrorKind::InvalidSignature)
         }
-
-        //Sanity check
-        match tx_kind {
-            TxKind::Public => {
-                if !utxo_commitments_created_hashes.is_empty()
-                    || !nullifier_created_hashes.is_empty()
-                {
-                    //Public transactions can not make private operations.
-                    return Err(
-                        TransactionMalformationErrorKind::PublicTransactionChangedPrivateData {
-                            tx: tx_hash,
-                        },
-                    );
-                }
-            }
-            TxKind::Private => {
-                if !execution_input.is_empty() || !execution_output.is_empty() {
-                    //Not entirely necessary, but useful simplification for a future.
-                    //This way only shielded and deshielded transactions can be used for interaction
-                    //between public and private state.
-                    return Err(
-                        TransactionMalformationErrorKind::PrivateTransactionChangedPublicData {
-                            tx: tx_hash,
-                        },
-                    );
-                }
-            }
-            _ => {}
-        };
-
-        //Native transfers checks
-        if let Ok(native_transfer_action) =
-            serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
-        {
-            let signer_address = address::from_public_key(&tx.transaction().public_key);
-
-            //Correct sender check
-            if native_transfer_action.from != signer_address {
-                return Err(TransactionMalformationErrorKind::IncorrectSender);
-            }
-        }
-
-        //Tree checks
-        let tx_tree_check = self.store.pub_tx_store.get_tx(tx_hash).is_some();
-        let nullifier_tree_check = nullifier_created_hashes.iter().any(|nullifier_hash| {
-            self.store.nullifier_store.contains(&UTXONullifier {
-                utxo_hash: *nullifier_hash,
-            })
-        });
-        let utxo_commitments_check =
-            utxo_commitments_created_hashes
-                .iter()
-                .any(|utxo_commitment_hash| {
-                    self.store
-                        .utxo_commitments_store
-                        .get_tx(*utxo_commitment_hash)
-                        .is_some()
-                });
-
-        if tx_tree_check {
-            return Err(
-                TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: *tx.hash() },
-            );
-        }
-
-        if nullifier_tree_check {
-            return Err(
-                TransactionMalformationErrorKind::NullifierAlreadyPresentInTree { tx: *tx.hash() },
-            );
-        }
-
-        if utxo_commitments_check {
-            return Err(
-                TransactionMalformationErrorKind::UTXOCommitmentAlreadyPresentInTree {
-                    tx: *tx.hash(),
-                },
-            );
-        }
-
-        Ok(tx)
     }
 
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
-        transaction: Transaction,
+        transaction: nssa::PublicTransaction,
     ) -> Result<(), TransactionMalformationErrorKind> {
         let mempool_size = self.mempool.len();
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
-            return Err(TransactionMalformationErrorKind::MempoolFullForRound {
-                tx: transaction.body().hash(),
-            });
+            return Err(TransactionMalformationErrorKind::MempoolFullForRound);
         }
 
         let authenticated_tx = self.transaction_pre_check(transaction)?;
 
-        self.mempool.push_item(authenticated_tx.into());
+        self.mempool.push_item(authenticated_tx);
 
         Ok(())
     }
 
     fn execute_check_transaction_on_state(
         &mut self,
-        mempool_tx: &MempoolTransaction,
-    ) -> Result<(), TransactionMalformationErrorKind> {
-        let TransactionBody {
-            ref utxo_commitments_created_hashes,
-            ref nullifier_created_hashes,
-            execution_input,
-            ..
-        } = mempool_tx.auth_tx.transaction().body();
+        tx: nssa::PublicTransaction,
+    ) -> Result<nssa::PublicTransaction, nssa::error::NssaError> {
+        self.store.state.transition_from_public_transaction(&tx)?;
 
-        let tx_hash = *mempool_tx.auth_tx.hash();
-
-        //Balance move
-        if let Ok(native_transfer_action) =
-            serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
-        {
-            // Nonce check
-            let signer_addres =
-                address::from_public_key(&mempool_tx.auth_tx.transaction().public_key);
-            if self.store.acc_store.get_account_nonce(&signer_addres)
-                != native_transfer_action.nonce
-            {
-                return Err(TransactionMalformationErrorKind::NonceMismatch { tx: tx_hash });
-            }
-
-            let from_balance = self
-                .store
-                .acc_store
-                .get_account_balance(&native_transfer_action.from);
-            let to_balance = self
-                .store
-                .acc_store
-                .get_account_balance(&native_transfer_action.to);
-
-            //Balance check
-            if from_balance < native_transfer_action.balance_to_move {
-                return Err(TransactionMalformationErrorKind::BalanceMismatch { tx: tx_hash });
-            }
-
-            self.store.acc_store.set_account_balance(
-                &native_transfer_action.from,
-                from_balance - native_transfer_action.balance_to_move,
-            );
-            self.store.acc_store.set_account_balance(
-                &native_transfer_action.to,
-                to_balance + native_transfer_action.balance_to_move,
-            );
-
-            self.store.acc_store.increase_nonce(&signer_addres);
-        }
-
-        for utxo_comm in utxo_commitments_created_hashes {
-            self.store
-                .utxo_commitments_store
-                .add_tx(&UTXOCommitment { hash: *utxo_comm });
-        }
-
-        for nullifier in nullifier_created_hashes.iter() {
-            self.store.nullifier_store.insert(UTXONullifier {
-                utxo_hash: *nullifier,
-            });
-        }
-
-        self.store
-            .pub_tx_store
-            .add_tx(mempool_tx.auth_tx.transaction());
-
-        Ok(())
-    }
-
-    pub fn register_account(&mut self, account_addr: AccountAddress) {
-        self.store.acc_store.register_account(account_addr);
+        Ok(tx)
     }
 
     ///Produces new block from transactions in mempool
@@ -284,15 +102,9 @@ impl SequencerCore {
             .mempool
             .pop_size(self.sequencer_config.max_num_tx_in_block);
 
-        let valid_transactions = transactions
+        let valid_transactions: Vec<_> = transactions
             .into_iter()
-            .filter_map(|mempool_tx| {
-                if self.execute_check_transaction_on_state(&mempool_tx).is_ok() {
-                    Some(mempool_tx.auth_tx.into_transaction())
-                } else {
-                    None
-                }
-            })
+            .filter_map(|tx| self.execute_check_transaction_on_state(tx).ok())
             .collect();
 
         let prev_block_hash = self
@@ -305,7 +117,6 @@ impl SequencerCore {
             block_id: new_block_height,
             prev_block_id: self.chain_height,
             transactions: valid_transactions,
-            data: vec![],
             prev_block_hash,
         };
 
@@ -324,8 +135,6 @@ mod tests {
     use crate::config::AccountInitialData;
 
     use super::*;
-    use k256::{ecdsa::SigningKey, FieldBytes};
-    use mempool_transaction::MempoolTransaction;
 
     fn setup_sequencer_config_variable_initial_accounts(
         initial_accounts: Vec<AccountInitialData>,
@@ -347,13 +156,13 @@ mod tests {
 
     fn setup_sequencer_config() -> SequencerConfig {
         let acc1_addr = vec![
-            13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
-            68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 85, 42, 215,
+            27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30, 24,
+            52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
         ];
 
         let acc2_addr = vec![
-            151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
-            135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 44, 243, 100,
+            77, 75, 108, 209, 54, 16, 50, 202, 155, 210, 174, 185, 217, 0, 170, 77, 69, 217, 234,
+            216, 10, 201, 66, 51, 116, 196, 81, 167, 37, 77, 7, 102,
         ];
 
         let initial_acc1 = AccountInitialData {
@@ -371,36 +180,17 @@ mod tests {
         setup_sequencer_config_variable_initial_accounts(initial_accounts)
     }
 
-    fn create_signing_key_for_account1() -> SigningKey {
-        let pub_sign_key_acc1 = [
-            133, 143, 177, 187, 252, 66, 237, 236, 234, 252, 244, 138, 5, 151, 3, 99, 217, 231,
-            112, 217, 77, 211, 58, 218, 176, 68, 99, 53, 152, 228, 198, 190,
-        ];
-
-        let field_bytes = FieldBytes::from_slice(&pub_sign_key_acc1);
-        SigningKey::from_bytes(field_bytes).unwrap()
+    fn create_signing_key_for_account1() -> nssa::PrivateKey {
+        nssa::PrivateKey::try_new([1; 32]).unwrap()
     }
 
-    fn create_signing_key_for_account2() -> SigningKey {
-        let pub_sign_key_acc2 = [
-            54, 90, 62, 225, 71, 225, 228, 148, 143, 53, 210, 23, 137, 158, 171, 156, 48, 7, 139,
-            52, 117, 242, 214, 7, 99, 29, 122, 184, 59, 116, 144, 107,
-        ];
-
-        let field_bytes = FieldBytes::from_slice(&pub_sign_key_acc2);
-        SigningKey::from_bytes(field_bytes).unwrap()
+    fn create_signing_key_for_account2() -> nssa::PrivateKey {
+        nssa::PrivateKey::try_new([2; 32]).unwrap()
     }
 
     fn common_setup(sequencer: &mut SequencerCore) {
-        let tx = common::test_utils::create_dummy_private_transaction_random_signer(
-            vec![[9; 32]],
-            vec![[7; 32]],
-            vec![[8; 32]],
-        );
-        let mempool_tx = MempoolTransaction {
-            auth_tx: tx.into_authenticated().unwrap(),
-        };
-        sequencer.mempool.push_item(mempool_tx);
+        let tx = common::test_utils::produce_dummy_empty_transaction();
+        sequencer.mempool.push_item(tx);
 
         sequencer
             .produce_new_block_with_mempool_transactions()
@@ -425,29 +215,31 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
-        assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
+        let balance_acc_1 = sequencer
+            .store
+            .state
+            .get_account_by_address(&nssa::Address::new(acc1_addr))
+            .balance;
+        let balance_acc_2 = sequencer
+            .store
+            .state
+            .get_account_by_address(&nssa::Address::new(acc2_addr))
+            .balance;
 
-        assert_eq!(
-            10000,
-            sequencer.store.acc_store.get_account_balance(&acc1_addr)
-        );
-        assert_eq!(
-            20000,
-            sequencer.store.acc_store.get_account_balance(&acc2_addr)
-        );
+        assert_eq!(10000, balance_acc_1);
+        assert_eq!(20000, balance_acc_2);
     }
 
     #[test]
     fn test_start_different_intial_accounts_balances() {
         let acc1_addr = vec![
-            13, 150, 223, 204, 65, 64, 25, 56, 12, 157, 222, 12, 211, 220, 229, 170, 201, 15, 181,
-            68, 59, 248, 113, 16, 135, 65, 174, 175, 222, 42, 42, 42,
+            27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30, 24,
+            52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
         ];
 
         let acc2_addr = vec![
-            151, 72, 112, 233, 190, 141, 10, 192, 138, 168, 59, 63, 199, 167, 166, 134, 41, 29,
-            135, 50, 80, 138, 186, 152, 179, 96, 128, 243, 156, 42, 42, 42,
+            77, 75, 108, 209, 54, 16, 50, 202, 155, 210, 174, 185, 217, 0, 170, 77, 69, 217, 234,
+            216, 10, 201, 66, 51, 116, 196, 81, 167, 37, 77, 7, 102,
         ];
 
         let initial_acc1 = AccountInitialData {
@@ -462,8 +254,6 @@ mod tests {
 
         let initial_accounts = vec![initial_acc1, initial_acc2];
 
-        let intial_accounts_len = initial_accounts.len();
-
         let config = setup_sequencer_config_variable_initial_accounts(initial_accounts);
         let sequencer = SequencerCore::start_from_config(config.clone());
 
@@ -476,30 +266,22 @@ mod tests {
             .try_into()
             .unwrap();
 
-        assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
-        assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
-
-        assert_eq!(sequencer.store.acc_store.len(), intial_accounts_len);
-
         assert_eq!(
             10000,
-            sequencer.store.acc_store.get_account_balance(&acc1_addr)
+            sequencer
+                .store
+                .state
+                .get_account_by_address(&nssa::Address::new(acc1_addr))
+                .balance
         );
         assert_eq!(
             20000,
-            sequencer.store.acc_store.get_account_balance(&acc2_addr)
+            sequencer
+                .store
+                .state
+                .get_account_by_address(&nssa::Address::new(acc2_addr))
+                .balance
         );
-    }
-
-    #[test]
-    fn test_get_tree_roots() {
-        let config = setup_sequencer_config();
-        let mut sequencer = SequencerCore::start_from_config(config);
-
-        common_setup(&mut sequencer);
-
-        let roots = sequencer.get_tree_roots();
-        assert_eq!(roots.len(), 2); // Should return two roots
     }
 
     #[test]
@@ -509,12 +291,7 @@ mod tests {
 
         common_setup(&mut sequencer);
 
-        let tx = common::test_utils::create_dummy_private_transaction_random_signer(
-            vec![[91; 32]],
-            vec![[71; 32]],
-            vec![[81; 32]],
-        );
-
+        let tx = common::test_utils::produce_dummy_empty_transaction();
         let result = sequencer.transaction_pre_check(tx);
 
         assert!(result.is_ok());
@@ -538,10 +315,9 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key1,
         );
-
         let result = sequencer.transaction_pre_check(tx);
 
         assert!(result.is_ok());
@@ -565,16 +341,20 @@ mod tests {
 
         let sign_key2 = create_signing_key_for_account2();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key2,
         );
 
-        let result = sequencer.transaction_pre_check(tx);
+        // Signature is valid, stateless check pass
+        let tx = sequencer.transaction_pre_check(tx).unwrap();
 
-        assert_eq!(
-            result.err().unwrap(),
-            TransactionMalformationErrorKind::IncorrectSender
-        );
+        // Signature is not from sender. Execution fails
+        let result = sequencer.execute_check_transaction_on_state(tx);
+
+        assert!(matches!(
+            result,
+            Err(nssa::error::NssaError::ProgramExecutionFailed(_))
+        ));
     }
 
     #[test]
@@ -595,7 +375,7 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10000000, sign_key1,
         );
 
@@ -604,10 +384,10 @@ mod tests {
         //Passed pre-check
         assert!(result.is_ok());
 
-        let result = sequencer.execute_check_transaction_on_state(&result.unwrap().into());
+        let result = sequencer.execute_check_transaction_on_state(result.unwrap());
         let is_failed_at_balance_mismatch = matches!(
             result.err().unwrap(),
-            TransactionMalformationErrorKind::BalanceMismatch { tx: _ }
+            nssa::error::NssaError::ProgramExecutionFailed(_)
         );
 
         assert!(is_failed_at_balance_mismatch);
@@ -631,16 +411,22 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 100, sign_key1,
         );
 
-        sequencer
-            .execute_check_transaction_on_state(&tx.into_authenticated().unwrap().into())
-            .unwrap();
+        sequencer.execute_check_transaction_on_state(tx).unwrap();
 
-        let bal_from = sequencer.store.acc_store.get_account_balance(&acc1);
-        let bal_to = sequencer.store.acc_store.get_account_balance(&acc2);
+        let bal_from = sequencer
+            .store
+            .state
+            .get_account_by_address(&nssa::Address::new(acc1))
+            .balance;
+        let bal_to = sequencer
+            .store
+            .state
+            .get_account_by_address(&nssa::Address::new(acc2))
+            .balance;
 
         assert_eq!(bal_from, 9900);
         assert_eq!(bal_to, 20100);
@@ -656,23 +442,16 @@ mod tests {
 
         common_setup(&mut sequencer);
 
-        let tx = common::test_utils::create_dummy_private_transaction_random_signer(
-            vec![[92; 32]],
-            vec![[72; 32]],
-            vec![[82; 32]],
-        );
+        let tx = common::test_utils::produce_dummy_empty_transaction();
 
         // Fill the mempool
-        let dummy_tx = MempoolTransaction {
-            auth_tx: tx.clone().into_authenticated().unwrap(),
-        };
-        sequencer.mempool.push_item(dummy_tx);
+        sequencer.mempool.push_item(tx.clone());
 
         let result = sequencer.push_tx_into_mempool_pre_check(tx);
 
         assert!(matches!(
             result,
-            Err(TransactionMalformationErrorKind::MempoolFullForRound { .. })
+            Err(TransactionMalformationErrorKind::MempoolFullForRound)
         ));
     }
 
@@ -683,11 +462,7 @@ mod tests {
 
         common_setup(&mut sequencer);
 
-        let tx = common::test_utils::create_dummy_private_transaction_random_signer(
-            vec![[93; 32]],
-            vec![[73; 32]],
-            vec![[83; 32]],
-        );
+        let tx = common::test_utils::produce_dummy_empty_transaction();
 
         let result = sequencer.push_tx_into_mempool_pre_check(tx);
         assert!(result.is_ok());
@@ -700,15 +475,8 @@ mod tests {
         let mut sequencer = SequencerCore::start_from_config(config);
         let genesis_height = sequencer.chain_height;
 
-        let tx = common::test_utils::create_dummy_private_transaction_random_signer(
-            vec![[94; 32]],
-            vec![[7; 32]],
-            vec![[8; 32]],
-        );
-        let tx_mempool = MempoolTransaction {
-            auth_tx: tx.into_authenticated().unwrap(),
-        };
-        sequencer.mempool.push_item(tx_mempool);
+        let tx = common::test_utils::produce_dummy_empty_transaction();
+        sequencer.mempool.push_item(tx);
 
         let block_id = sequencer.produce_new_block_with_mempool_transactions();
         assert!(block_id.is_ok());
@@ -733,20 +501,15 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 100, sign_key1,
         );
 
-        let tx_mempool_original = MempoolTransaction {
-            auth_tx: tx.clone().into_authenticated().unwrap(),
-        };
-        let tx_mempool_replay = MempoolTransaction {
-            auth_tx: tx.clone().into_authenticated().unwrap(),
-        };
-
+        let tx_original = tx.clone();
+        let tx_replay = tx.clone();
         // Pushing two copies of the same tx to the mempool
-        sequencer.mempool.push_item(tx_mempool_original);
-        sequencer.mempool.push_item(tx_mempool_replay);
+        sequencer.mempool.push_item(tx_original);
+        sequencer.mempool.push_item(tx_replay);
 
         // Create block
         let current_height = sequencer
@@ -780,15 +543,12 @@ mod tests {
 
         let sign_key1 = create_signing_key_for_account1();
 
-        let tx = common::test_utils::create_dummy_transaction_native_token_transfer(
+        let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 100, sign_key1,
         );
 
         // The transaction should be included the first time
-        let tx_mempool_original = MempoolTransaction {
-            auth_tx: tx.clone().into_authenticated().unwrap(),
-        };
-        sequencer.mempool.push_item(tx_mempool_original);
+        sequencer.mempool.push_item(tx.clone());
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap();
@@ -800,10 +560,7 @@ mod tests {
         assert_eq!(block.transactions, vec![tx.clone()]);
 
         // Add same transaction should fail
-        let tx_mempool_replay = MempoolTransaction {
-            auth_tx: tx.into_authenticated().unwrap(),
-        };
-        sequencer.mempool.push_item(tx_mempool_replay);
+        sequencer.mempool.push_item(tx);
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap();

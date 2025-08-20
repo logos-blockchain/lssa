@@ -20,8 +20,8 @@ struct Args {
     test_name: String,
 }
 
-pub const ACC_SENDER: &str = "0d96dfcc414019380c9dde0cd3dce5aac90fb5443bf871108741aeafde552ad7";
-pub const ACC_RECEIVER: &str = "974870e9be8d0ac08aa83b3fc7a7a686291d8732508aba98b36080f39c2cf364";
+pub const ACC_SENDER: &str = "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f";
+pub const ACC_RECEIVER: &str = "4d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766";
 
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 
@@ -156,7 +156,9 @@ pub async fn test_failure() {
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
-    wallet::execute_subcommand(command).await.unwrap();
+    let failed_send = wallet::execute_subcommand(command).await;
+
+    assert!(failed_send.is_err());
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;

@@ -22,11 +22,14 @@ path = "../storage"
 [dependencies.mempool]
 path = "../mempool"
 
-[dependencies.accounts]
-path = "../accounts"
+[dependencies.key_protocol]
+path = "../key_protocol"
 
 [dependencies.common]
 path = "../common"
+
+[dependencies.nssa]
+path = "../nssa"
 
 [dependencies.secp256k1-zkp]
 workspace = true

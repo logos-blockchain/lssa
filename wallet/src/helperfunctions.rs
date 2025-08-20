@@ -1,9 +1,12 @@
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
-use accounts::account_core::Account;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use nssa::Address;
 
-use crate::{config::WalletConfig, HOME_DIR_ENV_VAR};
+use crate::{
+    config::{InitialAccountData, WalletConfig},
+    HOME_DIR_ENV_VAR,
+};
 
 ///Get home dir for wallet. Env var `NSSA_WALLET_HOME_DIR` must be set before execution to succeed.
 pub fn get_home() -> Result<PathBuf> {
@@ -20,16 +23,14 @@ pub fn fetch_config() -> Result<WalletConfig> {
 }
 
 //ToDo: Replace with structures conversion in future
-pub fn produce_account_addr_from_hex(hex_str: String) -> Result<[u8; 32]> {
-    hex::decode(hex_str)?
-        .try_into()
-        .map_err(|_| anyhow!("Failed conversion to 32 bytes"))
+pub fn produce_account_addr_from_hex(hex_str: String) -> Result<Address> {
+    Ok(hex_str.parse()?)
 }
 
 ///Fetch list of accounts stored at `NSSA_WALLET_HOME_DIR/curr_accounts.json`
 ///
 /// If file not present, it is considered as empty list of persistent accounts
-pub fn fetch_persistent_accounts() -> Result<Vec<Account>> {
+pub fn fetch_persistent_accounts() -> Result<Vec<InitialAccountData>> {
     let home = get_home()?;
     let accs_path = home.join("curr_accounts.json");
 

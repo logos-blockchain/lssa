@@ -6,7 +6,7 @@ use std::path::PathBuf;
 pub struct AccountInitialData {
     ///Hex encoded `AccountAddress`
     pub addr: String,
-    pub balance: u64,
+    pub balance: u128,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

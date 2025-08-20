@@ -18,22 +18,17 @@ reqwest.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tempfile.workspace = true
-risc0-zkvm = { git = "https://github.com/risc0/risc0.git", branch = "release-2.3" }
+risc0-zkvm = "2.3.1"
 hex.workspace = true
 actix-rt.workspace = true
 clap.workspace = true
+nssa-core = { path = "../nssa/core" }
 
-[dependencies.sc_core]
-path = "../sc_core"
+[dependencies.key_protocol]
+path = "../key_protocol"
 
-[dependencies.accounts]
-path = "../accounts"
-
-[dependencies.utxo]
-path = "../utxo"
-
-[dependencies.zkvm]
-path = "../zkvm"
+[dependencies.nssa]
+path = "../nssa"
 
 [dependencies.common]
 path = "../common"
