@@ -4,8 +4,8 @@ mod transaction;
 mod witness_set;
 
 pub use message::Message;
-pub use witness_set::WitnessSet;
 pub use transaction::PrivacyPreservingTransaction;
+pub use witness_set::WitnessSet;
 
 pub mod circuit {
     use nssa_core::{
@@ -194,12 +194,16 @@ mod tests {
         let commitment_set =
             CommitmentSet(MerkleTree::new(vec![commitment_sender.to_byte_array()]));
 
+        let program = Program::authenticated_transfer_program();
+
         let expected_private_account_1 = Account {
+            program_owner: program.id(),
             balance: 100 - balance_to_move,
             nonce: 0xdeadbeef1,
             ..Default::default()
         };
         let expected_private_account_2 = Account {
+            program_owner: program.id(),
             balance: balance_to_move,
             nonce: 0xdeadbeef2,
             ..Default::default()
@@ -223,7 +227,7 @@ mod tests {
                 private_key_1,
                 commitment_set.get_proof_for(&commitment_sender).unwrap(),
             )],
-            &Program::authenticated_transfer_program(),
+            &program,
             &commitment_set.digest(),
         )
         .unwrap();

@@ -105,10 +105,11 @@ fn main() {
                 post_with_updated_values.nonce = *new_nonce;
 
                 if post_with_updated_values.program_owner == DEFAULT_PROGRAM_ID {
+                    // Claim account
                     post_with_updated_values.program_owner = program_id;
                 }
 
-                // Compute commitment and push
+                // Compute commitment
                 let commitment_post = Commitment::new(Npk, &post_with_updated_values);
                 new_commitments.push(commitment_post);
 

@@ -683,22 +683,19 @@ mod tests {
 
     #[test]
     fn test_transition_from_privacy_preserving_transaction() {
-        let sender = AccountWithMetadata {
-            account: Account {
-                balance: 200,
-                program_owner: Program::authenticated_transfer_program().id(),
-                ..Account::default()
-            },
-            is_authorized: true,
-        };
         let sender_signing_key = PrivateKey::try_new([1; 32]).unwrap();
         let sender_address =
             Address::from_public_key(&PublicKey::new_from_private_key(&sender_signing_key));
 
+        let mut state = V01State::new_with_genesis_accounts(&[(*sender_address.value(), 200)]);
+
+        let sender = AccountWithMetadata {
+            account: state.get_account_by_address(&sender_address),
+            is_authorized: true,
+        };
+
         let recipient = AccountWithMetadata {
-            account: Account {
-                ..Account::default()
-            },
+            account: Account::default(),
             is_authorized: false,
         };
 
@@ -707,8 +704,6 @@ mod tests {
         let esk = [3; 32];
 
         let balance_to_move: u128 = 37;
-
-        let mut state = V01State::new_with_genesis_accounts(&[(*sender_address.value(), 200)]);
 
         let (output, proof) = execute_and_prove(
             &[sender, recipient],
