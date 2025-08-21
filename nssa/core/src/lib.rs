@@ -1,4 +1,7 @@
-use risc0_zkvm::serde::to_vec;
+use risc0_zkvm::{
+    serde::to_vec,
+    sha::{Impl, Sha256},
+};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "host")]
@@ -21,15 +24,35 @@ pub mod program;
 #[cfg(feature = "host")]
 pub mod error;
 
-pub type CommitmentSetDigest = [u32; 8];
-pub type MembershipProof = Vec<[u8; 32]>;
+pub type CommitmentSetDigest = [u8; 32];
+pub type MembershipProof = (usize, Vec<[u8; 32]>);
 pub fn verify_membership_proof(
     commitment: &Commitment,
     proof: &MembershipProof,
     digest: &CommitmentSetDigest,
 ) -> bool {
-    // TODO: implement
-    true
+    let value_bytes = commitment.to_byte_array();
+    let mut result: [u8; 32] = Impl::hash_bytes(&value_bytes)
+        .as_bytes()
+        .try_into()
+        .unwrap();
+    let mut level_index = proof.0;
+    for node in &proof.1 {
+        let is_left_child = level_index & 1 == 0;
+        if is_left_child {
+            let mut bytes = [0u8; 64];
+            bytes[..32].copy_from_slice(&result);
+            bytes[32..].copy_from_slice(node);
+            result = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        } else {
+            let mut bytes = [0u8; 64];
+            bytes[..32].copy_from_slice(node);
+            bytes[32..].copy_from_slice(&result);
+            result = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        }
+        level_index >>= 1;
+    }
+    &result == digest
 }
 
 pub type IncomingViewingPublicKey = [u8; 32];
@@ -158,7 +181,7 @@ mod tests {
                 &Commitment::new(&NullifierPublicKey::from(&[2; 32]), &Account::default()),
                 &[1; 32],
             )],
-            commitment_set_digest: [0, 1, 0, 1, 0, 1, 0, 1],
+            commitment_set_digest: [0xab; 32],
         };
         let bytes = output.to_bytes();
         let output_from_slice: PrivacyPreservingCircuitOutput = from_slice(&bytes).unwrap();

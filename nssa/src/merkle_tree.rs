@@ -93,7 +93,7 @@ impl MerkleTree {
         let base_length = self.capacity;
         let mut layer_node = hash_value(&value);
         let mut layer_index = new_index + base_length - 1;
-        self.node_map.insert(layer_index, layer_node);
+        self.set_node(layer_index, layer_node);
 
         let mut layer = 0;
         let mut top_layer = self.depth();
@@ -158,6 +158,10 @@ impl MerkleTree {
             layer_index = parent_index;
         }
         Some((*value_index, result))
+    }
+
+    pub(crate) fn contains(&self, value: &[u8; 32]) -> bool {
+        self.index_map.contains_key(value)
     }
 }
 
@@ -517,7 +521,6 @@ mod tests {
         let value = [6; 32];
         assert!(tree.get_authentication_path_for(&value).is_none());
     }
-
 
     #[test]
     fn test_authentication_path_5() {

@@ -1,29 +1,32 @@
 use crate::{
-    address::Address, error::NssaError,
+    address::Address, error::NssaError, merkle_tree::MerkleTree,
     privacy_preserving_transaction::PrivacyPreservingTransaction, program::Program,
     public_transaction::PublicTransaction,
 };
 use nssa_core::{
-    CommitmentSetDigest,
-    account::{Account, Commitment, Nullifier},
-    program::{DEFAULT_PROGRAM_ID, ProgramId},
+    account::{Account, Commitment, Nullifier}, program::{ProgramId, DEFAULT_PROGRAM_ID}, CommitmentSetDigest, MembershipProof
 };
 use std::collections::{HashMap, HashSet};
 
-struct CommitmentSet(HashSet<Commitment>);
+pub(crate) struct CommitmentSet(pub(crate) MerkleTree);
 
 impl CommitmentSet {
-    fn extend(&mut self, commitments: Vec<Commitment>) {
-        self.0.extend(commitments)
+    fn extend(&mut self, commitments: &[Commitment]) {
+        for commitment in commitments {
+            self.0.insert(commitment.to_byte_array());
+        }
     }
 
-    fn digest(&self) -> CommitmentSetDigest {
-        // TODO: implement
-        [0; 8]
+    pub fn digest(&self) -> CommitmentSetDigest {
+        self.0.root()
+    }
+
+    pub fn get_proof_for(&self, commitment: &Commitment) -> Option<MembershipProof> {
+        self.0.get_authentication_path_for(&commitment.to_byte_array())
     }
 
     fn contains(&self, commitment: &Commitment) -> bool {
-        self.0.contains(commitment)
+        self.0.contains(&commitment.to_byte_array())
     }
 }
 
@@ -54,7 +57,10 @@ impl V01State {
 
         let mut this = Self {
             public_state,
-            private_state: (CommitmentSet(HashSet::new()), NullifierSet::new()),
+            private_state: (
+                CommitmentSet(MerkleTree::with_capacity(32)),
+                NullifierSet::new(),
+            ),
             builtin_programs: HashMap::new(),
         };
 
@@ -101,7 +107,7 @@ impl V01State {
         let message = tx.message();
 
         // 2. Add new commitments
-        self.private_state.0.extend(message.new_commitments.clone());
+        self.private_state.0.extend(&message.new_commitments);
 
         // 3. Add new nullifiers
         self.private_state.1.extend(message.new_nullifiers.clone());

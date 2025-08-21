@@ -113,14 +113,16 @@ pub mod circuit {
 mod tests {
     use nssa_core::{
         EncryptedAccountData,
-        account::{Account, AccountWithMetadata, NullifierPublicKey, NullifierSecretKey},
+        account::{
+            Account, AccountWithMetadata, Commitment, NullifierPublicKey, NullifierSecretKey,
+        },
     };
     use risc0_zkvm::{InnerReceipt, Journal, Receipt};
 
     use crate::{
-        Address, V01State,
+        Address, V01State, merkle_tree::MerkleTree,
         privacy_preserving_transaction::circuit::prove_privacy_preserving_execution_circuit,
-        program::Program,
+        program::Program, state::CommitmentSet,
     };
 
     use super::*;
@@ -153,7 +155,7 @@ mod tests {
         let private_account_keys = vec![(NullifierPublicKey::from(&[1; 32]), [2; 32], [3; 32])];
         let private_account_auth = vec![];
         let visibility_mask = vec![0, 2];
-        let commitment_set_digest = [99; 8];
+        let commitment_set_digest = [99; 32];
         let program = Program::authenticated_transfer_program();
         let (proof, output) = prove_privacy_preserving_execution_circuit(
             &pre_states,
@@ -190,6 +192,10 @@ mod tests {
             is_authorized: true,
         };
 
+        let private_key = [1; 32];
+        let Npk = NullifierPublicKey::from(&private_key);
+        let commitment = Commitment::new(&Npk, &sender.account);
+
         let recipient = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
@@ -197,19 +203,22 @@ mod tests {
 
         let balance_to_move: u128 = 37;
 
+        let commitment_set = CommitmentSet(MerkleTree::new(vec![commitment.to_byte_array()]));
+
         let expected_sender_pre = sender.clone();
-        let pre_states = vec![sender, recipient];
+        let pre_states = vec![sender.clone(), recipient];
         let instruction_data = Program::serialize_instruction(balance_to_move).unwrap();
-        let private_key = [1; 32];
         let private_account_keys = vec![
-            (NullifierPublicKey::from(&private_key), [2; 32], [3; 32]),
+            (Npk.clone(), [2; 32], [3; 32]),
             (NullifierPublicKey::from(&[2; 32]), [4; 32], [5; 32]),
         ];
-        //  TODO: Replace dummy authentication path when implemented
-        let private_account_auth = vec![(private_key, vec![])];
+        let private_account_auth = vec![(
+            private_key,
+            commitment_set.get_proof_for(&commitment).unwrap(),
+        )];
         let visibility_mask = vec![1, 2];
-        let commitment_set_digest = [99; 8];
         let program = Program::authenticated_transfer_program();
+        let mut commitment_set_digest = commitment_set.digest();
         let (proof, output) = prove_privacy_preserving_execution_circuit(
             &pre_states,
             &instruction_data,
