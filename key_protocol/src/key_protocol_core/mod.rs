@@ -116,6 +116,12 @@ impl NSSAUserData {
             .and_modify(|(_, acc)| acc.balance = new_balance);
     }
 
+    pub fn increment_account_nonce(&mut self, address: nssa::Address) {
+        self.accounts
+            .entry(address)
+            .and_modify(|(_, acc)| acc.nonce += 1);
+    }
+
     //ToDo: Part of a private keys update
     // pub fn make_tag(&self) -> Tag {
     //     self.address.value()[0]

@@ -78,7 +78,10 @@ mod tests {
             home,
             override_rust_log: None,
             sequencer_addr: "http://127.0.0.1".to_string(),
-            seq_poll_timeout_secs: 1,
+            seq_poll_timeout_millis: 12000,
+            seq_poll_max_blocks: 5,
+            seq_poll_max_retries: 10,
+            seq_poll_retry_delay_millis: 500,
             initial_accounts: create_initial_accounts(),
         }
     }

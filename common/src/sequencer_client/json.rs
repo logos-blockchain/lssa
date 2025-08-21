@@ -12,7 +12,7 @@ pub struct SendTxRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxResponse {
     pub status: String,
-    pub additional_data: Option<String>,
+    pub tx_hash: String,
 }
 
 //General

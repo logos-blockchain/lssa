@@ -23,6 +23,7 @@ hex.workspace = true
 actix-rt.workspace = true
 clap.workspace = true
 nssa-core = { path = "../nssa/core" }
+base64.workspace = true
 
 [dependencies.key_protocol]
 path = "../key_protocol"

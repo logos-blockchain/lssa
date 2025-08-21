@@ -43,6 +43,11 @@ pub struct GetTransactionByHashRequest {
     pub hash: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetAccountsNoncesRequest {
+    pub addresses: Vec<String>,
+}
+
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -52,6 +57,7 @@ parse_request!(GetLastBlockRequest);
 parse_request!(GetInitialTestnetAccountsRequest);
 parse_request!(GetAccountBalanceRequest);
 parse_request!(GetTransactionByHashRequest);
+parse_request!(GetAccountsNoncesRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -66,6 +72,7 @@ pub struct RegisterAccountResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxResponse {
     pub status: String,
+    pub tx_hash: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -86,6 +93,11 @@ pub struct GetLastBlockResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountBalanceResponse {
     pub balance: u128,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetAccountsNoncesResponse {
+    pub nonces: Vec<u128>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

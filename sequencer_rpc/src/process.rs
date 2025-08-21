@@ -12,7 +12,8 @@ use common::{
         message::{Message, Request},
         parser::RpcRequest,
         requests::{
-            GetAccountBalanceRequest, GetAccountBalanceResponse, GetInitialTestnetAccountsRequest,
+            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountsNoncesRequest,
+            GetAccountsNoncesResponse, GetInitialTestnetAccountsRequest,
             GetTransactionByHashRequest, GetTransactionByHashResponse,
         },
     },
@@ -33,10 +34,11 @@ pub const GET_GENESIS: &str = "get_genesis";
 pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
 pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
+pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
-pub const SUCCESS: &str = "Success";
+pub const TRANSACTION_SUBMITTED: &str = "Transaction submitted";
 
 pub const GET_INITIAL_TESTNET_ACCOUNTS: &str = "get_initial_testnet_accounts";
 
@@ -72,6 +74,7 @@ impl JsonHandler {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
         let tx = nssa::PublicTransaction::from_bytes(&send_tx_req.transaction)
             .map_err(|e| RpcError::serialization_error(&e.to_string()))?;
+        let tx_hash = hex::encode(tx.hash());
 
         {
             let mut state = self.sequencer_state.lock().await;
@@ -80,7 +83,8 @@ impl JsonHandler {
         }
 
         let helperstruct = SendTxResponse {
-            status: SUCCESS.to_string(),
+            status: TRANSACTION_SUBMITTED.to_string(),
+            tx_hash,
         };
 
         respond(helperstruct)
@@ -171,6 +175,38 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
+    /// Returns the nonces of the accounts at the given addresses.
+    /// Each address must be a valid hex string of the correct length.
+    async fn process_get_accounts_nonces(&self, request: Request) -> Result<Value, RpcErr> {
+        let get_account_nonces_req = GetAccountsNoncesRequest::parse(Some(request.params))?;
+        let mut addresses = vec![];
+        for address_raw in get_account_nonces_req.addresses {
+            let address_bytes = hex::decode(address_raw)
+                .map_err(|_| RpcError::invalid_params("invalid hex".to_string()))?;
+
+            let address = nssa::Address::new(
+                address_bytes
+                    .try_into()
+                    .map_err(|_| RpcError::invalid_params("invalid length".to_string()))?,
+            );
+
+            addresses.push(address);
+        }
+
+        let nonces = {
+            let state = self.sequencer_state.lock().await;
+
+            addresses
+                .into_iter()
+                .map(|addr| state.store.state.get_account_by_address(&addr).nonce)
+                .collect()
+        };
+
+        let helperstruct = GetAccountsNoncesResponse { nonces };
+
+        respond(helperstruct)
+    }
+
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
     /// The hash must be a valid hex string of the correct length.
     async fn process_get_transaction_by_hash(&self, request: Request) -> Result<Value, RpcErr> {
@@ -205,6 +241,7 @@ impl JsonHandler {
             GET_LAST_BLOCK => self.process_get_last_block(request).await,
             GET_INITIAL_TESTNET_ACCOUNTS => self.get_initial_testnet_accounts(request).await,
             GET_ACCOUNT_BALANCE => self.process_get_account_balance(request).await,
+            GET_ACCOUNTS_NONCES => self.process_get_accounts_nonces(request).await,
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }

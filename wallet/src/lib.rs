@@ -1,5 +1,6 @@
 use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
+use base64::Engine;
 use common::{
     sequencer_client::{json::SendTxResponse, SequencerClient},
     ExecutionFailureKind,
@@ -13,9 +14,12 @@ use nssa::Address;
 
 use clap::{Parser, Subcommand};
 
-use crate::helperfunctions::{
-    fetch_config, fetch_persistent_accounts, get_home, produce_account_addr_from_hex,
-    produce_data_for_storage,
+use crate::{
+    helperfunctions::{
+        fetch_config, fetch_persistent_accounts, get_home, produce_account_addr_from_hex,
+        produce_data_for_storage,
+    },
+    poller::TxPoller,
 };
 
 pub const HOME_DIR_ENV_VAR: &str = "NSSA_WALLET_HOME_DIR";
@@ -24,15 +28,24 @@ pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
 pub mod chain_storage;
 pub mod config;
 pub mod helperfunctions;
+pub mod poller;
 
 pub struct WalletCore {
     pub storage: WalletChainStore,
+    pub poller: TxPoller,
     pub sequencer_client: Arc<SequencerClient>,
 }
 
 impl WalletCore {
     pub async fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
         let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
+        let tx_poller = TxPoller {
+            polling_delay_millis: config.seq_poll_timeout_millis,
+            polling_max_blocks_to_query: config.seq_poll_max_blocks,
+            polling_max_error_attempts: config.seq_poll_max_retries,
+            polling_error_delay_millis: config.seq_poll_retry_delay_millis,
+            client: client.clone(),
+        };
 
         let mut storage = WalletChainStore::new(config)?;
 
@@ -48,6 +61,7 @@ impl WalletCore {
 
         Ok(Self {
             storage,
+            poller: tx_poller,
             sequencer_client: client.clone(),
         })
     }
@@ -110,6 +124,38 @@ impl WalletCore {
             Err(ExecutionFailureKind::AmountMismatchError)
         }
     }
+
+    pub async fn poll_public_native_token_transfer(
+        &self,
+        hash: String,
+    ) -> Result<nssa::PublicTransaction> {
+        let transaction_encoded = self.poller.poll_tx(hash).await?;
+        let tx_base64_decode =
+            base64::engine::general_purpose::STANDARD.decode(transaction_encoded)?;
+        let pub_tx = nssa::PublicTransaction::from_bytes(&tx_base64_decode)?;
+
+        Ok(pub_tx)
+    }
+
+    pub fn execute_native_token_transfer(
+        &mut self,
+        from: Address,
+        to: Address,
+        balance_to_move: u128,
+    ) {
+        self.storage.user_data.increment_account_nonce(from);
+        self.storage.user_data.increment_account_nonce(to);
+
+        let from_bal = self.storage.user_data.get_account_balance(&from);
+        let to_bal = self.storage.user_data.get_account_balance(&to);
+
+        self.storage
+            .user_data
+            .update_account_balance(from, from_bal - balance_to_move);
+        self.storage
+            .user_data
+            .update_account_balance(to, to_bal + balance_to_move);
+    }
 }
 
 ///Represents CLI command for a wallet
@@ -169,7 +215,13 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
 
             info!("Results of tx send is {res:#?}");
 
-            //ToDo: Insert transaction polling logic here
+            let transfer_tx = wallet_core
+                .poll_public_native_token_transfer(res.tx_hash)
+                .await?;
+
+            info!("Transaction data is {transfer_tx:#?}");
+
+            wallet_core.execute_native_token_transfer(from, to, amount);
         }
         Command::RegisterAccount {} => {
             let addr = wallet_core.create_new_account();
