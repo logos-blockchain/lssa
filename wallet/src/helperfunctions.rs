@@ -49,6 +49,7 @@ pub fn fetch_persistent_accounts() -> Result<Vec<InitialAccountData>> {
     }
 }
 
+///Produces a list of accounts for storage
 pub fn produce_data_for_storage(user_data: &NSSAUserData) -> Vec<InitialAccountData> {
     let mut vec_for_storage = vec![];
 

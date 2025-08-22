@@ -3,6 +3,7 @@ use std::fmt::Display;
 use anyhow::Result;
 use common::{block::HashableBlockData, merkle_tree_public::TreeHashType};
 use config::SequencerConfig;
+use log::warn;
 use mempool::MemPool;
 use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
@@ -78,7 +79,9 @@ impl SequencerCore {
             return Err(TransactionMalformationErrorKind::MempoolFullForRound);
         }
 
-        let authenticated_tx = self.transaction_pre_check(transaction)?;
+        let authenticated_tx = self
+            .transaction_pre_check(transaction)
+            .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         self.mempool.push_item(authenticated_tx);
 
@@ -89,7 +92,10 @@ impl SequencerCore {
         &mut self,
         tx: nssa::PublicTransaction,
     ) -> Result<nssa::PublicTransaction, nssa::error::NssaError> {
-        self.store.state.transition_from_public_transaction(&tx)?;
+        self.store
+            .state
+            .transition_from_public_transaction(&tx)
+            .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
 
         Ok(tx)
     }

@@ -5,6 +5,7 @@ use common::sequencer_client::SequencerClient;
 use log::{info, warn};
 
 #[derive(Clone)]
+///Helperstruct to poll transactions
 pub struct TxPoller {
     pub polling_max_blocks_to_query: usize,
     pub polling_max_error_attempts: u64,

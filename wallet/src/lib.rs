@@ -54,9 +54,7 @@ impl WalletCore {
         //ToDo: Add this into persistent data
         let persistent_accounts = fetch_persistent_accounts()?;
         for acc in persistent_accounts {
-            storage
-                .user_data
-                .update_account_balance(acc.address, acc.account.balance);
+            storage.insert_account_data(acc);
         }
 
         Ok(Self {
@@ -66,10 +64,13 @@ impl WalletCore {
         })
     }
 
+    ///Stre persistent accounts at home
     pub fn store_persistent_accounts(&self) -> Result<PathBuf> {
         let home = get_home()?;
         let accs_path = home.join("curr_accounts.json");
-        let accs = serde_json::to_vec(&produce_data_for_storage(&self.storage.user_data))?;
+
+        let data = produce_data_for_storage(&self.storage.user_data);
+        let accs = serde_json::to_vec_pretty(&data)?;
 
         let mut accs_file = File::create(accs_path.as_path())?;
         accs_file.write_all(&accs)?;
@@ -125,6 +126,7 @@ impl WalletCore {
         }
     }
 
+    ///Poll transactions
     pub async fn poll_public_native_token_transfer(
         &self,
         hash: String,
@@ -137,6 +139,7 @@ impl WalletCore {
         Ok(pub_tx)
     }
 
+    ///Execute native token transfer at wallet accounts
     pub fn execute_native_token_transfer(
         &mut self,
         from: Address,
@@ -219,7 +222,7 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
                 .poll_public_native_token_transfer(res.tx_hash)
                 .await?;
 
-            info!("Transaction data is {transfer_tx:#?}");
+            info!("Transaction data is {transfer_tx:?}");
 
             wallet_core.execute_native_token_transfer(from, to, amount);
         }

@@ -458,6 +458,54 @@ mod tests {
     }
 
     #[actix_web::test]
+    async fn test_get_accounts_nonces_for_non_existent_account() {
+        let (json_handler, _, _) = components_for_tests();
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_accounts_nonces",
+            "params": { "addresses": ["efac".repeat(16)] },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "result": {
+                "nonces": [ 0 ]
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
+    async fn test_get_accounts_nonces_for_existent_account() {
+        let (json_handler, initial_accounts, _) = components_for_tests();
+
+        let acc_1_addr = initial_accounts[0].addr.clone();
+        let acc_2_addr = initial_accounts[1].addr.clone();
+
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_accounts_nonces",
+            "params": { "addresses": [acc_1_addr, acc_2_addr] },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "result": {
+                "nonces": [ 1, 0 ]
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
     async fn test_get_transaction_by_hash_for_non_existent_hash() {
         let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({

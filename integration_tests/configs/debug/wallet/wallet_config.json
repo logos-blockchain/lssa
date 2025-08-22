@@ -2,7 +2,10 @@
     "home": "./node",
     "override_rust_log": null,
     "sequencer_addr": "http://127.0.0.1:3040",
-    "seq_poll_timeout_secs": 10,
+    "seq_poll_timeout_millis": 12000,
+    "seq_poll_max_blocks": 5,
+    "seq_poll_max_retries": 5,
+    "seq_poll_retry_delay_millis": 500,
     "initial_accounts": [
         {
             "address": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
