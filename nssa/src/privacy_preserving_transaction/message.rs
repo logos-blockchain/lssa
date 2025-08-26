@@ -9,7 +9,7 @@ use k256::{
 };
 use nssa_core::{
     Ciphertext, CommitmentSetDigest, PrivacyPreservingCircuitOutput, SharedSecretKey,
-    account::{Account, Commitment, Nonce, Nullifier},
+    account::{Account, Commitment, Nonce, Nullifier, NullifierPublicKey},
 };
 use serde::{Deserialize, Serialize};
 
@@ -51,10 +51,11 @@ impl EncryptedAccountData {
         self,
         isk: &[u8; 32],
         epk: &EphemeralPublicKey,
+        npk: &NullifierPublicKey,
         output_index: u32,
     ) -> Option<Account> {
         let shared_secret = Self::compute_shared_secret(isk, &epk);
-        self.ciphertext.decrypt(&shared_secret, output_index)
+        self.ciphertext.decrypt(&shared_secret, npk, output_index)
     }
 
     pub fn compute_shared_secret(scalar: &[u8; 32], point: &Secp256k1Point) -> SharedSecretKey {

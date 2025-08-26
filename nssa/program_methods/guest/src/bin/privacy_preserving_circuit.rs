@@ -121,7 +121,7 @@ fn main() {
                     shared_secret,
                     // &commitment_post,
                     // esk,
-                    // Npk,
+                    Npk,
                     // Ipk,
                     output_index,
                 );

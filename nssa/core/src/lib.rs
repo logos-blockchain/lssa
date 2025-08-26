@@ -67,9 +67,15 @@ pub struct Ciphertext(Vec<u8>);
 
 impl Ciphertext {
     #[cfg(feature = "host")]
-    pub fn decrypt(self, shared_secret: &[u8; 32], output_index: u32) -> Option<Account> {
+    pub fn decrypt(
+        self,
+        shared_secret: &[u8; 32],
+        npk: &NullifierPublicKey,
+        output_index: u32,
+    ) -> Option<Account> {
         let key = Self::kdf(
             &shared_secret,
+            npk,
             // &ipk,
             // &commitment.to_byte_array(),
             output_index,
@@ -85,7 +91,7 @@ impl Ciphertext {
     pub fn new(
         account: &Account,
         shared_secret: &[u8; 32],
-        // npk: &NullifierPublicKey,
+        npk: &NullifierPublicKey,
         // ipk: &IncomingViewingPublicKey,
         output_index: u32,
     ) -> Self {
@@ -93,6 +99,7 @@ impl Ciphertext {
 
         let key = Self::kdf(
             shared_secret,
+            npk,
             // ipk,
             // &commitment.to_byte_array(),
             output_index,
@@ -106,6 +113,7 @@ impl Ciphertext {
 
     pub fn kdf(
         ss_bytes: &[u8; 32],
+        npk: &NullifierPublicKey,
         // epk: &EphemeralPublicKey,
         // ipk: &IncomingViewingPublicKey,
         // commitment: &[u8; 32],
@@ -115,6 +123,7 @@ impl Ciphertext {
 
         bytes.extend_from_slice(b"NSSA/v0.1/KDF-SHA256");
         bytes.extend_from_slice(ss_bytes);
+        bytes.extend_from_slice(&npk.to_byte_array());
         // bytes.extend_from_slice(&epk.0[..]);
         // bytes.extend_from_slice(&ipk.0[..]);
         // bytes.extend_from_slice(&commitment[..]);
