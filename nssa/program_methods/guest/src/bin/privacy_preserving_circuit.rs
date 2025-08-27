@@ -9,8 +9,6 @@ use nssa_core::{
     PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput,
 };
 
-const AUTHENTICATED_TRANSFER_PROGRAM_ID: [u32; 8] = [4009390658, 295818534, 2287042879, 2991817555, 298425691, 3426172222, 3671663086, 1858988641];
-
 fn main() {
     let PrivacyPreservingCircuitInput {
         program_output,
@@ -21,9 +19,8 @@ fn main() {
         program_id,
     } = env::read();
 
-    // Check that `program_execution_proof` is one of the allowed built-in programs
-    // TODO: Adapt when more builtin programs are added
-    assert_eq!(program_id, AUTHENTICATED_TRANSFER_PROGRAM_ID);
+    // TODO: Check that `program_execution_proof` is one of the allowed built-in programs
+    // assert_eq!(program_id, AUTHENTICATED_TRANSFER_PROGRAM_ID);
 
     // Check that `program_output` is consistent with the execution of the corresponding program.
     env::verify(program_id, &to_vec(&program_output).unwrap()).unwrap();
