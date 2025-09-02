@@ -1,6 +1,8 @@
-use nssa;
+use k256::{ecdsa::{signature::SignerMut, SigningKey}, FieldBytes};
+use nssa::{self, NSSATransaction};
+use rand::rngs::OsRng;
 
-use crate::block::{Block, HashableBlockData};
+use crate::{block::{Block, HashableBlockData}, transaction::{Transaction, TransactionBody}};
 
 //Dummy producers
 
@@ -16,10 +18,25 @@ pub fn produce_dummy_block(
     prev_hash: Option<[u8; 32]>,
     transactions: Vec<nssa::PublicTransaction>,
 ) -> Block {
+    let transactions = transactions.into_iter().map(
+        |tx| {
+            let tx_body = TransactionBody::from(NSSATransaction::Public(tx));
+            //ToDo: Fix signing key
+            let transaction = Transaction::new(tx_body, SigningKey::random(&mut OsRng));
+            transaction.into_authenticated().unwrap()
+        }).collect();
+
+    //ToDo: Fix signature
+    let key_bytes = FieldBytes::from_slice(&[37; 32]);
+    let mut private_key: SigningKey = SigningKey::from_bytes(key_bytes).unwrap();
+    let signature = private_key.sign(&[1; 32]);
+
     let block_data = HashableBlockData {
         block_id: id,
         prev_block_id: id.saturating_sub(1),
         prev_block_hash: prev_hash.unwrap_or_default(),
+        timestamp: 0,
+        signature,
         transactions,
     };
 

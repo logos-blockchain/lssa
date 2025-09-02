@@ -4,7 +4,6 @@ use k256::ecdsa::Signature;
 use rs_merkle::Hasher;
 
 use crate::{merkle_tree_public::hasher::OwnHasher, transaction::AuthenticatedTransaction};
-use nssa;
 
 pub type BlockHash = [u8; 32];
 pub type BlockId = u64;
@@ -101,11 +100,18 @@ impl HashableBlockData {
         let mut prev_block_hash = [0u8; 32];
         cursor.read_exact(&mut prev_block_hash).unwrap();
 
+        let timestamp = u64_from_cursor(&mut cursor);
+        
+        let signature_bytes_len = u32_from_cursor(&mut cursor) as usize;
+        let mut signature_bytes = Vec::with_capacity(signature_bytes_len);
+        cursor.read_exact(&mut signature_bytes).unwrap();
+        let signature = Signature::from_bytes(signature_bytes.as_slice().try_into().unwrap()).unwrap();
+
         let num_transactions = u32_from_cursor(&mut cursor) as usize;
 
         let mut transactions = Vec::with_capacity(num_transactions);
         for _ in 0..num_transactions {
-            let tx = nssa::PublicTransaction::from_cursor(&mut cursor).unwrap();
+            let tx = AuthenticatedTransaction::from_cursor(&mut cursor);
             transactions.push(tx);
         }
 
@@ -113,6 +119,8 @@ impl HashableBlockData {
             block_id,
             prev_block_id,
             prev_block_hash,
+            timestamp,
+            signature,
             transactions,
         }
     }

@@ -1,16 +1,15 @@
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 
 use k256::ecdsa::{
     signature::{Signer, Verifier},
     Signature, SigningKey, VerifyingKey,
 };
 use log::info;
-use secp256k1_zkp::{PedersenCommitment, Tweak};
 use serde::{Deserialize, Serialize};
 
 use sha2::{digest::FixedOutput, Digest};
 
-use crate::merkle_tree_public::TreeHashType;
+use crate::{block::u32_from_cursor, merkle_tree_public::TreeHashType};
 
 use elliptic_curve::{
     consts::{B0, B1},
@@ -181,16 +180,13 @@ impl TransactionBody {
         serde_json::to_vec(&self).unwrap()
     }
 
+    fn from_bytes(bytes: Vec<u8>) -> Self {
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
     pub fn log(&self) {
         info!("Transaction hash is {:?}", hex::encode(self.hash()));
         info!("Transaction tx_kind is {:?}", self.tx_kind);
-        info!(
-            "Transaction encoded_data is {:?}",
-            self.encoded_data
-                .iter()
-                .map(|val| (hex::encode(val.0.clone()), hex::encode(val.1.clone())))
-                .collect::<Vec<_>>()
-        );
     }
 }
 
@@ -257,26 +253,33 @@ impl Transaction {
         bytes.extend_from_slice(&signature_bytes_len.to_le_bytes());
         bytes.extend_from_slice(&public_key_bytes_len.to_le_bytes());
 
-        bytes.extend_from_slice(&self.body.to_bytes());
-        bytes.extend_from_slice(&self.signature.to_bytes());
-        bytes.extend_from_slice(&self.public_key.to_sec1_bytes());
+        bytes.extend_from_slice(&body_bytes);
+        bytes.extend_from_slice(&signature_bytes);
+        bytes.extend_from_slice(&public_key_bytes);
 
         bytes
     }
 
     // TODO: Improve error handling. Remove unwraps.
-    pub fn from_bytes(data: &[u8]) -> Self {
-        let mut cursor = Cursor::new(data);
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Self {
+        let body_bytes_len = u32_from_cursor(cursor) as usize;
+        let signature_bytes_len = u32_from_cursor(cursor) as usize;
+        let public_key_bytes_len = u32_from_cursor(cursor) as usize;
 
-        let body_bytes_len = u32_from_cursor(&mut cursor) as usize;
-        let signature_bytes_len = u32_from_cursor(&mut cursor) as usize;
-        let public_key_bytes_len = u32_from_cursor(&mut cursor) as usize;
+        let mut body_bytes = Vec::with_capacity(body_bytes_len);
+        let mut signature_bytes = Vec::with_capacity(signature_bytes_len);
+        let mut public_key_bytes = Vec::with_capacity(public_key_bytes_len);
 
-        let body_bytes = Vec::with_capacity(body_bytes_len);
-        let signature_bytes = Vec::with_capacity(signature_bytes_len);
-        let public_key_bytes = Vec::with_capacity(public_key_bytes_len);
+        cursor.read_exact(&mut body_bytes).unwrap();
+        let body = TransactionBody::from_bytes(body_bytes);
 
-        
+        cursor.read_exact(&mut signature_bytes).unwrap();
+        let signature = Signature::from_bytes(signature_bytes.as_slice().try_into().unwrap()).unwrap();
+
+        cursor.read_exact(&mut public_key_bytes).unwrap();
+        let public_key = VerifyingKey::from_sec1_bytes(&public_key_bytes).unwrap();
+
+        Self { body, signature, public_key }
     }
 }
 
@@ -312,13 +315,20 @@ impl AuthenticatedTransaction {
         bytes.extend_from_slice(&self.transaction.to_bytes());
         bytes
     }
+
+    // TODO: Improve error handling. Remove unwraps.
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Self { 
+        let mut hash: [u8; 32] = [0; 32];
+        cursor.read_exact(&mut hash).unwrap();
+        let transaction = Transaction::from_cursor(cursor);
+        Self { hash, transaction }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use k256::{ecdsa::signature::Signer, FieldBytes};
-    use secp256k1_zkp::{constants::SECRET_KEY_SIZE, Tweak};
     use sha2::{digest::FixedOutput, Digest};
 
     use crate::{

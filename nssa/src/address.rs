@@ -1,5 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
+use serde::{Deserialize, Serialize};
+
 use crate::signature::PublicKey;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -54,6 +56,28 @@ impl FromStr for Address {
 impl Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(self.value))
+    }
+}
+
+impl Serialize for Address {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let hex_string = self.to_string();
+
+        hex_string.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Address {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let hex_string = String::deserialize(deserializer)?;
+
+        Address::from_str(&hex_string).map_err(serde::de::Error::custom)
     }
 }
 
