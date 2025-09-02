@@ -32,7 +32,9 @@ fn main() {
 
     // Check that the program is well behaved.
     // See the # Programs section for the definition of the `validate_execution` method.
-    validate_execution(&pre_states, &post_states, program_id);
+    if !validate_execution(&pre_states, &post_states, program_id) {
+        panic!();
+    }
 
     let n_accounts = pre_states.len();
     if visibility_mask.len() != n_accounts {

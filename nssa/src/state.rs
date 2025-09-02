@@ -214,6 +214,7 @@ pub mod tests {
     use crate::{
         Address, PublicKey, PublicTransaction, V01State,
         error::NssaError,
+        execute_and_prove,
         privacy_preserving_transaction::{
             PrivacyPreservingTransaction, circuit, message::Message, witness_set::WitnessSet,
         },
@@ -1062,5 +1063,36 @@ pub mod tests {
                 .balance,
             recipient_initial_balance + balance_to_move
         );
+    }
+
+    #[test]
+    fn test_burner_program_should_fail_in_privacy_preserving_circuit() {
+        let keys = test_private_account_keys_1();
+        let private_account = AccountWithMetadata {
+            account: Account {
+                balance: 100,
+                ..Account::default()
+            },
+            is_authorized: true,
+        };
+        let state = V01State::new_with_genesis_accounts(&[])
+            .with_private_account(&keys, &private_account.account);
+
+        let membership_proof = state
+            .get_proof_for_commitment(&Commitment::new(&keys.npk(), &private_account.account))
+            .unwrap();
+
+        let program = Program::burner();
+        let result = execute_and_prove(
+            &[private_account],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1],
+            &[0xdeadbeef],
+            &[(keys.npk(), SharedSecretKey::new(&[0xca; 32], &keys.ivk()))],
+            &[(keys.nsk, membership_proof)],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
     }
 }
