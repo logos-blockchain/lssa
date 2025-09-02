@@ -6,14 +6,8 @@ edition = "2021"
 [dependencies]
 hex.workspace = true
 anyhow.workspace = true
-serde_json.workspace = true
-env_logger.workspace = true
-log.workspace = true
 serde.workspace = true
 rand.workspace = true
-elliptic-curve.workspace = true
-k256.workspace = true
-tiny-keccak.workspace = true
 tempfile.workspace = true
 
 [dependencies.storage]
@@ -22,15 +16,8 @@ path = "../storage"
 [dependencies.mempool]
 path = "../mempool"
 
-[dependencies.key_protocol]
-path = "../key_protocol"
-
 [dependencies.common]
 path = "../common"
 
 [dependencies.nssa]
 path = "../nssa"
-
-[dependencies.secp256k1-zkp]
-workspace = true
-features = ["std", "rand-std", "rand", "serde", "global-context"]

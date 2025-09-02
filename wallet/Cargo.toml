@@ -9,18 +9,8 @@ serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
-rand.workspace = true
-k256.workspace = true
-sha2.workspace = true
-bincode.workspace = true
-elliptic-curve.workspace = true
-reqwest.workspace = true
-thiserror.workspace = true
 tokio.workspace = true
 tempfile.workspace = true
-risc0-zkvm = "3.0.3"
-hex.workspace = true
-actix-rt.workspace = true
 clap.workspace = true
 nssa-core = { path = "../nssa/core" }
 
@@ -32,7 +22,3 @@ path = "../nssa"
 
 [dependencies.common]
 path = "../common"
-
-[dependencies.secp256k1-zkp]
-workspace = true
-features = ["std", "rand-std", "rand", "serde", "global-context"]

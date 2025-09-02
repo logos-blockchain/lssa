@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow.workspace = true
 serde_json.workspace = true
-env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
 k256.workspace = true
@@ -16,8 +15,6 @@ elliptic-curve.workspace = true
 hex.workspace = true
 aes-gcm.workspace = true
 lazy_static.workspace = true
-tiny-keccak.workspace = true
-nssa-core = { path = "../nssa/core" }
 
 [dependencies.common]
 path = "../common"

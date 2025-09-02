@@ -5,24 +5,18 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
-serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
-serde.workspace = true
 actix.workspace = true
 
 actix-web.workspace = true
 tokio.workspace = true
-toml.workspace = true
 hex.workspace = true
 tempfile.workspace = true
 
 [dependencies.clap]
 features = ["derive", "env"]
 workspace = true
-
-[dependencies.sequencer_rpc]
-path = "../sequencer_rpc"
 
 [dependencies.sequencer_core]
 path = "../sequencer_core"
@@ -35,6 +29,3 @@ path = "../wallet"
 
 [dependencies.common]
 path = "../common"
-
-[dependencies.key_protocol]
-path = "../key_protocol"

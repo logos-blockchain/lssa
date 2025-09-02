@@ -8,19 +8,14 @@ anyhow.workspace = true
 serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
-serde.workspace = true
 actix.workspace = true
 
 actix-web.workspace = true
 tokio.workspace = true
-toml.workspace = true
 
 [dependencies.clap]
 features = ["derive", "env"]
 workspace = true
-
-[dependencies.mempool]
-path = "../mempool"
 
 [dependencies.sequencer_rpc]
 path = "../sequencer_rpc"

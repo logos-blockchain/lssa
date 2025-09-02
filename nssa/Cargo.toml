@@ -13,7 +13,6 @@ sha2 = "0.10.9"
 secp256k1 = "0.31.1"
 rand = "0.8"
 borsh = "1.5.7"
-bytemuck = "1.13"
 hex = "0.4.3"
 
 [dev-dependencies]
