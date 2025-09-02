@@ -1,12 +1,12 @@
-use serde::{Deserialize, Serialize};
-
 use crate::program::ProgramId;
+use serde::{Deserialize, Serialize};
 
 pub type Nonce = u128;
 type Data = Vec<u8>;
 
 /// Account to be used both in public and private contexts
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug))]
 pub struct Account {
     pub program_owner: ProgramId,
     pub balance: u128,
@@ -14,7 +14,8 @@ pub struct Account {
     pub nonce: Nonce,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct AccountWithMetadata {
     pub account: Account,
     pub is_authorized: bool,

@@ -52,7 +52,7 @@ version = "0.8.5"
 
 [workspace.dependencies.k256]
 features = ["ecdsa-core", "arithmetic", "expose-field", "serde", "pem"]
-version = "0.13.4"
+version = "0.13.3"
 
 [workspace.dependencies.elliptic-curve]
 features = ["arithmetic"]

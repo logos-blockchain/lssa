@@ -4,5 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-risc0-zkvm = "3.0.3"
+risc0-zkvm = { version = "3.0.3" }
 serde = { version = "1.0", default-features = false }
+thiserror = { version = "2.0.12", optional = true }
+bytemuck = { version = "1.13", optional = true }
+chacha20 = { version = "0.9", default-features = false }
+k256 = { version = "0.13.3", optional = true }
+
+[features]
+default = []
+host = ["thiserror", "bytemuck", "k256"]

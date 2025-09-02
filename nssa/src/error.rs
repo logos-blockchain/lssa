@@ -7,9 +7,6 @@ pub enum NssaError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
-    #[error("Risc0 error: {0}")]
-    ProgramExecutionFailed(String),
-
     #[error("Program violated execution rules")]
     InvalidProgramBehavior,
 
@@ -24,4 +21,28 @@ pub enum NssaError {
 
     #[error("Invalid Public Key")]
     InvalidPublicKey,
+
+    #[error("Risc0 error: {0}")]
+    ProgramWriteInputFailed(String),
+
+    #[error("Risc0 error: {0}")]
+    ProgramExecutionFailed(String),
+
+    #[error("Risc0 error: {0}")]
+    ProgramProveFailed(String),
+
+    #[error("Invalid transaction: {0}")]
+    TransactionDeserializationError(String),
+
+    #[error("Core error")]
+    Core(#[from] nssa_core::error::NssaCoreError),
+
+    #[error("Program output deserialization error: {0}")]
+    ProgramOutputDeserializationError(String),
+
+    #[error("Circuit output deserialization error: {0}")]
+    CircuitOutputDeserializationError(String),
+
+    #[error("Invalid privacy preserving execution circuit proof")]
+    InvalidPrivacyPreservingProof,
 }

@@ -1,12 +1,14 @@
-use nssa_core::program::read_nssa_inputs;
-use risc0_zkvm::guest::env;
+use nssa_core::program::{read_nssa_inputs, write_nssa_outputs, ProgramInput};
 
 type Instruction = u128;
 
 fn main() {
-    let (input_accounts, balance) = read_nssa_inputs::<Instruction>();
+    let ProgramInput {
+        pre_states,
+        instruction: balance,
+    } = read_nssa_inputs::<Instruction>();
 
-    let [sender_pre, receiver_pre] = match input_accounts.try_into() {
+    let [sender_pre, receiver_pre] = match pre_states.try_into() {
         Ok(array) => array,
         Err(_) => return,
     };
@@ -16,5 +18,8 @@ fn main() {
     sender_post.balance -= balance;
     receiver_post.balance += balance;
 
-    env::commit(&vec![sender_post, receiver_post]);
+    write_nssa_outputs(
+        vec![sender_pre, receiver_pre],
+        vec![sender_post, receiver_post],
+    );
 }

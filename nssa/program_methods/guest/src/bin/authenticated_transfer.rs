@@ -1,17 +1,17 @@
-use nssa_core::program::read_nssa_inputs;
-use risc0_zkvm::guest::env;
-
-type Instruction = u128;
+use nssa_core::program::{read_nssa_inputs, write_nssa_outputs, ProgramInput};
 
 /// A transfer of balance program.
 /// To be used both in public and private contexts.
 fn main() {
     // Read input accounts.
     // It is expected to receive only two accounts: [sender_account, receiver_account]
-    let (input_accounts, balance_to_move) = read_nssa_inputs::<Instruction>();
+    let ProgramInput {
+        pre_states,
+        instruction: balance_to_move,
+    } = read_nssa_inputs();
 
     // Continue only if input_accounts is an array of two elements
-    let [sender, receiver] = match input_accounts.try_into() {
+    let [sender, receiver] = match pre_states.try_into() {
         Ok(array) => array,
         Err(_) => return,
     };
@@ -32,5 +32,5 @@ fn main() {
     sender_post.balance -= balance_to_move;
     receiver_post.balance += balance_to_move;
 
-    env::commit(&vec![sender_post, receiver_post]);
+    write_nssa_outputs(vec![sender, receiver], vec![sender_post, receiver_post]);
 }

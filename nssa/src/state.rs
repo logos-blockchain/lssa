@@ -1,11 +1,60 @@
 use crate::{
-    address::Address, error::NssaError, program::Program, public_transaction::PublicTransaction,
+    address::Address, error::NssaError, merkle_tree::MerkleTree,
+    privacy_preserving_transaction::PrivacyPreservingTransaction, program::Program,
+    public_transaction::PublicTransaction,
 };
-use nssa_core::{account::Account, program::ProgramId};
-use std::collections::HashMap;
+use nssa_core::{
+    Commitment, CommitmentSetDigest, MembershipProof, Nullifier,
+    account::Account,
+    program::{DEFAULT_PROGRAM_ID, ProgramId},
+};
+use std::collections::{HashMap, HashSet};
+
+pub(crate) struct CommitmentSet {
+    merkle_tree: MerkleTree,
+    commitments: HashMap<Commitment, usize>,
+    root_history: HashSet<CommitmentSetDigest>,
+}
+
+impl CommitmentSet {
+    pub(crate) fn digest(&self) -> CommitmentSetDigest {
+        self.merkle_tree.root()
+    }
+
+    pub fn get_proof_for(&self, commitment: &Commitment) -> Option<MembershipProof> {
+        let index = *self.commitments.get(commitment)?;
+
+        self.merkle_tree
+            .get_authentication_path_for(index)
+            .map(|path| (index, path))
+    }
+
+    pub(crate) fn extend(&mut self, commitments: &[Commitment]) {
+        for commitment in commitments.iter().cloned() {
+            let index = self.merkle_tree.insert(commitment.to_byte_array());
+            self.commitments.insert(commitment, index);
+        }
+        self.root_history.insert(self.digest());
+    }
+
+    fn contains(&self, commitment: &Commitment) -> bool {
+        self.commitments.contains_key(commitment)
+    }
+
+    pub(crate) fn with_capacity(capacity: usize) -> CommitmentSet {
+        Self {
+            merkle_tree: MerkleTree::with_capacity(capacity),
+            commitments: HashMap::new(),
+            root_history: HashSet::new(),
+        }
+    }
+}
+
+type NullifierSet = HashSet<Nullifier>;
 
 pub struct V01State {
     public_state: HashMap<Address, Account>,
+    private_state: (CommitmentSet, NullifierSet),
     builtin_programs: HashMap<ProgramId, Program>,
 }
 
@@ -27,6 +76,7 @@ impl V01State {
 
         let mut this = Self {
             public_state,
+            private_state: (CommitmentSet::with_capacity(32), NullifierSet::new()),
             builtin_programs: HashMap::new(),
         };
 
@@ -43,13 +93,54 @@ impl V01State {
         &mut self,
         tx: &PublicTransaction,
     ) -> Result<(), NssaError> {
-        let state_diff = tx.validate_and_compute_post_states(self)?;
+        let state_diff = tx.validate_and_produce_public_state_diff(self)?;
 
         for (address, post) in state_diff.into_iter() {
+            let current_account = self.get_account_by_address_mut(address);
+
+            *current_account = post;
+            // The invoked program claims the accounts with default program id.
+            if current_account.program_owner == DEFAULT_PROGRAM_ID {
+                current_account.program_owner = tx.message().program_id;
+            }
+        }
+
+        for address in tx.signer_addresses() {
+            let current_account = self.get_account_by_address_mut(address);
+            current_account.nonce += 1;
+        }
+
+        Ok(())
+    }
+
+    pub fn transition_from_privacy_preserving_transaction(
+        &mut self,
+        tx: &PrivacyPreservingTransaction,
+    ) -> Result<(), NssaError> {
+        // 1. Verify the transaction satisfies acceptance criteria
+        let public_state_diff = tx.validate_and_produce_public_state_diff(self)?;
+
+        let message = tx.message();
+
+        // 2. Add new commitments
+        self.private_state.0.extend(&message.new_commitments);
+
+        // 3. Add new nullifiers
+        let new_nullifiers = message
+            .new_nullifiers
+            .iter()
+            .cloned()
+            .map(|(nullifier, _)| nullifier)
+            .collect::<Vec<Nullifier>>();
+        self.private_state.1.extend(new_nullifiers);
+
+        // 4. Update public accounts
+        for (address, post) in public_state_diff.into_iter() {
             let current_account = self.get_account_by_address_mut(address);
             *current_account = post;
         }
 
+        // // 5. Increment nonces
         for address in tx.signer_addresses() {
             let current_account = self.get_account_by_address_mut(address);
             current_account.nonce += 1;
@@ -69,21 +160,73 @@ impl V01State {
             .unwrap_or(Account::default())
     }
 
+    pub fn get_proof_for_commitment(&self, commitment: &Commitment) -> Option<MembershipProof> {
+        self.private_state.0.get_proof_for(commitment)
+    }
+
     pub(crate) fn builtin_programs(&self) -> &HashMap<ProgramId, Program> {
         &self.builtin_programs
+    }
+
+    pub fn commitment_set_digest(&self) -> CommitmentSetDigest {
+        self.private_state.0.digest()
+    }
+
+    pub(crate) fn check_commitments_are_new(
+        &self,
+        new_commitments: &[Commitment],
+    ) -> Result<(), NssaError> {
+        for commitment in new_commitments.iter() {
+            if self.private_state.0.contains(commitment) {
+                return Err(NssaError::InvalidInput(
+                    "Commitment already seen".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn check_nullifiers_are_valid(
+        &self,
+        new_nullifiers: &[(Nullifier, CommitmentSetDigest)],
+    ) -> Result<(), NssaError> {
+        for (nullifier, digest) in new_nullifiers.iter() {
+            if self.private_state.1.contains(nullifier) {
+                return Err(NssaError::InvalidInput(
+                    "Nullifier already seen".to_string(),
+                ));
+            }
+            if !self.private_state.0.root_history.contains(digest) {
+                return Err(NssaError::InvalidInput(
+                    "Unrecognized commitment set digest".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
 
     use std::collections::HashMap;
 
     use crate::{
-        Address, PublicKey, PublicTransaction, V01State, error::NssaError, program::Program,
-        public_transaction, signature::PrivateKey,
+        Address, PublicKey, PublicTransaction, V01State,
+        error::NssaError,
+        privacy_preserving_transaction::{
+            PrivacyPreservingTransaction, circuit, message::Message, witness_set::WitnessSet,
+        },
+        program::Program,
+        public_transaction,
+        signature::PrivateKey,
     };
-    use nssa_core::account::Account;
+
+    use nssa_core::{
+        Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
+        account::{Account, AccountWithMetadata, Nonce},
+        encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
+    };
 
     fn transfer_transaction(
         from: Address,
@@ -331,6 +474,12 @@ mod tests {
             self.force_insert_account(Address::new([252; 32]), account);
             self
         }
+
+        pub fn with_private_account(mut self, keys: &TestPrivateKeys, account: &Account) -> Self {
+            let commitment = Commitment::new(&keys.npk(), account);
+            self.private_state.0.extend(&[commitment]);
+            self
+        }
     }
 
     #[test]
@@ -569,5 +718,349 @@ mod tests {
         let result = state.transition_from_public_transaction(&tx);
 
         assert!(matches!(result, Err(NssaError::InvalidProgramBehavior)));
+    }
+
+    pub struct TestPublicKeys {
+        pub signing_key: PrivateKey,
+    }
+
+    impl TestPublicKeys {
+        pub fn address(&self) -> Address {
+            Address::from(&PublicKey::new_from_private_key(&self.signing_key))
+        }
+    }
+
+    fn test_public_account_keys_1() -> TestPublicKeys {
+        TestPublicKeys {
+            signing_key: PrivateKey::try_new([37; 32]).unwrap(),
+        }
+    }
+
+    pub struct TestPrivateKeys {
+        pub nsk: NullifierSecretKey,
+        pub isk: [u8; 32],
+    }
+
+    impl TestPrivateKeys {
+        pub fn npk(&self) -> NullifierPublicKey {
+            NullifierPublicKey::from(&self.nsk)
+        }
+
+        pub fn ivk(&self) -> IncomingViewingPublicKey {
+            IncomingViewingPublicKey::from_scalar(self.isk)
+        }
+    }
+
+    pub fn test_private_account_keys_1() -> TestPrivateKeys {
+        TestPrivateKeys {
+            nsk: [13; 32],
+            isk: [31; 32],
+        }
+    }
+
+    pub fn test_private_account_keys_2() -> TestPrivateKeys {
+        TestPrivateKeys {
+            nsk: [38; 32],
+            isk: [83; 32],
+        }
+    }
+
+    fn shielded_balance_transfer_for_tests(
+        sender_keys: &TestPublicKeys,
+        recipient_keys: &TestPrivateKeys,
+        balance_to_move: u128,
+        state: &V01State,
+    ) -> PrivacyPreservingTransaction {
+        let sender = AccountWithMetadata {
+            account: state.get_account_by_address(&sender_keys.address()),
+            is_authorized: true,
+        };
+
+        let sender_nonce = sender.account.nonce;
+
+        let recipient = AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: false,
+        };
+
+        let esk = [3; 32];
+        let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
+        let epk = EphemeralPublicKey::from_scalar(esk);
+
+        let (output, proof) = circuit::execute_and_prove(
+            &[sender, recipient],
+            &Program::serialize_instruction(balance_to_move).unwrap(),
+            &[0, 2],
+            &[0xdeadbeef],
+            &[(recipient_keys.npk(), shared_secret)],
+            &[],
+            &Program::authenticated_transfer_program(),
+        )
+        .unwrap();
+
+        let message = Message::try_from_circuit_output(
+            vec![sender_keys.address()],
+            vec![sender_nonce],
+            vec![epk],
+            output,
+        )
+        .unwrap();
+
+        let witness_set = WitnessSet::for_message(&message, proof, &[&sender_keys.signing_key]);
+        PrivacyPreservingTransaction::new(message, witness_set)
+    }
+
+    fn private_balance_transfer_for_tests(
+        sender_keys: &TestPrivateKeys,
+        sender_private_account: &Account,
+        recipient_keys: &TestPrivateKeys,
+        balance_to_move: u128,
+        new_nonces: [Nonce; 2],
+        state: &V01State,
+    ) -> PrivacyPreservingTransaction {
+        let program = Program::authenticated_transfer_program();
+        let sender_commitment = Commitment::new(&sender_keys.npk(), sender_private_account);
+        let sender_pre = AccountWithMetadata {
+            account: sender_private_account.clone(),
+            is_authorized: true,
+        };
+        let recipient_pre = AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: false,
+        };
+
+        let esk_1 = [3; 32];
+        let shared_secret_1 = SharedSecretKey::new(&esk_1, &sender_keys.ivk());
+        let epk_1 = EphemeralPublicKey::from_scalar(esk_1);
+
+        let esk_2 = [3; 32];
+        let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.ivk());
+        let epk_2 = EphemeralPublicKey::from_scalar(esk_2);
+
+        let (output, proof) = circuit::execute_and_prove(
+            &[sender_pre, recipient_pre],
+            &Program::serialize_instruction(balance_to_move).unwrap(),
+            &[1, 2],
+            &new_nonces,
+            &[
+                (sender_keys.npk(), shared_secret_1),
+                (recipient_keys.npk(), shared_secret_2),
+            ],
+            &[(
+                sender_keys.nsk,
+                state.get_proof_for_commitment(&sender_commitment).unwrap(),
+            )],
+            &program,
+        )
+        .unwrap();
+
+        let message =
+            Message::try_from_circuit_output(vec![], vec![], vec![epk_1, epk_2], output).unwrap();
+
+        let witness_set = WitnessSet::for_message(&message, proof, &[]);
+
+        PrivacyPreservingTransaction::new(message, witness_set)
+    }
+
+    fn deshielded_balance_transfer_for_tests(
+        sender_keys: &TestPrivateKeys,
+        sender_private_account: &Account,
+        recipient_address: &Address,
+        balance_to_move: u128,
+        new_nonce: Nonce,
+        state: &V01State,
+    ) -> PrivacyPreservingTransaction {
+        let program = Program::authenticated_transfer_program();
+        let sender_commitment = Commitment::new(&sender_keys.npk(), sender_private_account);
+        let sender_pre = AccountWithMetadata {
+            account: sender_private_account.clone(),
+            is_authorized: true,
+        };
+        let recipient_pre = AccountWithMetadata {
+            account: state.get_account_by_address(recipient_address),
+            is_authorized: false,
+        };
+
+        let esk = [3; 32];
+        let shared_secret = SharedSecretKey::new(&esk, &sender_keys.ivk());
+        let epk = EphemeralPublicKey::from_scalar(esk);
+
+        let (output, proof) = circuit::execute_and_prove(
+            &[sender_pre, recipient_pre],
+            &Program::serialize_instruction(balance_to_move).unwrap(),
+            &[1, 0],
+            &[new_nonce],
+            &[(sender_keys.npk(), shared_secret)],
+            &[(
+                sender_keys.nsk,
+                state.get_proof_for_commitment(&sender_commitment).unwrap(),
+            )],
+            &program,
+        )
+        .unwrap();
+
+        let message =
+            Message::try_from_circuit_output(vec![*recipient_address], vec![], vec![epk], output)
+                .unwrap();
+
+        let witness_set = WitnessSet::for_message(&message, proof, &[]);
+
+        PrivacyPreservingTransaction::new(message, witness_set)
+    }
+
+    #[test]
+    fn test_transition_from_privacy_preserving_transaction_shielded() {
+        let sender_keys = test_public_account_keys_1();
+        let recipient_keys = test_private_account_keys_1();
+
+        let mut state = V01State::new_with_genesis_accounts(&[(sender_keys.address(), 200)]);
+
+        let balance_to_move = 37;
+
+        let tx = shielded_balance_transfer_for_tests(
+            &sender_keys,
+            &recipient_keys,
+            balance_to_move,
+            &state,
+        );
+
+        let [expected_new_commitment] = tx.message().new_commitments.clone().try_into().unwrap();
+        assert!(!state.private_state.0.contains(&expected_new_commitment));
+
+        state
+            .transition_from_privacy_preserving_transaction(&tx)
+            .unwrap();
+
+        assert!(state.private_state.0.contains(&expected_new_commitment));
+
+        assert_eq!(
+            state.get_account_by_address(&sender_keys.address()).balance,
+            200 - balance_to_move
+        );
+    }
+
+    #[test]
+    fn test_transition_from_privacy_preserving_transaction_private() {
+        let sender_keys = test_private_account_keys_1();
+        let sender_private_account = Account {
+            program_owner: Program::authenticated_transfer_program().id(),
+            balance: 100,
+            nonce: 0xdeadbeef,
+            data: vec![],
+        };
+        let recipient_keys = test_private_account_keys_2();
+
+        let mut state = V01State::new_with_genesis_accounts(&[])
+            .with_private_account(&sender_keys, &sender_private_account);
+
+        let balance_to_move = 37;
+
+        let tx = private_balance_transfer_for_tests(
+            &sender_keys,
+            &sender_private_account,
+            &recipient_keys,
+            balance_to_move,
+            [0xcafecafe, 0xfecafeca],
+            &state,
+        );
+
+        let expected_new_commitment_1 = Commitment::new(
+            &sender_keys.npk(),
+            &Account {
+                program_owner: Program::authenticated_transfer_program().id(),
+                nonce: 0xcafecafe,
+                balance: sender_private_account.balance - balance_to_move,
+                data: vec![],
+            },
+        );
+
+        let sender_pre_commitment = Commitment::new(&sender_keys.npk(), &sender_private_account);
+        let expected_new_nullifier = Nullifier::new(&sender_pre_commitment, &sender_keys.nsk);
+
+        let expected_new_commitment_2 = Commitment::new(
+            &recipient_keys.npk(),
+            &Account {
+                program_owner: Program::authenticated_transfer_program().id(),
+                nonce: 0xfecafeca,
+                balance: balance_to_move,
+                ..Account::default()
+            },
+        );
+
+        let previous_public_state = state.public_state.clone();
+        assert!(state.private_state.0.contains(&sender_pre_commitment));
+        assert!(!state.private_state.0.contains(&expected_new_commitment_1));
+        assert!(!state.private_state.0.contains(&expected_new_commitment_2));
+        assert!(!state.private_state.1.contains(&expected_new_nullifier));
+
+        state
+            .transition_from_privacy_preserving_transaction(&tx)
+            .unwrap();
+
+        assert_eq!(state.public_state, previous_public_state);
+        assert!(state.private_state.0.contains(&sender_pre_commitment));
+        assert!(state.private_state.0.contains(&expected_new_commitment_1));
+        assert!(state.private_state.0.contains(&expected_new_commitment_2));
+        assert!(state.private_state.1.contains(&expected_new_nullifier));
+    }
+
+    #[test]
+    fn test_transition_from_privacy_preserving_transaction_deshielded() {
+        let sender_keys = test_private_account_keys_1();
+        let sender_private_account = Account {
+            program_owner: Program::authenticated_transfer_program().id(),
+            balance: 100,
+            nonce: 0xdeadbeef,
+            data: vec![],
+        };
+        let recipient_keys = test_public_account_keys_1();
+        let recipient_initial_balance = 400;
+        let mut state = V01State::new_with_genesis_accounts(&[(
+            recipient_keys.address(),
+            recipient_initial_balance,
+        )])
+        .with_private_account(&sender_keys, &sender_private_account);
+
+        let balance_to_move = 37;
+
+        let tx = deshielded_balance_transfer_for_tests(
+            &sender_keys,
+            &sender_private_account,
+            &recipient_keys.address(),
+            balance_to_move,
+            0xcafecafe,
+            &state,
+        );
+
+        let expected_new_commitment = Commitment::new(
+            &sender_keys.npk(),
+            &Account {
+                program_owner: Program::authenticated_transfer_program().id(),
+                nonce: 0xcafecafe,
+                balance: sender_private_account.balance - balance_to_move,
+                data: vec![],
+            },
+        );
+
+        let sender_pre_commitment = Commitment::new(&sender_keys.npk(), &sender_private_account);
+        let expected_new_nullifier = Nullifier::new(&sender_pre_commitment, &sender_keys.nsk);
+
+        assert!(state.private_state.0.contains(&sender_pre_commitment));
+        assert!(!state.private_state.0.contains(&expected_new_commitment));
+        assert!(!state.private_state.1.contains(&expected_new_nullifier));
+
+        state
+            .transition_from_privacy_preserving_transaction(&tx)
+            .unwrap();
+
+        assert!(state.private_state.0.contains(&sender_pre_commitment));
+        assert!(state.private_state.0.contains(&expected_new_commitment));
+        assert!(state.private_state.1.contains(&expected_new_nullifier));
+        assert_eq!(
+            state
+                .get_account_by_address(&recipient_keys.address())
+                .balance,
+            recipient_initial_balance + balance_to_move
+        );
     }
 }

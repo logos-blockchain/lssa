@@ -50,7 +50,7 @@ impl PublicTransaction {
         hasher.finalize_fixed().into()
     }
 
-    pub(crate) fn validate_and_compute_post_states(
+    pub(crate) fn validate_and_produce_public_state_diff(
         &self,
         state: &V01State,
     ) -> Result<HashMap<Address, Account>, NssaError> {
@@ -64,6 +64,7 @@ impl PublicTransaction {
             ));
         }
 
+        // Check exactly one nonce is provided for each signature
         if message.nonces.len() != witness_set.signatures_and_public_keys.len() {
             return Err(NssaError::InvalidInput(
                 "Mismatch between number of nonces and signatures/public keys".into(),
@@ -232,7 +233,7 @@ pub mod tests {
 
         let witness_set = WitnessSet::for_message(&message, &[&key1, &key1]);
         let tx = PublicTransaction::new(message, witness_set);
-        let result = tx.validate_and_compute_post_states(&state);
+        let result = tx.validate_and_produce_public_state_diff(&state);
         assert!(matches!(result, Err(NssaError::InvalidInput(_))))
     }
 
@@ -252,7 +253,7 @@ pub mod tests {
 
         let witness_set = WitnessSet::for_message(&message, &[&key1, &key2]);
         let tx = PublicTransaction::new(message, witness_set);
-        let result = tx.validate_and_compute_post_states(&state);
+        let result = tx.validate_and_produce_public_state_diff(&state);
         assert!(matches!(result, Err(NssaError::InvalidInput(_))))
     }
 
@@ -273,7 +274,7 @@ pub mod tests {
         let mut witness_set = WitnessSet::for_message(&message, &[&key1, &key2]);
         witness_set.signatures_and_public_keys[0].0 = Signature::new_for_tests([1; 64]);
         let tx = PublicTransaction::new(message, witness_set);
-        let result = tx.validate_and_compute_post_states(&state);
+        let result = tx.validate_and_produce_public_state_diff(&state);
         assert!(matches!(result, Err(NssaError::InvalidInput(_))))
     }
 
@@ -293,7 +294,7 @@ pub mod tests {
 
         let witness_set = WitnessSet::for_message(&message, &[&key1, &key2]);
         let tx = PublicTransaction::new(message, witness_set);
-        let result = tx.validate_and_compute_post_states(&state);
+        let result = tx.validate_and_produce_public_state_diff(&state);
         assert!(matches!(result, Err(NssaError::InvalidInput(_))))
     }
 
@@ -309,7 +310,7 @@ pub mod tests {
 
         let witness_set = WitnessSet::for_message(&message, &[&key1, &key2]);
         let tx = PublicTransaction::new(message, witness_set);
-        let result = tx.validate_and_compute_post_states(&state);
+        let result = tx.validate_and_produce_public_state_diff(&state);
         assert!(matches!(result, Err(NssaError::InvalidInput(_))))
     }
 }

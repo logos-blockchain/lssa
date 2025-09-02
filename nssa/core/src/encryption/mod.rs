@@ -1,0 +1,77 @@
+use chacha20::{
+    ChaCha20,
+    cipher::{KeyIvInit, StreamCipher},
+};
+use risc0_zkvm::sha::{Impl, Sha256};
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "host")]
+pub(crate) mod shared_key_derivation;
+
+#[cfg(feature = "host")]
+pub use shared_key_derivation::{EphemeralPublicKey, EphemeralSecretKey, IncomingViewingPublicKey};
+
+use crate::{Commitment, account::Account};
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SharedSecretKey([u8; 32]);
+
+pub struct EncryptionScheme;
+
+#[derive(Serialize, Deserialize)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, Clone, PartialEq, Eq))]
+pub struct Ciphertext(pub(crate) Vec<u8>);
+
+impl EncryptionScheme {
+    pub fn encrypt(
+        account: &Account,
+        shared_secret: &SharedSecretKey,
+        commitment: &Commitment,
+        output_index: u32,
+    ) -> Ciphertext {
+        let mut buffer = account.to_bytes().to_vec();
+        Self::symmetric_transform(&mut buffer, shared_secret, commitment, output_index);
+        Ciphertext(buffer)
+    }
+
+    fn symmetric_transform(
+        buffer: &mut [u8],
+        shared_secret: &SharedSecretKey,
+        commitment: &Commitment,
+        output_index: u32,
+    ) {
+        let key = Self::kdf(shared_secret, commitment, output_index);
+        let mut cipher = ChaCha20::new(&key.into(), &[0; 12].into());
+        cipher.apply_keystream(buffer);
+    }
+
+    fn kdf(
+        shared_secret: &SharedSecretKey,
+        commitment: &Commitment,
+        output_index: u32,
+    ) -> [u8; 32] {
+        let mut bytes = Vec::new();
+
+        bytes.extend_from_slice(b"NSSA/v0.1/KDF-SHA256");
+        bytes.extend_from_slice(&shared_secret.0);
+        bytes.extend_from_slice(&commitment.to_byte_array());
+        bytes.extend_from_slice(&output_index.to_le_bytes());
+
+        Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap()
+    }
+
+    #[cfg(feature = "host")]
+    pub fn decrypt(
+        ciphertext: &Ciphertext,
+        shared_secret: &SharedSecretKey,
+        commitment: &Commitment,
+        output_index: u32,
+    ) -> Option<Account> {
+        use std::io::Cursor;
+        let mut buffer = ciphertext.0.to_owned();
+        Self::symmetric_transform(&mut buffer, shared_secret, commitment, output_index);
+
+        let mut cursor = Cursor::new(buffer.as_slice());
+        Account::from_cursor(&mut cursor).ok()
+    }
+}
