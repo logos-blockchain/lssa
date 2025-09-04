@@ -272,6 +272,50 @@ pub async fn test_success_two_transactions() {
     info!("Second TX Success!");
 }
 
+pub async fn test_pinata() {
+    let pinata_addr = "cafe".repeat(16);
+    let pinata_prize = 150;
+    let solution = 989106;
+    let command = Command::ClaimPinata {
+        pinata_addr: pinata_addr.clone(),
+        winner_addr: ACC_SENDER.to_string(),
+        solution,
+    };
+
+    let wallet_config = fetch_config().unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    let pinata_balance_pre = seq_client
+        .get_account_balance(pinata_addr.clone())
+        .await
+        .unwrap()
+        .balance;
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    info!("Checking correct balance move");
+    let pinata_balance_post = seq_client
+        .get_account_balance(pinata_addr.clone())
+        .await
+        .unwrap()
+        .balance;
+
+    let winner_balance_post = seq_client
+        .get_account_balance(ACC_SENDER.to_string())
+        .await
+        .unwrap()
+        .balance;
+
+    assert_eq!(pinata_balance_post, pinata_balance_pre - pinata_prize);
+    assert_eq!(winner_balance_post, 10000 + pinata_prize);
+
+    info!("Success!");
+}
+
 macro_rules! test_cleanup_wrap {
     ($home_dir:ident, $test_func:ident) => {{
         let res = pre_test($home_dir.clone()).await.unwrap();
@@ -307,11 +351,15 @@ pub async fn main_tests_runner() -> Result<()> {
         "test_success_two_transactions" => {
             test_cleanup_wrap!(home_dir, test_success_two_transactions);
         }
+        "test_pinata" => {
+            test_cleanup_wrap!(home_dir, test_pinata);
+        }
         "all" => {
             test_cleanup_wrap!(home_dir, test_success_move_to_another_account);
             test_cleanup_wrap!(home_dir, test_success);
             test_cleanup_wrap!(home_dir, test_failure);
             test_cleanup_wrap!(home_dir, test_success_two_transactions);
+            test_cleanup_wrap!(home_dir, test_pinata);
         }
         _ => {
             anyhow::bail!("Unknown test name");

@@ -86,41 +86,6 @@ impl V01State {
         this
     }
 
-    pub fn add_pinata_accounts(&mut self) {
-        self.insert_program(Program::pinata());
-
-        let mut rng = OsRng;
-        let mut seed = [0; 32];
-
-        rng.fill_bytes(&mut seed);
-        self.public_state.insert(
-            "6a79aee868a1c641ea895582af7ddd6f2da339e3091a67eddcbfdaa1b9010001"
-                .parse()
-                .unwrap(),
-            Account {
-                program_owner: Program::pinata().id(),
-                balance: 1500,
-                // Difficulty: 3
-                data: std::iter::once(3).chain(seed).collect(),
-                nonce: 0,
-            },
-        );
-
-        rng.fill_bytes(&mut seed);
-        self.public_state.insert(
-            "6a79aee868a1c641ea895582af7ddd6f2da339e3091a67eddcbfdaa1b9010002"
-                .parse()
-                .unwrap(),
-            Account {
-                program_owner: Program::pinata().id(),
-                balance: 1500,
-                // Difficulty: 4
-                data: std::iter::once(4).chain(seed).collect(),
-                nonce: 0,
-            },
-        );
-    }
-
     pub(crate) fn insert_program(&mut self, program: Program) {
         self.builtin_programs.insert(program.id(), program);
     }
@@ -239,6 +204,24 @@ impl V01State {
             }
         }
         Ok(())
+    }
+}
+
+// TODO: This is for testnet only, consider refactoring to have this not compiled for mainnet
+impl V01State {
+    pub fn add_pinata_program(&mut self, address: Address) {
+        self.insert_program(Program::pinata());
+
+        self.public_state.insert(
+            address,
+            Account {
+                program_owner: Program::pinata().id(),
+                balance: 1500,
+                // Difficulty: 3
+                data: vec![3; 33],
+                nonce: 0,
+            },
+        );
     }
 }
 

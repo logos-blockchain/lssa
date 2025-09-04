@@ -20,6 +20,7 @@ workspace = true
 
 [dependencies.sequencer_core]
 path = "../sequencer_core"
+features = ["testnet"]
 
 [dependencies.sequencer_runner]
 path = "../sequencer_runner"

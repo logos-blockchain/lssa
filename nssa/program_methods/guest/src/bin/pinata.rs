@@ -1,4 +1,4 @@
-use nssa_core::program::{read_nssa_inputs, write_nssa_outputs, ProgramInput};
+use nssa_core::program::{ProgramInput, read_nssa_inputs, write_nssa_outputs};
 use risc0_zkvm::sha::{Impl, Sha256};
 
 const PRIZE: u128 = 150;
@@ -21,10 +21,12 @@ impl Challenge {
         Self { difficulty, seed }
     }
 
-    fn is_nonce_valid(&self, nonce: Instruction) -> bool {
+    // Checks if the leftmost `self.difficulty` number of bytes of SHA256(self.data || solution) are
+    // zero.
+    fn validate_solution(&self, solution: Instruction) -> bool {
         let mut bytes = [0; 32 + 16];
-        bytes.copy_from_slice(&self.seed);
-        bytes[32..].copy_from_slice(&nonce.to_le_bytes());
+        bytes[..32].copy_from_slice(&self.seed);
+        bytes[32..].copy_from_slice(&solution.to_le_bytes());
         let digest: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
         let difficulty = self.difficulty as usize;
         digest[..difficulty].iter().all(|&b| b == 0)
@@ -33,7 +35,7 @@ impl Challenge {
     fn next_data(self) -> [u8; 33] {
         let mut result = [0; 33];
         result[0] = self.difficulty;
-        result.copy_from_slice(Impl::hash_bytes(&self.seed).as_bytes());
+        result[1..].copy_from_slice(Impl::hash_bytes(&self.seed).as_bytes());
         result
     }
 }
@@ -44,7 +46,7 @@ fn main() {
     // It is expected to receive only two accounts: [pinata_account, winner_account]
     let ProgramInput {
         pre_states,
-        instruction: nonce,
+        instruction: solution,
     } = read_nssa_inputs::<Instruction>();
 
     let [pinata, winner] = match pre_states.try_into() {
@@ -54,7 +56,7 @@ fn main() {
 
     let data = Challenge::new(&pinata.account.data);
 
-    if !data.is_nonce_valid(nonce) {
+    if !data.validate_solution(solution) {
         return;
     }
 

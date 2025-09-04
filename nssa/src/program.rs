@@ -2,7 +2,9 @@ use nssa_core::{
     account::{Account, AccountWithMetadata},
     program::{InstructionData, ProgramId, ProgramOutput},
 };
-use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID, PINATA_ELF, PINATA_ID};
+use program_methods::{
+    AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID, PINATA_ELF, PINATA_ID,
+};
 use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, default_executor, serde::to_vec};
 use serde::Serialize;
 
@@ -73,11 +75,14 @@ impl Program {
             elf: AUTHENTICATED_TRANSFER_ELF,
         }
     }
+}
 
+// TODO: This is for testnet only, consider refactoring to have this not compiled for mainnet
+impl Program {
     pub fn pinata() -> Self {
         Self {
             id: PINATA_ID,
-            elf: PINATA_ELF
+            elf: PINATA_ELF,
         }
     }
 }
