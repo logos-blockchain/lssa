@@ -36,7 +36,9 @@ impl NSSAUserData {
         accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
     ) -> Result<Self> {
         if !Self::valid_key_transaction_pairing_check(&accounts_keys) {
-            anyhow::bail!("Key transaction pairing check not satisfied, there is addresses, which is not derived from keys");
+            anyhow::bail!(
+                "Key transaction pairing check not satisfied, there is addresses, which is not derived from keys"
+            );
         }
 
         let key_holder = KeyChain::new_os_random_with_accounts(accounts_keys);

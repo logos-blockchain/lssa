@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
+use aes_gcm::{Aes256Gcm, KeyInit, aead::Aead};
 use constants_types::{CipherText, Nonce};
 use elliptic_curve::point::AffineCoordinates;
 use k256::AffinePoint;
@@ -136,8 +136,8 @@ impl KeyChain {
 #[cfg(test)]
 mod tests {
     use aes_gcm::{
-        aead::{Aead, KeyInit, OsRng},
         Aes256Gcm,
+        aead::{Aead, KeyInit, OsRng},
     };
     use constants_types::{CipherText, Nonce};
     use constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};

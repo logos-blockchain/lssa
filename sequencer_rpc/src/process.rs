@@ -1,5 +1,5 @@
 use actix_web::Error as HttpError;
-use base64::{engine::general_purpose, Engine};
+use base64::{Engine, engine::general_purpose};
 use nssa;
 use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
@@ -26,7 +26,7 @@ use common::rpc_primitives::requests::{
     SendTxResponse,
 };
 
-use super::{respond, types::err_rpc::RpcErr, JsonHandler};
+use super::{JsonHandler, respond, types::err_rpc::RpcErr};
 
 pub const HELLO: &str = "hello";
 pub const SEND_TX: &str = "send_tx";
@@ -276,13 +276,13 @@ impl JsonHandler {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{rpc_handler, JsonHandler};
-    use base64::{engine::general_purpose, Engine};
+    use crate::{JsonHandler, rpc_handler};
+    use base64::{Engine, engine::general_purpose};
     use common::rpc_primitives::RpcPollingConfig;
 
     use sequencer_core::{
-        config::{AccountInitialData, SequencerConfig},
         SequencerCore,
+        config::{AccountInitialData, SequencerConfig},
     };
     use serde_json::Value;
     use tempfile::tempdir;
@@ -368,7 +368,7 @@ mod tests {
     }
 
     async fn call_rpc_handler_with_json(handler: JsonHandler, request_json: Value) -> Value {
-        use actix_web::{test, web, App};
+        use actix_web::{App, test, web};
 
         let app = test::init_service(
             App::new()

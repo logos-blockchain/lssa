@@ -2,14 +2,14 @@ use std::{collections::HashMap, fmt, marker::PhantomData};
 
 use rs_merkle::{MerkleProof, MerkleTree};
 use serde::{
+    Deserialize, Deserializer, Serialize,
     de::{SeqAccess, Visitor},
     ser::SerializeSeq,
-    Deserialize, Deserializer, Serialize,
 };
 
 use crate::{transaction::Transaction, utxo_commitment::UTXOCommitment};
 
-use super::{hasher::OwnHasher, tree_leav_item::TreeLeavItem, TreeHashType};
+use super::{TreeHashType, hasher::OwnHasher, tree_leav_item::TreeLeavItem};
 
 #[derive(Clone)]
 pub struct HashStorageMerkleTree<Leav: TreeLeavItem + Clone> {

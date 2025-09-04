@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use tokio::runtime::Builder;
-use wallet::{execute_subcommand, Args};
+use wallet::{Args, execute_subcommand};
 
 pub const NUM_THREADS: usize = 2;
 

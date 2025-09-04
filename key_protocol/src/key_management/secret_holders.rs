@@ -1,9 +1,9 @@
 use common::merkle_tree_public::TreeHashType;
 use elliptic_curve::PrimeField;
 use k256::{AffinePoint, FieldBytes, Scalar};
-use rand::{rngs::OsRng, RngCore};
+use rand::{RngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
-use sha2::{digest::FixedOutput, Digest};
+use sha2::{Digest, digest::FixedOutput};
 
 use super::constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};
 

@@ -5,8 +5,8 @@ use key_protocol::key_protocol_core::NSSAUserData;
 use nssa::Address;
 
 use crate::{
-    config::{PersistentAccountData, WalletConfig},
     HOME_DIR_ENV_VAR,
+    config::{PersistentAccountData, WalletConfig},
 };
 
 ///Get home dir for wallet. Env var `NSSA_WALLET_HOME_DIR` must be set before execution to succeed.
@@ -69,12 +69,16 @@ mod tests {
 
     #[test]
     fn test_get_home_get_env_var() {
-        std::env::set_var(HOME_DIR_ENV_VAR, "/path/to/configs");
+        unsafe {
+            std::env::set_var(HOME_DIR_ENV_VAR, "/path/to/configs");
+        }
 
         let home = get_home().unwrap();
 
         assert_eq!(PathBuf::from_str("/path/to/configs").unwrap(), home);
 
-        std::env::remove_var(HOME_DIR_ENV_VAR);
+        unsafe {
+            std::env::remove_var(HOME_DIR_ENV_VAR);
+        }
     }
 }

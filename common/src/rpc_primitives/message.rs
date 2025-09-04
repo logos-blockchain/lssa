@@ -315,10 +315,10 @@ impl From<Message> for Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
     use serde_json::de::from_slice;
     use serde_json::json;
     use serde_json::ser::to_vec;
-    use serde_json::Value;
 
     use super::*;
 

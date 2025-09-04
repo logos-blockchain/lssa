@@ -1,9 +1,9 @@
-use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, KeyInit};
-use elliptic_curve::point::AffineCoordinates;
+use aes_gcm::{AeadCore, Aes256Gcm, KeyInit, aead::Aead};
 use elliptic_curve::PrimeField;
+use elliptic_curve::point::AffineCoordinates;
 use k256::{AffinePoint, FieldBytes, Scalar};
 use log::info;
-use rand::{rngs::OsRng, RngCore};
+use rand::{RngCore, rngs::OsRng};
 
 use super::constants_types::{CipherText, Nonce};
 

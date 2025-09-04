@@ -1,8 +1,8 @@
 use crate::parse_request;
 
 use super::errors::RpcParseError;
-use super::parser::parse_params;
 use super::parser::RpcRequest;
+use super::parser::parse_params;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

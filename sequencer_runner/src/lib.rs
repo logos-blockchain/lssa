@@ -5,7 +5,7 @@ use anyhow::Result;
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
 use log::info;
-use sequencer_core::{config::SequencerConfig, SequencerCore};
+use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -71,7 +71,9 @@ pub async fn main_runner() -> Result<()> {
     if let Some(ref rust_log) = app_config.override_rust_log {
         info!("RUST_LOG env var set to {rust_log:?}");
 
-        std::env::set_var(RUST_LOG, rust_log);
+        unsafe {
+            std::env::set_var(RUST_LOG, rust_log);
+        }
     }
 
     //ToDo: Add restart on failures

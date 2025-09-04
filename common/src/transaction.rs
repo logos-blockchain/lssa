@@ -1,12 +1,12 @@
 use k256::ecdsa::{
-    signature::{Signer, Verifier},
     Signature, SigningKey, VerifyingKey,
+    signature::{Signer, Verifier},
 };
 use log::info;
 use secp256k1_zkp::{PedersenCommitment, Tweak};
 use serde::{Deserialize, Serialize};
 
-use sha2::{digest::FixedOutput, Digest};
+use sha2::{Digest, digest::FixedOutput};
 
 use crate::merkle_tree_public::TreeHashType;
 
@@ -297,9 +297,9 @@ impl AuthenticatedTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use k256::{ecdsa::signature::Signer, FieldBytes};
-    use secp256k1_zkp::{constants::SECRET_KEY_SIZE, Tweak};
-    use sha2::{digest::FixedOutput, Digest};
+    use k256::{FieldBytes, ecdsa::signature::Signer};
+    use secp256k1_zkp::{Tweak, constants::SECRET_KEY_SIZE};
+    use sha2::{Digest, digest::FixedOutput};
 
     use crate::{
         merkle_tree_public::TreeHashType,
@@ -378,11 +378,13 @@ mod tests {
 
         assert_eq!(authenticated_tx.transaction(), &transaction);
         assert_eq!(hash, &transaction.body.hash());
-        assert!(authenticated_tx
-            .transaction()
-            .public_key
-            .verify(&transaction.body.to_bytes(), &signature)
-            .is_ok());
+        assert!(
+            authenticated_tx
+                .transaction()
+                .public_key
+                .verify(&transaction.body.to_bytes(), &signature)
+                .is_ok()
+        );
     }
 
     #[test]

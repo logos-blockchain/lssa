@@ -5,7 +5,7 @@ use error::DbError;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
 };
-use sc_db_utils::{produce_blob_from_fit_vec, DataBlob, DataBlobChangeVariant};
+use sc_db_utils::{DataBlob, DataBlobChangeVariant, produce_blob_from_fit_vec};
 
 pub mod error;
 pub mod sc_db_utils;
