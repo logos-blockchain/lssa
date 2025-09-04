@@ -1,3 +1,4 @@
+use bip39::Mnemonic;
 use common::merkle_tree_public::TreeHashType;
 use elliptic_curve::PrimeField;
 use k256::{AffinePoint, FieldBytes, Scalar};
@@ -29,12 +30,16 @@ pub struct UTXOSecretKeyHolder {
 
 impl SeedHolder {
     pub fn new_os_random() -> Self {
-        let mut bytes = FieldBytes::default();
+        let mut enthopy_bytes: [u8; 32] = [0; 32];
+        OsRng.fill_bytes(&mut enthopy_bytes);
 
-        OsRng.fill_bytes(&mut bytes);
+        let mnemonic = Mnemonic::from_entropy(&enthopy_bytes).unwrap();
+        let seed = mnemonic.to_seed("");
+
+        let field_bytes = FieldBytes::from_slice(&seed);
 
         Self {
-            seed: Scalar::from_repr(bytes).unwrap(),
+            seed: Scalar::from_repr(*field_bytes).unwrap(),
         }
     }
 
