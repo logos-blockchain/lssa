@@ -76,8 +76,8 @@ impl MerkleTree {
         }
     }
 
-    /// reallocate storage of Merkle tree for double capacity.
-    /// current tree is embedded into the new tree as a subtree
+    /// Reallocates storage of Merkle tree for double capacity.
+    /// The current tree is embedded into the new tree as a subtree
     fn reallocate_to_double_capacity(&mut self) {
         let old_capacity = self.capacity;
         let new_capacity = old_capacity << 1;
