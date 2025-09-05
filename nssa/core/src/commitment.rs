@@ -8,8 +8,8 @@ use crate::{NullifierPublicKey, account::Account};
 pub struct Commitment(pub(super) [u8; 32]);
 
 impl Commitment {
-    //generate new commitment to a private account owned by user with npk.
-    //hash(npk || program_owner || balance || nonce || data)
+    // Generates the commitment to a private account owned by user for npk:
+    // hash(npk || program_owner || balance || nonce || data)
     pub fn new(npk: &NullifierPublicKey, account: &Account) -> Self {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&npk.to_byte_array());
@@ -36,8 +36,7 @@ pub type CommitmentSetDigest = [u8; 32];
 
 pub type MembershipProof = (usize, Vec<[u8; 32]>);
 
-/// computes the resulting digest/root hash for a membership proof
-/// and its corresponding commitment.
+/// Computes the resulting digest for the given membership proof and corresponding commitment
 pub fn compute_digest_for_path(
     commitment: &Commitment,
     proof: &MembershipProof,
