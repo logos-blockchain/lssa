@@ -21,7 +21,7 @@ impl CommitmentSet {
         self.merkle_tree.root()
     }
 
-    /// Queries the CommitmentSet for a membership proof of commitment
+    /// Queries the `CommitmentSet` for a membership proof of commitment
     pub fn get_proof_for(&self, commitment: &Commitment) -> Option<MembershipProof> {
         let index = *self.commitments.get(commitment)?;
 
