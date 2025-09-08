@@ -1,5 +1,5 @@
 use rs_merkle::Hasher;
-use sha2::{digest::FixedOutput, Digest, Sha256};
+use sha2::{Digest, Sha256, digest::FixedOutput};
 
 use super::TreeHashType;
 

@@ -9,6 +9,12 @@ pub struct InitialAccountData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistentAccountData {
+    pub address: nssa::Address,
+    pub pub_sign_key: nssa::PrivateKey,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GasConfig {
     /// Gas spent per deploying one byte of data
     pub gas_fee_per_byte_deploy: u64,
@@ -34,8 +40,14 @@ pub struct WalletConfig {
     pub override_rust_log: Option<String>,
     ///Sequencer URL
     pub sequencer_addr: String,
-    ///Sequencer polling duration for new blocks in seconds
-    pub seq_poll_timeout_secs: u64,
+    ///Sequencer polling duration for new blocks in milliseconds
+    pub seq_poll_timeout_millis: u64,
+    ///Sequencer polling max number of blocks
+    pub seq_poll_max_blocks: usize,
+    ///Sequencer polling max number error retries
+    pub seq_poll_max_retries: u64,
+    ///Sequencer polling error retry delay in milliseconds
+    pub seq_poll_retry_delay_millis: u64,
     ///Initial accounts for wallet
     pub initial_accounts: Vec<InitialAccountData>,
 }

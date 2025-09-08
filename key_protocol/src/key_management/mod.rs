@@ -114,8 +114,8 @@ impl KeyChain {
 #[cfg(test)]
 mod tests {
     use aes_gcm::{
-        aead::{Aead, KeyInit, OsRng},
         Aes256Gcm,
+        aead::{Aead, KeyInit, OsRng},
     };
     use elliptic_curve::ff::Field;
     use elliptic_curve::group::prime::PrimeCurveAffine;

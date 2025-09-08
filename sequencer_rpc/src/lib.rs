@@ -5,8 +5,8 @@ pub mod types;
 use std::sync::Arc;
 
 use common::rpc_primitives::{
-    errors::{RpcError, RpcErrorKind},
     RpcPollingConfig,
+    errors::{RpcError, RpcErrorKind},
 };
 use sequencer_core::SequencerCore;
 use serde::Serialize;

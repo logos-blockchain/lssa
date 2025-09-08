@@ -2,13 +2,13 @@ use std::io;
 use std::sync::Arc;
 
 use actix_cors::Cors;
-use actix_web::{http, middleware, web, App, Error as HttpError, HttpResponse, HttpServer};
+use actix_web::{App, Error as HttpError, HttpResponse, HttpServer, http, middleware, web};
 use futures::Future;
 use futures::FutureExt;
 use log::info;
 
-use common::rpc_primitives::message::Message;
 use common::rpc_primitives::RpcConfig;
+use common::rpc_primitives::message::Message;
 use sequencer_core::SequencerCore;
 use tokio::sync::Mutex;
 

@@ -3,7 +3,7 @@ use std::path::Path;
 use block_store::SequecerBlockStore;
 use common::block::HashableBlockData;
 use nssa::{self, Address};
-use rand::{rngs::OsRng, RngCore};
+use rand::{RngCore, rngs::OsRng};
 
 use crate::config::AccountInitialData;
 

@@ -4,7 +4,7 @@ use anyhow::Result;
 use common::merkle_tree_public::merkle_tree::UTXOCommitmentsMerkleTree;
 use key_protocol::key_protocol_core::NSSAUserData;
 
-use crate::config::WalletConfig;
+use crate::config::{PersistentAccountData, WalletConfig};
 
 pub struct WalletChainStore {
     pub user_data: NSSAUserData,
@@ -28,6 +28,13 @@ impl WalletChainStore {
             utxo_commitments_store,
             wallet_config: config,
         })
+    }
+
+    pub(crate) fn insert_account_data(&mut self, acc_data: PersistentAccountData) {
+        self.user_data
+            .key_holder
+            .pub_account_signing_keys
+            .insert(acc_data.address, acc_data.pub_sign_key);
     }
 }
 
@@ -72,7 +79,10 @@ mod tests {
             home,
             override_rust_log: None,
             sequencer_addr: "http://127.0.0.1".to_string(),
-            seq_poll_timeout_secs: 1,
+            seq_poll_timeout_millis: 12000,
+            seq_poll_max_blocks: 5,
+            seq_poll_max_retries: 10,
+            seq_poll_retry_delay_millis: 500,
             initial_accounts: create_initial_accounts(),
         }
     }

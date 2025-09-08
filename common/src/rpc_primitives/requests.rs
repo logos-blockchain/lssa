@@ -1,8 +1,8 @@
 use crate::parse_request;
 
 use super::errors::RpcParseError;
-use super::parser::parse_params;
 use super::parser::RpcRequest;
+use super::parser::parse_params;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -43,6 +43,16 @@ pub struct GetTransactionByHashRequest {
     pub hash: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetAccountsNoncesRequest {
+    pub addresses: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetAccountDataRequest {
+    pub address: String,
+}
+
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -52,6 +62,8 @@ parse_request!(GetLastBlockRequest);
 parse_request!(GetInitialTestnetAccountsRequest);
 parse_request!(GetAccountBalanceRequest);
 parse_request!(GetTransactionByHashRequest);
+parse_request!(GetAccountsNoncesRequest);
+parse_request!(GetAccountDataRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -66,6 +78,7 @@ pub struct RegisterAccountResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxResponse {
     pub status: String,
+    pub tx_hash: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -89,6 +102,19 @@ pub struct GetAccountBalanceResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GetAccountsNoncesResponse {
+    pub nonces: Vec<u128>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetTransactionByHashResponse {
     pub transaction: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetAccountDataResponse {
+    pub balance: u128,
+    pub nonce: u128,
+    pub program_owner: [u32; 8],
+    pub data: Vec<u8>,
 }

@@ -7,6 +7,10 @@ use json::{SendTxRequest, SendTxResponse, SequencerRpcRequest, SequencerRpcRespo
 use reqwest::Client;
 use serde_json::Value;
 
+use crate::rpc_primitives::requests::{
+    GetAccountsNoncesRequest, GetAccountsNoncesResponse, GetTransactionByHashRequest,
+    GetTransactionByHashResponse,
+};
 use crate::sequencer_client::json::AccountInitialData;
 use crate::{SequencerClientError, SequencerRpcError};
 
@@ -79,6 +83,42 @@ impl SequencerClient {
 
         let resp = self
             .call_method_with_payload("get_account_balance", req)
+            .await?;
+
+        let resp_deser = serde_json::from_value(resp)?;
+
+        Ok(resp_deser)
+    }
+
+    ///Get accounts nonces for `addresses`. `addresses` must be a list of valid hex-strings for 32 bytes.
+    pub async fn get_accounts_nonces(
+        &self,
+        addresses: Vec<String>,
+    ) -> Result<GetAccountsNoncesResponse, SequencerClientError> {
+        let block_req = GetAccountsNoncesRequest { addresses };
+
+        let req = serde_json::to_value(block_req)?;
+
+        let resp = self
+            .call_method_with_payload("get_accounts_nonces", req)
+            .await?;
+
+        let resp_deser = serde_json::from_value(resp)?;
+
+        Ok(resp_deser)
+    }
+
+    ///Get transaction details for `hash`.
+    pub async fn get_transaction_by_hash(
+        &self,
+        hash: String,
+    ) -> Result<GetTransactionByHashResponse, SequencerClientError> {
+        let block_req = GetTransactionByHashRequest { hash };
+
+        let req = serde_json::to_value(block_req)?;
+
+        let resp = self
+            .call_method_with_payload("get_transaction_by_hash", req)
             .await?;
 
         let resp_deser = serde_json::from_value(resp)?;

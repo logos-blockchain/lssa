@@ -66,6 +66,8 @@ pub enum ExecutionFailureKind {
     ProveError(anyhow::Error),
     #[error("Failed to decode data from VM: {0:?}")]
     DecodeError(String),
+    #[error("Failed to get account data from sequencer")]
+    SequencerError,
     #[error("Inputs amounts does not match outputs")]
     AmountMismatchError,
     #[error("Accounts key not found")]

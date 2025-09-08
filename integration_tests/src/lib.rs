@@ -4,12 +4,15 @@ use actix_web::dev::ServerHandle;
 use anyhow::Result;
 use clap::Parser;
 use common::sequencer_client::SequencerClient;
-use log::info;
+use log::{info, warn};
 use sequencer_core::config::SequencerConfig;
 use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
-use wallet::{Command, helperfunctions::fetch_config};
+use wallet::{
+    Command,
+    helperfunctions::{fetch_config, fetch_persistent_accounts},
+};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -66,6 +69,14 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
     sequencer_loop_handle.abort();
     seq_http_server_handle.stop(true).await;
 
+    let wallet_home = wallet::helperfunctions::get_home().unwrap();
+    let persistent_data_home = wallet_home.join("curr_accounts.json");
+
+    //Removing persistent accounts after run to not affect other executions
+    //Not necessary an error, if fails as there is tests for failure scenario
+    let _ = std::fs::remove_file(persistent_data_home)
+        .inspect_err(|err| warn!("Failed to remove persistent data with err {err:#?}"));
+
     //At this point all of the references to sequencer_core must be lost.
     //So they are dropped and tempdirs will be dropped too,
 }
@@ -73,7 +84,6 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
 pub async fn test_success() {
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
-        nonce: 0,
         to: ACC_RECEIVER.to_string(),
         amount: 100,
     };
@@ -107,18 +117,35 @@ pub async fn test_success() {
 }
 
 pub async fn test_success_move_to_another_account() {
-    let hex_acc_receiver_new_acc = hex::encode([42; 32]);
-
-    let command = Command::SendNativeTokenTransfer {
-        from: ACC_SENDER.to_string(),
-        nonce: 0,
-        to: hex_acc_receiver_new_acc.clone(),
-        amount: 100,
-    };
+    let command = Command::RegisterAccount {};
 
     let wallet_config = fetch_config().unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    let persistent_accounts = fetch_persistent_accounts().unwrap();
+
+    let mut new_persistent_account_addr = String::new();
+
+    for per_acc in persistent_accounts {
+        if (per_acc.address.to_string() != ACC_RECEIVER)
+            && (per_acc.address.to_string() != ACC_SENDER)
+        {
+            new_persistent_account_addr = per_acc.address.to_string();
+        }
+    }
+
+    if new_persistent_account_addr == String::new() {
+        panic!("Failed to produce new account, not present in persistent accounts");
+    }
+
+    let command = Command::SendNativeTokenTransfer {
+        from: ACC_SENDER.to_string(),
+        to: new_persistent_account_addr.clone(),
+        amount: 100,
+    };
 
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -131,7 +158,7 @@ pub async fn test_success_move_to_another_account() {
         .await
         .unwrap();
     let acc_2_balance = seq_client
-        .get_account_balance(hex_acc_receiver_new_acc)
+        .get_account_balance(new_persistent_account_addr)
         .await
         .unwrap();
 
@@ -147,7 +174,6 @@ pub async fn test_success_move_to_another_account() {
 pub async fn test_failure() {
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
-        nonce: 0,
         to: ACC_RECEIVER.to_string(),
         amount: 1000000,
     };
@@ -185,7 +211,6 @@ pub async fn test_failure() {
 pub async fn test_success_two_transactions() {
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
-        nonce: 0,
         to: ACC_RECEIVER.to_string(),
         amount: 100,
     };
@@ -219,7 +244,6 @@ pub async fn test_success_two_transactions() {
 
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
-        nonce: 1,
         to: ACC_RECEIVER.to_string(),
         amount: 100,
     };

@@ -1,4 +1,4 @@
-use serde_json::{to_value, Value};
+use serde_json::{Value, to_value};
 use std::fmt;
 
 #[derive(serde::Serialize)]
@@ -65,7 +65,7 @@ impl RpcError {
                 return Self::server_error(Some(format!(
                     "Failed to serialize invalid parameters error: {:?}",
                     err.to_string()
-                )))
+                )));
             }
         };
         RpcError::new(-32_602, "Invalid params".to_owned(), Some(value))
@@ -178,7 +178,7 @@ impl From<ServerError> for RpcError {
         let error_data = match to_value(&e) {
             Ok(value) => value,
             Err(_err) => {
-                return RpcError::new_internal_error(None, "Failed to serialize ServerError")
+                return RpcError::new_internal_error(None, "Failed to serialize ServerError");
             }
         };
         RpcError::new_internal_error(Some(error_data), e.to_string().as_str())

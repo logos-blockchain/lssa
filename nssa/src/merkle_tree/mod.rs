@@ -39,11 +39,11 @@ impl MerkleTree {
         if tree_depth == capacity_depth {
             0
         } else {
+            // 2^(capacity_depth - tree_depth) - 1
             (1 << (capacity_depth - tree_depth)) - 1
         }
     }
-
-    /// Number of levels required to hold all values
+    /// Number of levels required to hold all nodes
     fn depth(&self) -> usize {
         self.length.next_power_of_two().trailing_zeros() as usize
     }
@@ -57,6 +57,7 @@ impl MerkleTree {
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
+        // Adjust capacity to ensure power of two
         let capacity = capacity.next_power_of_two();
         let total_depth = capacity.trailing_zeros() as usize;
 
@@ -75,6 +76,8 @@ impl MerkleTree {
         }
     }
 
+    /// Reallocates storage of Merkle tree for double capacity.
+    /// The current tree is embedded into the new tree as a subtree
     fn reallocate_to_double_capacity(&mut self) {
         let old_capacity = self.capacity;
         let new_capacity = old_capacity << 1;
@@ -102,9 +105,11 @@ impl MerkleTree {
         let mut node_index = new_index + self.capacity - 1;
         let mut node_hash = hash_value(&value);
 
+        // Insert the new node at the bottom layer
         self.set_node(node_index, node_hash);
         self.length += 1;
 
+        // Update upper levels for the newly inserted node
         for _ in 0..self.depth() {
             let parent_index = (node_index - 1) >> 1;
             let left_child = self.get_node((parent_index << 1) + 1);
@@ -129,6 +134,7 @@ impl MerkleTree {
 
         while node_index != root_index {
             let parent_index = (node_index - 1) >> 1;
+            // Left children have odd indices, and right children have even indices
             let is_left_child = node_index & 1 == 1;
             let sibling_index = if is_left_child {
                 node_index + 1

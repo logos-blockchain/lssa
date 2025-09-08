@@ -4,7 +4,7 @@ use elliptic_curve::PrimeField;
 use k256::{AffinePoint, Scalar};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
-use sha2::{digest::FixedOutput, Digest};
+use sha2::{Digest, digest::FixedOutput};
 
 #[derive(Debug)]
 ///Seed holder. Non-clonable to ensure that different holders use different seeds.

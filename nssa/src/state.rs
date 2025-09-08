@@ -21,6 +21,7 @@ impl CommitmentSet {
         self.merkle_tree.root()
     }
 
+    /// Queries the `CommitmentSet` for a membership proof of commitment
     pub fn get_proof_for(&self, commitment: &Commitment) -> Option<MembershipProof> {
         let index = *self.commitments.get(commitment)?;
 
@@ -29,6 +30,7 @@ impl CommitmentSet {
             .map(|path| (index, path))
     }
 
+    /// Inserts a list of commitments to the `CommitmentSet`.
     pub(crate) fn extend(&mut self, commitments: &[Commitment]) {
         for commitment in commitments.iter().cloned() {
             let index = self.merkle_tree.insert(commitment.to_byte_array());
@@ -41,6 +43,9 @@ impl CommitmentSet {
         self.commitments.contains_key(commitment)
     }
 
+    /// Initializes an empty `CommitmentSet` with a given capacity.
+    /// If the capacity is not a power_of_two, then capacity is taken
+    /// to be the next power_of_two.
     pub(crate) fn with_capacity(capacity: usize) -> CommitmentSet {
         Self {
             merkle_tree: MerkleTree::with_capacity(capacity),
