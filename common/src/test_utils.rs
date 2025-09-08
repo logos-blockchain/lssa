@@ -1,8 +1,6 @@
-use nssa::NSSATransaction;
-
 use crate::{
     block::{Block, HashableBlockData},
-    transaction::TransactionBody,
+    transaction::{EncodedTransaction, NSSATransaction},
 };
 
 //Helpers
@@ -19,15 +17,14 @@ pub fn sequencer_sign_key_for_testing() -> nssa::PrivateKey {
 ///
 /// `prev_hash` - hash of previous block, provide None for genesis
 ///
-/// `transactions` - vector of `AuthenticatedTransaction` objects
+/// `transactions` - vector of `EncodedTransaction` objects
 pub fn produce_dummy_block(
     id: u64,
     prev_hash: Option<[u8; 32]>,
-    transactions: Vec<TransactionBody>,
+    transactions: Vec<EncodedTransaction>,
 ) -> Block {
     let block_data = HashableBlockData {
         block_id: id,
-        prev_block_id: id.saturating_sub(1),
         prev_block_hash: prev_hash.unwrap_or_default(),
         timestamp: id * 100,
         transactions,
@@ -36,7 +33,7 @@ pub fn produce_dummy_block(
     block_data.into_block(&sequencer_sign_key_for_testing())
 }
 
-pub fn produce_dummy_empty_transaction() -> TransactionBody {
+pub fn produce_dummy_empty_transaction() -> EncodedTransaction {
     let program_id = nssa::program::Program::authenticated_transfer_program().id();
     let addresses = vec![];
     let nonces = vec![];
@@ -49,7 +46,7 @@ pub fn produce_dummy_empty_transaction() -> TransactionBody {
 
     let nssa_tx = nssa::PublicTransaction::new(message, witness_set);
 
-    TransactionBody::from(NSSATransaction::Public(nssa_tx))
+    EncodedTransaction::from(NSSATransaction::Public(nssa_tx))
 }
 
 pub fn create_transaction_native_token_transfer(
@@ -58,7 +55,7 @@ pub fn create_transaction_native_token_transfer(
     to: [u8; 32],
     balance_to_move: u128,
     signing_key: nssa::PrivateKey,
-) -> TransactionBody {
+) -> EncodedTransaction {
     let addresses = vec![nssa::Address::new(from), nssa::Address::new(to)];
     let nonces = vec![nonce];
     let program_id = nssa::program::Program::authenticated_transfer_program().id();
@@ -69,5 +66,5 @@ pub fn create_transaction_native_token_transfer(
 
     let nssa_tx = nssa::PublicTransaction::new(message, witness_set);
 
-    TransactionBody::from(NSSATransaction::Public(nssa_tx))
+    EncodedTransaction::from(NSSATransaction::Public(nssa_tx))
 }

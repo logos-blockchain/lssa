@@ -1,4 +1,5 @@
 pub mod address;
+pub mod encoding;
 pub mod error;
 mod merkle_tree;
 mod privacy_preserving_transaction;
@@ -16,21 +17,3 @@ pub use signature::PrivateKey;
 pub use signature::PublicKey;
 pub use signature::Signature;
 pub use state::V01State;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NSSATransaction {
-    Public(PublicTransaction),
-    PrivacyPreserving(PrivacyPreservingTransaction),
-}
-
-impl From<PublicTransaction> for NSSATransaction {
-    fn from(value: PublicTransaction) -> Self {
-        Self::Public(value)
-    }
-}
-
-impl From<PrivacyPreservingTransaction> for NSSATransaction {
-    fn from(value: PrivacyPreservingTransaction) -> Self {
-        Self::PrivacyPreserving(value)
-    }
-}

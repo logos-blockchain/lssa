@@ -14,7 +14,7 @@ use program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT
 
 /// Proof of the privacy preserving execution circuit
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Proof(Vec<u8>);
+pub struct Proof(pub(super) Vec<u8>);
 
 impl Proof {
     pub(crate) fn is_valid_for(&self, circuit_output: &PrivacyPreservingCircuitOutput) -> bool {
@@ -34,7 +34,14 @@ impl Proof {
     pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
         let proof_len = u32_from_cursor(cursor) as usize;
         let mut proof = Vec::with_capacity(proof_len);
-        cursor.read_exact(&mut proof)?;
+
+        for _ in 0..proof_len {
+            let mut one_byte_buf = [0u8];
+
+            cursor.read_exact(&mut one_byte_buf)?;
+
+            proof.push(one_byte_buf[0]);
+        }
         Ok(Self(proof))
     }
 }

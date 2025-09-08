@@ -10,11 +10,11 @@ use crate::{
     Address, PrivacyPreservingTransaction, PublicKey, Signature,
     error::NssaError,
     privacy_preserving_transaction::{
-        circuit::Proof, message::EncryptedAccountData, witness_set::WitnessSet,
+        circuit::Proof,
+        message::{EncryptedAccountData, Message},
+        witness_set::WitnessSet,
     },
 };
-
-use super::message::Message;
 
 const MESSAGE_ENCODING_PREFIX_LEN: usize = 22;
 const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] = b"\x01/NSSA/v0.1/TxMessage/";

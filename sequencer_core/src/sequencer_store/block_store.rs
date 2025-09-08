@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{TreeHashType, block::Block, transaction::TransactionBody};
+use common::{TreeHashType, block::Block, transaction::EncodedTransaction};
 use storage::RocksDBIO;
 
 pub struct SequecerBlockStore {
@@ -57,7 +57,7 @@ impl SequecerBlockStore {
     }
 
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
-    pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<TransactionBody> {
+    pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<EncodedTransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
         let block = block_id.map(|&id| self.get_block_at_id(id));
         if let Some(Ok(block)) = block {
@@ -96,7 +96,6 @@ mod tests {
 
         let genesis_block_hashable_data = HashableBlockData {
             block_id: 0,
-            prev_block_id: 0,
             prev_block_hash: [0; 32],
             timestamp: 0,
             transactions: vec![],

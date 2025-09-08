@@ -1,7 +1,7 @@
 use rs_merkle::Hasher;
 use std::io::{Cursor, Read};
 
-use crate::{OwnHasher, transaction::TransactionBody};
+use crate::{OwnHasher, transaction::EncodedTransaction};
 
 pub type BlockHash = [u8; 32];
 pub type BlockId = u64;
@@ -10,7 +10,6 @@ pub type TimeStamp = u64;
 #[derive(Debug, Clone)]
 pub struct BlockHeader {
     pub block_id: BlockId,
-    pub prev_block_id: BlockId,
     pub prev_block_hash: BlockHash,
     pub hash: BlockHash,
     pub timestamp: TimeStamp,
@@ -19,7 +18,7 @@ pub struct BlockHeader {
 
 #[derive(Debug, Clone)]
 pub struct BlockBody {
-    pub transactions: Vec<TransactionBody>,
+    pub transactions: Vec<EncodedTransaction>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,10 +30,9 @@ pub struct Block {
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashableBlockData {
     pub block_id: BlockId,
-    pub prev_block_id: BlockId,
     pub prev_block_hash: BlockHash,
     pub timestamp: TimeStamp,
-    pub transactions: Vec<TransactionBody>,
+    pub transactions: Vec<EncodedTransaction>,
 }
 
 impl HashableBlockData {
@@ -45,7 +43,6 @@ impl HashableBlockData {
         Block {
             header: BlockHeader {
                 block_id: self.block_id,
-                prev_block_id: self.prev_block_id,
                 prev_block_hash: self.prev_block_hash,
                 hash,
                 timestamp: self.timestamp,
@@ -62,7 +59,6 @@ impl From<Block> for HashableBlockData {
     fn from(value: Block) -> Self {
         Self {
             block_id: value.header.block_id,
-            prev_block_id: value.header.prev_block_id,
             prev_block_hash: value.header.prev_block_hash,
             timestamp: value.header.timestamp,
             transactions: value.body.transactions,
@@ -74,7 +70,6 @@ impl HashableBlockData {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&self.block_id.to_le_bytes());
-        bytes.extend_from_slice(&self.prev_block_id.to_le_bytes());
         bytes.extend_from_slice(&self.prev_block_hash);
         bytes.extend_from_slice(&self.timestamp.to_le_bytes());
         let num_transactions: u32 = self.transactions.len() as u32;
@@ -94,7 +89,6 @@ impl HashableBlockData {
         let mut cursor = Cursor::new(data);
 
         let block_id = u64_from_cursor(&mut cursor);
-        let prev_block_id = u64_from_cursor(&mut cursor);
 
         let mut prev_block_hash = [0u8; 32];
         cursor.read_exact(&mut prev_block_hash).unwrap();
@@ -114,13 +108,12 @@ impl HashableBlockData {
                 tx_bytes.push(buff[0]);
             }
 
-            let tx = TransactionBody::from_bytes(tx_bytes);
+            let tx = EncodedTransaction::from_bytes(tx_bytes);
             transactions.push(tx);
         }
 
         Self {
             block_id,
-            prev_block_id,
             prev_block_hash,
             timestamp,
             transactions,

@@ -4,7 +4,7 @@ use base64::Engine;
 use common::{
     ExecutionFailureKind,
     sequencer_client::{SequencerClient, json::SendTxResponse},
-    transaction::TransactionBody,
+    transaction::{EncodedTransaction, NSSATransaction},
 };
 
 use anyhow::Result;
@@ -146,16 +146,13 @@ impl WalletCore {
     }
 
     ///Poll transactions
-    pub async fn poll_public_native_token_transfer(
-        &self,
-        hash: String,
-    ) -> Result<nssa::NSSATransaction> {
+    pub async fn poll_public_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
         let transaction_encoded = self.poller.poll_tx(hash).await?;
         let tx_base64_decode =
             base64::engine::general_purpose::STANDARD.decode(transaction_encoded)?;
-        let pub_tx = TransactionBody::from_bytes(tx_base64_decode);
+        let pub_tx = EncodedTransaction::from_bytes(tx_base64_decode);
 
-        Ok(nssa::NSSATransaction::try_from(&pub_tx)?)
+        Ok(NSSATransaction::try_from(&pub_tx)?)
     }
 }
 

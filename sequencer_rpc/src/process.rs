@@ -18,7 +18,7 @@ use common::{
             GetTransactionByHashResponse,
         },
     },
-    transaction::TransactionBody,
+    transaction::EncodedTransaction,
 };
 
 use common::rpc_primitives::requests::{
@@ -75,7 +75,7 @@ impl JsonHandler {
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
-        let tx = TransactionBody::from_bytes(send_tx_req.transaction);
+        let tx = EncodedTransaction::from_bytes(send_tx_req.transaction);
         let tx_hash = hex::encode(tx.hash());
 
         {
@@ -280,7 +280,7 @@ mod tests {
     use base64::{Engine, engine::general_purpose};
     use common::{
         rpc_primitives::RpcPollingConfig, test_utils::sequencer_sign_key_for_testing,
-        transaction::TransactionBody,
+        transaction::EncodedTransaction,
     };
 
     use sequencer_core::{
@@ -329,7 +329,7 @@ mod tests {
         }
     }
 
-    fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, TransactionBody) {
+    fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
         let config = sequencer_config_for_tests();
         let mut sequencer_core = SequencerCore::start_from_config(config);
         let initial_accounts = sequencer_core.sequencer_config.initial_accounts.clone();

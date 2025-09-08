@@ -1,11 +1,14 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use common::{TreeHashType, block::HashableBlockData, transaction::TransactionBody};
+use common::{
+    TreeHashType,
+    block::HashableBlockData,
+    transaction::{EncodedTransaction, NSSATransaction},
+};
 use config::SequencerConfig;
-use log::{info, warn};
+use log::warn;
 use mempool::MemPool;
-use nssa::NSSATransaction;
 use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +17,7 @@ pub mod sequencer_store;
 
 pub struct SequencerCore {
     pub store: SequecerChainStore,
-    pub mempool: MemPool<TransactionBody>,
+    pub mempool: MemPool<EncodedTransaction>,
     pub sequencer_config: SequencerConfig,
     pub chain_height: u64,
 }
@@ -85,15 +88,13 @@ impl SequencerCore {
 
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
-        transaction: TransactionBody,
+        transaction: EncodedTransaction,
     ) -> Result<(), TransactionMalformationErrorKind> {
         let transaction = NSSATransaction::try_from(&transaction).map_err(|_| {
             TransactionMalformationErrorKind::FailedToDecode {
                 tx: transaction.hash(),
             }
         })?;
-
-        info!("Transaction got {transaction:#?}");
 
         let mempool_size = self.mempool.len();
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
@@ -135,24 +136,23 @@ impl SequencerCore {
     pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<u64> {
         let new_block_height = self.chain_height + 1;
 
-        let transactions = self
-            .mempool
-            .pop_size(self.sequencer_config.max_num_tx_in_block);
+        let mut num_valid_transactions_in_block = 0;
+        let mut valid_transactions = vec![];
 
-        let mut nssa_transactions = vec![];
-
-        for tx in transactions {
+        while let Some(tx) = self.mempool.pop_last() {
             let nssa_transaction = NSSATransaction::try_from(&tx)
                 .map_err(|_| TransactionMalformationErrorKind::FailedToDecode { tx: tx.hash() })?;
 
-            nssa_transactions.push(nssa_transaction);
-        }
+            if let Ok(valid_tx) = self.execute_check_transaction_on_state(nssa_transaction) {
+                valid_transactions.push(valid_tx.into());
 
-        let valid_transactions: Vec<_> = nssa_transactions
-            .into_iter()
-            .filter_map(|tx| self.execute_check_transaction_on_state(tx).ok())
-            .map(Into::into)
-            .collect();
+                num_valid_transactions_in_block += 1;
+
+                if num_valid_transactions_in_block >= self.sequencer_config.max_num_tx_in_block {
+                    break;
+                }
+            }
+        }
 
         let prev_block_hash = self
             .store
@@ -165,7 +165,6 @@ impl SequencerCore {
 
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
-            prev_block_id: self.chain_height,
             transactions: valid_transactions,
             prev_block_hash,
             timestamp: curr_time,
@@ -189,7 +188,7 @@ mod tests {
 
     use super::*;
 
-    fn parse_unwrap_tx_body_into_nssa_tx(tx_body: TransactionBody) -> NSSATransaction {
+    fn parse_unwrap_tx_body_into_nssa_tx(tx_body: EncodedTransaction) -> NSSATransaction {
         NSSATransaction::try_from(&tx_body)
             .map_err(|_| TransactionMalformationErrorKind::FailedToDecode { tx: tx_body.hash() })
             .unwrap()

@@ -10,6 +10,24 @@ use elliptic_curve::{
 };
 use sha2::digest::typenum::{UInt, UTerm};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NSSATransaction {
+    Public(nssa::PublicTransaction),
+    PrivacyPreserving(nssa::PrivacyPreservingTransaction),
+}
+
+impl From<nssa::PublicTransaction> for NSSATransaction {
+    fn from(value: nssa::PublicTransaction) -> Self {
+        Self::Public(value)
+    }
+}
+
+impl From<nssa::PrivacyPreservingTransaction> for NSSATransaction {
+    fn from(value: nssa::PrivacyPreservingTransaction) -> Self {
+        Self::PrivacyPreserving(value)
+    }
+}
+
 use crate::TreeHashType;
 
 pub type CipherText = Vec<u8>;
@@ -24,20 +42,20 @@ pub enum TxKind {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 ///General transaction object
-pub struct TransactionBody {
+pub struct EncodedTransaction {
     pub tx_kind: TxKind,
     ///Encoded blobs of data
     pub encoded_transaction_data: Vec<u8>,
 }
 
-impl From<nssa::NSSATransaction> for TransactionBody {
-    fn from(value: nssa::NSSATransaction) -> Self {
+impl From<NSSATransaction> for EncodedTransaction {
+    fn from(value: NSSATransaction) -> Self {
         match value {
-            nssa::NSSATransaction::Public(tx) => Self {
+            NSSATransaction::Public(tx) => Self {
                 tx_kind: TxKind::Public,
                 encoded_transaction_data: tx.to_bytes(),
             },
-            nssa::NSSATransaction::PrivacyPreserving(tx) => Self {
+            NSSATransaction::PrivacyPreserving(tx) => Self {
                 tx_kind: TxKind::PrivacyPreserving,
                 encoded_transaction_data: tx.to_bytes(),
             },
@@ -45,10 +63,10 @@ impl From<nssa::NSSATransaction> for TransactionBody {
     }
 }
 
-impl TryFrom<&TransactionBody> for nssa::NSSATransaction {
+impl TryFrom<&EncodedTransaction> for NSSATransaction {
     type Error = nssa::error::NssaError;
 
-    fn try_from(value: &TransactionBody) -> Result<Self, Self::Error> {
+    fn try_from(value: &EncodedTransaction) -> Result<Self, Self::Error> {
         match value.tx_kind {
             TxKind::Public => nssa::PublicTransaction::from_bytes(&value.encoded_transaction_data)
                 .map(|tx| tx.into()),
@@ -153,7 +171,7 @@ impl ActionData {
     }
 }
 
-impl TransactionBody {
+impl EncodedTransaction {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
     pub fn hash(&self) -> TreeHashType {
         let bytes_to_hash = self.to_bytes();
@@ -189,11 +207,11 @@ mod tests {
 
     use crate::{
         TreeHashType,
-        transaction::{TransactionBody, TxKind},
+        transaction::{EncodedTransaction, TxKind},
     };
 
-    fn test_transaction_body() -> TransactionBody {
-        TransactionBody {
+    fn test_transaction_body() -> EncodedTransaction {
+        EncodedTransaction {
             tx_kind: TxKind::Public,
             encoded_transaction_data: vec![1, 2, 3, 4],
         }
@@ -219,7 +237,7 @@ mod tests {
         let body = test_transaction_body();
 
         let body_bytes = body.to_bytes();
-        let body_new = TransactionBody::from_bytes(body_bytes);
+        let body_new = EncodedTransaction::from_bytes(body_bytes);
 
         assert_eq!(body, body_new);
     }

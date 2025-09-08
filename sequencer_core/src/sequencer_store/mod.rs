@@ -41,7 +41,6 @@ impl SequecerChainStore {
 
         let hashable_data = HashableBlockData {
             block_id: genesis_id,
-            prev_block_id: genesis_id.saturating_sub(1),
             transactions: vec![],
             prev_block_hash,
             timestamp: curr_time,
