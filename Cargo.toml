@@ -42,6 +42,8 @@ ark-ff = "0.5.0"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 base64 = "0.22.1"
 chrono = "0.4.41"
+bip39 = "2.2.0"
+hmac-sha512 = "1.1.7"
 
 rocksdb = { version = "0.21.0", default-features = false, features = [
   "snappy",

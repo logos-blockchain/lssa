@@ -20,14 +20,14 @@ impl WalletChainStore {
             .collect();
 
         Ok(Self {
-            user_data: NSSAUserData::new_with_accounts(accounts_keys)?,
+            user_data: NSSAUserData::new_with_accounts(accounts_keys, HashMap::new())?,
+            utxo_commitments_store,
             wallet_config: config,
         })
     }
 
     pub(crate) fn insert_account_data(&mut self, acc_data: PersistentAccountData) {
         self.user_data
-            .key_holder
             .pub_account_signing_keys
             .insert(acc_data.address, acc_data.pub_sign_key);
     }

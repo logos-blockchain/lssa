@@ -53,7 +53,7 @@ pub fn fetch_persistent_accounts() -> Result<Vec<PersistentAccountData>> {
 pub fn produce_data_for_storage(user_data: &NSSAUserData) -> Vec<PersistentAccountData> {
     let mut vec_for_storage = vec![];
 
-    for (addr, key) in &user_data.key_holder.pub_account_signing_keys {
+    for (addr, key) in &user_data.pub_account_signing_keys {
         vec_for_storage.push(PersistentAccountData {
             address: *addr,
             pub_sign_key: key.clone(),
