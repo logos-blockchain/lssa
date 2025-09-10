@@ -75,11 +75,7 @@ fn execute_and_prove_program(
 ) -> Result<Receipt, NssaError> {
     // Write inputs to the program
     let mut env_builder = ExecutorEnv::builder();
-    Program::write_inputs(
-        pre_states,
-        instruction_data,
-        &mut env_builder,
-    )?;
+    Program::write_inputs(pre_states, instruction_data, &mut env_builder)?;
     let env = env_builder.build().unwrap();
 
     // Prove the program
@@ -110,6 +106,7 @@ mod tests {
 
     #[test]
     fn prove_privacy_preserving_execution_circuit_public_and_private_pre_accounts() {
+        let recipient_keys = test_private_account_keys_1();
         let program = Program::authenticated_transfer_program();
         let sender = AccountWithMetadata {
             account: Account {
@@ -117,13 +114,13 @@ mod tests {
                 ..Account::default()
             },
             is_authorized: true,
-            fingerprint: [0; 32],
+            fingerprint: FingerPrint::new([0; 32]),
         };
 
         let recipient = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
-            fingerprint: [1; 32],
+            fingerprint: recipient_keys.npk().into(),
         };
 
         let balance_to_move: u128 = 37;
@@ -143,7 +140,6 @@ mod tests {
         };
 
         let expected_sender_pre = sender.clone();
-        let recipient_keys = test_private_account_keys_1();
 
         let esk = [3; 32];
         let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
@@ -181,6 +177,9 @@ mod tests {
 
     #[test]
     fn prove_privacy_preserving_execution_circuit_fully_private() {
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+
         let sender_pre = AccountWithMetadata {
             account: Account {
                 balance: 100,
@@ -188,16 +187,14 @@ mod tests {
                 ..Account::default()
             },
             is_authorized: true,
-            fingerprint: [0; 32],
+            fingerprint: sender_keys.npk().into(),
         };
-        let sender_keys = test_private_account_keys_1();
-        let recipient_keys = test_private_account_keys_2();
         let commitment_sender = Commitment::new(&sender_keys.npk(), &sender_pre.account);
 
         let recipient = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
-            fingerprint: [1; 32],
+            fingerprint: recipient_keys.npk().into(),
         };
         let balance_to_move: u128 = 37;
 

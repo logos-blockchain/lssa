@@ -779,7 +779,7 @@ pub mod tests {
         let sender = AccountWithMetadata {
             account: state.get_account_by_address(&sender_keys.address()),
             is_authorized: true,
-            fingerprint: *sender_keys.address().value(),
+            fingerprint: sender_keys.address().into(),
         };
 
         let sender_nonce = sender.account.nonce;
@@ -787,7 +787,7 @@ pub mod tests {
         let recipient = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
-            fingerprint: recipient_keys.npk().to_byte_array(),
+            fingerprint: recipient_keys.npk().into(),
         };
 
         let esk = [3; 32];
@@ -830,12 +830,12 @@ pub mod tests {
         let sender_pre = AccountWithMetadata {
             account: sender_private_account.clone(),
             is_authorized: true,
-            fingerprint: sender_keys.npk().to_byte_array(),
+            fingerprint: sender_keys.npk().into(),
         };
         let recipient_pre = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
-            fingerprint: recipient_keys.npk().to_byte_array(),
+            fingerprint: recipient_keys.npk().into(),
         };
 
         let esk_1 = [3; 32];
@@ -892,12 +892,12 @@ pub mod tests {
         let sender_pre = AccountWithMetadata {
             account: sender_private_account.clone(),
             is_authorized: true,
-            fingerprint: sender_keys.npk().to_byte_array(),
+            fingerprint: sender_keys.npk().into(),
         };
         let recipient_pre = AccountWithMetadata {
             account: state.get_account_by_address(recipient_address),
             is_authorized: false,
-            fingerprint: *recipient_address.value(),
+            fingerprint: recipient_address.into(),
         };
 
         let esk = [3; 32];

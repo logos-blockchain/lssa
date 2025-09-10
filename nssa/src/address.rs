@@ -1,5 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
+use nssa_core::account::FingerPrint;
 use serde::{Deserialize, Serialize};
 
 use crate::signature::PublicKey;
@@ -80,6 +81,20 @@ impl<'de> Deserialize<'de> for Address {
         Address::from_str(&hex_string).map_err(serde::de::Error::custom)
     }
 }
+
+
+impl From<&Address> for FingerPrint {
+    fn from(address: &Address) -> Self {
+        FingerPrint::new(address.value)
+    }
+}
+
+impl From<Address> for FingerPrint {
+    fn from(address: Address) -> Self {
+        FingerPrint::new(address.value)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

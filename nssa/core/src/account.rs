@@ -1,4 +1,4 @@
-use crate::program::ProgramId;
+use crate::{NullifierPublicKey, program::ProgramId};
 use serde::{Deserialize, Serialize};
 
 pub type Nonce = u128;
@@ -14,7 +14,14 @@ pub struct Account {
     pub nonce: Nonce,
 }
 
-pub type FingerPrint = [u8; 32];
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug))]
+pub struct FingerPrint([u8; 32]);
+impl FingerPrint {
+    pub fn new(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]

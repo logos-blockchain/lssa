@@ -1,12 +1,7 @@
 use risc0_zkvm::{guest::env, serde::to_vec};
 
 use nssa_core::{
-    account::{Account, AccountWithMetadata},
-    compute_digest_for_path,
-    encryption::Ciphertext,
-    program::{validate_execution, ProgramOutput, DEFAULT_PROGRAM_ID},
-    Commitment, CommitmentSetDigest, EncryptionScheme, Nullifier, NullifierPublicKey,
-    PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput,
+    account::{Account, AccountWithMetadata, FingerPrint}, compute_digest_for_path, encryption::Ciphertext, program::{validate_execution, ProgramOutput, DEFAULT_PROGRAM_ID}, Commitment, CommitmentSetDigest, EncryptionScheme, Nullifier, NullifierPublicKey, PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput
 };
 
 fn main() {
@@ -69,6 +64,10 @@ fn main() {
             1 | 2 => {
                 let new_nonce = private_nonces_iter.next().expect("Missing private nonce");
                 let (npk, shared_secret) = private_keys_iter.next().expect("Missing keys");
+
+                if FingerPrint::from(npk) != pre_states[i].fingerprint {
+                    panic!("Fingerprint mismatch");
+                }
 
                 if visibility_mask[i] == 1 {
                     // Private account with authentication

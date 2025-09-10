@@ -40,8 +40,7 @@ impl PrivacyPreservingCircuitOutput {
 mod tests {
     use super::*;
     use crate::{
-        Commitment, Nullifier, NullifierPublicKey,
-        account::{Account, AccountWithMetadata},
+        account::{Account, AccountWithMetadata, FingerPrint}, Commitment, Nullifier, NullifierPublicKey
     };
     use risc0_zkvm::serde::from_slice;
 
@@ -57,7 +56,7 @@ mod tests {
                         nonce: 18446744073709551614,
                     },
                     is_authorized: true, 
-                    fingerprint: [0; 32],
+                    fingerprint: FingerPrint::new([0; 32]),
                 },
                 AccountWithMetadata {
                     account: Account {
@@ -67,7 +66,7 @@ mod tests {
                         nonce: 9999999999999999999999,
                     },
                     is_authorized: false, 
-                    fingerprint: [1; 32],
+                    fingerprint: FingerPrint::new([1; 32]),
                 },
             ],
             public_post_states: vec![Account {

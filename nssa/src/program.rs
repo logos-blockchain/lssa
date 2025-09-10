@@ -77,7 +77,7 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
-    use nssa_core::account::{Account, AccountWithMetadata};
+    use nssa_core::account::{Account, AccountWithMetadata, FingerPrint};
 
     use crate::program::Program;
 
@@ -174,12 +174,12 @@ mod tests {
                 ..Account::default()
             },
             is_authorized: true,
-            fingerprint: [0; 32],
+            fingerprint: FingerPrint::new([0; 32]),
         };
         let recipient = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
-            fingerprint: [1; 32],
+            fingerprint: FingerPrint::new([1; 32]),
         };
 
         let expected_sender_post = Account {
