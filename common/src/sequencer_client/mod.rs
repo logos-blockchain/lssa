@@ -12,6 +12,7 @@ use crate::rpc_primitives::requests::{
     GetTransactionByHashResponse,
 };
 use crate::sequencer_client::json::AccountInitialData;
+use crate::transaction::{EncodedTransaction, NSSATransaction};
 use crate::{SequencerClientError, SequencerRpcError};
 
 pub mod json;
@@ -127,10 +128,12 @@ impl SequencerClient {
     }
 
     ///Send transaction to sequencer
-    pub async fn send_tx(
+    pub async fn send_tx_public(
         &self,
         transaction: nssa::PublicTransaction,
     ) -> Result<SendTxResponse, SequencerClientError> {
+        let transaction = EncodedTransaction::from(NSSATransaction::Public(transaction));
+
         let tx_req = SendTxRequest {
             transaction: transaction.to_bytes(),
         };

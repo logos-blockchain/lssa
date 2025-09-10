@@ -92,7 +92,7 @@ impl RocksDBIO {
         if is_start_set {
             Ok(dbio)
         } else if let Some(block) = start_block {
-            let block_id = block.block_id;
+            let block_id = block.header.block_id;
             dbio.put_meta_first_block_in_db(block)?;
             dbio.put_meta_is_first_block_set()?;
 
@@ -186,7 +186,7 @@ impl RocksDBIO {
             .put_cf(
                 &cf_meta,
                 DB_META_FIRST_BLOCK_IN_DB_KEY.as_bytes(),
-                block.block_id.to_be_bytes(),
+                block.header.block_id.to_be_bytes(),
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
@@ -233,22 +233,22 @@ impl RocksDBIO {
         if !first {
             let last_curr_block = self.get_meta_last_block_in_db()?;
 
-            if block.block_id > last_curr_block {
-                self.put_meta_last_block_in_db(block.block_id)?;
+            if block.header.block_id > last_curr_block {
+                self.put_meta_last_block_in_db(block.header.block_id)?;
             }
         }
 
         self.db
             .put_cf(
                 &cf_block,
-                block.block_id.to_be_bytes(),
+                block.header.block_id.to_be_bytes(),
                 HashableBlockData::from(block).to_bytes(),
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
         Ok(())
     }
 
-    pub fn get_block(&self, block_id: u64) -> DbResult<Block> {
+    pub fn get_block(&self, block_id: u64) -> DbResult<HashableBlockData> {
         let cf_block = self.block_column();
         let res = self
             .db
@@ -256,7 +256,7 @@ impl RocksDBIO {
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
         if let Some(data) = res {
-            Ok(HashableBlockData::from_bytes(&data).into())
+            Ok(HashableBlockData::from_bytes(&data))
         } else {
             Err(DbError::db_interaction_error(
                 "Block on this id not found".to_string(),

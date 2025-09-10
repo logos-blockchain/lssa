@@ -1,3 +1,5 @@
+use std::io::{Cursor, Read};
+
 use nssa_core::{
     MembershipProof, NullifierPublicKey, NullifierSecretKey, PrivacyPreservingCircuitInput,
     PrivacyPreservingCircuitOutput, SharedSecretKey,
@@ -12,7 +14,7 @@ use program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT
 
 /// Proof of the privacy preserving execution circuit
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Proof(Vec<u8>);
+pub struct Proof(pub(super) Vec<u8>);
 
 impl Proof {
     pub(crate) fn is_valid_for(&self, circuit_output: &PrivacyPreservingCircuitOutput) -> bool {
@@ -20,6 +22,35 @@ impl Proof {
         let receipt = Receipt::new(inner, circuit_output.to_bytes());
         receipt.verify(PRIVACY_PRESERVING_CIRCUIT_ID).is_ok()
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let proof_len = self.0.len() as u32;
+        bytes.extend_from_slice(&proof_len.to_le_bytes());
+        bytes.extend_from_slice(&self.0);
+        bytes
+    }
+
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
+        let proof_len = u32_from_cursor(cursor) as usize;
+        let mut proof = Vec::with_capacity(proof_len);
+
+        for _ in 0..proof_len {
+            let mut one_byte_buf = [0u8];
+
+            cursor.read_exact(&mut one_byte_buf)?;
+
+            proof.push(one_byte_buf[0]);
+        }
+        Ok(Self(proof))
+    }
+}
+
+// TODO: Improve error handling. Remove unwraps.
+pub fn u32_from_cursor(cursor: &mut Cursor<&[u8]>) -> u32 {
+    let mut word_buf = [0u8; 4];
+    cursor.read_exact(&mut word_buf).unwrap();
+    u32::from_le_bytes(word_buf)
 }
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution
