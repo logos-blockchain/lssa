@@ -1,7 +1,7 @@
 use nssa_core::{
     MembershipProof, NullifierPublicKey, NullifierSecretKey, PrivacyPreservingCircuitInput,
     PrivacyPreservingCircuitOutput, SharedSecretKey,
-    account::{AccountWithMetadata, FingerPrint},
+    account::AccountWithMetadata,
     program::{InstructionData, ProgramOutput},
 };
 use risc0_zkvm::{ExecutorEnv, InnerReceipt, Receipt, default_prover};
@@ -90,7 +90,7 @@ fn execute_and_prove_program(
 mod tests {
     use nssa_core::{
         Commitment, EncryptionScheme, Nullifier,
-        account::{Account, AccountWithMetadata},
+        account::{Account, AccountWithMetadata, FingerPrint},
     };
 
     use crate::{

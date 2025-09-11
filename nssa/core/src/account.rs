@@ -1,4 +1,4 @@
-use crate::{NullifierPublicKey, program::ProgramId};
+use crate::program::ProgramId;
 use serde::{Deserialize, Serialize};
 
 pub type Nonce = u128;

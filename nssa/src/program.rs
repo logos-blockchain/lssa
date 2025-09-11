@@ -1,5 +1,5 @@
 use nssa_core::{
-    account::{Account, AccountWithMetadata, FingerPrint},
+    account::{Account, AccountWithMetadata},
     program::{InstructionData, ProgramId, ProgramOutput},
 };
 use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID};

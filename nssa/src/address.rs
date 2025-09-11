@@ -82,7 +82,6 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
-
 impl From<&Address> for FingerPrint {
     fn from(address: &Address) -> Self {
         FingerPrint::new(address.value)
@@ -94,7 +93,6 @@ impl From<Address> for FingerPrint {
         FingerPrint::new(address.value)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
