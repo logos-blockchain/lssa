@@ -1,4 +1,4 @@
-use crate::account::{Account, AccountWithMetadata, FingerPrint};
+use crate::account::{Account, AccountWithMetadata};
 use risc0_zkvm::serde::Deserializer;
 use risc0_zkvm::{DeserializeOwned, guest::env};
 use serde::{Deserialize, Serialize};
