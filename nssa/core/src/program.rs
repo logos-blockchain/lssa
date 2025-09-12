@@ -71,8 +71,8 @@ pub fn validate_execution(
 
         // 5. Data changes only allowed if owned by executing program
         if pre.account.data != post.data
-            && (executing_program_id != pre.account.program_owner
-                || executing_program_id != post.program_owner)
+            && (pre.account != Account::default() && (executing_program_id != pre.account.program_owner
+                || executing_program_id != post.program_owner))
         {
             return false;
         }

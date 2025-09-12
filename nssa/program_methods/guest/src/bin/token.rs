@@ -4,11 +4,14 @@ use nssa_core::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-enum Instruction {
-    Transfer(u128),
-    NewDefinition([u8; 6], u128),
-}
+// #[derive(Serialize, Deserialize)]
+// enum Instruction {
+//     Transfer(u128),
+//     NewDefinition([u8; 6], u128),
+// }
+//
+/// [type (1) || amount (16) || name (6)]
+type Instruction = [u8; 23];
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;
 const TOKEN_DEFINITION_SIZE: usize = 23;
@@ -52,8 +55,8 @@ impl TokenHolding {
             None
         } else {
             let account_type = data[0];
-            let definition_id = AccountId::new(data[33..65].try_into().unwrap());
-            let balance = u128::from_le_bytes(data[65..].try_into().unwrap());
+            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
+            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
             Some(Self {
                 definition_id,
                 balance,
@@ -157,10 +160,19 @@ fn main() {
         instruction,
     } = read_nssa_inputs::<Instruction>();
 
-    match instruction {
-        Instruction::Transfer(balance_to_move) => transfer(pre_states, balance_to_move),
-        Instruction::NewDefinition(name, total_supply) => {
+    match instruction[0] {
+        0 => {
+            let total_supply = u128::from_le_bytes(instruction[1..17].try_into().unwrap());
+            let name: [u8; 6] = instruction[17..].try_into().unwrap();
+            assert_ne!(name, [0; 6]);
             new_definition(pre_states, name, total_supply)
         }
+        1 => {
+            let balance_to_move = u128::from_le_bytes(instruction[1..17].try_into().unwrap());
+            let name: [u8; 6] = instruction[17..].try_into().unwrap();
+            assert_eq!(name, [0; 6]);
+            transfer(pre_states, balance_to_move)
+        }
+        _ => panic!("Invalid instruction"),
     };
 }

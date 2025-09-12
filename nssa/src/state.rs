@@ -257,14 +257,14 @@ pub mod tests {
         let addr1 = Address::from(&PublicKey::new_from_private_key(&key1));
         let addr2 = Address::from(&PublicKey::new_from_private_key(&key2));
         let initial_data = [(addr1, 100u128), (addr2, 151u128)];
-        let program = Program::authenticated_transfer_program();
+        let authenticated_transfers_program = Program::authenticated_transfer_program();
         let expected_public_state = {
             let mut this = HashMap::new();
             this.insert(
                 addr1,
                 Account {
                     balance: 100,
-                    program_owner: program.id(),
+                    program_owner: authenticated_transfers_program.id(),
                     ..Account::default()
                 },
             );
@@ -272,7 +272,7 @@ pub mod tests {
                 addr2,
                 Account {
                     balance: 151,
-                    program_owner: program.id(),
+                    program_owner: authenticated_transfers_program.id(),
                     ..Account::default()
                 },
             );
@@ -280,7 +280,11 @@ pub mod tests {
         };
         let expected_builtin_programs = {
             let mut this = HashMap::new();
-            this.insert(program.id(), program);
+            this.insert(
+                authenticated_transfers_program.id(),
+                authenticated_transfers_program,
+            );
+            this.insert(Program::token().id(), Program::token());
             this
         };
 
@@ -660,12 +664,13 @@ pub mod tests {
     #[test]
     fn test_program_should_fail_if_modifies_data_of_non_owned_account() {
         let initial_data = [];
-        let mut state = V01State::new_with_genesis_accounts(&initial_data).with_test_programs();
-        let address = Address::new([1; 32]);
+        let mut state = V01State::new_with_genesis_accounts(&initial_data)
+            .with_test_programs()
+            .with_non_default_accounts_but_default_program_owners();
+        let address = Address::new([255; 32]);
         let program_id = Program::data_changer().id();
 
-        // Consider the extreme case where the target account is the default account
-        assert_eq!(state.get_account_by_address(&address), Account::default());
+        assert_ne!(state.get_account_by_address(&address), Account::default());
         assert_ne!(
             state.get_account_by_address(&address).program_owner,
             program_id

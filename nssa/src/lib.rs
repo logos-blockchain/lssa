@@ -7,6 +7,7 @@ pub mod public_transaction;
 mod signature;
 mod state;
 
+pub use nssa_core::account::Account;
 pub use address::Address;
 pub use nssa_core::account::Account;
 pub use privacy_preserving_transaction::{
