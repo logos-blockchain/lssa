@@ -8,8 +8,8 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::rpc_primitives::requests::{
-    GetAccountsNoncesRequest, GetAccountsNoncesResponse, GetTransactionByHashRequest,
-    GetTransactionByHashResponse,
+    GetAccountsNoncesRequest, GetAccountsNoncesResponse, GetProofByCommitmentRequest,
+    GetProofByCommitmentResponse, GetTransactionByHashRequest, GetTransactionByHashResponse,
 };
 use crate::sequencer_client::json::AccountInitialData;
 use crate::transaction::{EncodedTransaction, NSSATransaction};
@@ -197,6 +197,27 @@ impl SequencerClient {
             .unwrap();
 
         let resp_deser = serde_json::from_value(resp).unwrap();
+
+        Ok(resp_deser)
+    }
+
+    ///Get proof for commitment
+    pub async fn get_proof_for_commitment(
+        &self,
+        commitment: nssa_core::Commitment,
+    ) -> Result<Option<nssa_core::MembershipProof>, SequencerClientError> {
+        let acc_req = GetProofByCommitmentRequest { commitment };
+
+        let req = serde_json::to_value(acc_req).unwrap();
+
+        let resp = self
+            .call_method_with_payload("get_proof_for_commitment", req)
+            .await
+            .unwrap();
+
+        let resp_deser = serde_json::from_value::<GetProofByCommitmentResponse>(resp)
+            .unwrap()
+            .membership_proof;
 
         Ok(resp_deser)
     }

@@ -10,6 +10,8 @@ use common::{
 use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
+use k256::elliptic_curve::group::GroupEncoding;
+use k256::elliptic_curve::sec1::ToEncodedPoint;
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use log::info;
 use nssa::Address;
@@ -176,37 +178,86 @@ impl WalletCore {
                 &[
                     (
                         nssa_core::NullifierPublicKey(from_keys.nullifer_public_key),
-                        shared_secret,
+                        nssa_core::SharedSecretKey(
+                            shared_secret.to_bytes().as_slice().try_into().unwrap(),
+                        ),
                     ),
                     (
                         nssa_core::NullifierPublicKey(to_keys.nullifer_public_key),
-                        shared_secret,
+                        nssa_core::SharedSecretKey(
+                            shared_secret.to_bytes().as_slice().try_into().unwrap(),
+                        ),
                     ),
                 ],
                 &[(
                     from_keys.private_key_holder.nullifier_secret_key,
-                    state.get_proof_for_commitment(&sender_commitment).unwrap(),
+                    self.sequencer_client
+                        .get_proof_for_commitment(sender_commitment)
+                        .await
+                        .unwrap()
+                        .unwrap(),
                 )],
                 &program,
             )
             .unwrap();
 
-            let message = Message::try_from_circuit_output(
-                vec![],
-                vec![],
-                vec![
-                    (sender_keys.npk(), sender_keys.ivk(), epk_1),
-                    (recipient_keys.npk(), recipient_keys.ivk(), epk_2),
-                ],
-                output,
-            )
-            .unwrap();
+            let message =
+                nssa::privacy_preserving_transaction::message::Message::try_from_circuit_output(
+                    vec![],
+                    vec![],
+                    vec![
+                        (
+                            nssa_core::NullifierPublicKey(from_keys.nullifer_public_key),
+                            nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                                from_keys
+                                    .incoming_viewing_public_key
+                                    .to_encoded_point(true)
+                                    .as_bytes()
+                                    .to_vec(),
+                            ),
+                            nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                                eph_holder
+                                    .generate_ephemeral_public_key()
+                                    .to_encoded_point(true)
+                                    .as_bytes()
+                                    .to_vec(),
+                            ),
+                        ),
+                        (
+                            nssa_core::NullifierPublicKey(to_keys.nullifer_public_key),
+                            nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                                to_keys
+                                    .incoming_viewing_public_key
+                                    .to_encoded_point(true)
+                                    .as_bytes()
+                                    .to_vec(),
+                            ),
+                            nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                                eph_holder
+                                    .generate_ephemeral_public_key()
+                                    .to_encoded_point(true)
+                                    .as_bytes()
+                                    .to_vec(),
+                            ),
+                        ),
+                    ],
+                    output,
+                )
+                .unwrap();
 
-            let witness_set = WitnessSet::for_message(&message, proof, &[]);
+            let witness_set =
+                nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
+                    &message,
+                    proof,
+                    &[],
+                );
 
-            let tx = PrivacyPreservingTransaction::new(message, witness_set);
+            let tx = nssa::privacy_preserving_transaction::PrivacyPreservingTransaction::new(
+                message,
+                witness_set,
+            );
 
-            Ok(self.sequencer_client.send_tx_public(tx).await?)
+            Ok(self.sequencer_client.send_tx_private(tx).await?)
         } else {
             Err(ExecutionFailureKind::InsufficientFundsError)
         }
@@ -231,7 +282,7 @@ impl WalletCore {
     }
 
     ///Poll transactions
-    pub async fn poll_public_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
+    pub async fn poll_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
         let transaction_encoded = self.poller.poll_tx(hash).await?;
         let tx_base64_decode =
             base64::engine::general_purpose::STANDARD.decode(transaction_encoded)?;
@@ -246,7 +297,23 @@ impl WalletCore {
 #[clap(about)]
 pub enum Command {
     ///Send native token transfer from `from` to `to` for `amount`
-    SendNativeTokenTransfer {
+    ///
+    /// Public operation
+    SendNativeTokenTransferPublic {
+        ///from - valid 32 byte hex string
+        #[arg(long)]
+        from: String,
+        ///to - valid 32 byte hex string
+        #[arg(long)]
+        to: String,
+        ///amount - amount of balance to move
+        #[arg(long)]
+        amount: u128,
+    },
+    ///Send native token transfer from `from` to `to` for `amount`
+    ///
+    /// Private operation
+    SendNativeTokenTransferPrivate {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -292,7 +359,7 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
     let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config)?;
 
     match command {
-        Command::SendNativeTokenTransfer { from, to, amount } => {
+        Command::SendNativeTokenTransferPublic { from, to, amount } => {
             let from = produce_account_addr_from_hex(from)?;
             let to = produce_account_addr_from_hex(to)?;
 
@@ -302,9 +369,21 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
 
             info!("Results of tx send is {res:#?}");
 
-            let transfer_tx = wallet_core
-                .poll_public_native_token_transfer(res.tx_hash)
+            let transfer_tx = wallet_core.poll_native_token_transfer(res.tx_hash).await?;
+
+            info!("Transaction data is {transfer_tx:?}");
+        }
+        Command::SendNativeTokenTransferPrivate { from, to, amount } => {
+            let from = produce_account_addr_from_hex(from)?;
+            let to = produce_account_addr_from_hex(to)?;
+
+            let res = wallet_core
+                .send_private_native_token_transfer(from, to, amount)
                 .await?;
+
+            info!("Results of tx send is {res:#?}");
+
+            let transfer_tx = wallet_core.poll_native_token_transfer(res.tx_hash).await?;
 
             info!("Transaction data is {transfer_tx:?}");
         }

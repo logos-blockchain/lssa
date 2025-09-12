@@ -14,6 +14,7 @@ tempfile.workspace = true
 clap.workspace = true
 nssa-core = { path = "../nssa/core" }
 base64.workspace = true
+k256 = { version = "0.13.3" }
 
 [dependencies.key_protocol]
 path = "../key_protocol"

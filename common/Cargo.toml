@@ -16,6 +16,7 @@ sha2.workspace = true
 log.workspace = true
 elliptic-curve.workspace = true
 hex.workspace = true
+nssa-core = { path = "../nssa/core", features = ["host"] }
 
 [dependencies.secp256k1-zkp]
 workspace = true

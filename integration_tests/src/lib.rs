@@ -82,7 +82,7 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
 }
 
 pub async fn test_success() {
-    let command = Command::SendNativeTokenTransfer {
+    let command = Command::SendNativeTokenTransferPublic {
         from: ACC_SENDER.to_string(),
         to: ACC_RECEIVER.to_string(),
         amount: 100,
@@ -141,7 +141,7 @@ pub async fn test_success_move_to_another_account() {
         panic!("Failed to produce new account, not present in persistent accounts");
     }
 
-    let command = Command::SendNativeTokenTransfer {
+    let command = Command::SendNativeTokenTransferPublic {
         from: ACC_SENDER.to_string(),
         to: new_persistent_account_addr.clone(),
         amount: 100,
@@ -172,7 +172,7 @@ pub async fn test_success_move_to_another_account() {
 }
 
 pub async fn test_failure() {
-    let command = Command::SendNativeTokenTransfer {
+    let command = Command::SendNativeTokenTransferPublic {
         from: ACC_SENDER.to_string(),
         to: ACC_RECEIVER.to_string(),
         amount: 1000000,
@@ -209,7 +209,7 @@ pub async fn test_failure() {
 }
 
 pub async fn test_success_two_transactions() {
-    let command = Command::SendNativeTokenTransfer {
+    let command = Command::SendNativeTokenTransferPublic {
         from: ACC_SENDER.to_string(),
         to: ACC_RECEIVER.to_string(),
         amount: 100,
@@ -242,7 +242,7 @@ pub async fn test_success_two_transactions() {
 
     info!("First TX Success!");
 
-    let command = Command::SendNativeTokenTransfer {
+    let command = Command::SendNativeTokenTransferPublic {
         from: ACC_SENDER.to_string(),
         to: ACC_RECEIVER.to_string(),
         amount: 100,

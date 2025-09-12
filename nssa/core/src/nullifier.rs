@@ -5,7 +5,7 @@ use crate::Commitment;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, Clone, Hash))]
-pub struct NullifierPublicKey(pub(super) [u8; 32]);
+pub struct NullifierPublicKey(pub [u8; 32]);
 
 impl From<&NullifierSecretKey> for NullifierPublicKey {
     fn from(value: &NullifierSecretKey) -> Self {

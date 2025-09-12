@@ -53,6 +53,11 @@ pub struct GetAccountDataRequest {
     pub address: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetProofByCommitmentRequest {
+    pub commitment: nssa_core::Commitment,
+}
+
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -64,6 +69,7 @@ parse_request!(GetAccountBalanceRequest);
 parse_request!(GetTransactionByHashRequest);
 parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetAccountDataRequest);
+parse_request!(GetProofByCommitmentRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -117,4 +123,9 @@ pub struct GetAccountDataResponse {
     pub nonce: u128,
     pub program_owner: [u32; 8],
     pub data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetProofByCommitmentResponse {
+    pub membership_proof: Option<nssa_core::MembershipProof>,
 }

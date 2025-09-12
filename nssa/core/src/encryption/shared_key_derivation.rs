@@ -11,7 +11,7 @@ use k256::{
 use crate::SharedSecretKey;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct Secp256k1Point(pub(crate) Vec<u8>);
+pub struct Secp256k1Point(pub Vec<u8>);
 
 impl Secp256k1Point {
     pub fn from_scalar(value: [u8; 32]) -> Secp256k1Point {

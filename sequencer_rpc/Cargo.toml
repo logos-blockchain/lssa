@@ -12,6 +12,7 @@ actix-cors.workspace = true
 futures.workspace = true
 hex.workspace = true
 tempfile.workspace = true
+nssa-core = { path = "../nssa/core", features = ["host"] }
 base64.workspace = true
 
 actix-web.workspace = true

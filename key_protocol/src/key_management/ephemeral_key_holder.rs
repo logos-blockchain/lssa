@@ -37,9 +37,9 @@ impl EphemeralKeyHolder {
 
     pub fn calculate_shared_secret_sender(
         &self,
-        receiver_incoming_viewing_public_key: Scalar,
-    ) -> Scalar {
-        receiver_incoming_viewing_public_key * self.ephemeral_secret_key
+        receiver_incoming_viewing_public_key: AffinePoint,
+    ) -> AffinePoint {
+        (receiver_incoming_viewing_public_key * self.ephemeral_secret_key).into()
     }
 
     pub fn log(&self) {

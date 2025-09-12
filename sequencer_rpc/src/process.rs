@@ -14,7 +14,8 @@ use common::{
         requests::{
             GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountDataRequest,
             GetAccountDataResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-            GetInitialTestnetAccountsRequest, GetTransactionByHashRequest,
+            GetInitialTestnetAccountsRequest, GetProofByCommitmentRequest,
+            GetProofByCommitmentResponse, GetTransactionByHashRequest,
             GetTransactionByHashResponse,
         },
     },
@@ -38,6 +39,7 @@ pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
 pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
 pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT_DATA: &str = "get_account_data";
+pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -255,6 +257,21 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
+    /// Returns the commitment proof, corresponding to commitment
+    async fn process_get_proof_by_commitment(&self, request: Request) -> Result<Value, RpcErr> {
+        let get_proof_req = GetProofByCommitmentRequest::parse(Some(request.params))?;
+
+        let membership_proof = {
+            let state = self.sequencer_state.lock().await;
+            state
+                .store
+                .state
+                .get_proof_for_commitment(&get_proof_req.commitment)
+        };
+        let helperstruct = GetProofByCommitmentResponse { membership_proof };
+        respond(helperstruct)
+    }
+
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -267,6 +284,7 @@ impl JsonHandler {
             GET_ACCOUNTS_NONCES => self.process_get_accounts_nonces(request).await,
             GET_ACCOUNT_DATA => self.process_get_account_data(request).await,
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
+            GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
