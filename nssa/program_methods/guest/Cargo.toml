@@ -8,3 +8,4 @@ edition = "2024"
 [dependencies]
 risc0-zkvm = { version = "3.0.3", default-features = false, features = ['std'] }
 nssa-core = { path = "../../core" }
+serde = { version = "1.0.219", default-features = false }

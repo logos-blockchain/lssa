@@ -86,6 +86,7 @@ impl V01State {
         };
 
         this.insert_program(Program::authenticated_transfer_program());
+        this.insert_program(Program::token());
 
         this
     }

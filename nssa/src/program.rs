@@ -2,7 +2,7 @@ use nssa_core::{
     account::{Account, AccountWithMetadata},
     program::{InstructionData, ProgramId, ProgramOutput},
 };
-use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID};
+use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID, TOKEN_ELF, TOKEN_ID};
 use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, default_executor, serde::to_vec};
 use serde::Serialize;
 
@@ -71,6 +71,13 @@ impl Program {
         Self {
             id: AUTHENTICATED_TRANSFER_ID,
             elf: AUTHENTICATED_TRANSFER_ELF,
+        }
+    }
+
+    pub fn token() -> Self {
+        Self {
+            id: TOKEN_ID,
+            elf: TOKEN_ELF,
         }
     }
 }

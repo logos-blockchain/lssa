@@ -2,7 +2,7 @@ use crate::program::ProgramId;
 use serde::{Deserialize, Serialize};
 
 pub type Nonce = u128;
-type Data = Vec<u8>;
+pub type Data = Vec<u8>;
 
 /// Account to be used both in public and private contexts
 #[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -18,7 +18,7 @@ pub struct Account {
 /// is public, or a `NullifierPublicKey` in case the account is private.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[cfg_attr(any(feature = "host", test), derive(Debug))]
-pub struct AccountId([u8; 32]);
+pub struct AccountId(pub(super) [u8; 32]);
 impl AccountId {
     pub fn new(value: [u8; 32]) -> Self {
         Self(value)

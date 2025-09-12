@@ -7,6 +7,7 @@ use std::io::Read;
 
 use crate::account::Account;
 
+use crate::account::AccountId;
 #[cfg(feature = "host")]
 use crate::encryption::shared_key_derivation::Secp256k1Point;
 
@@ -134,6 +135,12 @@ impl Secp256k1Point {
         let mut value = vec![0; 33];
         cursor.read_exact(&mut value)?;
         Ok(Self(value))
+    }
+}
+
+impl AccountId {
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0
     }
 }
 
