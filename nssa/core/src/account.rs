@@ -18,8 +18,8 @@ pub struct Account {
 /// is public, or a `NullifierPublicKey` in case the account is private.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[cfg_attr(any(feature = "host", test), derive(Debug))]
-pub struct FingerPrint([u8; 32]);
-impl FingerPrint {
+pub struct AccountId([u8; 32]);
+impl AccountId {
     pub fn new(value: [u8; 32]) -> Self {
         Self(value)
     }
@@ -30,16 +30,16 @@ impl FingerPrint {
 pub struct AccountWithMetadata {
     pub account: Account,
     pub is_authorized: bool,
-    pub fingerprint: FingerPrint,
+    pub account_id: AccountId,
 }
 
 #[cfg(feature = "host")]
 impl AccountWithMetadata {
-    pub fn new(account: Account, is_authorized: bool, fingerprint: impl Into<FingerPrint>) -> Self {
+    pub fn new(account: Account, is_authorized: bool, account_id: impl Into<AccountId>) -> Self {
         Self {
             account,
             is_authorized,
-            fingerprint: fingerprint.into(),
+            account_id: account_id.into(),
         }
     }
 }
@@ -86,11 +86,11 @@ mod tests {
             data: b"testing_account_with_metadata_constructor".to_vec(),
             nonce: 0xdeadbeef,
         };
-        let fingerprint = FingerPrint::new([8; 32]);
+        let fingerprint = AccountId::new([8; 32]);
         let new_acc_with_metadata =
             AccountWithMetadata::new(account.clone(), true, fingerprint.clone());
         assert_eq!(new_acc_with_metadata.account, account);
         assert!(new_acc_with_metadata.is_authorized);
-        assert_eq!(new_acc_with_metadata.fingerprint, fingerprint);
+        assert_eq!(new_acc_with_metadata.account_id, fingerprint);
     }
 }

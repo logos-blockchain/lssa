@@ -90,7 +90,7 @@ fn execute_and_prove_program(
 mod tests {
     use nssa_core::{
         Commitment, EncryptionScheme, Nullifier,
-        account::{Account, AccountWithMetadata, FingerPrint},
+        account::{Account, AccountWithMetadata, AccountId},
     };
 
     use crate::{
@@ -114,13 +114,13 @@ mod tests {
                 ..Account::default()
             },
             true,
-            FingerPrint::new([0; 32]),
+            AccountId::new([0; 32]),
         );
 
         let recipient = AccountWithMetadata::new(
             Account::default(),
             false,
-            FingerPrint::from(&recipient_keys.npk()),
+            AccountId::from(&recipient_keys.npk()),
         );
 
         let balance_to_move: u128 = 37;
@@ -187,14 +187,14 @@ mod tests {
                 ..Account::default()
             },
             true,
-            FingerPrint::from(&sender_keys.npk()),
+            AccountId::from(&sender_keys.npk()),
         );
         let commitment_sender = Commitment::new(&sender_keys.npk(), &sender_pre.account);
 
         let recipient = AccountWithMetadata::new(
             Account::default(),
             false,
-            FingerPrint::from(&recipient_keys.npk()),
+            AccountId::from(&recipient_keys.npk()),
         );
         let balance_to_move: u128 = 37;
 

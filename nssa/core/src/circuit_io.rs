@@ -41,7 +41,7 @@ mod tests {
     use super::*;
     use crate::{
         Commitment, Nullifier, NullifierPublicKey,
-        account::{Account, AccountWithMetadata, FingerPrint},
+        account::{Account, AccountWithMetadata, AccountId},
     };
     use risc0_zkvm::serde::from_slice;
 
@@ -57,7 +57,7 @@ mod tests {
                         nonce: 18446744073709551614,
                     },
                     true,
-                    FingerPrint::new([0; 32]),
+                    AccountId::new([0; 32]),
                 ),
                 AccountWithMetadata::new(
                     Account {
@@ -67,7 +67,7 @@ mod tests {
                         nonce: 9999999999999999999999,
                     },
                     false,
-                    FingerPrint::new([1; 32]),
+                    AccountId::new([1; 32]),
                 ),
             ],
             public_post_states: vec![Account {

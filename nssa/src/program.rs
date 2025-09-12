@@ -77,7 +77,7 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
-    use nssa_core::account::{Account, AccountWithMetadata, FingerPrint};
+    use nssa_core::account::{Account, AccountWithMetadata, AccountId};
 
     use crate::program::Program;
 
@@ -174,10 +174,10 @@ mod tests {
                 ..Account::default()
             },
             true,
-            FingerPrint::new([0; 32]),
+            AccountId::new([0; 32]),
         );
         let recipient =
-            AccountWithMetadata::new(Account::default(), false, FingerPrint::new([1; 32]));
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
 
         let expected_sender_post = Account {
             balance: 77665544332211 - balance_to_move,

@@ -1,15 +1,15 @@
 use risc0_zkvm::sha::{Impl, Sha256};
 use serde::{Deserialize, Serialize};
 
-use crate::{Commitment, account::FingerPrint};
+use crate::{Commitment, account::AccountId};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, Clone, Hash))]
 pub struct NullifierPublicKey(pub(super) [u8; 32]);
 
-impl From<&NullifierPublicKey> for FingerPrint {
+impl From<&NullifierPublicKey> for AccountId {
     fn from(value: &NullifierPublicKey) -> Self {
-        FingerPrint::new(value.0)
+        AccountId::new(value.0)
     }
 }
 

@@ -1,6 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
-use nssa_core::account::FingerPrint;
+use nssa_core::account::AccountId;
 use serde::{Deserialize, Serialize};
 
 use crate::signature::PublicKey;
@@ -82,9 +82,9 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
-impl From<&Address> for FingerPrint {
+impl From<&Address> for AccountId {
     fn from(address: &Address) -> Self {
-        FingerPrint::new(address.value)
+        AccountId::new(address.value)
     }
 }
 
