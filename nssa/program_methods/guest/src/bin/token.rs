@@ -2,14 +2,7 @@ use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata, Data},
     program::{ProgramInput, read_nssa_inputs, write_nssa_outputs},
 };
-use serde::{Deserialize, Serialize};
 
-// #[derive(Serialize, Deserialize)]
-// enum Instruction {
-//     Transfer(u128),
-//     NewDefinition([u8; 6], u128),
-// }
-//
 /// [type (1) || amount (16) || name (6)]
 type Instruction = [u8; 23];
 
