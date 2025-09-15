@@ -3,14 +3,27 @@ use nssa_core::{
     program::{ProgramInput, read_nssa_inputs, write_nssa_outputs},
 };
 
-/// [type (1) || amount (16) || name (6)]
-type Instruction = [u8; 23];
+// The token program has two functions:
+// 1. New token definition.
+//    Arguments to this function are:
+//      * Two **default** accounts: [definition_account, holding_account].
+//        The first default account  will be populated with the token definition account values. The second account will
+//        be set to a token holding account for the new token, holding the entire total supply.
+//      * An instruction data of 23-bytes, indicating the total supply and the token name, with
+//        the following layout:
+//        [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
+//        The name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+// 2. Token transfer
+//    Arguments to this function are:
+//      * Two accounts: [sender_account, recipient_account].
+//      * An instruction data byte string of length 23, indicating the total supply and the token name, with the following layout
+//        [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;
-const TOKEN_DEFINITION_SIZE: usize = 23;
+const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
 
 const TOKEN_HOLDING_TYPE: u8 = 1;
-const TOKEN_HOLDING_SIZE: usize = 49;
+const TOKEN_HOLDING_DATA_SIZE: usize = 49;
 
 struct TokenDefinition {
     account_type: u8,
@@ -26,7 +39,7 @@ struct TokenHolding {
 
 impl TokenDefinition {
     fn into_data(self) -> Vec<u8> {
-        let mut bytes = [0; TOKEN_DEFINITION_SIZE];
+        let mut bytes = [0; TOKEN_DEFINITION_DATA_SIZE];
         bytes[0] = self.account_type;
         bytes[1..7].copy_from_slice(&self.name);
         bytes[7..].copy_from_slice(&self.total_supply.to_le_bytes());
@@ -44,7 +57,7 @@ impl TokenHolding {
     }
 
     fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != TOKEN_HOLDING_SIZE && data[0] != TOKEN_HOLDING_TYPE {
+        if data.len() != TOKEN_HOLDING_DATA_SIZE && data[0] != TOKEN_HOLDING_TYPE {
             None
         } else {
             let account_type = data[0];
@@ -59,7 +72,7 @@ impl TokenHolding {
     }
 
     fn into_data(self) -> Data {
-        let mut bytes = [0; TOKEN_HOLDING_SIZE];
+        let mut bytes = [0; TOKEN_HOLDING_DATA_SIZE];
         bytes[0] = self.account_type;
         bytes[1..33].copy_from_slice(&self.definition_id.to_bytes());
         bytes[33..].copy_from_slice(&self.balance.to_le_bytes());
@@ -146,6 +159,8 @@ fn new_definition(pre_states: Vec<AccountWithMetadata>, name: [u8; 6], total_sup
         vec![definition_target_account_post, holding_target_account_post],
     );
 }
+
+type Instruction = [u8; 23];
 
 fn main() {
     let ProgramInput {

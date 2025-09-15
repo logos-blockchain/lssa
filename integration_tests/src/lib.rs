@@ -172,6 +172,47 @@ pub async fn test_success_move_to_another_account() {
     info!("Success!");
 }
 
+pub async fn test_success_token_program() {
+    let wallet_config = fetch_config().unwrap();
+
+    wallet::execute_subcommand(Command::RegisterAccount {})
+        .await
+        .unwrap();
+    wallet::execute_subcommand(Command::RegisterAccount {})
+        .await
+        .unwrap();
+    wallet::execute_subcommand(Command::RegisterAccount {})
+        .await
+        .unwrap();
+
+    let persistent_accounts = fetch_persistent_accounts().unwrap();
+
+    let mut new_persistent_accounts_addr = Vec::new();
+
+    for per_acc in persistent_accounts {
+        if (per_acc.address.to_string() != ACC_RECEIVER)
+            && (per_acc.address.to_string() != ACC_SENDER)
+        {
+            new_persistent_accounts_addr.push(per_acc.address.to_string());
+        }
+    }
+
+    let [definition_addr, supply_addr, other_addr] = new_persistent_accounts_addr
+        .try_into()
+        .expect("Failed to produce new account, not present in persistent accounts");
+
+    let command = Command::NewTokenDefinition {
+        definition_addr,
+        supply_addr,
+        name: "name".to_string(),
+        total_supply: 37,
+    };
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+}
+
 pub async fn test_failure() {
     let command = Command::SendNativeTokenTransfer {
         from: ACC_SENDER.to_string(),
