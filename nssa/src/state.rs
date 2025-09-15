@@ -227,6 +227,7 @@ pub mod tests {
         signature::PrivateKey,
     };
 
+    use k256::{Scalar, elliptic_curve::PrimeField};
     use nssa_core::{
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
         account::{Account, AccountWithMetadata, Nonce},
@@ -743,7 +744,7 @@ pub mod tests {
 
     pub struct TestPrivateKeys {
         pub nsk: NullifierSecretKey,
-        pub isk: [u8; 32],
+        pub isk: Scalar,
     }
 
     impl TestPrivateKeys {
@@ -759,14 +760,14 @@ pub mod tests {
     pub fn test_private_account_keys_1() -> TestPrivateKeys {
         TestPrivateKeys {
             nsk: [13; 32],
-            isk: [31; 32],
+            isk: Scalar::from_repr([31; 32].into()).unwrap(),
         }
     }
 
     pub fn test_private_account_keys_2() -> TestPrivateKeys {
         TestPrivateKeys {
             nsk: [38; 32],
-            isk: [83; 32],
+            isk: Scalar::from_repr([83; 32].into()).unwrap(),
         }
     }
 
@@ -788,7 +789,7 @@ pub mod tests {
             is_authorized: false,
         };
 
-        let esk = [3; 32];
+        let esk = Scalar::from_repr([3; 32].into()).unwrap();
         let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
         let epk = EphemeralPublicKey::from_scalar(esk);
 
@@ -834,11 +835,11 @@ pub mod tests {
             is_authorized: false,
         };
 
-        let esk_1 = [3; 32];
+        let esk_1 = Scalar::from_repr([3; 32].into()).unwrap();
         let shared_secret_1 = SharedSecretKey::new(&esk_1, &sender_keys.ivk());
         let epk_1 = EphemeralPublicKey::from_scalar(esk_1);
 
-        let esk_2 = [3; 32];
+        let esk_2 = Scalar::from_repr([3; 32].into()).unwrap();
         let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.ivk());
         let epk_2 = EphemeralPublicKey::from_scalar(esk_2);
 
@@ -894,7 +895,7 @@ pub mod tests {
             is_authorized: false,
         };
 
-        let esk = [3; 32];
+        let esk = Scalar::from_repr([3; 32].into()).unwrap();
         let shared_secret = SharedSecretKey::new(&esk, &sender_keys.ivk());
         let epk = EphemeralPublicKey::from_scalar(esk);
 

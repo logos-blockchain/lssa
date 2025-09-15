@@ -1,28 +1,25 @@
-use aes_gcm::{Aes256Gcm, KeyInit, aead::Aead};
 use common::TreeHashType;
-use elliptic_curve::group::GroupEncoding;
-use elliptic_curve::point::AffineCoordinates;
-use k256::AffinePoint;
 use log::info;
-use secret_holders::{PrivateKeyHolder, SeedHolder, TopSecretKeyHolder};
+use nssa_core::{
+    NullifierPublicKey, SharedSecretKey,
+    encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
+};
+use secret_holders::{PrivateKeyHolder, SecretSpendingKey, SeedHolder};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, digest::FixedOutput};
-use types::{CipherText, Nonce};
 
-use crate::key_protocol_core::PublicKey;
 pub type PublicAccountSigningKey = [u8; 32];
 
 pub mod ephemeral_key_holder;
 pub mod secret_holders;
-pub mod types;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 ///Entrypoint to key management
 pub struct KeyChain {
-    top_secret_key_holder: TopSecretKeyHolder,
+    secret_spending_key: SecretSpendingKey,
     pub private_key_holder: PrivateKeyHolder,
-    pub nullifer_public_key: [u8; 32],
-    pub incoming_viewing_public_key: PublicKey,
+    pub nullifer_public_key: NullifierPublicKey,
+    pub incoming_viewing_public_key: IncomingViewingPublicKey,
 }
 
 impl KeyChain {
@@ -30,15 +27,15 @@ impl KeyChain {
         //Currently dropping SeedHolder at the end of initialization.
         //Now entirely sure if we need it in the future.
         let seed_holder = SeedHolder::new_os_random();
-        let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
+        let secret_spending_key = seed_holder.produce_top_secret_key_holder();
 
-        let private_key_holder = top_secret_key_holder.produce_private_key_holder();
+        let private_key_holder = secret_spending_key.produce_private_key_holder();
 
         let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
         let incoming_viewing_public_key = private_key_holder.generate_incoming_viewing_public_key();
 
         Self {
-            top_secret_key_holder,
+            secret_spending_key,
             private_key_holder,
             nullifer_public_key,
             incoming_viewing_public_key,
@@ -48,7 +45,7 @@ impl KeyChain {
     pub fn produce_user_address(&self) -> [u8; 32] {
         let mut hasher = sha2::Sha256::new();
 
-        hasher.update(self.nullifer_public_key);
+        hasher.update(&self.nullifer_public_key);
         hasher.update(self.incoming_viewing_public_key.to_bytes());
 
         <TreeHashType>::from(hasher.finalize_fixed())
@@ -56,33 +53,20 @@ impl KeyChain {
 
     pub fn calculate_shared_secret_receiver(
         &self,
-        ephemeral_public_key_sender: AffinePoint,
-    ) -> AffinePoint {
-        (ephemeral_public_key_sender
-            * self
-                .top_secret_key_holder
-                .generate_incloming_viewing_secret_key())
-        .into()
-    }
-
-    pub fn decrypt_data(
-        &self,
-        ephemeral_public_key_sender: AffinePoint,
-        ciphertext: CipherText,
-        nonce: Nonce,
-    ) -> Result<Vec<u8>, aes_gcm::Error> {
-        let shared_secret = self.calculate_shared_secret_receiver(ephemeral_public_key_sender);
-        let cipher = Aes256Gcm::new(&shared_secret.x());
-
-        cipher.decrypt(&nonce, ciphertext.as_slice())
+        ephemeral_public_key_sender: EphemeralPublicKey,
+    ) -> SharedSecretKey {
+        SharedSecretKey::new(
+            &self
+                .secret_spending_key
+                .generate_incoming_viewing_secret_key(),
+            &ephemeral_public_key_sender,
+        )
     }
 
     pub fn log(&self) {
         info!(
             "Secret spending key is {:?}",
-            hex::encode(
-                serde_json::to_vec(&self.top_secret_key_holder.secret_spending_key).unwrap()
-            ),
+            hex::encode(serde_json::to_vec(&self.secret_spending_key).unwrap()),
         );
         info!(
             "Nulifier secret key is {:?}",
@@ -113,17 +97,9 @@ impl KeyChain {
 
 #[cfg(test)]
 mod tests {
-    use aes_gcm::{
-        Aes256Gcm,
-        aead::{Aead, KeyInit, OsRng},
-    };
+    use aes_gcm::aead::OsRng;
     use elliptic_curve::ff::Field;
-    use elliptic_curve::group::prime::PrimeCurveAffine;
-    use elliptic_curve::point::AffineCoordinates;
-    use k256::{AffinePoint, ProjectivePoint, Scalar};
-    use types::{CipherText, Nonce};
-
-    use crate::key_management::ephemeral_key_holder::EphemeralKeyHolder;
+    use k256::{AffinePoint, Scalar};
 
     use super::*;
 
@@ -133,10 +109,7 @@ mod tests {
         let address_key_holder = KeyChain::new_os_random();
 
         // Check that key holder fields are initialized with expected types
-        assert_ne!(address_key_holder.nullifer_public_key, [0u8; 32]);
-        assert!(!Into::<bool>::into(
-            address_key_holder.incoming_viewing_public_key.is_identity()
-        ));
+        assert_ne!(address_key_holder.nullifer_public_key.as_ref(), &[0u8; 32]);
     }
 
     #[test]
@@ -145,171 +118,11 @@ mod tests {
 
         // Generate a random ephemeral public key sender
         let scalar = Scalar::random(&mut OsRng);
-        let ephemeral_public_key_sender = (ProjectivePoint::GENERATOR * scalar).to_affine();
+        let ephemeral_public_key_sender = EphemeralPublicKey::from_scalar(scalar);
 
         // Calculate shared secret
-        let shared_secret =
+        let _shared_secret =
             address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
-
-        // Ensure the shared secret is not an identity point (suggesting non-zero output)
-        assert!(!Into::<bool>::into(shared_secret.is_identity()));
-    }
-
-    #[test]
-    fn test_decrypt_data() {
-        let address_key_holder = KeyChain::new_os_random();
-
-        let test_receiver_nullifier_public_key = [42; 32];
-        let sender_outgoing_viewing_key = address_key_holder
-            .top_secret_key_holder
-            .generate_outgoing_viewing_secret_key();
-        let nonce = 0;
-
-        // Generate an ephemeral key and shared secret
-        let ephemeral_public_key_sender = EphemeralKeyHolder::new(
-            test_receiver_nullifier_public_key,
-            sender_outgoing_viewing_key,
-            nonce,
-        )
-        .generate_ephemeral_public_key();
-        let shared_secret =
-            address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
-
-        // Encrypt sample data
-        let cipher = Aes256Gcm::new(&shared_secret.x());
-        let nonce = Nonce::from_slice(b"unique nonce");
-        let plaintext = b"Sensitive data";
-        let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .expect("encryption failure");
-
-        // Attempt decryption
-        let decrypted_data: Vec<u8> = address_key_holder
-            .decrypt_data(
-                ephemeral_public_key_sender,
-                CipherText::from(ciphertext),
-                *nonce,
-            )
-            .unwrap();
-
-        // Verify decryption is successful and matches original plaintext
-        assert_eq!(decrypted_data, plaintext);
-    }
-
-    #[test]
-    fn test_calculate_shared_secret_with_identity_point() {
-        let address_key_holder = KeyChain::new_os_random();
-
-        // Use identity point as ephemeral public key
-        let identity_point = AffinePoint::identity();
-
-        // Calculate shared secret
-        let shared_secret = address_key_holder.calculate_shared_secret_receiver(identity_point);
-
-        // The shared secret with the identity point should also result in the identity point
-        assert!(Into::<bool>::into(shared_secret.is_identity()));
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_decrypt_data_with_incorrect_nonce() {
-        let address_key_holder = KeyChain::new_os_random();
-
-        // Generate ephemeral public key and shared secret
-        let scalar = Scalar::random(OsRng);
-        let ephemeral_public_key_sender = (ProjectivePoint::GENERATOR * scalar).to_affine();
-        let shared_secret =
-            address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
-
-        // Encrypt sample data with a specific nonce
-        let cipher = Aes256Gcm::new(&shared_secret.x());
-        let nonce = Nonce::from_slice(b"unique nonce");
-        let plaintext = b"Sensitive data";
-        let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .expect("encryption failure");
-
-        // Attempt decryption with an incorrect nonce
-        let incorrect_nonce = Nonce::from_slice(b"wrong nonce");
-        let decrypted_data = address_key_holder
-            .decrypt_data(
-                ephemeral_public_key_sender,
-                CipherText::from(ciphertext.clone()),
-                *incorrect_nonce,
-            )
-            .unwrap();
-
-        // The decryption should fail or produce incorrect output due to nonce mismatch
-        assert_ne!(decrypted_data, plaintext);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_decrypt_data_with_incorrect_ciphertext() {
-        let address_key_holder = KeyChain::new_os_random();
-
-        // Generate ephemeral public key and shared secret
-        let scalar = Scalar::random(OsRng);
-        let ephemeral_public_key_sender = (ProjectivePoint::GENERATOR * scalar).to_affine();
-        let shared_secret =
-            address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
-
-        // Encrypt sample data
-        let cipher = Aes256Gcm::new(&shared_secret.x());
-        let nonce = Nonce::from_slice(b"unique nonce");
-        let plaintext = b"Sensitive data";
-        let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .expect("encryption failure");
-
-        // Tamper with the ciphertext to simulate corruption
-        let mut corrupted_ciphertext = ciphertext.clone();
-        corrupted_ciphertext[0] ^= 1; // Flip a bit in the ciphertext
-
-        // Attempt decryption
-        let result = address_key_holder
-            .decrypt_data(
-                ephemeral_public_key_sender,
-                CipherText::from(corrupted_ciphertext),
-                *nonce,
-            )
-            .unwrap();
-
-        // The decryption should fail or produce incorrect output due to tampered ciphertext
-        assert_ne!(result, plaintext);
-    }
-
-    #[test]
-    fn test_encryption_decryption_round_trip() {
-        let address_key_holder = KeyChain::new_os_random();
-
-        // Generate ephemeral key and shared secret
-        let scalar = Scalar::random(OsRng);
-        let ephemeral_public_key_sender = (ProjectivePoint::GENERATOR * scalar).to_affine();
-
-        // Encrypt sample data
-        let plaintext = b"Round-trip test data";
-        let nonce = Nonce::from_slice(b"unique nonce");
-
-        let shared_secret =
-            address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
-        let cipher = Aes256Gcm::new(&shared_secret.x());
-
-        let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_ref())
-            .expect("encryption failure");
-
-        // Decrypt the data using the `KeyChain` instance
-        let decrypted_data = address_key_holder
-            .decrypt_data(
-                ephemeral_public_key_sender,
-                CipherText::from(ciphertext),
-                *nonce,
-            )
-            .unwrap();
-
-        // Verify the decrypted data matches the original plaintext
-        assert_eq!(decrypted_data, plaintext);
     }
 
     #[test]

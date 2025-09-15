@@ -88,6 +88,7 @@ impl Proof {
 
 #[cfg(test)]
 mod tests {
+    use k256::{Scalar, elliptic_curve::PrimeField};
     use nssa_core::{
         Commitment, EncryptionScheme, Nullifier,
         account::{Account, AccountWithMetadata},
@@ -139,7 +140,7 @@ mod tests {
         let expected_sender_pre = sender.clone();
         let recipient_keys = test_private_account_keys_1();
 
-        let esk = [3; 32];
+        let esk = Scalar::from_repr([3; 32].into()).unwrap();
         let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
 
         let (output, proof) = execute_and_prove(
@@ -220,10 +221,10 @@ mod tests {
             Commitment::new(&recipient_keys.npk(), &expected_private_account_2),
         ];
 
-        let esk_1 = [3; 32];
+        let esk_1 = Scalar::from_repr([3; 32].into()).unwrap();
         let shared_secret_1 = SharedSecretKey::new(&esk_1, &sender_keys.ivk());
 
-        let esk_2 = [5; 32];
+        let esk_2 = Scalar::from_repr([5; 32].into()).unwrap();
         let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.ivk());
 
         let (output, proof) = execute_and_prove(

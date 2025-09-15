@@ -17,6 +17,7 @@ aes-gcm.workspace = true
 lazy_static.workspace = true
 bip39.workspace = true
 hmac-sha512.workspace = true
+nssa-core = { path = "../nssa/core", features = ["host"] }
 
 [dependencies.common]
 path = "../common"

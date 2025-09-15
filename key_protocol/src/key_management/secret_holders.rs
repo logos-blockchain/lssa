@@ -1,7 +1,8 @@
 use bip39::Mnemonic;
 use common::TreeHashType;
 use elliptic_curve::PrimeField;
-use k256::{AffinePoint, Scalar};
+use k256::Scalar;
+use nssa_core::{NullifierPublicKey, NullifierSecretKey, encryption::IncomingViewingPublicKey};
 use rand::{RngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, digest::FixedOutput};
@@ -15,17 +16,18 @@ pub struct SeedHolder {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-///Secret spending key holder. Produces `PrivateKeyHolder` objects.
-pub struct TopSecretKeyHolder {
-    pub(crate) secret_spending_key: [u8; 32],
-}
+///Secret spending key object. Can produce `PrivateKeyHolder` objects.
+pub struct SecretSpendingKey(pub(crate) [u8; 32]);
+
+pub type IncomingViewingSecretKey = Scalar;
+pub type OutgoingViewingSecretKey = Scalar;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 ///Private key holder. Produces public keys. Can produce address. Can produce shared secret for recepient.
 pub struct PrivateKeyHolder {
-    pub(crate) nullifier_secret_key: [u8; 32],
-    pub(crate) incoming_viewing_secret_key: Scalar,
-    pub(crate) outgoing_viewing_secret_key: Scalar,
+    pub(crate) nullifier_secret_key: NullifierSecretKey,
+    pub(crate) incoming_viewing_secret_key: IncomingViewingSecretKey,
+    pub(crate) outgoing_viewing_secret_key: OutgoingViewingSecretKey,
 }
 
 impl SeedHolder {
@@ -52,74 +54,65 @@ impl SeedHolder {
         *hash.first_chunk::<32>().unwrap()
     }
 
-    pub fn produce_top_secret_key_holder(&self) -> TopSecretKeyHolder {
-        TopSecretKeyHolder {
-            secret_spending_key: self.generate_secret_spending_key_hash(),
-        }
+    pub fn produce_top_secret_key_holder(&self) -> SecretSpendingKey {
+        SecretSpendingKey(self.generate_secret_spending_key_hash())
     }
 }
 
-impl TopSecretKeyHolder {
-    pub fn generate_nullifier_secret_key(&self) -> [u8; 32] {
+impl SecretSpendingKey {
+    pub fn generate_nullifier_secret_key(&self) -> NullifierSecretKey {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update("NSSA_keys");
-        hasher.update(self.secret_spending_key);
+        hasher.update(self.0);
         hasher.update([1u8]);
-        hasher.update([0u8; 176]);
+        hasher.update([0u8; 22]);
 
-        <TreeHashType>::from(hasher.finalize_fixed())
+        <NullifierSecretKey>::from(hasher.finalize_fixed())
     }
 
-    pub fn generate_incloming_viewing_secret_key(&self) -> Scalar {
+    pub fn generate_incoming_viewing_secret_key(&self) -> IncomingViewingSecretKey {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update("NSSA_keys");
-        hasher.update(self.secret_spending_key);
+        hasher.update(self.0);
         hasher.update([2u8]);
-        hasher.update([0u8; 176]);
+        hasher.update([0u8; 22]);
 
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
-        Scalar::from_repr(hash.into()).unwrap()
+        IncomingViewingSecretKey::from_repr(hash.into()).unwrap()
     }
 
-    pub fn generate_outgoing_viewing_secret_key(&self) -> Scalar {
+    pub fn generate_outgoing_viewing_secret_key(&self) -> OutgoingViewingSecretKey {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update("NSSA_keys");
-        hasher.update(self.secret_spending_key);
+        hasher.update(self.0);
         hasher.update([3u8]);
-        hasher.update([0u8; 176]);
+        hasher.update([0u8; 22]);
 
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
-        Scalar::from_repr(hash.into()).unwrap()
+        OutgoingViewingSecretKey::from_repr(hash.into()).unwrap()
     }
 
     pub fn produce_private_key_holder(&self) -> PrivateKeyHolder {
         PrivateKeyHolder {
             nullifier_secret_key: self.generate_nullifier_secret_key(),
-            incoming_viewing_secret_key: self.generate_incloming_viewing_secret_key(),
+            incoming_viewing_secret_key: self.generate_incoming_viewing_secret_key(),
             outgoing_viewing_secret_key: self.generate_outgoing_viewing_secret_key(),
         }
     }
 }
 
 impl PrivateKeyHolder {
-    pub fn generate_nullifier_public_key(&self) -> [u8; 32] {
-        let mut hasher = sha2::Sha256::new();
-
-        hasher.update("NSSA_keys");
-        hasher.update(self.nullifier_secret_key);
-        hasher.update([7u8]);
-        hasher.update([0u8; 176]);
-
-        <TreeHashType>::from(hasher.finalize_fixed())
+    pub fn generate_nullifier_public_key(&self) -> NullifierPublicKey {
+        (&self.nullifier_secret_key).into()
     }
 
-    pub fn generate_incoming_viewing_public_key(&self) -> AffinePoint {
-        (AffinePoint::GENERATOR * self.incoming_viewing_secret_key).into()
+    pub fn generate_incoming_viewing_public_key(&self) -> IncomingViewingPublicKey {
+        IncomingViewingPublicKey::from_scalar(self.incoming_viewing_secret_key)
     }
 }
 
@@ -151,7 +144,7 @@ mod tests {
 
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let _ = top_secret_key_holder.generate_incloming_viewing_secret_key();
+        let _ = top_secret_key_holder.generate_incoming_viewing_secret_key();
     }
 
     #[test]
