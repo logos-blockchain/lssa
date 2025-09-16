@@ -2623,6 +2623,7 @@ dependencies = [
  "borsh",
  "hex",
  "hex-literal 1.0.0",
+ "k256",
  "nssa-core",
  "program-methods",
  "rand 0.8.5",

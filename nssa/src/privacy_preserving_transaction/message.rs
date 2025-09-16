@@ -90,6 +90,7 @@ impl Message {
 
 #[cfg(test)]
 pub mod tests {
+    use k256::{Scalar, elliptic_curve::PrimeField};
     use std::io::Cursor;
 
     use nssa_core::{
@@ -151,10 +152,10 @@ pub mod tests {
     #[test]
     fn test_encrypted_account_data_constructor() {
         let npk = NullifierPublicKey::from(&[1; 32]);
-        let ivk = IncomingViewingPublicKey::from(&[2; 32]);
+        let ivk = IncomingViewingPublicKey::from(&Scalar::from_repr([2; 32].into()).unwrap());
         let account = Account::default();
         let commitment = Commitment::new(&npk, &account);
-        let esk = [3; 32];
+        let esk = Scalar::from_repr([3; 32].into()).unwrap();
         let shared_secret = SharedSecretKey::new(&esk, &ivk);
         let epk = EphemeralPublicKey::from_scalar(esk);
         let ciphertext = EncryptionScheme::encrypt(&account, &shared_secret, &commitment, 2);
