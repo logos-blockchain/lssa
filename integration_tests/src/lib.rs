@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::Parser;
 use common::sequencer_client::SequencerClient;
 use log::{info, warn};
+use nssa::program::Program;
 use sequencer_core::config::SequencerConfig;
 use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
@@ -272,6 +273,36 @@ pub async fn test_success_two_transactions() {
     info!("Second TX Success!");
 }
 
+pub async fn test_get_account_wallet_command() {
+    let command = Command::GetAccount {
+        addr: ACC_SENDER.to_string(),
+    };
+
+    let wallet_config = fetch_config().unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    info!("Checking correct account");
+    let account = seq_client
+        .get_account(ACC_SENDER.to_string())
+        .await
+        .unwrap()
+        .account;
+
+    assert_eq!(
+        account.program_owner,
+        Program::authenticated_transfer_program().id()
+    );
+    assert_eq!(account.balance, 10000);
+    assert!(account.data.is_empty());
+    assert_eq!(account.nonce, 0);
+}
+
 macro_rules! test_cleanup_wrap {
     ($home_dir:ident, $test_func:ident) => {{
         let res = pre_test($home_dir.clone()).await.unwrap();
@@ -304,6 +335,9 @@ pub async fn main_tests_runner() -> Result<()> {
         "test_failure" => {
             test_cleanup_wrap!(home_dir, test_failure);
         }
+        "test_get_account_wallet_command" => {
+            test_cleanup_wrap!(home_dir, test_get_account_wallet_command);
+        }
         "test_success_two_transactions" => {
             test_cleanup_wrap!(home_dir, test_success_two_transactions);
         }
@@ -312,6 +346,7 @@ pub async fn main_tests_runner() -> Result<()> {
             test_cleanup_wrap!(home_dir, test_success);
             test_cleanup_wrap!(home_dir, test_failure);
             test_cleanup_wrap!(home_dir, test_success_two_transactions);
+            test_cleanup_wrap!(home_dir, test_get_account_wallet_command);
         }
         _ => {
             anyhow::bail!("Unknown test name");

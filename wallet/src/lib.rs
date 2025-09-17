@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, path::PathBuf, str::FromStr, sync::Arc};
 
-use base64::Engine;
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use common::{
     ExecutionFailureKind,
     sequencer_client::{SequencerClient, json::SendTxResponse},
@@ -18,8 +18,8 @@ use nssa_core::account::Account;
 
 use crate::{
     helperfunctions::{
-        fetch_config, fetch_persistent_accounts, get_home, produce_account_addr_from_hex,
-        produce_data_for_storage,
+        HumanReadableAccount, fetch_config, fetch_persistent_accounts, get_home,
+        produce_account_addr_from_hex, produce_data_for_storage,
     },
     poller::TxPoller,
 };
@@ -147,11 +147,16 @@ impl WalletCore {
             .nonces)
     }
 
+    ///Get account
+    pub async fn get_account(&self, addr: Address) -> Result<Account> {
+        let response = self.sequencer_client.get_account(addr.to_string()).await?;
+        Ok(response.account)
+    }
+
     ///Poll transactions
     pub async fn poll_public_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
         let transaction_encoded = self.poller.poll_tx(hash).await?;
-        let tx_base64_decode =
-            base64::engine::general_purpose::STANDARD.decode(transaction_encoded)?;
+        let tx_base64_decode = BASE64.decode(transaction_encoded)?;
         let pub_tx = EncodedTransaction::from_bytes(tx_base64_decode);
 
         Ok(NSSATransaction::try_from(&pub_tx)?)
@@ -191,6 +196,11 @@ pub enum Command {
         #[arg(short, long)]
         addr: String,
     },
+    ///Get account at address `addr`
+    GetAccount {
+        #[arg(short, long)]
+        addr: String,
+    },
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -215,24 +225,19 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
                 .send_public_native_token_transfer(from, to, amount)
                 .await?;
 
-            info!("Results of tx send is {res:#?}");
+            println!("Results of tx send is {res:#?}");
 
             let transfer_tx = wallet_core
                 .poll_public_native_token_transfer(res.tx_hash)
                 .await?;
 
-            info!("Transaction data is {transfer_tx:?}");
+            println!("Transaction data is {transfer_tx:?}");
         }
         Command::RegisterAccount {} => {
             let addr = wallet_core.create_new_account();
+            wallet_core.store_persistent_accounts()?;
 
-            let key = wallet_core
-                .storage
-                .user_data
-                .get_pub_account_signing_key(&addr);
-
-            info!("Generated new account with addr {addr:#?}");
-            info!("With key {key:#?}");
+            println!("Generated new account with addr {addr}");
         }
         Command::FetchTx { tx_hash } => {
             let tx_obj = wallet_core
@@ -240,23 +245,26 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
                 .get_transaction_by_hash(tx_hash)
                 .await?;
 
-            info!("Transaction object {tx_obj:#?}");
+            println!("Transaction object {tx_obj:#?}");
         }
         Command::GetAccountBalance { addr } => {
             let addr = Address::from_str(&addr)?;
 
             let balance = wallet_core.get_account_balance(addr).await?;
-            info!("Accounts {addr:#?} balance is {balance}");
+            println!("Accounts {addr} balance is {balance}");
         }
         Command::GetAccountNonce { addr } => {
             let addr = Address::from_str(&addr)?;
 
             let nonce = wallet_core.get_accounts_nonces(vec![addr]).await?[0];
-            info!("Accounts {addr:#?} nonce is {nonce}");
+            println!("Accounts {addr} nonce is {nonce}");
+        }
+        Command::GetAccount { addr } => {
+            let addr: Address = addr.parse()?;
+            let account: HumanReadableAccount = wallet_core.get_account(addr).await?.into();
+            println!("{}", serde_json::to_string(&account).unwrap());
         }
     }
-
-    wallet_core.store_persistent_accounts()?;
 
     Ok(())
 }

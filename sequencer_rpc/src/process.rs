@@ -12,8 +12,8 @@ use common::{
         message::{Message, Request},
         parser::RpcRequest,
         requests::{
-            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountDataRequest,
-            GetAccountDataResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
+            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
+            GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
             GetInitialTestnetAccountsRequest, GetTransactionByHashRequest,
             GetTransactionByHashResponse,
         },
@@ -37,7 +37,7 @@ pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
 pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
 pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
-pub const GET_ACCOUNT_DATA: &str = "get_account_data";
+pub const GET_ACCOUNT: &str = "get_account";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -204,10 +204,10 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
-    ///Returns account struct for give address.
+    /// Returns account struct for given address.
     /// Address must be a valid hex string of the correct length.
-    async fn process_get_account_data(&self, request: Request) -> Result<Value, RpcErr> {
-        let get_account_nonces_req = GetAccountDataRequest::parse(Some(request.params))?;
+    async fn process_get_account(&self, request: Request) -> Result<Value, RpcErr> {
+        let get_account_nonces_req = GetAccountRequest::parse(Some(request.params))?;
 
         let address = get_account_nonces_req
             .address
@@ -220,12 +220,7 @@ impl JsonHandler {
             state.store.state.get_account_by_address(&address)
         };
 
-        let helperstruct = GetAccountDataResponse {
-            balance: account.balance,
-            nonce: account.nonce,
-            program_owner: account.program_owner,
-            data: account.data,
-        };
+        let helperstruct = GetAccountResponse { account };
 
         respond(helperstruct)
     }
@@ -265,7 +260,7 @@ impl JsonHandler {
             GET_INITIAL_TESTNET_ACCOUNTS => self.get_initial_testnet_accounts(request).await,
             GET_ACCOUNT_BALANCE => self.process_get_account_balance(request).await,
             GET_ACCOUNTS_NONCES => self.process_get_accounts_nonces(request).await,
-            GET_ACCOUNT_DATA => self.process_get_account_data(request).await,
+            GET_ACCOUNT => self.process_get_account(request).await,
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
@@ -534,7 +529,7 @@ mod tests {
         let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
-            "method": "get_account_data",
+            "method": "get_account",
             "params": { "address": "efac".repeat(16) },
             "id": 1
         });
@@ -542,10 +537,12 @@ mod tests {
             "id": 1,
             "jsonrpc": "2.0",
             "result": {
-                "balance": 0,
-                "nonce": 0,
-                "program_owner": [ 0, 0, 0, 0, 0, 0, 0, 0],
-                "data": [],
+                "account": {
+                    "balance": 0,
+                    "nonce": 0,
+                    "program_owner": [ 0, 0, 0, 0, 0, 0, 0, 0],
+                    "data": [],
+                }
             }
         });
 
