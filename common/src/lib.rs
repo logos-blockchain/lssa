@@ -1,10 +1,10 @@
-use merkle_tree_public::TreeHashType;
+use rs_merkle::Hasher;
 use serde::Deserialize;
+use sha2::{Digest, Sha256, digest::FixedOutput};
 
 pub mod block;
 pub mod commitment;
 pub mod execution_input;
-pub mod merkle_tree_public;
 pub mod nullifier;
 pub mod rpc_primitives;
 pub mod sequencer_client;
@@ -15,6 +15,25 @@ pub mod utxo_commitment;
 pub mod test_utils;
 
 use rpc_primitives::errors::RpcError;
+
+pub type TreeHashType = [u8; 32];
+pub type CommitmentHashType = Vec<u8>;
+
+#[derive(Debug, Clone)]
+///Our own hasher.
+/// Currently it is SHA256 hasher wrapper. May change in a future.
+pub struct OwnHasher {}
+
+impl Hasher for OwnHasher {
+    type Hash = TreeHashType;
+
+    fn hash(data: &[u8]) -> TreeHashType {
+        let mut hasher = Sha256::new();
+
+        hasher.update(data);
+        <TreeHashType>::from(hasher.finalize_fixed())
+    }
+}
 
 ///Account id on blockchain
 pub type AccountId = TreeHashType;

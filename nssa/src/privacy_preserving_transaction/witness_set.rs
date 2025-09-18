@@ -5,8 +5,8 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WitnessSet {
-    pub(super) signatures_and_public_keys: Vec<(Signature, PublicKey)>,
-    pub(super) proof: Proof,
+    pub(crate) signatures_and_public_keys: Vec<(Signature, PublicKey)>,
+    pub(crate) proof: Proof,
 }
 
 impl WitnessSet {

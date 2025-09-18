@@ -7,16 +7,20 @@ use nssa_core::{
 };
 
 use crate::{
-    Address, error::NssaError, privacy_preserving_transaction::message::EncryptedAccountData,
+    Address, PrivacyPreservingTransaction, PublicKey, Signature,
+    error::NssaError,
+    privacy_preserving_transaction::{
+        circuit::Proof,
+        message::{EncryptedAccountData, Message},
+        witness_set::WitnessSet,
+    },
 };
-
-use super::message::Message;
 
 const MESSAGE_ENCODING_PREFIX_LEN: usize = 22;
 const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] = b"\x01/NSSA/v0.1/TxMessage/";
 
 impl EncryptedAccountData {
-    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = self.ciphertext.to_bytes();
         bytes.extend_from_slice(&self.epk.to_bytes());
         bytes.push(self.view_tag);
@@ -167,4 +171,87 @@ impl Message {
             new_nullifiers,
         })
     }
+}
+
+impl WitnessSet {
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let size = self.signatures_and_public_keys().len() as u32;
+        bytes.extend_from_slice(&size.to_le_bytes());
+        for (signature, public_key) in self.signatures_and_public_keys() {
+            bytes.extend_from_slice(signature.to_bytes());
+            bytes.extend_from_slice(public_key.to_bytes());
+        }
+        bytes.extend_from_slice(&self.proof.to_bytes());
+        bytes
+    }
+
+    pub(crate) fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
+        let num_signatures: u32 = {
+            let mut buf = [0u8; 4];
+            cursor.read_exact(&mut buf)?;
+            u32::from_le_bytes(buf)
+        };
+        let mut signatures_and_public_keys = Vec::with_capacity(num_signatures as usize);
+        for _i in 0..num_signatures {
+            let signature = Signature::from_cursor(cursor)?;
+            let public_key = PublicKey::from_cursor(cursor)?;
+            signatures_and_public_keys.push((signature, public_key))
+        }
+        let proof = Proof::from_cursor(cursor)?;
+        Ok(Self {
+            signatures_and_public_keys,
+            proof,
+        })
+    }
+}
+
+impl PrivacyPreservingTransaction {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = self.message().to_bytes();
+        bytes.extend_from_slice(&self.witness_set().to_bytes());
+        bytes
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, NssaError> {
+        let mut cursor = Cursor::new(bytes);
+        Self::from_cursor(&mut cursor)
+    }
+
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
+        let message = Message::from_cursor(cursor)?;
+        let witness_set = WitnessSet::from_cursor(cursor)?;
+        Ok(PrivacyPreservingTransaction::new(message, witness_set))
+    }
+}
+
+impl Proof {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let proof_len = self.0.len() as u32;
+        bytes.extend_from_slice(&proof_len.to_le_bytes());
+        bytes.extend_from_slice(&self.0);
+        bytes
+    }
+
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
+        let proof_len = u32_from_cursor(cursor) as usize;
+        let mut proof = Vec::with_capacity(proof_len);
+
+        for _ in 0..proof_len {
+            let mut one_byte_buf = [0u8];
+
+            cursor.read_exact(&mut one_byte_buf)?;
+
+            proof.push(one_byte_buf[0]);
+        }
+        Ok(Self(proof))
+    }
+}
+
+// TODO: Improve error handling. Remove unwraps.
+pub fn u32_from_cursor(cursor: &mut Cursor<&[u8]>) -> u32 {
+    let mut word_buf = [0u8; 4];
+    cursor.read_exact(&mut word_buf).unwrap();
+    u32::from_le_bytes(word_buf)
 }

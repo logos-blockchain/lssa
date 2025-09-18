@@ -170,3 +170,42 @@ fn n_unique<T: Eq + Hash>(data: &[T]) -> usize {
     let set: HashSet<&T> = data.iter().collect();
     set.len()
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Address, PrivacyPreservingTransaction, PrivateKey, PublicKey,
+        privacy_preserving_transaction::{
+            circuit::Proof, message::tests::message_for_tests, witness_set::WitnessSet,
+        },
+    };
+
+    fn keys_for_tests() -> (PrivateKey, PrivateKey, Address, Address) {
+        let key1 = PrivateKey::try_new([1; 32]).unwrap();
+        let key2 = PrivateKey::try_new([2; 32]).unwrap();
+        let addr1 = Address::from(&PublicKey::new_from_private_key(&key1));
+        let addr2 = Address::from(&PublicKey::new_from_private_key(&key2));
+        (key1, key2, addr1, addr2)
+    }
+
+    fn proof_for_tests() -> Proof {
+        Proof(vec![1, 2, 3, 4, 5])
+    }
+
+    fn transaction_for_tests() -> PrivacyPreservingTransaction {
+        let (key1, key2, _, _) = keys_for_tests();
+
+        let message = message_for_tests();
+
+        let witness_set = WitnessSet::for_message(&message, proof_for_tests(), &[&key1, &key2]);
+        PrivacyPreservingTransaction::new(message, witness_set)
+    }
+
+    #[test]
+    fn test_privacy_preserving_transaction_encoding_bytes_roundtrip() {
+        let tx = transaction_for_tests();
+        let bytes = tx.to_bytes();
+        let tx_from_bytes = PrivacyPreservingTransaction::from_bytes(&bytes).unwrap();
+        assert_eq!(tx, tx_from_bytes);
+    }
+}

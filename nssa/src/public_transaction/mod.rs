@@ -1,4 +1,3 @@
-mod encoding;
 mod message;
 mod transaction;
 mod witness_set;

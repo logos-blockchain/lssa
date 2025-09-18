@@ -27,4 +27,6 @@ pub struct SequencerConfig {
     pub port: u16,
     ///List of initial accounts data
     pub initial_accounts: Vec<AccountInitialData>,
+    ///Sequencer own signing key
+    pub signing_key: [u8; 32],
 }

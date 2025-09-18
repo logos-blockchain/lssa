@@ -145,12 +145,6 @@ impl V01State {
             *current_account = post;
         }
 
-        // // 5. Increment nonces
-        for address in tx.signer_addresses() {
-            let current_account = self.get_account_by_address_mut(address);
-            current_account.nonce += 1;
-        }
-
         Ok(())
     }
 
@@ -219,6 +213,7 @@ pub mod tests {
     use crate::{
         Address, PublicKey, PublicTransaction, V01State,
         error::NssaError,
+        execute_and_prove,
         privacy_preserving_transaction::{
             PrivacyPreservingTransaction, circuit, message::Message, witness_set::WitnessSet,
         },
@@ -229,7 +224,7 @@ pub mod tests {
 
     use nssa_core::{
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
-        account::{Account, AccountWithMetadata, Nonce},
+        account::{Account, AccountId, AccountWithMetadata, Nonce},
         encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
     };
 
@@ -934,6 +929,13 @@ pub mod tests {
             &state,
         );
 
+        let expected_sender_post = {
+            let mut this = state.get_account_by_address(&sender_keys.address());
+            this.balance -= balance_to_move;
+            this.nonce += 1;
+            this
+        };
+
         let [expected_new_commitment] = tx.message().new_commitments.clone().try_into().unwrap();
         assert!(!state.private_state.0.contains(&expected_new_commitment));
 
@@ -941,6 +943,8 @@ pub mod tests {
             .transition_from_privacy_preserving_transaction(&tx)
             .unwrap();
 
+        let sender_post = state.get_account_by_address(&sender_keys.address());
+        assert_eq!(sender_post, expected_sender_post);
         assert!(state.private_state.0.contains(&expected_new_commitment));
 
         assert_eq!(
@@ -1033,6 +1037,12 @@ pub mod tests {
 
         let balance_to_move = 37;
 
+        let expected_recipient_post = {
+            let mut this = state.get_account_by_address(&recipient_keys.address());
+            this.balance += balance_to_move;
+            this
+        };
+
         let tx = deshielded_balance_transfer_for_tests(
             &sender_keys,
             &sender_private_account,
@@ -1063,6 +1073,8 @@ pub mod tests {
             .transition_from_privacy_preserving_transaction(&tx)
             .unwrap();
 
+        let recipient_post = state.get_account_by_address(&recipient_keys.address());
+        assert_eq!(recipient_post, expected_recipient_post);
         assert!(state.private_state.0.contains(&sender_pre_commitment));
         assert!(state.private_state.0.contains(&expected_new_commitment));
         assert!(state.private_state.1.contains(&expected_new_nullifier));
@@ -1072,5 +1084,824 @@ pub mod tests {
                 .balance,
             recipient_initial_balance + balance_to_move
         );
+    }
+
+    #[test]
+    fn test_burner_program_should_fail_in_privacy_preserving_circuit() {
+        let program = Program::burner();
+        let public_account = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_minter_program_should_fail_in_privacy_preserving_circuit() {
+        let program = Program::minter();
+        let public_account = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_nonce_changer_program_should_fail_in_privacy_preserving_circuit() {
+        let program = Program::nonce_changer_program();
+        let public_account = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account],
+            &Program::serialize_instruction(()).unwrap(),
+            &[0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_data_changer_program_should_fail_for_non_owned_account_in_privacy_preserving_circuit() {
+        let program = Program::data_changer();
+        let public_account = AccountWithMetadata::new(
+            Account {
+                program_owner: [0, 1, 2, 3, 4, 5, 6, 7],
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account],
+            &Program::serialize_instruction(()).unwrap(),
+            &[0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_extra_output_program_should_fail_in_privacy_preserving_circuit() {
+        let program = Program::extra_output_program();
+        let public_account = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account],
+            &Program::serialize_instruction(()).unwrap(),
+            &[0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_missing_output_program_should_fail_in_privacy_preserving_circuit() {
+        let program = Program::missing_output_program();
+        let public_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let public_account_2 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([1; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account_1, public_account_2],
+            &Program::serialize_instruction(()).unwrap(),
+            &[0, 0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_program_owner_changer_should_fail_in_privacy_preserving_circuit() {
+        let program = Program::program_owner_changer();
+        let public_account = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account],
+            &Program::serialize_instruction(()).unwrap(),
+            &[0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_transfer_from_non_owned_account_should_fail_in_privacy_preserving_circuit() {
+        let program = Program::simple_balance_transfer();
+        let public_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: [0, 1, 2, 3, 4, 5, 6, 7],
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let public_account_2 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([1; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[public_account_1, public_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[0, 0],
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_fails_if_visibility_masks_have_incorrect_lenght() {
+        let program = Program::simple_balance_transfer();
+        let public_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let public_account_2 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([1; 32]),
+        );
+
+        // Setting only one visibility mask for a circuit execution with two pre_state accounts.
+        let visibility_mask = [0];
+        let result = execute_and_prove(
+            &[public_account_1, public_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &visibility_mask,
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_fails_if_insufficient_nonces_are_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        // Setting only one nonce for an execution with two private accounts.
+        let private_account_nonces = [0xdeadbeef1];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &private_account_nonces,
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_fails_if_insufficient_keys_are_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        // Setting only one key for an execution with two private accounts.
+        let private_account_keys = [(
+            sender_keys.npk(),
+            SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+        )];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &private_account_keys,
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_fails_if_insufficient_auth_keys_are_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        // Setting no auth key for an execution with one non default private accounts.
+        let private_account_auth = [];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &private_account_auth,
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_fails_if_invalid_auth_keys_are_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        let private_account_keys = [
+            // First private account is the sender
+            (
+                sender_keys.npk(),
+                SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+            ),
+            // Second private account is the recipient
+            (
+                recipient_keys.npk(),
+                SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+            ),
+        ];
+        let private_account_auth = [
+            // Setting the recipient key to authorize the sender.
+            // This should be set to the sender private account in
+            // a normal circumstance. The recipient can't authorize this.
+            (recipient_keys.nsk, (0, vec![])),
+        ];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &private_account_keys,
+            &private_account_auth,
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_if_new_private_account_with_non_default_balance_is_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 = AccountWithMetadata::new(
+            Account {
+                // Non default balance
+                balance: 1,
+                ..Account::default()
+            },
+            false,
+            AccountId::new([1; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_if_new_private_account_with_non_default_program_owner_is_provided()
+    {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 = AccountWithMetadata::new(
+            Account {
+                // Non default program_owner
+                program_owner: [0, 1, 2, 3, 4, 5, 6, 7],
+                ..Account::default()
+            },
+            false,
+            AccountId::new([1; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_if_new_private_account_with_non_default_data_is_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 = AccountWithMetadata::new(
+            Account {
+                // Non default data
+                data: b"hola mundo".to_vec(),
+                ..Account::default()
+            },
+            false,
+            AccountId::new([1; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_if_new_private_account_with_non_default_nonce_is_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 = AccountWithMetadata::new(
+            Account {
+                // Non default nonce
+                nonce: 0xdeadbeef,
+                ..Account::default()
+            },
+            false,
+            AccountId::new([1; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_if_new_private_account_is_provided_with_default_values_but_marked_as_authorized()
+     {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 = AccountWithMetadata::new(
+            Account::default(),
+            // This should be set to false in normal circumstances
+            true,
+            AccountId::new([1; 32]),
+        );
+
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_with_invalid_visibility_mask_value() {
+        let program = Program::simple_balance_transfer();
+        let public_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let public_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        let visibility_mask = [0, 3];
+        let result = execute_and_prove(
+            &[public_account_1, public_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &visibility_mask,
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_with_too_many_nonces() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        // Setting three new private account nonces for a circuit execution with only two private
+        // accounts.
+        let private_account_nonces = [0xdeadbeef1, 0xdeadbeef2, 0xdeadbeef3];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &private_account_nonces,
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_with_too_many_private_account_keys() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        // Setting three private account keys for a circuit execution with only two private
+        // accounts.
+        let private_account_keys = [
+            (
+                sender_keys.npk(),
+                SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+            ),
+            (
+                recipient_keys.npk(),
+                SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+            ),
+            (
+                sender_keys.npk(),
+                SharedSecretKey::new(&[57; 32], &sender_keys.ivk()),
+            ),
+        ];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &private_account_keys,
+            &[(sender_keys.nsk, (0, vec![]))],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_should_fail_with_too_many_private_account_auth_keys() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            AccountId::new([0; 32]),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
+
+        // Setting two private account keys for a circuit execution with only one non default
+        // private account (visibility mask equal to 1 means that auth keys are expected).
+        let visibility_mask = [1, 2];
+        let private_account_auth = [
+            (sender_keys.nsk, (0, vec![])),
+            (recipient_keys.nsk, (1, vec![])),
+        ];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &visibility_mask,
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &private_account_auth,
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
     }
 }

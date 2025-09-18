@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::merkle_tree_public::CommitmentHashType;
+use crate::CommitmentHashType;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct Commitment {

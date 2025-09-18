@@ -77,7 +77,9 @@ pub async fn main_runner() -> Result<()> {
     }
 
     //ToDo: Add restart on failures
-    let (_, _) = startup_sequencer(app_config).await?;
+    let (_, main_loop_handle) = startup_sequencer(app_config).await?;
+
+    main_loop_handle.await??;
 
     Ok(())
 }

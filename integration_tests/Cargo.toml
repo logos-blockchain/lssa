@@ -29,3 +29,6 @@ path = "../wallet"
 
 [dependencies.common]
 path = "../common"
+
+[dependencies.nssa]
+path = "../nssa"

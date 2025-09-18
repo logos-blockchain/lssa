@@ -2,7 +2,7 @@ use crate::{PrivateKey, PublicKey, Signature, public_transaction::Message};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WitnessSet {
-    pub(super) signatures_and_public_keys: Vec<(Signature, PublicKey)>,
+    pub(crate) signatures_and_public_keys: Vec<(Signature, PublicKey)>,
 }
 
 impl WitnessSet {

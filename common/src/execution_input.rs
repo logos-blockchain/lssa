@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::merkle_tree_public::TreeHashType;
+use crate::TreeHashType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicNativeTokenSend {

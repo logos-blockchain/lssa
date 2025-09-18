@@ -12,15 +12,7 @@ use program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT
 
 /// Proof of the privacy preserving execution circuit
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Proof(Vec<u8>);
-
-impl Proof {
-    pub(crate) fn is_valid_for(&self, circuit_output: &PrivacyPreservingCircuitOutput) -> bool {
-        let inner: InnerReceipt = borsh::from_slice(&self.0).unwrap();
-        let receipt = Receipt::new(inner, circuit_output.to_bytes());
-        receipt.verify(PRIVACY_PRESERVING_CIRCUIT_ID).is_ok()
-    }
-}
+pub struct Proof(pub(crate) Vec<u8>);
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution
 /// circuit
@@ -55,7 +47,9 @@ pub fn execute_and_prove(
     env_builder.write(&circuit_input).unwrap();
     let env = env_builder.build().unwrap();
     let prover = default_prover();
-    let prove_info = prover.prove(env, PRIVACY_PRESERVING_CIRCUIT_ELF).unwrap();
+    let prove_info = prover
+        .prove(env, PRIVACY_PRESERVING_CIRCUIT_ELF)
+        .map_err(|e| NssaError::CircuitProvingError(e.to_string()))?;
 
     let proof = Proof(borsh::to_vec(&prove_info.receipt.inner)?);
 
@@ -86,6 +80,14 @@ fn execute_and_prove_program(
         .receipt)
 }
 
+impl Proof {
+    pub(crate) fn is_valid_for(&self, circuit_output: &PrivacyPreservingCircuitOutput) -> bool {
+        let inner: InnerReceipt = borsh::from_slice(&self.0).unwrap();
+        let receipt = Receipt::new(inner, circuit_output.to_bytes());
+        receipt.verify(PRIVACY_PRESERVING_CIRCUIT_ID).is_ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use nssa_core::{
@@ -110,6 +112,7 @@ mod tests {
         let program = Program::authenticated_transfer_program();
         let sender = AccountWithMetadata::new(
             Account {
+                program_owner: program.id(),
                 balance: 100,
                 ..Account::default()
             },
@@ -177,6 +180,7 @@ mod tests {
 
     #[test]
     fn prove_privacy_preserving_execution_circuit_fully_private() {
+        let program = Program::authenticated_transfer_program();
         let sender_keys = test_private_account_keys_1();
         let recipient_keys = test_private_account_keys_2();
 
@@ -184,7 +188,8 @@ mod tests {
             Account {
                 balance: 100,
                 nonce: 0xdeadbeef,
-                ..Account::default()
+                program_owner: program.id(),
+                data: vec![],
             },
             true,
             AccountId::from(&sender_keys.npk()),
