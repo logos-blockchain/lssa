@@ -1,9 +1,10 @@
 use std::{fs::File, io::Write, path::PathBuf, str::FromStr, sync::Arc};
 
-use base64::Engine;
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use common::{
     ExecutionFailureKind,
     sequencer_client::{SequencerClient, json::SendTxResponse},
+    transaction::{EncodedTransaction, NSSATransaction},
 };
 
 use anyhow::Result;
@@ -17,8 +18,8 @@ use nssa_core::account::Account;
 
 use crate::{
     helperfunctions::{
-        fetch_config, fetch_persistent_accounts, get_home, produce_account_addr_from_hex,
-        produce_data_for_storage,
+        HumanReadableAccount, fetch_config, fetch_persistent_accounts, get_home,
+        produce_account_addr_from_hex, produce_data_for_storage,
     },
     poller::TxPoller,
 };
@@ -99,7 +100,7 @@ impl WalletCore {
         let witness_set = nssa::public_transaction::WitnessSet::for_message(&message, &[]);
         let tx = nssa::PublicTransaction::new(message, witness_set);
 
-        Ok(self.sequencer_client.send_tx(tx).await?)
+        Ok(self.sequencer_client.send_tx_public(tx).await?)
     }
 
     pub async fn send_public_native_token_transfer(
@@ -138,7 +139,7 @@ impl WalletCore {
 
             let tx = nssa::PublicTransaction::new(message, witness_set);
 
-            Ok(self.sequencer_client.send_tx(tx).await?)
+            Ok(self.sequencer_client.send_tx_public(tx).await?)
         } else {
             Err(ExecutionFailureKind::InsufficientFundsError)
         }
@@ -162,17 +163,19 @@ impl WalletCore {
             .nonces)
     }
 
-    ///Poll transactions
-    pub async fn poll_public_native_token_transfer(
-        &self,
-        hash: String,
-    ) -> Result<nssa::PublicTransaction> {
-        let transaction_encoded = self.poller.poll_tx(hash).await?;
-        let tx_base64_decode =
-            base64::engine::general_purpose::STANDARD.decode(transaction_encoded)?;
-        let pub_tx = nssa::PublicTransaction::from_bytes(&tx_base64_decode)?;
+    ///Get account
+    pub async fn get_account(&self, addr: Address) -> Result<Account> {
+        let response = self.sequencer_client.get_account(addr.to_string()).await?;
+        Ok(response.account)
+    }
 
-        Ok(pub_tx)
+    ///Poll transactions
+    pub async fn poll_public_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
+        let transaction_encoded = self.poller.poll_tx(hash).await?;
+        let tx_base64_decode = BASE64.decode(transaction_encoded)?;
+        let pub_tx = EncodedTransaction::from_bytes(tx_base64_decode);
+
+        Ok(NSSATransaction::try_from(&pub_tx)?)
     }
 }
 
@@ -209,7 +212,11 @@ pub enum Command {
         #[arg(short, long)]
         addr: String,
     },
-
+    ///Get account at address `addr`
+    GetAccount {
+        #[arg(short, long)]
+        addr: String,
+    },
     // TODO: Testnet only. Refactor to prevent compilation on mainnet.
     // Claim piñata prize
     ClaimPinata {
@@ -247,21 +254,19 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
                 .send_public_native_token_transfer(from, to, amount)
                 .await?;
 
-            info!("Results of tx send is {res:#?}");
+            println!("Results of tx send is {res:#?}");
 
             let transfer_tx = wallet_core
                 .poll_public_native_token_transfer(res.tx_hash)
                 .await?;
 
-            info!("Transaction data is {transfer_tx:?}");
+            println!("Transaction data is {transfer_tx:?}");
         }
         Command::RegisterAccount {} => {
             let addr = wallet_core.create_new_account();
-
-            let key = wallet_core.storage.user_data.get_account_signing_key(&addr);
+            wallet_core.store_persistent_accounts()?;
 
             println!("Generated new account with addr {addr}");
-            info!("With key {key:#?}");
         }
         Command::FetchTx { tx_hash } => {
             let tx_obj = wallet_core
@@ -269,7 +274,7 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
                 .get_transaction_by_hash(tx_hash)
                 .await?;
 
-            info!("Transaction object {tx_obj:#?}");
+            println!("Transaction object {tx_obj:#?}");
         }
         Command::GetAccountBalance { addr } => {
             let addr = Address::from_str(&addr)?;
@@ -282,6 +287,11 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
 
             let nonce = wallet_core.get_accounts_nonces(vec![addr]).await?[0];
             println!("Accounts {addr} nonce is {nonce}");
+        }
+        Command::GetAccount { addr } => {
+            let addr: Address = addr.parse()?;
+            let account: HumanReadableAccount = wallet_core.get_account(addr).await?.into();
+            println!("{}", serde_json::to_string(&account).unwrap());
         }
         Command::ClaimPinata {
             pinata_addr,
@@ -298,8 +308,6 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
             info!("Results of tx send is {res:#?}");
         }
     }
-
-    wallet_core.store_persistent_accounts()?;
 
     Ok(())
 }

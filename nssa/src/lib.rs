@@ -1,4 +1,5 @@
 pub mod address;
+pub mod encoding;
 pub mod error;
 mod merkle_tree;
 mod privacy_preserving_transaction;
@@ -8,6 +9,7 @@ mod signature;
 mod state;
 
 pub use address::Address;
+pub use nssa_core::account::Account;
 pub use privacy_preserving_transaction::{
     PrivacyPreservingTransaction, circuit::execute_and_prove,
 };

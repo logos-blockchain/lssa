@@ -1,4 +1,3 @@
-mod encoding;
 pub mod message;
 pub mod transaction;
 pub mod witness_set;

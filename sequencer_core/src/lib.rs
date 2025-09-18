@@ -1,7 +1,11 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use common::{block::HashableBlockData, merkle_tree_public::TreeHashType};
+use common::{
+    TreeHashType,
+    block::HashableBlockData,
+    transaction::{EncodedTransaction, NSSATransaction},
+};
 use config::SequencerConfig;
 use log::warn;
 use mempool::MemPool;
@@ -13,7 +17,7 @@ pub mod sequencer_store;
 
 pub struct SequencerCore {
     pub store: SequecerChainStore,
-    pub mempool: MemPool<nssa::PublicTransaction>,
+    pub mempool: MemPool<EncodedTransaction>,
     pub sequencer_config: SequencerConfig,
     pub chain_height: u64,
 }
@@ -51,6 +55,7 @@ impl SequencerCore {
                 config.genesis_id,
                 config.is_genesis_random,
                 &config.initial_accounts,
+                nssa::PrivateKey::try_new(config.signing_key).unwrap(),
             ),
             mempool: MemPool::default(),
             chain_height: config.genesis_id,
@@ -60,20 +65,37 @@ impl SequencerCore {
 
     pub fn transaction_pre_check(
         &mut self,
-        tx: nssa::PublicTransaction,
-    ) -> Result<nssa::PublicTransaction, TransactionMalformationErrorKind> {
+        tx: NSSATransaction,
+    ) -> Result<NSSATransaction, TransactionMalformationErrorKind> {
         // Stateless checks here
-        if tx.witness_set().is_valid_for(tx.message()) {
-            Ok(tx)
-        } else {
-            Err(TransactionMalformationErrorKind::InvalidSignature)
+        match tx {
+            NSSATransaction::Public(tx) => {
+                if tx.witness_set().is_valid_for(tx.message()) {
+                    Ok(NSSATransaction::Public(tx))
+                } else {
+                    Err(TransactionMalformationErrorKind::InvalidSignature)
+                }
+            }
+            NSSATransaction::PrivacyPreserving(tx) => {
+                if tx.witness_set().signatures_are_valid_for(tx.message()) {
+                    Ok(NSSATransaction::PrivacyPreserving(tx))
+                } else {
+                    Err(TransactionMalformationErrorKind::InvalidSignature)
+                }
+            }
         }
     }
 
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
-        transaction: nssa::PublicTransaction,
+        transaction: EncodedTransaction,
     ) -> Result<(), TransactionMalformationErrorKind> {
+        let transaction = NSSATransaction::try_from(&transaction).map_err(|_| {
+            TransactionMalformationErrorKind::FailedToDecode {
+                tx: transaction.hash(),
+            }
+        })?;
+
         let mempool_size = self.mempool.len();
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
             return Err(TransactionMalformationErrorKind::MempoolFullForRound);
@@ -83,19 +105,29 @@ impl SequencerCore {
             .transaction_pre_check(transaction)
             .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
-        self.mempool.push_item(authenticated_tx);
+        self.mempool.push_item(authenticated_tx.into());
 
         Ok(())
     }
 
     fn execute_check_transaction_on_state(
         &mut self,
-        tx: nssa::PublicTransaction,
-    ) -> Result<nssa::PublicTransaction, nssa::error::NssaError> {
-        self.store
-            .state
-            .transition_from_public_transaction(&tx)
-            .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
+        tx: NSSATransaction,
+    ) -> Result<NSSATransaction, nssa::error::NssaError> {
+        match &tx {
+            NSSATransaction::Public(tx) => {
+                self.store
+                    .state
+                    .transition_from_public_transaction(tx)
+                    .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
+            }
+            NSSATransaction::PrivacyPreserving(tx) => {
+                self.store
+                    .state
+                    .transition_from_privacy_preserving_transaction(tx)
+                    .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
+            }
+        }
 
         Ok(tx)
     }
@@ -104,29 +136,41 @@ impl SequencerCore {
     pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<u64> {
         let new_block_height = self.chain_height + 1;
 
-        let transactions = self
-            .mempool
-            .pop_size(self.sequencer_config.max_num_tx_in_block);
+        let mut num_valid_transactions_in_block = 0;
+        let mut valid_transactions = vec![];
 
-        let valid_transactions: Vec<_> = transactions
-            .into_iter()
-            .filter_map(|tx| self.execute_check_transaction_on_state(tx).ok())
-            .collect();
+        while let Some(tx) = self.mempool.pop_last() {
+            let nssa_transaction = NSSATransaction::try_from(&tx)
+                .map_err(|_| TransactionMalformationErrorKind::FailedToDecode { tx: tx.hash() })?;
+
+            if let Ok(valid_tx) = self.execute_check_transaction_on_state(nssa_transaction) {
+                valid_transactions.push(valid_tx.into());
+
+                num_valid_transactions_in_block += 1;
+
+                if num_valid_transactions_in_block >= self.sequencer_config.max_num_tx_in_block {
+                    break;
+                }
+            }
+        }
 
         let prev_block_hash = self
             .store
             .block_store
             .get_block_at_id(self.chain_height)?
+            .header
             .hash;
+
+        let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
-            prev_block_id: self.chain_height,
             transactions: valid_transactions,
             prev_block_hash,
+            timestamp: curr_time,
         };
 
-        let block = hashable_data.into();
+        let block = hashable_data.into_block(&self.store.block_store.signing_key);
 
         self.store.block_store.put_block_at_id(block)?;
 
@@ -138,9 +182,17 @@ impl SequencerCore {
 
 #[cfg(test)]
 mod tests {
+    use common::test_utils::sequencer_sign_key_for_testing;
+
     use crate::config::AccountInitialData;
 
     use super::*;
+
+    fn parse_unwrap_tx_body_into_nssa_tx(tx_body: EncodedTransaction) -> NSSATransaction {
+        NSSATransaction::try_from(&tx_body)
+            .map_err(|_| TransactionMalformationErrorKind::FailedToDecode { tx: tx_body.hash() })
+            .unwrap()
+    }
 
     fn setup_sequencer_config_variable_initial_accounts(
         initial_accounts: Vec<AccountInitialData>,
@@ -157,6 +209,7 @@ mod tests {
             block_create_timeout_millis: 1000,
             port: 8080,
             initial_accounts,
+            signing_key: *sequencer_sign_key_for_testing().value(),
         }
     }
 
@@ -298,7 +351,7 @@ mod tests {
         common_setup(&mut sequencer);
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
-        let result = sequencer.transaction_pre_check(tx);
+        let result = sequencer.transaction_pre_check(parse_unwrap_tx_body_into_nssa_tx(tx));
 
         assert!(result.is_ok());
     }
@@ -324,7 +377,7 @@ mod tests {
         let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key1,
         );
-        let result = sequencer.transaction_pre_check(tx);
+        let result = sequencer.transaction_pre_check(parse_unwrap_tx_body_into_nssa_tx(tx));
 
         assert!(result.is_ok());
     }
@@ -352,7 +405,9 @@ mod tests {
         );
 
         // Signature is valid, stateless check pass
-        let tx = sequencer.transaction_pre_check(tx).unwrap();
+        let tx = sequencer
+            .transaction_pre_check(parse_unwrap_tx_body_into_nssa_tx(tx))
+            .unwrap();
 
         // Signature is not from sender. Execution fails
         let result = sequencer.execute_check_transaction_on_state(tx);
@@ -385,7 +440,7 @@ mod tests {
             acc1, 0, acc2, 10000000, sign_key1,
         );
 
-        let result = sequencer.transaction_pre_check(tx);
+        let result = sequencer.transaction_pre_check(parse_unwrap_tx_body_into_nssa_tx(tx));
 
         //Passed pre-check
         assert!(result.is_ok());
@@ -421,7 +476,9 @@ mod tests {
             acc1, 0, acc2, 100, sign_key1,
         );
 
-        sequencer.execute_check_transaction_on_state(tx).unwrap();
+        sequencer
+            .execute_check_transaction_on_state(parse_unwrap_tx_body_into_nssa_tx(tx))
+            .unwrap();
 
         let bal_from = sequencer
             .store
@@ -528,7 +585,7 @@ mod tests {
             .unwrap();
 
         // Only one should be included in the block
-        assert_eq!(block.transactions, vec![tx.clone()]);
+        assert_eq!(block.body.transactions, vec![tx.clone()]);
     }
 
     #[test]
@@ -563,7 +620,7 @@ mod tests {
             .block_store
             .get_block_at_id(current_height)
             .unwrap();
-        assert_eq!(block.transactions, vec![tx.clone()]);
+        assert_eq!(block.body.transactions, vec![tx.clone()]);
 
         // Add same transaction should fail
         sequencer.mempool.push_item(tx);
@@ -575,6 +632,6 @@ mod tests {
             .block_store
             .get_block_at_id(current_height)
             .unwrap();
-        assert!(block.transactions.is_empty());
+        assert!(block.body.transactions.is_empty());
     }
 }

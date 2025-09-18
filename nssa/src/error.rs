@@ -45,4 +45,7 @@ pub enum NssaError {
 
     #[error("Invalid privacy preserving execution circuit proof")]
     InvalidPrivacyPreservingProof,
+
+    #[error("Circuit proving error")]
+    CircuitProvingError(String),
 }

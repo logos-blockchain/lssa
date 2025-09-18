@@ -49,7 +49,7 @@ pub struct GetAccountsNoncesRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GetAccountDataRequest {
+pub struct GetAccountRequest {
     pub address: String,
 }
 
@@ -63,7 +63,7 @@ parse_request!(GetInitialTestnetAccountsRequest);
 parse_request!(GetAccountBalanceRequest);
 parse_request!(GetTransactionByHashRequest);
 parse_request!(GetAccountsNoncesRequest);
-parse_request!(GetAccountDataRequest);
+parse_request!(GetAccountRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -112,9 +112,6 @@ pub struct GetTransactionByHashResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GetAccountDataResponse {
-    pub balance: u128,
-    pub nonce: u128,
-    pub program_owner: [u32; 8],
-    pub data: Vec<u8>,
+pub struct GetAccountResponse {
+    pub account: nssa::Account,
 }

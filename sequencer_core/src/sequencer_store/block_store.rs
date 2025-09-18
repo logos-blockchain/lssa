@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{block::Block, merkle_tree_public::TreeHashType};
+use common::{TreeHashType, block::Block, transaction::EncodedTransaction};
 use storage::RocksDBIO;
 
 pub struct SequecerBlockStore {
@@ -9,6 +9,7 @@ pub struct SequecerBlockStore {
     // TODO: Consider adding the hashmap to the database for faster recovery.
     tx_hash_to_block_map: HashMap<TreeHashType, u64>,
     pub genesis_id: u64,
+    pub signing_key: nssa::PrivateKey,
 }
 
 impl SequecerBlockStore {
@@ -16,7 +17,11 @@ impl SequecerBlockStore {
     /// Creates files if necessary.
     ///
     /// ATTENTION: Will overwrite genesis block.
-    pub fn open_db_with_genesis(location: &Path, genesis_block: Option<Block>) -> Result<Self> {
+    pub fn open_db_with_genesis(
+        location: &Path,
+        genesis_block: Option<Block>,
+        signing_key: nssa::PrivateKey,
+    ) -> Result<Self> {
         let tx_hash_to_block_map = if let Some(block) = &genesis_block {
             block_to_transactions_map(block)
         } else {
@@ -31,16 +36,17 @@ impl SequecerBlockStore {
             dbio,
             genesis_id,
             tx_hash_to_block_map,
+            signing_key,
         })
     }
 
     ///Reopening existing database
-    pub fn open_db_restart(location: &Path) -> Result<Self> {
-        SequecerBlockStore::open_db_with_genesis(location, None)
+    pub fn open_db_restart(location: &Path, signing_key: nssa::PrivateKey) -> Result<Self> {
+        SequecerBlockStore::open_db_with_genesis(location, None, signing_key)
     }
 
     pub fn get_block_at_id(&self, id: u64) -> Result<Block> {
-        Ok(self.dbio.get_block(id)?)
+        Ok(self.dbio.get_block(id)?.into_block(&self.signing_key))
     }
 
     pub fn put_block_at_id(&mut self, block: Block) -> Result<()> {
@@ -51,11 +57,11 @@ impl SequecerBlockStore {
     }
 
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
-    pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<nssa::PublicTransaction> {
+    pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<EncodedTransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
         let block = block_id.map(|&id| self.get_block_at_id(id));
         if let Some(Ok(block)) = block {
-            for transaction in block.transactions.into_iter() {
+            for transaction in block.body.transactions.into_iter() {
                 if transaction.hash() == hash {
                     return Some(transaction);
                 }
@@ -67,9 +73,10 @@ impl SequecerBlockStore {
 
 fn block_to_transactions_map(block: &Block) -> HashMap<TreeHashType, u64> {
     block
+        .body
         .transactions
         .iter()
-        .map(|transaction| (transaction.hash(), block.block_id))
+        .map(|transaction| (transaction.hash(), block.header.block_id))
         .collect()
 }
 
@@ -77,22 +84,28 @@ fn block_to_transactions_map(block: &Block) -> HashMap<TreeHashType, u64> {
 mod tests {
     use super::*;
 
+    use common::{block::HashableBlockData, test_utils::sequencer_sign_key_for_testing};
     use tempfile::tempdir;
 
     #[test]
     fn test_get_transaction_by_hash() {
         let temp_dir = tempdir().unwrap();
         let path = temp_dir.path();
-        let genesis_block = Block {
+
+        let signing_key = sequencer_sign_key_for_testing();
+
+        let genesis_block_hashable_data = HashableBlockData {
             block_id: 0,
-            prev_block_id: 0,
             prev_block_hash: [0; 32],
-            hash: [1; 32],
+            timestamp: 0,
             transactions: vec![],
         };
+
+        let genesis_block = genesis_block_hashable_data.into_block(&signing_key);
         // Start an empty node store
         let mut node_store =
-            SequecerBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
+            SequecerBlockStore::open_db_with_genesis(path, Some(genesis_block), signing_key)
+                .unwrap();
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
         let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);

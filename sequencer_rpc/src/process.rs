@@ -5,19 +5,20 @@ use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
 
 use common::{
+    TreeHashType,
     block::HashableBlockData,
-    merkle_tree_public::TreeHashType,
     rpc_primitives::{
         errors::RpcError,
         message::{Message, Request},
         parser::RpcRequest,
         requests::{
-            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountDataRequest,
-            GetAccountDataResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
+            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
+            GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
             GetInitialTestnetAccountsRequest, GetTransactionByHashRequest,
             GetTransactionByHashResponse,
         },
     },
+    transaction::EncodedTransaction,
 };
 
 use common::rpc_primitives::requests::{
@@ -36,7 +37,7 @@ pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
 pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
 pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
-pub const GET_ACCOUNT_DATA: &str = "get_account_data";
+pub const GET_ACCOUNT: &str = "get_account";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -74,8 +75,7 @@ impl JsonHandler {
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
-        let tx = nssa::PublicTransaction::from_bytes(&send_tx_req.transaction)
-            .map_err(|e| RpcError::serialization_error(&e.to_string()))?;
+        let tx = EncodedTransaction::from_bytes(send_tx_req.transaction);
         let tx_hash = hex::encode(tx.hash());
 
         {
@@ -204,10 +204,10 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
-    ///Returns account struct for give address.
+    /// Returns account struct for given address.
     /// Address must be a valid hex string of the correct length.
-    async fn process_get_account_data(&self, request: Request) -> Result<Value, RpcErr> {
-        let get_account_nonces_req = GetAccountDataRequest::parse(Some(request.params))?;
+    async fn process_get_account(&self, request: Request) -> Result<Value, RpcErr> {
+        let get_account_nonces_req = GetAccountRequest::parse(Some(request.params))?;
 
         let address = get_account_nonces_req
             .address
@@ -220,12 +220,7 @@ impl JsonHandler {
             state.store.state.get_account_by_address(&address)
         };
 
-        let helperstruct = GetAccountDataResponse {
-            balance: account.balance,
-            nonce: account.nonce,
-            program_owner: account.program_owner,
-            data: account.data,
-        };
+        let helperstruct = GetAccountResponse { account };
 
         respond(helperstruct)
     }
@@ -265,7 +260,7 @@ impl JsonHandler {
             GET_INITIAL_TESTNET_ACCOUNTS => self.get_initial_testnet_accounts(request).await,
             GET_ACCOUNT_BALANCE => self.process_get_account_balance(request).await,
             GET_ACCOUNTS_NONCES => self.process_get_accounts_nonces(request).await,
-            GET_ACCOUNT_DATA => self.process_get_account_data(request).await,
+            GET_ACCOUNT => self.process_get_account(request).await,
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
@@ -278,7 +273,10 @@ mod tests {
 
     use crate::{JsonHandler, rpc_handler};
     use base64::{Engine, engine::general_purpose};
-    use common::rpc_primitives::RpcPollingConfig;
+    use common::{
+        rpc_primitives::RpcPollingConfig, test_utils::sequencer_sign_key_for_testing,
+        transaction::EncodedTransaction,
+    };
 
     use sequencer_core::{
         SequencerCore,
@@ -322,14 +320,11 @@ mod tests {
             block_create_timeout_millis: 1000,
             port: 8080,
             initial_accounts,
+            signing_key: *sequencer_sign_key_for_testing().value(),
         }
     }
 
-    fn components_for_tests() -> (
-        JsonHandler,
-        Vec<AccountInitialData>,
-        nssa::PublicTransaction,
-    ) {
+    fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
         let config = sequencer_config_for_tests();
         let mut sequencer_core = SequencerCore::start_from_config(config);
         let initial_accounts = sequencer_core.sequencer_config.initial_accounts.clone();
@@ -534,7 +529,7 @@ mod tests {
         let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
-            "method": "get_account_data",
+            "method": "get_account",
             "params": { "address": "efac".repeat(16) },
             "id": 1
         });
@@ -542,10 +537,12 @@ mod tests {
             "id": 1,
             "jsonrpc": "2.0",
             "result": {
-                "balance": 0,
-                "nonce": 0,
-                "program_owner": [ 0, 0, 0, 0, 0, 0, 0, 0],
-                "data": [],
+                "account": {
+                    "balance": 0,
+                    "nonce": 0,
+                    "program_owner": [ 0, 0, 0, 0, 0, 0, 0, 0],
+                    "data": [],
+                }
             }
         });
 

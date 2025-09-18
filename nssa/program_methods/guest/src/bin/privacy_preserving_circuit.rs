@@ -32,11 +32,13 @@ fn main() {
 
     // Check that the program is well behaved.
     // See the # Programs section for the definition of the `validate_execution` method.
-    validate_execution(&pre_states, &post_states, program_id);
+    if !validate_execution(&pre_states, &post_states, program_id) {
+        panic!("Bad behaved program");
+    }
 
     let n_accounts = pre_states.len();
     if visibility_mask.len() != n_accounts {
-        panic!();
+        panic!("Invalid visibility mask length");
     }
 
     // These lists will be the public outputs of this circuit
@@ -59,7 +61,9 @@ fn main() {
                 public_pre_states.push(pre_states[i].clone());
 
                 let mut post = post_states[i].clone();
-                post.nonce += 1;
+                if pre_states[i].is_authorized {
+                    post.nonce += 1;
+                }
                 if post.program_owner == DEFAULT_PROGRAM_ID {
                     // Claim account
                     post.program_owner = program_id;
@@ -136,7 +140,7 @@ fn main() {
     }
 
     if private_keys_iter.next().is_some() {
-        panic!("Too many private accounts keys.");
+        panic!("Too many private account keys.");
     }
 
     if private_auth_iter.next().is_some() {
