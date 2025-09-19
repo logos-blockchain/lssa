@@ -207,7 +207,7 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
             let from = produce_account_addr_from_hex(from)?;
             let to = produce_account_addr_from_hex(to)?;
 
-            let res = wallet_core
+            let (res, secret) = wallet_core
                 .send_private_native_token_transfer(from, to, amount)
                 .await?;
 
@@ -215,7 +215,30 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
 
             let transfer_tx = wallet_core.poll_native_token_transfer(res.tx_hash).await?;
 
-            println!("Transaction data is {transfer_tx:?}");
+            if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                let from_ebc = tx.message.encrypted_private_post_states[0].clone();
+                let from_comm = tx.message.new_commitments[0].clone();
+
+                let to_ebc = tx.message.encrypted_private_post_states[1].clone();
+                let to_comm = tx.message.new_commitments[1].clone();
+
+                let res_acc = nssa_core::EncryptionScheme::decrypt(
+                    &from_ebc.ciphertext,
+                    &secret,
+                    &from_comm,
+                    0,
+                )
+                .unwrap();
+
+                let res_acc_to =
+                    nssa_core::EncryptionScheme::decrypt(&to_ebc.ciphertext, &secret, &to_comm, 1)
+                        .unwrap();
+
+                println!("RES acc {res_acc:#?}");
+                println!("RES acc to {res_acc_to:#?}");
+
+                println!("Transaction data is {:?}", tx.message);
+            }
         }
         Command::RegisterAccountPublic {} => {
             let addr = wallet_core.create_new_account_public();

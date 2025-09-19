@@ -11,8 +11,8 @@ use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
 use wallet::{
-    Command,
-    helperfunctions::{fetch_config, fetch_persistent_accounts},
+    Command, WalletCore,
+    helperfunctions::{fetch_config, fetch_persistent_accounts, produce_account_addr_from_hex},
 };
 
 #[derive(Parser, Debug)]
@@ -26,6 +26,11 @@ struct Args {
 
 pub const ACC_SENDER: &str = "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f";
 pub const ACC_RECEIVER: &str = "4d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766";
+
+pub const ACC_SENDER_PRIVATE: &str =
+    "6ffe0893c4b2c956fdb769b11fe4e3b2dd36ac4bd0ad90c810844051747c8c04";
+pub const ACC_RECEIVER_PRIVATE: &str =
+    "4ee9de60e33da96fd72929f1485fb365bcc9c1634dd44e4ba55b1ab96692674b";
 
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 
@@ -303,6 +308,96 @@ pub async fn test_get_account_wallet_command() {
     assert_eq!(account.nonce, 0);
 }
 
+pub async fn test_success_private_transfer_to_another_owned_account() {
+    let command = Command::SendNativeTokenTransferPrivate {
+        from: ACC_SENDER_PRIVATE.to_string(),
+        to: ACC_RECEIVER_PRIVATE.to_string(),
+        amount: 100,
+    };
+
+    let from = produce_account_addr_from_hex(ACC_SENDER_PRIVATE.to_string()).unwrap();
+    let to = produce_account_addr_from_hex(ACC_RECEIVER_PRIVATE.to_string()).unwrap();
+
+    let wallet_config = fetch_config().unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    let mut wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let old_commitment1 = {
+        let from_acc = wallet_storage
+            .storage
+            .user_data
+            .get_private_account_mut(&from)
+            .unwrap();
+
+        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
+    };
+
+    let old_commitment2 = {
+        let to_acc = wallet_storage
+            .storage
+            .user_data
+            .get_private_account_mut(&to)
+            .unwrap();
+
+        nssa_core::Commitment::new(&to_acc.0.nullifer_public_key, &to_acc.1)
+    };
+
+    println!("Old commitment {old_commitment1:?}");
+    println!("Old commitment {old_commitment2:?}");
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let new_commitment1 = {
+        let from_acc = wallet_storage
+            .storage
+            .user_data
+            .get_private_account_mut(&from)
+            .unwrap();
+
+        from_acc.1.balance -= 100;
+        from_acc.1.nonce += 1;
+
+        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
+    };
+
+    let new_commitment2 = {
+        let to_acc = wallet_storage
+            .storage
+            .user_data
+            .get_private_account_mut(&to)
+            .unwrap();
+
+        to_acc.1.balance += 100;
+        to_acc.1.nonce += 1;
+
+        nssa_core::Commitment::new(&to_acc.0.nullifer_public_key, &to_acc.1)
+    };
+
+    println!("New commitment {new_commitment1:?}");
+    println!("New commitment {new_commitment2:?}");
+
+    let proof1 = seq_client
+        .get_proof_for_commitment(new_commitment1)
+        .await
+        .unwrap()
+        .unwrap();
+    let proof2 = seq_client
+        .get_proof_for_commitment(new_commitment2)
+        .await
+        .unwrap()
+        .unwrap();
+
+    println!("New proof is {proof1:#?}");
+    println!("New proof is {proof2:#?}");
+
+    info!("Success!");
+}
+
 macro_rules! test_cleanup_wrap {
     ($home_dir:ident, $test_func:ident) => {{
         let res = pre_test($home_dir.clone()).await.unwrap();
@@ -340,6 +435,12 @@ pub async fn main_tests_runner() -> Result<()> {
         }
         "test_success_two_transactions" => {
             test_cleanup_wrap!(home_dir, test_success_two_transactions);
+        }
+        "test_success_private_transfer_to_another_owned_account" => {
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_owned_account
+            );
         }
         "all" => {
             test_cleanup_wrap!(home_dir, test_success_move_to_another_account);
