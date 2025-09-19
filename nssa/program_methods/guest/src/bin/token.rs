@@ -7,8 +7,8 @@ use nssa_core::{
 // 1. New token definition.
 //    Arguments to this function are:
 //      * Two **default** accounts: [definition_account, holding_account].
-//        The first default account  will be populated with the token definition account values. The second account will
-//        be set to a token holding account for the new token, holding the entire total supply.
+//        The first default account will be initialized with the token definition account values. The second account will
+//        be initialized to a token holding account for the new token, holding the entire total supply.
 //      * An instruction data of 23-bytes, indicating the total supply and the token name, with
 //        the following layout:
 //        [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
@@ -16,7 +16,7 @@ use nssa_core::{
 // 2. Token transfer
 //    Arguments to this function are:
 //      * Two accounts: [sender_account, recipient_account].
-//      * An instruction data byte string of length 23, indicating the total supply and the token name, with the following layout
+//      * An instruction data byte string of length 23, indicating the total supply with the following layout
 //        [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;
@@ -57,7 +57,7 @@ impl TokenHolding {
     }
 
     fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != TOKEN_HOLDING_DATA_SIZE && data[0] != TOKEN_HOLDING_TYPE {
+        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
             None
         } else {
             let account_type = data[0];
@@ -106,7 +106,10 @@ fn transfer(pre_states: Vec<AccountWithMetadata>, balance_to_move: u128) {
     }
 
     sender_holding.balance -= balance_to_move;
-    recipient_holding.balance += balance_to_move;
+    recipient_holding.balance = recipient_holding
+        .balance
+        .checked_add(balance_to_move)
+        .expect("Recipient balance overflow.");
 
     let sender_post = {
         let mut this = sender.account.clone();
