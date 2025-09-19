@@ -204,7 +204,7 @@ fn main() {
 mod tests {
     use nssa_core::account::{Account, AccountId, AccountWithMetadata};
 
-    use crate::{TOKEN_HOLDING_DATA_SIZE, new_definition, transfer};
+    use crate::{new_definition, transfer, TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_TYPE};
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
@@ -358,11 +358,12 @@ mod tests {
     #[should_panic(expected = "Invalid sender data")]
     #[test]
     fn test_transfer_invalid_instruction_type_should_fail() {
+        let invalid_type = TOKEN_HOLDING_TYPE ^ 1;
         let pre_states = vec![
             AccountWithMetadata {
                 account: Account {
-                    // First byte should be 0x01  for transfers
-                    data: vec![0; TOKEN_HOLDING_DATA_SIZE],
+                    // First byte should be `TOKEN_HOLDING_TYPE` for token holding accounts
+                    data: vec![invalid_type; TOKEN_HOLDING_DATA_SIZE],
                     ..Account::default()
                 },
                 is_authorized: true,

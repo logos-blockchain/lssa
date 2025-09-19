@@ -1,7 +1,12 @@
 use risc0_zkvm::{guest::env, serde::to_vec};
 
 use nssa_core::{
-    account::{Account, AccountWithMetadata, AccountId}, compute_digest_for_path, encryption::Ciphertext, program::{validate_execution, ProgramOutput, DEFAULT_PROGRAM_ID}, Commitment, CommitmentSetDigest, EncryptionScheme, Nullifier, NullifierPublicKey, PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput
+    Commitment, CommitmentSetDigest, EncryptionScheme, Nullifier, NullifierPublicKey,
+    PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput,
+    account::{Account, AccountId, AccountWithMetadata},
+    compute_digest_for_path,
+    encryption::Ciphertext,
+    program::{DEFAULT_PROGRAM_ID, ProgramOutput, validate_execution},
 };
 
 fn main() {

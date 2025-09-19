@@ -1,4 +1,4 @@
-use nssa_core::program::{read_nssa_inputs, write_nssa_outputs, ProgramInput};
+use nssa_core::program::{ProgramInput, read_nssa_inputs, write_nssa_outputs};
 
 /// A transfer of balance program.
 /// To be used both in public and private contexts.
