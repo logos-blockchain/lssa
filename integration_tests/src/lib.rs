@@ -324,29 +324,6 @@ pub async fn test_success_private_transfer_to_another_owned_account() {
 
     let mut wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
-    let old_commitment1 = {
-        let from_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&from)
-            .unwrap();
-
-        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
-    };
-
-    let old_commitment2 = {
-        let to_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&to)
-            .unwrap();
-
-        nssa_core::Commitment::new(&to_acc.0.nullifer_public_key, &to_acc.1)
-    };
-
-    println!("Old commitment {old_commitment1:?}");
-    println!("Old commitment {old_commitment2:?}");
-
     wallet::execute_subcommand(command).await.unwrap();
 
     info!("Waiting for next block creation");
@@ -378,8 +355,69 @@ pub async fn test_success_private_transfer_to_another_owned_account() {
         nssa_core::Commitment::new(&to_acc.0.nullifer_public_key, &to_acc.1)
     };
 
-    println!("New commitment {new_commitment1:?}");
-    println!("New commitment {new_commitment2:?}");
+    let proof1 = seq_client
+        .get_proof_for_commitment(new_commitment1)
+        .await
+        .unwrap()
+        .unwrap();
+    let proof2 = seq_client
+        .get_proof_for_commitment(new_commitment2)
+        .await
+        .unwrap()
+        .unwrap();
+
+    println!("New proof is {proof1:#?}");
+    println!("New proof is {proof2:#?}");
+
+    info!("Success!");
+}
+
+pub async fn test_success_private_transfer_to_another_foreign_account() {
+    let command = Command::SendNativeTokenTransferPrivate {
+        from: ACC_SENDER_PRIVATE.to_string(),
+        to: ACC_RECEIVER_PRIVATE.to_string(),
+        amount: 100,
+    };
+
+    let from = produce_account_addr_from_hex(ACC_SENDER_PRIVATE.to_string()).unwrap();
+    let to = produce_account_addr_from_hex(ACC_RECEIVER_PRIVATE.to_string()).unwrap();
+
+    let wallet_config = fetch_config().unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    let mut wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let new_commitment1 = {
+        let from_acc = wallet_storage
+            .storage
+            .user_data
+            .get_private_account_mut(&from)
+            .unwrap();
+
+        from_acc.1.balance -= 100;
+        from_acc.1.nonce += 1;
+
+        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
+    };
+
+    let new_commitment2 = {
+        let to_acc = wallet_storage
+            .storage
+            .user_data
+            .get_private_account_mut(&to)
+            .unwrap();
+
+        to_acc.1.balance += 100;
+        to_acc.1.nonce += 1;
+
+        nssa_core::Commitment::new(&to_acc.0.nullifer_public_key, &to_acc.1)
+    };
 
     let proof1 = seq_client
         .get_proof_for_commitment(new_commitment1)

@@ -149,6 +149,23 @@ pub enum Command {
         #[arg(long)]
         amount: u128,
     },
+    ///Send native token transfer from `from` to `to` for `amount`
+    ///
+    /// Private operation
+    SendNativeTokenTransferPrivateForeignAccount {
+        ///from - valid 32 byte hex string
+        #[arg(long)]
+        from: String,
+        ///to_npk - valid 32 byte hex string
+        #[arg(long)]
+        to_npk: String,
+        ///to_ipk - valid 33 byte hex string
+        #[arg(long)]
+        to_ipk: String,
+        ///amount - amount of balance to move
+        #[arg(long)]
+        amount: u128,
+    },
     ///Register new public account
     RegisterAccountPublic {},
     ///Register new private account
@@ -209,6 +226,51 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
 
             let (res, secret) = wallet_core
                 .send_private_native_token_transfer(from, to, amount)
+                .await?;
+
+            println!("Results of tx send is {res:#?}");
+
+            let transfer_tx = wallet_core.poll_native_token_transfer(res.tx_hash).await?;
+
+            if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                let from_ebc = tx.message.encrypted_private_post_states[0].clone();
+                let from_comm = tx.message.new_commitments[0].clone();
+
+                let to_ebc = tx.message.encrypted_private_post_states[1].clone();
+                let to_comm = tx.message.new_commitments[1].clone();
+
+                let res_acc = nssa_core::EncryptionScheme::decrypt(
+                    &from_ebc.ciphertext,
+                    &secret,
+                    &from_comm,
+                    0,
+                )
+                .unwrap();
+
+                let res_acc_to =
+                    nssa_core::EncryptionScheme::decrypt(&to_ebc.ciphertext, &secret, &to_comm, 1)
+                        .unwrap();
+
+                println!("RES acc {res_acc:#?}");
+                println!("RES acc to {res_acc_to:#?}");
+
+                println!("Transaction data is {:?}", tx.message);
+            }
+        }
+        Command::SendNativeTokenTransferPrivateForeignAccount { from, to_npk, to_ipk, amount } => {
+            let from = produce_account_addr_from_hex(from)?;
+            let to_npk_res = hex::decode(to_npk)?;
+            let mut to_npk = [0; 32];
+            to_npk.copy_from_slice(&to_npk_res);
+            let to_npk = nssa_core::NullifierPublicKey(to_npk);
+
+            let to_ipk_res = hex::decode(to_ipk)?;
+            let mut to_ipk = [0u8; 33];
+            to_ipk.copy_from_slice(&to_ipk_res);
+            let to_ipk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
+
+            let (res, secret) = wallet_core
+                .send_private_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
                 .await?;
 
             println!("Results of tx send is {res:#?}");
