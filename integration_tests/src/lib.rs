@@ -412,15 +412,15 @@ pub async fn test_success_private_transfer_to_another_foreign_account() {
     };
 
     let new_commitment2 = {
-        let mut to_acc = nssa_core::account::Account::default();
-
-        to_acc.program_owner = [
-            1793544791, 852173979, 3315478100, 4158236927, 146723505, 3793635251, 999304864,
-            2535706995,
-        ];
-
-        to_acc.balance += 100;
-        to_acc.nonce += 1;
+        let to_acc = nssa_core::account::Account {
+            program_owner: [
+                1793544791, 852173979, 3315478100, 4158236927, 146723505, 3793635251, 999304864,
+                2535706995,
+            ],
+            balance: 100,
+            data: vec![],
+            nonce: 1,
+        };
 
         nssa_core::Commitment::new(&to_npk_orig, &to_acc)
     };
@@ -565,15 +565,15 @@ pub async fn test_success_shielded_transfer_to_another_foreign_account() {
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
     let new_commitment2 = {
-        let mut to_acc = nssa_core::account::Account::default();
-
-        to_acc.program_owner = [
-            1793544791, 852173979, 3315478100, 4158236927, 146723505, 3793635251, 999304864,
-            2535706995,
-        ];
-
-        to_acc.balance += 100;
-        to_acc.nonce += 1;
+        let to_acc = nssa_core::account::Account {
+            program_owner: [
+                1793544791, 852173979, 3315478100, 4158236927, 146723505, 3793635251, 999304864,
+                2535706995,
+            ],
+            balance: 100,
+            data: vec![],
+            nonce: 1,
+        };
 
         nssa_core::Commitment::new(&to_npk_orig, &to_acc)
     };

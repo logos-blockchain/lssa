@@ -28,17 +28,9 @@ jobs:
           toolchain: nightly
           override: true
           components: rustfmt, clippy
-      
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-      
       - name: lint - ubuntu-latest
         if: success() || failure()
         run: chmod 777 ./ci_scripts/lint-ubuntu.sh && ./ci_scripts/lint-ubuntu.sh
-      
       - name: test ubuntu-latest
         if: success() || failure()
         run: chmod 777 ./ci_scripts/test-ubuntu.sh && ./ci_scripts/test-ubuntu.sh
