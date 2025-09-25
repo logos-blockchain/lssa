@@ -175,7 +175,7 @@ impl WalletCore {
     pub async fn poll_public_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
         let transaction_encoded = self.poller.poll_tx(hash).await?;
         let tx_base64_decode = BASE64.decode(transaction_encoded)?;
-        let pub_tx = EncodedTransaction::from_bytes(tx_base64_decode);
+        let pub_tx = borsh::from_slice::<EncodedTransaction>(&tx_base64_decode).unwrap();
 
         Ok(NSSATransaction::try_from(&pub_tx)?)
     }

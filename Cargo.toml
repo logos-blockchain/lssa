@@ -44,6 +44,7 @@ base64 = "0.22.1"
 bip39 = "2.2.0"
 hmac-sha512 = "1.1.7"
 chrono = "0.4.41"
+borsh = "1.5.7"
 
 rocksdb = { version = "0.21.0", default-features = false, features = [
   "snappy",

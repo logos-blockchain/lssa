@@ -1,5 +1,4 @@
 use common::TreeHashType;
-use log::info;
 use nssa_core::{
     NullifierPublicKey, SharedSecretKey,
     encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
@@ -62,43 +61,13 @@ impl KeyChain {
             &ephemeral_public_key_sender,
         )
     }
-
-    pub fn log(&self) {
-        info!(
-            "Secret spending key is {:?}",
-            hex::encode(serde_json::to_vec(&self.secret_spending_key).unwrap()),
-        );
-        info!(
-            "Nulifier secret key is {:?}",
-            hex::encode(serde_json::to_vec(&self.private_key_holder.nullifier_secret_key).unwrap()),
-        );
-        info!(
-            "Viewing secret key is {:?}",
-            hex::encode(
-                serde_json::to_vec(&self.private_key_holder.incoming_viewing_secret_key).unwrap()
-            ),
-        );
-        info!(
-            "Viewing secret key is {:?}",
-            hex::encode(
-                serde_json::to_vec(&self.private_key_holder.outgoing_viewing_secret_key).unwrap()
-            ),
-        );
-        info!(
-            "Nullifier public key is {:?}",
-            hex::encode(serde_json::to_vec(&self.nullifer_public_key).unwrap()),
-        );
-        info!(
-            "Viewing public key is {:?}",
-            hex::encode(serde_json::to_vec(&self.incoming_viewing_public_key).unwrap()),
-        );
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use aes_gcm::aead::OsRng;
     use k256::AffinePoint;
+    use k256::elliptic_curve::group::GroupEncoding;
     use rand::RngCore;
 
     use super::*;
@@ -147,7 +116,7 @@ mod tests {
 
         println!(
             "Group generator {:?}",
-            hex::encode(serde_json::to_vec(&AffinePoint::GENERATOR).unwrap())
+            hex::encode(AffinePoint::GENERATOR.to_bytes())
         );
         println!();
 
@@ -164,11 +133,11 @@ mod tests {
         println!("Address{:?}", hex::encode(address.value()));
         println!(
             "Nulifier public key {:?}",
-            hex::encode(serde_json::to_vec(&nullifer_public_key).unwrap())
+            hex::encode(nullifer_public_key.to_byte_array())
         );
         println!(
             "Viewing public key {:?}",
-            hex::encode(serde_json::to_vec(&viewing_public_key).unwrap())
+            hex::encode(viewing_public_key.to_bytes())
         );
     }
 }

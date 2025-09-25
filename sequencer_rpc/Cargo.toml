@@ -16,6 +16,7 @@ base64.workspace = true
 
 actix-web.workspace = true
 tokio.workspace = true
+borsh.workspace = true
 
 [dependencies.sequencer_core]
 path = "../sequencer_core"

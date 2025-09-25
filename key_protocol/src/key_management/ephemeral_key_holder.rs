@@ -1,4 +1,3 @@
-use log::info;
 use nssa_core::{
     NullifierPublicKey, SharedSecretKey,
     encryption::{EphemeralPublicKey, EphemeralSecretKey, IncomingViewingPublicKey},
@@ -47,12 +46,5 @@ impl EphemeralKeyHolder {
             &self.ephemeral_secret_key,
             &receiver_incoming_viewing_public_key,
         )
-    }
-
-    pub fn log(&self) {
-        info!(
-            "Ephemeral private key is {:?}",
-            hex::encode(serde_json::to_vec(&self.ephemeral_secret_key).unwrap())
-        );
     }
 }

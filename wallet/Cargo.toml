@@ -15,6 +15,7 @@ clap.workspace = true
 nssa-core = { path = "../nssa/core" }
 base64.workspace = true
 bytemuck = "1.23.2"
+borsh.workspace = true
 
 [dependencies.key_protocol]
 path = "../key_protocol"
