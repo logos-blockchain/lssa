@@ -1,11 +1,22 @@
 use risc0_zkvm::sha::{Impl, Sha256};
 use serde::{Deserialize, Serialize};
 
-use crate::Commitment;
+use crate::{Commitment, account::AccountId};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, Clone, Hash))]
 pub struct NullifierPublicKey(pub(super) [u8; 32]);
+
+impl From<&NullifierPublicKey> for AccountId {
+    fn from(value: &NullifierPublicKey) -> Self {
+        const PRIVATE_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.1/AccountId/Private/\x00\x00\x00";
+
+        let mut bytes = [0; 64];
+        bytes[0..32].copy_from_slice(PRIVATE_ACCOUNT_ID_PREFIX);
+        bytes[32..].copy_from_slice(&value.0);
+        AccountId::new(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
+    }
+}
 
 impl AsRef<[u8]> for NullifierPublicKey {
     fn as_ref(&self) -> &[u8] {
@@ -70,5 +81,22 @@ mod tests {
         ]);
         let npk = NullifierPublicKey::from(&nsk);
         assert_eq!(npk, expected_npk);
+    }
+
+    #[test]
+    fn test_account_id_from_nullifier_public_key() {
+        let nsk = [
+            57, 5, 64, 115, 153, 56, 184, 51, 207, 238, 99, 165, 147, 214, 213, 151, 30, 251, 30,
+            196, 134, 22, 224, 211, 237, 120, 136, 225, 188, 220, 249, 28,
+        ];
+        let npk = NullifierPublicKey::from(&nsk);
+        let expected_account_id = AccountId::new([
+            69, 160, 50, 67, 12, 56, 150, 116, 62, 145, 17, 161, 17, 45, 24, 53, 33, 167, 83, 178,
+            47, 114, 111, 233, 251, 30, 54, 244, 184, 22, 100, 236,
+        ]);
+
+        let account_id = AccountId::from(&npk);
+
+        assert_eq!(account_id, expected_account_id);
     }
 }
