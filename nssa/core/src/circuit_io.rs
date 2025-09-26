@@ -41,7 +41,7 @@ mod tests {
     use super::*;
     use crate::{
         Commitment, Nullifier, NullifierPublicKey,
-        account::{Account, AccountWithMetadata},
+        account::{Account, AccountId, AccountWithMetadata},
     };
     use risc0_zkvm::serde::from_slice;
 
@@ -49,24 +49,26 @@ mod tests {
     fn test_privacy_preserving_circuit_output_to_bytes_is_compatible_with_from_slice() {
         let output = PrivacyPreservingCircuitOutput {
             public_pre_states: vec![
-                AccountWithMetadata {
-                    account: Account {
+                AccountWithMetadata::new(
+                    Account {
                         program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
                         balance: 12345678901234567890,
                         data: b"test data".to_vec(),
                         nonce: 18446744073709551614,
                     },
-                    is_authorized: true,
-                },
-                AccountWithMetadata {
-                    account: Account {
+                    true,
+                    AccountId::new([0; 32]),
+                ),
+                AccountWithMetadata::new(
+                    Account {
                         program_owner: [9, 9, 9, 8, 8, 8, 7, 7],
                         balance: 123123123456456567112,
                         data: b"test data".to_vec(),
                         nonce: 9999999999999999999999,
                     },
-                    is_authorized: false,
-                },
+                    false,
+                    AccountId::new([1; 32]),
+                ),
             ],
             public_post_states: vec![Account {
                 program_owner: [1, 2, 3, 4, 5, 6, 7, 8],

@@ -92,7 +92,7 @@ impl Proof {
 mod tests {
     use nssa_core::{
         Commitment, EncryptionScheme, Nullifier,
-        account::{Account, AccountWithMetadata},
+        account::{Account, AccountId, AccountWithMetadata},
     };
 
     use crate::{
@@ -108,20 +108,23 @@ mod tests {
 
     #[test]
     fn prove_privacy_preserving_execution_circuit_public_and_private_pre_accounts() {
+        let recipient_keys = test_private_account_keys_1();
         let program = Program::authenticated_transfer_program();
-        let sender = AccountWithMetadata {
-            account: Account {
+        let sender = AccountWithMetadata::new(
+            Account {
                 program_owner: program.id(),
                 balance: 100,
                 ..Account::default()
             },
-            is_authorized: true,
-        };
+            true,
+            AccountId::new([0; 32]),
+        );
 
-        let recipient = AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: false,
-        };
+        let recipient = AccountWithMetadata::new(
+            Account::default(),
+            false,
+            AccountId::from(&recipient_keys.npk()),
+        );
 
         let balance_to_move: u128 = 37;
 
@@ -140,7 +143,6 @@ mod tests {
         };
 
         let expected_sender_pre = sender.clone();
-        let recipient_keys = test_private_account_keys_1();
 
         let esk = [3; 32];
         let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
@@ -179,23 +181,26 @@ mod tests {
     #[test]
     fn prove_privacy_preserving_execution_circuit_fully_private() {
         let program = Program::authenticated_transfer_program();
-        let sender_pre = AccountWithMetadata {
-            account: Account {
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+
+        let sender_pre = AccountWithMetadata::new(
+            Account {
                 balance: 100,
                 nonce: 0xdeadbeef,
                 program_owner: program.id(),
                 data: vec![],
             },
-            is_authorized: true,
-        };
-        let sender_keys = test_private_account_keys_1();
-        let recipient_keys = test_private_account_keys_2();
+            true,
+            AccountId::from(&sender_keys.npk()),
+        );
         let commitment_sender = Commitment::new(&sender_keys.npk(), &sender_pre.account);
 
-        let recipient = AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: false,
-        };
+        let recipient = AccountWithMetadata::new(
+            Account::default(),
+            false,
+            AccountId::from(&recipient_keys.npk()),
+        );
         let balance_to_move: u128 = 37;
 
         let mut commitment_set = CommitmentSet::with_capacity(2);

@@ -89,7 +89,7 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
-    use nssa_core::account::{Account, AccountWithMetadata};
+    use nssa_core::account::{Account, AccountId, AccountWithMetadata};
 
     use crate::program::Program;
 
@@ -180,17 +180,16 @@ mod tests {
         let program = Program::simple_balance_transfer();
         let balance_to_move: u128 = 11223344556677;
         let instruction_data = Program::serialize_instruction(balance_to_move).unwrap();
-        let sender = AccountWithMetadata {
-            account: Account {
+        let sender = AccountWithMetadata::new(
+            Account {
                 balance: 77665544332211,
                 ..Account::default()
             },
-            is_authorized: false,
-        };
-        let recipient = AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: false,
-        };
+            true,
+            AccountId::new([0; 32]),
+        );
+        let recipient =
+            AccountWithMetadata::new(Account::default(), false, AccountId::new([1; 32]));
 
         let expected_sender_post = Account {
             balance: 77665544332211 - balance_to_move,
