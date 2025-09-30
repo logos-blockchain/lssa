@@ -22,7 +22,9 @@ impl NSSAUserData {
     ) -> bool {
         let mut check_res = true;
         for (addr, key) in accounts_keys_map {
-            if &nssa::Address::from(&nssa::PublicKey::new_from_private_key(key)) != addr {
+            let expected_addr = nssa::Address::from(&nssa::PublicKey::new_from_private_key(key));
+            if &expected_addr != addr {
+                println!("{}, {}", expected_addr, addr);
                 check_res = false;
             }
         }
@@ -34,7 +36,9 @@ impl NSSAUserData {
     ) -> bool {
         let mut check_res = true;
         for (addr, (key, _)) in accounts_keys_map {
-            if nssa::Address::new(key.produce_user_address()) != *addr {
+            let expected_addr = nssa::Address::from(&key.nullifer_public_key);
+            if expected_addr != *addr {
+                println!("{}, {}", expected_addr, addr);
                 check_res = false;
             }
         }
@@ -88,7 +92,7 @@ impl NSSAUserData {
     /// Returns the address of new account
     pub fn generate_new_privacy_preserving_transaction_key_chain(&mut self) -> nssa::Address {
         let key_chain = KeyChain::new_os_random();
-        let address = nssa::Address::new(key_chain.produce_user_address());
+        let address = nssa::Address::from(&key_chain.nullifer_public_key);
 
         self.user_private_accounts
             .insert(address, (key_chain, nssa_core::account::Account::default()));
