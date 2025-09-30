@@ -18,10 +18,11 @@ impl WalletChainStore {
         for init_acc_data in config.initial_accounts.clone() {
             match init_acc_data {
                 InitialAccountData::Public(data) => {
-                    public_init_acc_map.insert(data.address, data.pub_sign_key);
+                    public_init_acc_map.insert(data.address.parse()?, data.pub_sign_key);
                 }
                 InitialAccountData::Private(data) => {
-                    private_init_acc_map.insert(data.address, (data.key_chain, data.account));
+                    private_init_acc_map
+                        .insert(data.address.parse()?, (data.key_chain, data.account));
                 }
             }
         }

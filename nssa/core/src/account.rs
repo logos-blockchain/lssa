@@ -1,4 +1,4 @@
-use crate::program::ProgramId;
+use crate::{address::Address, program::ProgramId};
 use serde::{Deserialize, Serialize};
 
 pub type Nonce = u128;
@@ -14,16 +14,17 @@ pub struct Account {
     pub nonce: Nonce,
 }
 
-/// A fingerprint of the owner of an account. This can be, for example, an `Address` in case the account
-/// is public, or a `NullifierPublicKey` in case the account is private.
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "host", test), derive(Debug))]
-pub struct AccountId(pub(super) [u8; 32]);
-impl AccountId {
-    pub fn new(value: [u8; 32]) -> Self {
-        Self(value)
-    }
-}
+// /// A fingerprint of the owner of an account. This can be, for example, an `Address` in case the account
+// /// is public, or a `NullifierPublicKey` in case the account is private.
+// #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+// #[cfg_attr(any(feature = "host", test), derive(Debug))]
+// pub struct AccountId(pub(super) [u8; 32]);
+// impl AccountId {
+//     pub fn new(value: [u8; 32]) -> Self {
+//         Self(value)
+//     }
+// }
+pub type AccountId = Address;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]

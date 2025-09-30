@@ -6,7 +6,6 @@ pub mod encryption;
 mod nullifier;
 pub mod program;
 
-#[cfg(feature = "host")]
 pub mod address;
 
 pub use circuit_io::{PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput};
