@@ -1,14 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
 use nssa_core::{
-    account::{Account, AccountWithMetadata},
-    program::validate_execution,
+    account::{Account, AccountWithMetadata}, address::Address, program::validate_execution
 };
 use sha2::{Digest, digest::FixedOutput};
 
 use crate::{
     V01State,
-    address::Address,
     error::NssaError,
     public_transaction::{Message, WitnessSet},
 };

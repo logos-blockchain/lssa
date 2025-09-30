@@ -1,3 +1,5 @@
+use nssa_core::address::Address;
+
 use crate::{PrivateKey, error::NssaError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,6 +26,13 @@ impl PublicKey {
 
     pub fn value(&self) -> &[u8; 32] {
         &self.0
+    }
+}
+
+impl From<&PublicKey> for Address {
+    fn from(value: &PublicKey) -> Self {
+        // TODO: Check specs
+        Self::new(*value.value())
     }
 }
 

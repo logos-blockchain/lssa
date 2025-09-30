@@ -1,12 +1,10 @@
 use crate::{
-    address::Address, error::NssaError, merkle_tree::MerkleTree,
+    error::NssaError, merkle_tree::MerkleTree,
     privacy_preserving_transaction::PrivacyPreservingTransaction, program::Program,
     public_transaction::PublicTransaction,
 };
 use nssa_core::{
-    Commitment, CommitmentSetDigest, MembershipProof, Nullifier,
-    account::Account,
-    program::{DEFAULT_PROGRAM_ID, ProgramId},
+    account::Account, address::Address, program::{ProgramId, DEFAULT_PROGRAM_ID}, Commitment, CommitmentSetDigest, MembershipProof, Nullifier
 };
 use std::collections::{HashMap, HashSet};
 
