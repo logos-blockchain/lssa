@@ -12,14 +12,13 @@ impl WalletCore {
         to: Address,
         balance_to_move: u128,
     ) -> Result<(SendTxResponse, nssa_core::SharedSecretKey), ExecutionFailureKind> {
-        let from_data = self.storage.user_data.get_private_account(&from).cloned();
-        let to_data = self.get_account(to).await;
-
-        let Some((from_keys, mut from_acc)) = from_data else {
+        let Some((from_keys, mut from_acc)) =
+            self.storage.user_data.get_private_account(&from).cloned()
+        else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
-        let Ok(to_acc) = to_data else {
+        let Ok(to_acc) = self.get_account(to).await else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
