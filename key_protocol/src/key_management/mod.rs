@@ -22,17 +22,6 @@ pub struct KeyChain {
     pub incoming_viewing_public_key: IncomingViewingPublicKey,
 }
 
-pub fn produce_user_address_foreign_account(
-    npk: &NullifierPublicKey,
-    ipk: &IncomingViewingPublicKey,
-) -> [u8; 32] {
-    let mut hasher = sha2::Sha256::new();
-
-    hasher.update(npk);
-    hasher.update(ipk.to_bytes());
-
-    <TreeHashType>::from(hasher.finalize_fixed())
-}
 
 impl KeyChain {
     pub fn new_os_random() -> Self {
