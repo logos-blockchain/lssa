@@ -60,17 +60,6 @@ impl Display for Address {
     }
 }
 
-#[cfg(feature = "host")]
-impl From<&Address> for AccountId {
-    fn from(address: &Address) -> Self {
-        const PUBLIC_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.1/AccountId/Public/\x00\x00\x00\x00";
-
-        let mut bytes = PUBLIC_ACCOUNT_ID_PREFIX.to_vec();
-        bytes.extend_from_slice(&address.value);
-        AccountId::new(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::account::AccountId;
@@ -103,18 +92,5 @@ mod tests {
         let hex_str = "00".repeat(33); // 66 chars = 33 bytes
         let result = hex_str.parse::<Address>().unwrap_err();
         assert!(matches!(result, AddressError::InvalidLength(_)));
-    }
-
-    #[test]
-    fn test_account_id_from_address() {
-        let address: Address = "37".repeat(32).parse().unwrap();
-        let expected_account_id = AccountId::new([
-            93, 223, 66, 245, 78, 230, 157, 188, 110, 161, 134, 255, 137, 177, 220, 88, 37, 44,
-            243, 91, 236, 4, 36, 147, 185, 112, 21, 49, 234, 4, 107, 185,
-        ]);
-
-        let account_id = AccountId::from(&address);
-
-        assert_eq!(account_id, expected_account_id);
     }
 }

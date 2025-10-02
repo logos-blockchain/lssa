@@ -2,6 +2,8 @@ use nssa_core::address::Address;
 
 use crate::{PrivateKey, error::NssaError};
 
+use sha2::{Digest, Sha256};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicKey([u8; 32]);
 
@@ -30,9 +32,13 @@ impl PublicKey {
 }
 
 impl From<&PublicKey> for Address {
-    fn from(value: &PublicKey) -> Self {
-        // TODO: Check specs
-        Self::new(*value.value())
+    fn from(key: &PublicKey) -> Self {
+        const PUBLIC_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.1/AccountId/Public/\x00\x00\x00\x00";
+
+        let mut hasher = Sha256::new();
+        hasher.update(PUBLIC_ACCOUNT_ID_PREFIX);
+        hasher.update(key.0);
+        Self::new(hasher.finalize().into())
     }
 }
 

@@ -1,4 +1,3 @@
-// pub mod address;
 pub mod encoding;
 pub mod error;
 mod merkle_tree;

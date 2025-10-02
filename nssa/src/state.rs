@@ -808,7 +808,7 @@ pub mod tests {
         let sender = AccountWithMetadata::new(
             state.get_account_by_address(&sender_keys.address()),
             true,
-            &sender_keys.address(),
+            sender_keys.address(),
         );
 
         let sender_nonce = sender.account.nonce;
@@ -913,7 +913,7 @@ pub mod tests {
         let recipient_pre = AccountWithMetadata::new(
             state.get_account_by_address(recipient_address),
             false,
-            recipient_address,
+            *recipient_address,
         );
 
         let esk = [3; 32];

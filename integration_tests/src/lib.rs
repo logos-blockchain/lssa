@@ -26,8 +26,8 @@ struct Args {
     test_name: String,
 }
 
-pub const ACC_SENDER: &str = "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f";
-pub const ACC_RECEIVER: &str = "4d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766";
+pub const ACC_SENDER: &str = "0eee24287296ba55278f1e5403be014754866366388730303c2889be17ada065";
+pub const ACC_RECEIVER: &str = "9e3d8e654d440e95293aa2dceceb137899a59535e952f747068e7a0ee30965f2";
 
 pub const ACC_SENDER_PRIVATE: &str =
     "9cb6b0035320266e430eac9d96745769e7efcf30d2b9cc21ff000b3f873dc2a8";
@@ -389,10 +389,7 @@ pub async fn test_success_token_program() {
     // Bytes from 1 to 33 represent the id of the token this account is associated with.
     // In this example, this is a token account of the newly created token, so it is expected
     // to be equal to the address of the token definition account.
-    assert_eq!(
-        &supply_acc.data[1..33],
-        nssa::AccountId::from(&definition_addr).to_bytes()
-    );
+    assert_eq!(&supply_acc.data[1..33], definition_addr.to_bytes());
     assert_eq!(
         u128::from_le_bytes(supply_acc.data[33..].try_into().unwrap()),
         37
@@ -419,10 +416,7 @@ pub async fn test_success_token_program() {
     // First byte equal to 1 means it's a token holding account
     assert_eq!(supply_acc.data[0], 1);
     // Bytes from 1 to 33 represent the id of the token this account is associated with.
-    assert_eq!(
-        &supply_acc.data[1..33],
-        nssa::AccountId::from(&definition_addr).to_bytes()
-    );
+    assert_eq!(&supply_acc.data[1..33], definition_addr.to_bytes());
     assert_eq!(
         u128::from_le_bytes(supply_acc.data[33..].try_into().unwrap()),
         30
@@ -440,10 +434,7 @@ pub async fn test_success_token_program() {
     // First byte equal to 1 means it's a token holding account
     assert_eq!(recipient_acc.data[0], 1);
     // Bytes from 1 to 33 represent the id of the token this account is associated with.
-    assert_eq!(
-        &recipient_acc.data[1..33],
-        nssa::AccountId::from(&definition_addr).to_bytes()
-    );
+    assert_eq!(&recipient_acc.data[1..33], definition_addr.to_bytes());
     assert_eq!(
         u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
         7
