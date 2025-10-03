@@ -304,16 +304,16 @@ pub enum Command {
         amount: u128,
     },
     ///Claim account `acc_addr` generated in transaction `tx_hash`, using secret `sh_secret` at ciphertext id `ciph_id`
-    ClaimPrivateAccount {
+    FetchPrivateAccount {
         ///tx_hash - valid 32 byte hex string
         #[arg(long)]
         tx_hash: String,
         ///acc_addr - valid 32 byte hex string
         #[arg(long)]
         acc_addr: String,
-        ///ciph_id - id of cipher in transaction
+        ///output_id - id of the output in the transaction
         #[arg(long)]
-        ciph_id: usize,
+        output_id: usize,
     },
     ///Get private account with `addr` from storage
     GetPrivateAccount {
@@ -330,17 +330,17 @@ pub enum Command {
         tx_hash: String,
     },
     ///Get account `addr` balance
-    GetAccountBalance {
+    GetPublicAccountBalance {
         #[arg(short, long)]
         addr: String,
     },
     ///Get account `addr` nonce
-    GetAccountNonce {
+    GetPublicAccountNonce {
         #[arg(short, long)]
         addr: String,
     },
     ///Get account at address `addr`
-    GetAccount {
+    GetPublicAccount {
         #[arg(short, long)]
         addr: String,
     },
@@ -671,10 +671,10 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash }
         }
-        Command::ClaimPrivateAccount {
+        Command::FetchPrivateAccount {
             tx_hash,
             acc_addr,
-            ciph_id,
+            output_id: ciph_id,
         } => {
             let acc_addr: Address = acc_addr.parse().unwrap();
 
@@ -761,7 +761,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::GetAccountBalance { addr } => {
+        Command::GetPublicAccountBalance { addr } => {
             let addr = Address::from_str(&addr)?;
 
             let balance = wallet_core.get_account_balance(addr).await?;
@@ -769,7 +769,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::GetAccountNonce { addr } => {
+        Command::GetPublicAccountNonce { addr } => {
             let addr = Address::from_str(&addr)?;
 
             let nonce = wallet_core.get_accounts_nonces(vec![addr]).await?[0];
@@ -777,7 +777,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::GetAccount { addr } => {
+        Command::GetPublicAccount { addr } => {
             let addr: Address = addr.parse()?;
             let account = wallet_core.get_account_public(addr).await?;
             let account_hr: HumanReadableAccount = account.clone().into();

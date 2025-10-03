@@ -467,17 +467,17 @@ pub async fn test_success_private_transfer_to_another_owned_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let command = Command::ClaimPrivateAccount {
+    let command = Command::FetchPrivateAccount {
         tx_hash: tx_hash.clone(),
         acc_addr: from.to_string(),
-        ciph_id: 0,
+        output_id: 0,
     };
     wallet::execute_subcommand(command).await.unwrap();
 
-    let command = Command::ClaimPrivateAccount {
+    let command = Command::FetchPrivateAccount {
         tx_hash,
         acc_addr: to.to_string(),
-        ciph_id: 1,
+        output_id: 1,
     };
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -519,10 +519,10 @@ pub async fn test_success_private_transfer_to_another_foreign_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let command = Command::ClaimPrivateAccount {
+    let command = Command::FetchPrivateAccount {
         tx_hash: tx_hash.clone(),
         acc_addr: from.to_string(),
-        ciph_id: 0,
+        output_id: 0,
     };
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -582,10 +582,10 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
 
     let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
 
-    let command = Command::ClaimPrivateAccount {
+    let command = Command::FetchPrivateAccount {
         tx_hash,
         acc_addr: to_addr.to_string(),
-        ciph_id: 1,
+        output_id: 1,
     };
     wallet::execute_subcommand(command).await.unwrap();
     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
@@ -633,10 +633,10 @@ pub async fn test_success_deshielded_transfer_to_another_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let command = Command::ClaimPrivateAccount {
+    let command = Command::FetchPrivateAccount {
         tx_hash,
         acc_addr: from.to_string(),
-        ciph_id: 0,
+        output_id: 0,
     };
     wallet::execute_subcommand(command).await.unwrap();
     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
@@ -680,10 +680,10 @@ pub async fn test_success_shielded_transfer_to_another_owned_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let command = Command::ClaimPrivateAccount {
+    let command = Command::FetchPrivateAccount {
         tx_hash,
         acc_addr: to.to_string(),
-        ciph_id: 0,
+        output_id: 0,
     };
     wallet::execute_subcommand(command).await.unwrap();
     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
@@ -961,8 +961,8 @@ async fn verify_commitment_is_in_state(
     commitment: Commitment,
     seq_client: &SequencerClient,
 ) -> bool {
-    match seq_client.get_proof_for_commitment(commitment).await {
-        Ok(Some(_)) => true,
-        _ => false,
-    }
+    matches!(
+        seq_client.get_proof_for_commitment(commitment).await,
+        Ok(Some(_))
+    )
 }
