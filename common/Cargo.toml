@@ -18,6 +18,8 @@ elliptic-curve.workspace = true
 hex.workspace = true
 nssa-core = { path = "../nssa/core", features = ["host"] }
 
+borsh.workspace = true
+
 [dependencies.secp256k1-zkp]
 workspace = true
 features = ["std", "rand-std", "rand", "serde", "global-context"]

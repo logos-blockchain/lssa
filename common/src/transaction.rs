@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use k256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -34,13 +35,15 @@ pub type CipherText = Vec<u8>;
 pub type Nonce = GenericArray<u8, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>>;
 pub type Tag = u8;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize,
+)]
 pub enum TxKind {
     Public,
     PrivacyPreserving,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 ///General transaction object
 pub struct EncodedTransaction {
     pub tx_kind: TxKind,
@@ -174,21 +177,10 @@ impl ActionData {
 impl EncodedTransaction {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
     pub fn hash(&self) -> TreeHashType {
-        let bytes_to_hash = self.to_bytes();
+        let bytes_to_hash = borsh::to_vec(&self).unwrap();
         let mut hasher = sha2::Sha256::new();
         hasher.update(&bytes_to_hash);
         TreeHashType::from(hasher.finalize_fixed())
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        // TODO: Remove `unwrap` by implementing a `to_bytes` method
-        // that deterministically encodes all transaction fields to bytes
-        // and guarantees serialization will succeed.
-        serde_json::to_vec(&self).unwrap()
-    }
-
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        serde_json::from_slice(&bytes).unwrap()
     }
 
     pub fn log(&self) {
@@ -221,7 +213,7 @@ mod tests {
     fn test_transaction_hash_is_sha256_of_json_bytes() {
         let body = test_transaction_body();
         let expected_hash = {
-            let data = body.to_bytes();
+            let data = borsh::to_vec(&body).unwrap();
             let mut hasher = sha2::Sha256::new();
             hasher.update(&data);
             TreeHashType::from(hasher.finalize_fixed())
@@ -236,8 +228,8 @@ mod tests {
     fn test_to_bytes_from_bytes() {
         let body = test_transaction_body();
 
-        let body_bytes = body.to_bytes();
-        let body_new = EncodedTransaction::from_bytes(body_bytes);
+        let body_bytes = borsh::to_vec(&body).unwrap();
+        let body_new = borsh::from_slice::<EncodedTransaction>(&body_bytes).unwrap();
 
         assert_eq!(body, body_new);
     }

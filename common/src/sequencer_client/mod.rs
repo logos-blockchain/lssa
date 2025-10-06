@@ -151,7 +151,7 @@ impl SequencerClient {
         let transaction = EncodedTransaction::from(NSSATransaction::Public(transaction));
 
         let tx_req = SendTxRequest {
-            transaction: transaction.to_bytes(),
+            transaction: borsh::to_vec(&transaction).unwrap(),
         };
 
         let req = serde_json::to_value(tx_req)?;
@@ -171,7 +171,7 @@ impl SequencerClient {
         let transaction = EncodedTransaction::from(NSSATransaction::PrivacyPreserving(transaction));
 
         let tx_req = SendTxRequest {
-            transaction: transaction.to_bytes(),
+            transaction: borsh::to_vec(&transaction).unwrap(),
         };
 
         let req = serde_json::to_value(tx_req)?;

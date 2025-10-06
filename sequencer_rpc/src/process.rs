@@ -77,7 +77,7 @@ impl JsonHandler {
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
-        let tx = EncodedTransaction::from_bytes(send_tx_req.transaction);
+        let tx = borsh::from_slice::<EncodedTransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = hex::encode(tx.hash());
 
         {
@@ -107,7 +107,7 @@ impl JsonHandler {
         };
 
         let helperstruct = GetBlockDataResponse {
-            block: HashableBlockData::from(block).to_bytes(),
+            block: borsh::to_vec(&HashableBlockData::from(block)).unwrap(),
         };
 
         respond(helperstruct)
@@ -243,7 +243,7 @@ impl JsonHandler {
                 .store
                 .block_store
                 .get_transaction_by_hash(hash)
-                .map(|tx| tx.to_bytes())
+                .map(|tx| borsh::to_vec(&tx).unwrap())
         };
         let base64_encoded = transaction.map(|tx| general_purpose::STANDARD.encode(tx));
         let helperstruct = GetTransactionByHashResponse {
@@ -644,7 +644,7 @@ mod tests {
     async fn test_get_transaction_by_hash_for_existing_transaction() {
         let (json_handler, _, tx) = components_for_tests();
         let tx_hash_hex = hex::encode(tx.hash());
-        let expected_base64_encoded = general_purpose::STANDARD.encode(tx.to_bytes());
+        let expected_base64_encoded = general_purpose::STANDARD.encode(borsh::to_vec(&tx).unwrap());
 
         let request = serde_json::json!({
             "jsonrpc": "2.0",
