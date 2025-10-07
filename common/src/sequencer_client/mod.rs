@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::rpc_primitives::requests::{
     GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-    GetProofByCommitmentRequest, GetProofByCommitmentResponse, GetTransactionByHashRequest,
+    GetProofForCommitmentRequest, GetProofForCommitmentResponse, GetTransactionByHashRequest,
     GetTransactionByHashResponse,
 };
 use crate::sequencer_client::json::AccountInitialData;
@@ -151,7 +151,7 @@ impl SequencerClient {
         let transaction = EncodedTransaction::from(NSSATransaction::Public(transaction));
 
         let tx_req = SendTxRequest {
-            transaction: transaction.to_bytes(),
+            transaction: borsh::to_vec(&transaction).unwrap(),
         };
 
         let req = serde_json::to_value(tx_req)?;
@@ -171,7 +171,7 @@ impl SequencerClient {
         let transaction = EncodedTransaction::from(NSSATransaction::PrivacyPreserving(transaction));
 
         let tx_req = SendTxRequest {
-            transaction: transaction.to_bytes(),
+            transaction: borsh::to_vec(&transaction).unwrap(),
         };
 
         let req = serde_json::to_value(tx_req)?;
@@ -222,7 +222,7 @@ impl SequencerClient {
         &self,
         commitment: nssa_core::Commitment,
     ) -> Result<Option<nssa_core::MembershipProof>, SequencerClientError> {
-        let acc_req = GetProofByCommitmentRequest { commitment };
+        let acc_req = GetProofForCommitmentRequest { commitment };
 
         let req = serde_json::to_value(acc_req).unwrap();
 
@@ -231,7 +231,7 @@ impl SequencerClient {
             .await
             .unwrap();
 
-        let resp_deser = serde_json::from_value::<GetProofByCommitmentResponse>(resp)
+        let resp_deser = serde_json::from_value::<GetProofForCommitmentResponse>(resp)
             .unwrap()
             .membership_proof;
 

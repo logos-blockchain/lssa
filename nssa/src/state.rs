@@ -1,11 +1,12 @@
 use crate::{
-    address::Address, error::NssaError, merkle_tree::MerkleTree,
+    error::NssaError, merkle_tree::MerkleTree,
     privacy_preserving_transaction::PrivacyPreservingTransaction, program::Program,
     public_transaction::PublicTransaction,
 };
 use nssa_core::{
     Commitment, CommitmentSetDigest, MembershipProof, Nullifier,
     account::Account,
+    address::Address,
     program::{DEFAULT_PROGRAM_ID, ProgramId},
 };
 use std::collections::{HashMap, HashSet};
@@ -810,7 +811,7 @@ pub mod tests {
         let sender = AccountWithMetadata::new(
             state.get_account_by_address(&sender_keys.address()),
             true,
-            &sender_keys.address(),
+            sender_keys.address(),
         );
 
         let sender_nonce = sender.account.nonce;
@@ -915,7 +916,7 @@ pub mod tests {
         let recipient_pre = AccountWithMetadata::new(
             state.get_account_by_address(recipient_address),
             false,
-            recipient_address,
+            *recipient_address,
         );
 
         let esk = [3; 32];

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPublic {
-    pub address: nssa::Address,
+    pub address: String,
     pub pub_sign_key: nssa::PrivateKey,
 }
 
@@ -16,7 +16,7 @@ pub struct PersistentAccountDataPublic {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPrivate {
-    pub address: nssa::Address,
+    pub address: String,
     pub account: nssa_core::account::Account,
     pub key_chain: KeyChain,
 }
@@ -49,8 +49,8 @@ pub enum PersistentAccountData {
 impl InitialAccountData {
     pub fn address(&self) -> nssa::Address {
         match &self {
-            Self::Public(acc) => acc.address,
-            Self::Private(acc) => acc.address,
+            Self::Public(acc) => acc.address.parse().unwrap(),
+            Self::Private(acc) => acc.address.parse().unwrap(),
         }
     }
 }

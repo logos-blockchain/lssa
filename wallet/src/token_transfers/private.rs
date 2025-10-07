@@ -1,61 +1,58 @@
 use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
-use nssa::Address;
+use nssa::{
+    Address, PrivacyPreservingTransaction,
+    privacy_preserving_transaction::{circuit, message::Message, witness_set::WitnessSet},
+    program::Program,
+};
+use nssa_core::{
+    Commitment, NullifierPublicKey, SharedSecretKey, account::AccountWithMetadata,
+    encryption::IncomingViewingPublicKey,
+};
 
-use crate::WalletCore;
+use crate::{WalletCore, helperfunctions::produce_random_nonces};
 
 impl WalletCore {
     pub async fn send_private_native_token_transfer_outer_account(
         &self,
         from: Address,
-        to_npk: nssa_core::NullifierPublicKey,
-        to_ipk: nssa_core::encryption::IncomingViewingPublicKey,
+        to_npk: NullifierPublicKey,
+        to_ipk: IncomingViewingPublicKey,
         balance_to_move: u128,
-    ) -> Result<(SendTxResponse, nssa_core::SharedSecretKey), ExecutionFailureKind> {
-        let from_data = self.storage.user_data.get_private_account(&from).cloned();
-
-        let Some((from_keys, mut from_acc)) = from_data else {
+    ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
+        let Some((from_keys, from_acc)) =
+            self.storage.user_data.get_private_account(&from).cloned()
+        else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
         let to_acc = nssa_core::account::Account::default();
 
         if from_acc.balance >= balance_to_move {
-            let program = nssa::program::Program::authenticated_transfer_program();
+            let program = Program::authenticated_transfer_program();
 
-            from_acc.program_owner = program.id();
+            let from_npk = from_keys.nullifer_public_key;
+            let from_ipk = from_keys.incoming_viewing_public_key;
 
-            let sender_commitment =
-                nssa_core::Commitment::new(&from_keys.nullifer_public_key, &from_acc);
+            let sender_commitment = Commitment::new(&from_npk, &from_acc);
 
-            let sender_pre = nssa_core::account::AccountWithMetadata {
-                account: from_acc.clone(),
-                is_authorized: true,
-                account_id: (&from_keys.nullifer_public_key).into(),
-            };
+            let sender_pre = AccountWithMetadata::new(from_acc.clone(), true, &from_npk);
 
-            let recipient_pre = nssa_core::account::AccountWithMetadata {
-                account: to_acc.clone(),
-                is_authorized: false,
-                account_id: (&to_npk).into(),
-            };
+            let recipient_pre = AccountWithMetadata::new(to_acc.clone(), false, &to_npk);
 
-            let eph_holder = EphemeralKeyHolder::new(
-                to_npk.clone(),
-                from_keys.private_key_holder.outgoing_viewing_secret_key,
-                from_acc.nonce.try_into().unwrap(),
-            );
+            let eph_holder = EphemeralKeyHolder::new(&to_npk);
 
-            let shared_secret = eph_holder.calculate_shared_secret_sender(to_ipk.clone());
+            let shared_secret_from = eph_holder.calculate_shared_secret_sender(&from_ipk);
+            let shared_secret_to = eph_holder.calculate_shared_secret_sender(&to_ipk);
 
-            let (output, proof) = nssa::privacy_preserving_transaction::circuit::execute_and_prove(
+            let (output, proof) = circuit::execute_and_prove(
                 &[sender_pre, recipient_pre],
-                &nssa::program::Program::serialize_instruction(balance_to_move).unwrap(),
+                &Program::serialize_instruction(balance_to_move).unwrap(),
                 &[1, 2],
-                &[from_acc.nonce + 1, to_acc.nonce + 1],
+                &produce_random_nonces(2),
                 &[
-                    (from_keys.nullifer_public_key.clone(), shared_secret.clone()),
-                    (to_npk.clone(), shared_secret.clone()),
+                    (from_npk.clone(), shared_secret_from.clone()),
+                    (to_npk.clone(), shared_secret_to.clone()),
                 ],
                 &[(
                     from_keys.private_key_holder.nullifier_secret_key,
@@ -69,105 +66,83 @@ impl WalletCore {
             )
             .unwrap();
 
-            let message =
-                nssa::privacy_preserving_transaction::message::Message::try_from_circuit_output(
-                    vec![],
-                    vec![],
-                    vec![
-                        (
-                            from_keys.nullifer_public_key.clone(),
-                            from_keys.incoming_viewing_public_key.clone(),
-                            eph_holder.generate_ephemeral_public_key(),
-                        ),
-                        (
-                            to_npk.clone(),
-                            to_ipk.clone(),
-                            eph_holder.generate_ephemeral_public_key(),
-                        ),
-                    ],
-                    output,
-                )
-                .unwrap();
+            let message = Message::try_from_circuit_output(
+                vec![],
+                vec![],
+                vec![
+                    (
+                        from_npk.clone(),
+                        from_ipk.clone(),
+                        eph_holder.generate_ephemeral_public_key(),
+                    ),
+                    (
+                        to_npk.clone(),
+                        to_ipk.clone(),
+                        eph_holder.generate_ephemeral_public_key(),
+                    ),
+                ],
+                output,
+            )
+            .unwrap();
 
-            let witness_set =
-                nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
-                    &message,
-                    proof,
-                    &[],
-                );
+            let witness_set = WitnessSet::for_message(&message, proof, &[]);
 
-            let tx = nssa::privacy_preserving_transaction::PrivacyPreservingTransaction::new(
-                message,
-                witness_set,
-            );
+            let tx = PrivacyPreservingTransaction::new(message, witness_set);
 
             Ok((
                 self.sequencer_client.send_tx_private(tx).await?,
-                shared_secret,
+                [shared_secret_from, shared_secret_to],
             ))
         } else {
             Err(ExecutionFailureKind::InsufficientFundsError)
         }
     }
 
-    pub async fn send_private_native_token_transfer(
+    pub async fn send_private_native_token_transfer_owned_account(
         &self,
         from: Address,
         to: Address,
         balance_to_move: u128,
-    ) -> Result<(SendTxResponse, nssa_core::SharedSecretKey), ExecutionFailureKind> {
-        let from_data = self.storage.user_data.get_private_account(&from).cloned();
-        let to_data = self.storage.user_data.get_private_account(&to).cloned();
-
-        let Some((from_keys, mut from_acc)) = from_data else {
+    ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
+        let Some((from_keys, from_acc)) =
+            self.storage.user_data.get_private_account(&from).cloned()
+        else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
-        let Some((to_keys, mut to_acc)) = to_data else {
+        let Some((to_keys, to_acc)) = self.storage.user_data.get_private_account(&to).cloned()
+        else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
+        let from_npk = from_keys.nullifer_public_key;
+        let from_ipk = from_keys.incoming_viewing_public_key;
         let to_npk = to_keys.nullifer_public_key.clone();
         let to_ipk = to_keys.incoming_viewing_public_key.clone();
 
         if from_acc.balance >= balance_to_move {
-            let program = nssa::program::Program::authenticated_transfer_program();
+            let program = Program::authenticated_transfer_program();
 
-            from_acc.program_owner = program.id();
-            to_acc.program_owner = program.id();
+            let sender_commitment = Commitment::new(&from_npk, &from_acc);
+            let receiver_commitment = Commitment::new(&to_npk, &to_acc);
 
-            let sender_commitment =
-                nssa_core::Commitment::new(&from_keys.nullifer_public_key, &from_acc);
-            let receiver_commitment =
-                nssa_core::Commitment::new(&to_keys.nullifer_public_key, &to_acc);
+            let sender_pre = AccountWithMetadata::new(from_acc.clone(), true, &from_npk);
+            let recipient_pre = AccountWithMetadata::new(to_acc.clone(), true, &to_npk);
 
-            let sender_pre = nssa_core::account::AccountWithMetadata {
-                account: from_acc.clone(),
-                is_authorized: true,
-                account_id: (&from_keys.nullifer_public_key).into(),
-            };
-            let recipient_pre = nssa_core::account::AccountWithMetadata {
-                account: to_acc.clone(),
-                is_authorized: true,
-                account_id: (&to_npk).into(),
-            };
+            let eph_holder_from = EphemeralKeyHolder::new(&from_npk);
+            let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_ipk);
 
-            let eph_holder = EphemeralKeyHolder::new(
-                to_npk.clone(),
-                from_keys.private_key_holder.outgoing_viewing_secret_key,
-                from_acc.nonce.try_into().unwrap(),
-            );
+            let eph_holder_to = EphemeralKeyHolder::new(&to_npk);
+            let shared_secret_to = eph_holder_to.calculate_shared_secret_sender(&to_ipk);
 
-            let shared_secret = eph_holder.calculate_shared_secret_sender(to_ipk.clone());
-
-            let (output, proof) = nssa::privacy_preserving_transaction::circuit::execute_and_prove(
+            let (output, proof) = circuit::execute_and_prove(
                 &[sender_pre, recipient_pre],
-                &nssa::program::Program::serialize_instruction(balance_to_move).unwrap(),
+                &Program::serialize_instruction(balance_to_move).unwrap(),
                 &[1, 1],
-                &[from_acc.nonce + 1, to_acc.nonce + 1],
+                &produce_random_nonces(2),
                 &[
-                    (from_keys.nullifer_public_key.clone(), shared_secret.clone()),
-                    (to_npk.clone(), shared_secret.clone()),
+                    (from_npk.clone(), shared_secret_from.clone()),
+                    (to_npk.clone(), shared_secret_to.clone()),
                 ],
                 &[
                     (
@@ -191,41 +166,31 @@ impl WalletCore {
             )
             .unwrap();
 
-            let message =
-                nssa::privacy_preserving_transaction::message::Message::try_from_circuit_output(
-                    vec![],
-                    vec![],
-                    vec![
-                        (
-                            from_keys.nullifer_public_key.clone(),
-                            from_keys.incoming_viewing_public_key.clone(),
-                            eph_holder.generate_ephemeral_public_key(),
-                        ),
-                        (
-                            to_npk.clone(),
-                            to_ipk.clone(),
-                            eph_holder.generate_ephemeral_public_key(),
-                        ),
-                    ],
-                    output,
-                )
-                .unwrap();
+            let message = Message::try_from_circuit_output(
+                vec![],
+                vec![],
+                vec![
+                    (
+                        from_npk.clone(),
+                        from_ipk.clone(),
+                        eph_holder_from.generate_ephemeral_public_key(),
+                    ),
+                    (
+                        to_npk.clone(),
+                        to_ipk.clone(),
+                        eph_holder_to.generate_ephemeral_public_key(),
+                    ),
+                ],
+                output,
+            )
+            .unwrap();
 
-            let witness_set =
-                nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
-                    &message,
-                    proof,
-                    &[],
-                );
-
-            let tx = nssa::privacy_preserving_transaction::PrivacyPreservingTransaction::new(
-                message,
-                witness_set,
-            );
+            let witness_set = WitnessSet::for_message(&message, proof, &[]);
+            let tx = PrivacyPreservingTransaction::new(message, witness_set);
 
             Ok((
                 self.sequencer_client.send_tx_private(tx).await?,
-                shared_secret,
+                [shared_secret_from, shared_secret_to],
             ))
         } else {
             Err(ExecutionFailureKind::InsufficientFundsError)

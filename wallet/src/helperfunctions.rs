@@ -1,9 +1,11 @@
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use nssa_core::account::Nonce;
+use rand::{RngCore, rngs::OsRng};
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
 use anyhow::Result;
 use key_protocol::key_protocol_core::NSSAUserData;
-use nssa::{Account, Address};
+use nssa::Account;
 use serde::Serialize;
 
 use crate::{
@@ -26,11 +28,6 @@ pub fn fetch_config() -> Result<WalletConfig> {
     let reader = BufReader::new(file);
 
     Ok(serde_json::from_reader(reader)?)
-}
-
-// ToDo: Replace with structures conversion in future
-pub fn produce_account_addr_from_hex(hex_str: String) -> Result<Address> {
-    Ok(hex_str.parse()?)
 }
 
 /// Fetch list of accounts stored at `NSSA_WALLET_HOME_DIR/curr_accounts.json`
@@ -80,6 +77,12 @@ pub fn produce_data_for_storage(user_data: &NSSAUserData) -> Vec<PersistentAccou
     }
 
     vec_for_storage
+}
+
+pub(crate) fn produce_random_nonces(size: usize) -> Vec<Nonce> {
+    let mut result = vec![[0; 16]; size];
+    result.iter_mut().for_each(|bytes| OsRng.fill_bytes(bytes));
+    result.into_iter().map(Nonce::from_le_bytes).collect()
 }
 
 /// Human-readable representation of an account.

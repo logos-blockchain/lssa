@@ -7,7 +7,7 @@ pub enum DbError {
     },
     #[error("Serialization error")]
     SerializationError {
-        error: serde_json::Error,
+        error: borsh::io::Error,
         additional_info: Option<String>,
     },
     #[error("Logic Error")]
@@ -22,9 +22,9 @@ impl DbError {
         }
     }
 
-    pub fn serde_cast_message(serr: serde_json::Error, message: Option<String>) -> Self {
+    pub fn borsh_cast_message(berr: borsh::io::Error, message: Option<String>) -> Self {
         Self::SerializationError {
-            error: serr,
+            error: berr,
             additional_info: message,
         }
     }

@@ -140,7 +140,7 @@ impl Secp256k1Point {
 
 impl AccountId {
     pub fn to_bytes(&self) -> [u8; 32] {
-        self.0
+        *self.value()
     }
 }
 

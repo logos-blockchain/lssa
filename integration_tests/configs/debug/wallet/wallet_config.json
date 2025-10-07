@@ -9,7 +9,7 @@
     "initial_accounts": [
         {
             "Public": {
-                "address": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+                "address": "0eee24287296ba55278f1e5403be014754866366388730303c2889be17ada065",
                 "pub_sign_key": [
                     1,
                     1,
@@ -48,7 +48,7 @@
         },
         {
             "Public": {
-                "address": "4d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766",
+                "address": "9e3d8e654d440e95293aa2dceceb137899a59535e952f747068e7a0ee30965f2",
                 "pub_sign_key": [
                     2,
                     2,
@@ -87,7 +87,7 @@
         },
         {
             "Private": {
-                "address": "6ffe0893c4b2c956fdb769b11fe4e3b2dd36ac4bd0ad90c810844051747c8c04",
+                "address": "9cb6b0035320266e430eac9d96745769e7efcf30d2b9cc21ff000b3f873dc2a8",
                 "account": {
                     "program_owner": [
                         0,
@@ -316,7 +316,7 @@
         },
         {
             "Private": {
-                "address": "4ee9de60e33da96fd72929f1485fb365bcc9c1634dd44e4ba55b1ab96692674b",
+                "address": "a55f4f98d2f265c91d8a9868564242d8070b9bf7180a29363f52eb76988636fd",
                 "account": {
                     "program_owner": [
                         0,
