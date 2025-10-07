@@ -1,12 +1,18 @@
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use std::{path::PathBuf, time::Duration};
 
 use actix_web::dev::ServerHandle;
 use anyhow::Result;
 use clap::Parser;
-use common::sequencer_client::SequencerClient;
+use common::{
+    sequencer_client::SequencerClient,
+    transaction::{EncodedTransaction, NSSATransaction},
+};
 use log::{info, warn};
-use nssa::program::Program;
-use nssa_core::{NullifierPublicKey, encryption::shared_key_derivation::Secp256k1Point};
+use nssa::{Address, PrivacyPreservingTransaction, program::Program};
+use nssa_core::{
+    Commitment, NullifierPublicKey, encryption::shared_key_derivation::Secp256k1Point,
+};
 use sequencer_core::config::SequencerConfig;
 use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
@@ -14,7 +20,7 @@ use tokio::task::JoinHandle;
 use wallet::{
     Command, SubcommandReturnValue, WalletCore,
     config::PersistentAccountData,
-    helperfunctions::{fetch_config, fetch_persistent_accounts, produce_account_addr_from_hex},
+    helperfunctions::{fetch_config, fetch_persistent_accounts},
 };
 
 #[derive(Parser, Debug)]
@@ -26,13 +32,13 @@ struct Args {
     test_name: String,
 }
 
-pub const ACC_SENDER: &str = "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f";
-pub const ACC_RECEIVER: &str = "4d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766";
+pub const ACC_SENDER: &str = "0eee24287296ba55278f1e5403be014754866366388730303c2889be17ada065";
+pub const ACC_RECEIVER: &str = "9e3d8e654d440e95293aa2dceceb137899a59535e952f747068e7a0ee30965f2";
 
 pub const ACC_SENDER_PRIVATE: &str =
-    "6ffe0893c4b2c956fdb769b11fe4e3b2dd36ac4bd0ad90c810844051747c8c04";
+    "9cb6b0035320266e430eac9d96745769e7efcf30d2b9cc21ff000b3f873dc2a8";
 pub const ACC_RECEIVER_PRIVATE: &str =
-    "4ee9de60e33da96fd72929f1485fb365bcc9c1634dd44e4ba55b1ab96692674b";
+    "a55f4f98d2f265c91d8a9868564242d8070b9bf7180a29363f52eb76988636fd";
 
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 
@@ -389,10 +395,7 @@ pub async fn test_success_token_program() {
     // Bytes from 1 to 33 represent the id of the token this account is associated with.
     // In this example, this is a token account of the newly created token, so it is expected
     // to be equal to the address of the token definition account.
-    assert_eq!(
-        &supply_acc.data[1..33],
-        nssa::AccountId::from(&definition_addr).to_bytes()
-    );
+    assert_eq!(&supply_acc.data[1..33], definition_addr.to_bytes());
     assert_eq!(
         u128::from_le_bytes(supply_acc.data[33..].try_into().unwrap()),
         37
@@ -419,10 +422,7 @@ pub async fn test_success_token_program() {
     // First byte equal to 1 means it's a token holding account
     assert_eq!(supply_acc.data[0], 1);
     // Bytes from 1 to 33 represent the id of the token this account is associated with.
-    assert_eq!(
-        &supply_acc.data[1..33],
-        nssa::AccountId::from(&definition_addr).to_bytes()
-    );
+    assert_eq!(&supply_acc.data[1..33], definition_addr.to_bytes());
     assert_eq!(
         u128::from_le_bytes(supply_acc.data[33..].try_into().unwrap()),
         30
@@ -440,10 +440,7 @@ pub async fn test_success_token_program() {
     // First byte equal to 1 means it's a token holding account
     assert_eq!(recipient_acc.data[0], 1);
     // Bytes from 1 to 33 represent the id of the token this account is associated with.
-    assert_eq!(
-        &recipient_acc.data[1..33],
-        nssa::AccountId::from(&definition_addr).to_bytes()
-    );
+    assert_eq!(&recipient_acc.data[1..33], definition_addr.to_bytes());
     assert_eq!(
         u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
         7
@@ -452,159 +449,118 @@ pub async fn test_success_token_program() {
 
 pub async fn test_success_private_transfer_to_another_owned_account() {
     info!("test_success_private_transfer_to_another_owned_account");
-    let command = Command::SendNativeTokenTransferPrivate {
-        from: ACC_SENDER_PRIVATE.to_string(),
-        to: ACC_RECEIVER_PRIVATE.to_string(),
+    let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
+    let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
+
+    let command = Command::SendNativeTokenTransferPrivateOwnedAccount {
+        from: from.to_string(),
+        to: to.to_string(),
         amount: 100,
     };
 
-    let from = produce_account_addr_from_hex(ACC_SENDER_PRIVATE.to_string()).unwrap();
-    let to = produce_account_addr_from_hex(ACC_RECEIVER_PRIVATE.to_string()).unwrap();
-
-    let wallet_config = fetch_config().unwrap();
-
-    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-
-    let mut wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
-
-    wallet::execute_subcommand(command).await.unwrap();
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        wallet::execute_subcommand(command).await.unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let new_commitment1 = {
-        let from_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&from)
-            .unwrap();
-
-        from_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        from_acc.1.balance -= 100;
-        from_acc.1.nonce += 1;
-
-        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
+    let command = Command::FetchPrivateAccount {
+        tx_hash: tx_hash.clone(),
+        acc_addr: from.to_string(),
+        output_id: 0,
     };
+    wallet::execute_subcommand(command).await.unwrap();
 
-    let new_commitment2 = {
-        let to_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&to)
-            .unwrap();
-
-        to_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        to_acc.1.balance += 100;
-        to_acc.1.nonce += 1;
-
-        nssa_core::Commitment::new(&to_acc.0.nullifer_public_key, &to_acc.1)
+    let command = Command::FetchPrivateAccount {
+        tx_hash,
+        acc_addr: to.to_string(),
+        output_id: 1,
     };
+    wallet::execute_subcommand(command).await.unwrap();
 
-    let proof1 = seq_client
-        .get_proof_for_commitment(new_commitment1)
-        .await
-        .unwrap()
-        .unwrap();
-    let proof2 = seq_client
-        .get_proof_for_commitment(new_commitment2)
-        .await
-        .unwrap()
-        .unwrap();
+    let wallet_config = fetch_config().unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
-    println!("New proof is {proof1:#?}");
-    println!("New proof is {proof2:#?}");
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&from)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    let new_commitment2 = wallet_storage.get_private_account_commitment(&to).unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
 
     info!("Success!");
 }
 
 pub async fn test_success_private_transfer_to_another_foreign_account() {
     info!("test_success_private_transfer_to_another_foreign_account");
-    let to_npk_orig = NullifierPublicKey([42; 32]);
-    let to_npk = hex::encode(to_npk_orig.0);
-    let to_ipk = Secp256k1Point::from_scalar(to_npk_orig.0);
+    let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
+    let to_npk = NullifierPublicKey([42; 32]);
+    let to_npk_string = hex::encode(to_npk.0);
+    let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
 
     let command = Command::SendNativeTokenTransferPrivateForeignAccount {
-        from: ACC_SENDER_PRIVATE.to_string(),
-        to_npk,
+        from: from.to_string(),
+        to_npk: to_npk_string,
         to_ipk: hex::encode(to_ipk.0),
         amount: 100,
     };
 
-    let from = produce_account_addr_from_hex(ACC_SENDER_PRIVATE.to_string()).unwrap();
-
-    let wallet_config = fetch_config().unwrap();
-
-    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-
-    let mut wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
-
-    let sub_ret = wallet::execute_subcommand(command).await.unwrap();
-
-    println!("SUB RET is {sub_ret:#?}");
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        wallet::execute_subcommand(command).await.unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let new_commitment1 = {
-        let from_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&from)
-            .unwrap();
-
-        from_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        from_acc.1.balance -= 100;
-        from_acc.1.nonce += 1;
-
-        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
+    let command = Command::FetchPrivateAccount {
+        tx_hash: tx_hash.clone(),
+        acc_addr: from.to_string(),
+        output_id: 0,
     };
+    wallet::execute_subcommand(command).await.unwrap();
 
-    let new_commitment2 = {
-        let to_acc = nssa_core::account::Account {
-            program_owner: nssa::program::Program::authenticated_transfer_program().id(),
-            balance: 100,
-            data: vec![],
-            nonce: 1,
-        };
+    let wallet_config = fetch_config().unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
-        nssa_core::Commitment::new(&to_npk_orig, &to_acc)
-    };
-
-    let proof1 = seq_client
-        .get_proof_for_commitment(new_commitment1)
-        .await
-        .unwrap()
-        .unwrap();
-    let proof2 = seq_client
-        .get_proof_for_commitment(new_commitment2)
-        .await
-        .unwrap()
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&from)
         .unwrap();
 
-    println!("New proof is {proof1:#?}");
-    println!("New proof is {proof2:#?}");
+    let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
+    assert_eq!(tx.message.new_commitments[0], new_commitment1);
+
+    assert_eq!(tx.message.new_commitments.len(), 2);
+    for commitment in tx.message.new_commitments.into_iter() {
+        assert!(verify_commitment_is_in_state(commitment, &seq_client).await);
+    }
 
     info!("Success!");
 }
 
 pub async fn test_success_private_transfer_to_another_owned_account_claiming_path() {
     info!("test_success_private_transfer_to_another_owned_account_claiming_path");
+    let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
+
     let command = Command::RegisterAccountPrivate {};
 
     let sub_ret = wallet::execute_subcommand(command).await.unwrap();
-
     let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
         panic!("FAILED TO REGISTER ACCOUNT");
     };
 
     let wallet_config = fetch_config().unwrap();
-
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone()).unwrap();
 
-    let mut wallet_storage =
-        WalletCore::start_from_config_update_chain(wallet_config.clone()).unwrap();
-
-    let (to_keys, mut to_acc) = wallet_storage
+    let (to_keys, _) = wallet_storage
         .storage
         .user_data
         .user_private_accounts
@@ -613,74 +569,38 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
         .unwrap();
 
     let command = Command::SendNativeTokenTransferPrivateForeignAccount {
-        from: ACC_SENDER_PRIVATE.to_string(),
+        from: from.to_string(),
         to_npk: hex::encode(to_keys.nullifer_public_key.0),
         to_ipk: hex::encode(to_keys.incoming_viewing_public_key.0),
         amount: 100,
     };
 
-    let from = produce_account_addr_from_hex(ACC_SENDER_PRIVATE.to_string()).unwrap();
-
     let sub_ret = wallet::execute_subcommand(command).await.unwrap();
-
     let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } = sub_ret else {
         panic!("FAILED TO SEND TX");
     };
 
-    info!("Waiting for next block creation");
-    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+    let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
 
-    let new_commitment1 = {
-        let from_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&from)
-            .unwrap();
-
-        from_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        from_acc.1.balance -= 100;
-        from_acc.1.nonce += 1;
-
-        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
-    };
-
-    let new_commitment2 = {
-        to_acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        to_acc.balance = 100;
-        to_acc.nonce = 1;
-
-        nssa_core::Commitment::new(&to_keys.nullifer_public_key, &to_acc)
-    };
-
-    let proof1 = seq_client
-        .get_proof_for_commitment(new_commitment1)
-        .await
-        .unwrap()
-        .unwrap();
-    let proof2 = seq_client
-        .get_proof_for_commitment(new_commitment2)
-        .await
-        .unwrap()
-        .unwrap();
-
-    println!("New proof is {proof1:#?}");
-    println!("New proof is {proof2:#?}");
-
-    let command = Command::ClaimPrivateAccount {
+    let command = Command::FetchPrivateAccount {
         tx_hash,
-        acc_addr: hex::encode(to_addr),
-        ciph_id: 1,
+        acc_addr: to_addr.to_string(),
+        output_id: 1,
     };
-
     wallet::execute_subcommand(command).await.unwrap();
-
     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
-    let (_, to_res_acc) = wallet_storage
-        .storage
-        .user_data
-        .get_private_account(&to_addr)
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&from)
         .unwrap();
+    assert_eq!(tx.message.new_commitments[0], new_commitment1);
+
+    assert_eq!(tx.message.new_commitments.len(), 2);
+    for commitment in tx.message.new_commitments.into_iter() {
+        assert!(verify_commitment_is_in_state(commitment, &seq_client).await);
+    }
+
+    let to_res_acc = wallet_storage.get_account_private(&to_addr).unwrap();
 
     assert_eq!(to_res_acc.balance, 100);
 
@@ -689,51 +609,50 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
 
 pub async fn test_success_deshielded_transfer_to_another_account() {
     info!("test_success_deshielded_transfer_to_another_account");
+    let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
+    let to: Address = ACC_RECEIVER.parse().unwrap();
     let command = Command::SendNativeTokenTransferDeshielded {
-        from: ACC_SENDER_PRIVATE.to_string(),
-        to: ACC_RECEIVER.to_string(),
+        from: from.to_string(),
+        to: to.to_string(),
         amount: 100,
     };
 
-    let from = produce_account_addr_from_hex(ACC_SENDER_PRIVATE.to_string()).unwrap();
-
     let wallet_config = fetch_config().unwrap();
-
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone()).unwrap();
 
-    let mut wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let from_acc = wallet_storage.get_account_private(&from).unwrap();
+    assert_eq!(from_acc.balance, 10000);
 
-    wallet::execute_subcommand(command).await.unwrap();
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        wallet::execute_subcommand(command).await.unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let new_commitment1 = {
-        let from_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&from)
-            .unwrap();
-
-        from_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        from_acc.1.balance -= 100;
-        from_acc.1.nonce += 1;
-
-        nssa_core::Commitment::new(&from_acc.0.nullifer_public_key, &from_acc.1)
+    let command = Command::FetchPrivateAccount {
+        tx_hash,
+        acc_addr: from.to_string(),
+        output_id: 0,
     };
+    wallet::execute_subcommand(command).await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
-    let proof1 = seq_client
-        .get_proof_for_commitment(new_commitment1)
-        .await
-        .unwrap()
+    let from_acc = wallet_storage.get_account_private(&from).unwrap();
+    let new_commitment = wallet_storage
+        .get_private_account_commitment(&from)
         .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment, &seq_client).await);
 
     let acc_2_balance = seq_client
-        .get_account_balance(ACC_RECEIVER.to_string())
+        .get_account_balance(to.to_string())
         .await
         .unwrap();
 
-    println!("New proof is {proof1:#?}");
+    assert_eq!(from_acc.balance, 10000 - 100);
     assert_eq!(acc_2_balance.balance, 20100);
 
     info!("Success!");
@@ -741,66 +660,59 @@ pub async fn test_success_deshielded_transfer_to_another_account() {
 
 pub async fn test_success_shielded_transfer_to_another_owned_account() {
     info!("test_success_shielded_transfer_to_another_owned_account");
+    let from: Address = ACC_SENDER.parse().unwrap();
+    let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
     let command = Command::SendNativeTokenTransferShielded {
-        from: ACC_SENDER.to_string(),
-        to: ACC_RECEIVER_PRIVATE.to_string(),
+        from: from.to_string(),
+        to: to.to_string(),
         amount: 100,
     };
 
-    let to = produce_account_addr_from_hex(ACC_RECEIVER_PRIVATE.to_string()).unwrap();
-
     let wallet_config = fetch_config().unwrap();
-
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
-    let mut wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
-
-    wallet::execute_subcommand(command).await.unwrap();
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        wallet::execute_subcommand(command).await.unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let new_commitment2 = {
-        let to_acc = wallet_storage
-            .storage
-            .user_data
-            .get_private_account_mut(&to)
-            .unwrap();
-
-        to_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        to_acc.1.balance += 100;
-        to_acc.1.nonce += 1;
-
-        nssa_core::Commitment::new(&to_acc.0.nullifer_public_key, &to_acc.1)
+    let command = Command::FetchPrivateAccount {
+        tx_hash,
+        acc_addr: to.to_string(),
+        output_id: 0,
     };
+    wallet::execute_subcommand(command).await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
-    let acc_1_balance = seq_client
-        .get_account_balance(ACC_SENDER.to_string())
+    let acc_to = wallet_storage.get_account_private(&to).unwrap();
+    let new_commitment = wallet_storage.get_private_account_commitment(&to).unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment, &seq_client).await);
+
+    let acc_from_balance = seq_client
+        .get_account_balance(from.to_string())
         .await
         .unwrap();
 
-    let proof2 = seq_client
-        .get_proof_for_commitment(new_commitment2)
-        .await
-        .unwrap()
-        .unwrap();
-
-    assert_eq!(acc_1_balance.balance, 9900);
-
-    println!("New proof is {proof2:#?}");
+    assert_eq!(acc_from_balance.balance, 9900);
+    assert_eq!(acc_to.balance, 20000 + 100);
 
     info!("Success!");
 }
 
 pub async fn test_success_shielded_transfer_to_another_foreign_account() {
     info!("test_success_shielded_transfer_to_another_foreign_account");
-    let to_npk_orig = NullifierPublicKey([42; 32]);
-    let to_npk = hex::encode(to_npk_orig.0);
-    let to_ipk = Secp256k1Point::from_scalar(to_npk_orig.0);
+    let to_npk = NullifierPublicKey([42; 32]);
+    let to_npk_string = hex::encode(to_npk.0);
+    let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
+    let from: Address = ACC_SENDER.parse().unwrap();
 
     let command = Command::SendNativeTokenTransferShieldedForeignAccount {
-        from: ACC_SENDER.to_string(),
-        to_npk,
+        from: from.to_string(),
+        to_npk: to_npk_string,
         to_ipk: hex::encode(to_ipk.0),
         amount: 100,
     };
@@ -809,118 +721,27 @@ pub async fn test_success_shielded_transfer_to_another_foreign_account() {
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
-    wallet::execute_subcommand(command).await.unwrap();
-
-    info!("Waiting for next block creation");
-    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-    let new_commitment2 = {
-        let to_acc = nssa_core::account::Account {
-            program_owner: nssa::program::Program::authenticated_transfer_program().id(),
-            balance: 100,
-            data: vec![],
-            nonce: 1,
-        };
-
-        nssa_core::Commitment::new(&to_npk_orig, &to_acc)
-    };
-
-    let acc_1_balance = seq_client
-        .get_account_balance(ACC_SENDER.to_string())
-        .await
-        .unwrap();
-
-    let proof2 = seq_client
-        .get_proof_for_commitment(new_commitment2)
-        .await
-        .unwrap()
-        .unwrap();
-
-    assert_eq!(acc_1_balance.balance, 9900);
-    println!("New proof is {proof2:#?}");
-
-    info!("Success!");
-}
-
-pub async fn test_success_shielded_transfer_to_another_owned_account_claiming_path() {
-    info!("test_success_shielded_transfer_to_another_owned_account_claiming_path");
-    let command = Command::RegisterAccountPrivate {};
-
-    let sub_ret = wallet::execute_subcommand(command).await.unwrap();
-
-    let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
-        panic!("FAILED TO REGISTER ACCOUNT");
-    };
-
-    let wallet_config = fetch_config().unwrap();
-
-    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone()).unwrap();
-
-    let (to_keys, mut to_acc) = wallet_storage
-        .storage
-        .user_data
-        .user_private_accounts
-        .get(&to_addr)
-        .cloned()
-        .unwrap();
-
-    let command = Command::SendNativeTokenTransferShieldedForeignAccount {
-        from: ACC_SENDER.to_string(),
-        to_npk: hex::encode(to_keys.nullifer_public_key.0),
-        to_ipk: hex::encode(to_keys.incoming_viewing_public_key.0),
-        amount: 100,
-    };
-
-    let sub_ret = wallet::execute_subcommand(command).await.unwrap();
-
-    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } = sub_ret else {
-        panic!("FAILED TO SEND TX");
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        wallet::execute_subcommand(command).await.unwrap()
+    else {
+        panic!("invalid subcommand return value");
     };
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let new_commitment2 = {
-        to_acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
-        to_acc.balance = 100;
-        to_acc.nonce = 1;
-
-        nssa_core::Commitment::new(&to_keys.nullifer_public_key, &to_acc)
-    };
+    let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash).await;
 
     let acc_1_balance = seq_client
-        .get_account_balance(ACC_SENDER.to_string())
+        .get_account_balance(from.to_string())
         .await
         .unwrap();
 
-    let proof2 = seq_client
-        .get_proof_for_commitment(new_commitment2)
-        .await
-        .unwrap()
-        .unwrap();
+    assert!(
+        verify_commitment_is_in_state(tx.message.new_commitments[0].clone(), &seq_client).await
+    );
 
     assert_eq!(acc_1_balance.balance, 9900);
-    println!("New proof is {proof2:#?}");
-
-    let command = Command::ClaimPrivateAccount {
-        tx_hash,
-        acc_addr: hex::encode(to_addr),
-        ciph_id: 0,
-    };
-
-    wallet::execute_subcommand(command).await.unwrap();
-
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
-
-    let (_, to_res_acc) = wallet_storage
-        .storage
-        .user_data
-        .get_private_account(&to_addr)
-        .unwrap();
-
-    assert_eq!(to_res_acc.balance, 100);
 
     info!("Success!");
 }
@@ -1047,12 +868,6 @@ pub async fn main_tests_runner() -> Result<()> {
                 test_success_shielded_transfer_to_another_foreign_account
             );
         }
-        "test_success_shielded_transfer_to_another_owned_account_claiming_path" => {
-            test_cleanup_wrap!(
-                home_dir,
-                test_success_shielded_transfer_to_another_owned_account_claiming_path
-            );
-        }
         "test_pinata" => {
             test_cleanup_wrap!(home_dir, test_pinata);
         }
@@ -1086,11 +901,33 @@ pub async fn main_tests_runner() -> Result<()> {
                 home_dir,
                 test_success_private_transfer_to_another_owned_account_claiming_path
             );
+            test_cleanup_wrap!(home_dir, test_pinata);
+        }
+        "all_private" => {
             test_cleanup_wrap!(
                 home_dir,
-                test_success_shielded_transfer_to_another_owned_account_claiming_path
+                test_success_private_transfer_to_another_owned_account
             );
-            test_cleanup_wrap!(home_dir, test_pinata);
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_foreign_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_deshielded_transfer_to_another_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_shielded_transfer_to_another_owned_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_shielded_transfer_to_another_foreign_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_owned_account_claiming_path
+            );
         }
         _ => {
             anyhow::bail!("Unknown test name");
@@ -1098,4 +935,38 @@ pub async fn main_tests_runner() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn fetch_privacy_preserving_tx(
+    seq_client: &SequencerClient,
+    tx_hash: String,
+) -> PrivacyPreservingTransaction {
+    let transaction_encoded = seq_client
+        .get_transaction_by_hash(tx_hash.clone())
+        .await
+        .unwrap()
+        .transaction
+        .unwrap();
+
+    let tx_base64_decode = BASE64.decode(transaction_encoded).unwrap();
+    match NSSATransaction::try_from(
+        &borsh::from_slice::<EncodedTransaction>(&tx_base64_decode).unwrap(),
+    )
+    .unwrap()
+    {
+        NSSATransaction::PrivacyPreserving(privacy_preserving_transaction) => {
+            privacy_preserving_transaction
+        }
+        _ => panic!("Invalid tx type"),
+    }
+}
+
+async fn verify_commitment_is_in_state(
+    commitment: Commitment,
+    seq_client: &SequencerClient,
+) -> bool {
+    matches!(
+        seq_client.get_proof_for_commitment(commitment).await,
+        Ok(Some(_))
+    )
 }

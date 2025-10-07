@@ -54,7 +54,7 @@ pub struct GetAccountRequest {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GetProofByCommitmentRequest {
+pub struct GetProofForCommitmentRequest {
     pub commitment: nssa_core::Commitment,
 }
 
@@ -68,7 +68,7 @@ parse_request!(GetInitialTestnetAccountsRequest);
 parse_request!(GetAccountBalanceRequest);
 parse_request!(GetTransactionByHashRequest);
 parse_request!(GetAccountsNoncesRequest);
-parse_request!(GetProofByCommitmentRequest);
+parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -123,6 +123,6 @@ pub struct GetAccountResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GetProofByCommitmentResponse {
+pub struct GetProofForCommitmentResponse {
     pub membership_proof: Option<nssa_core::MembershipProof>,
 }

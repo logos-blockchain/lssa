@@ -1,5 +1,9 @@
 use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
-use nssa::Address;
+use nssa::{
+    Address, PublicTransaction,
+    program::Program,
+    public_transaction::{Message, WitnessSet},
+};
 
 use crate::WalletCore;
 
@@ -20,14 +24,8 @@ impl WalletCore {
             };
 
             let addresses = vec![from, to];
-            let program_id = nssa::program::Program::authenticated_transfer_program().id();
-            let message = nssa::public_transaction::Message::try_new(
-                program_id,
-                addresses,
-                nonces,
-                balance_to_move,
-            )
-            .unwrap();
+            let program_id = Program::authenticated_transfer_program().id();
+            let message = Message::try_new(program_id, addresses, nonces, balance_to_move).unwrap();
 
             let signing_key = self.storage.user_data.get_pub_account_signing_key(&from);
 
@@ -35,10 +33,9 @@ impl WalletCore {
                 return Err(ExecutionFailureKind::KeyNotFoundError);
             };
 
-            let witness_set =
-                nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
+            let witness_set = WitnessSet::for_message(&message, &[signing_key]);
 
-            let tx = nssa::PublicTransaction::new(message, witness_set);
+            let tx = PublicTransaction::new(message, witness_set);
 
             Ok(self.sequencer_client.send_tx_public(tx).await?)
         } else {

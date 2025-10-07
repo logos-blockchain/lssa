@@ -2,13 +2,13 @@ use std::collections::{HashMap, HashSet};
 
 use nssa_core::{
     account::{Account, AccountWithMetadata},
+    address::Address,
     program::validate_execution,
 };
 use sha2::{Digest, digest::FixedOutput};
 
 use crate::{
     V01State,
-    address::Address,
     error::NssaError,
     public_transaction::{Message, WitnessSet},
 };
@@ -95,7 +95,7 @@ impl PublicTransaction {
                 AccountWithMetadata::new(
                     state.get_account_by_address(address),
                     signer_addresses.contains(address),
-                    address,
+                    *address,
                 )
             })
             .collect();
@@ -187,12 +187,12 @@ pub mod tests {
         let tx = transaction_for_tests();
         let expected_signer_addresses = vec![
             Address::new([
-                27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30,
-                24, 52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
+                14, 238, 36, 40, 114, 150, 186, 85, 39, 143, 30, 84, 3, 190, 1, 71, 84, 134, 99,
+                102, 56, 135, 48, 48, 60, 40, 137, 190, 23, 173, 160, 101,
             ]),
             Address::new([
-                77, 75, 108, 209, 54, 16, 50, 202, 155, 210, 174, 185, 217, 0, 170, 77, 69, 217,
-                234, 216, 10, 201, 66, 51, 116, 196, 81, 167, 37, 77, 7, 102,
+                158, 61, 142, 101, 77, 68, 14, 149, 41, 58, 162, 220, 236, 235, 19, 120, 153, 165,
+                149, 53, 233, 82, 247, 71, 6, 142, 122, 14, 227, 9, 101, 242,
             ]),
         ];
         let signer_addresses = tx.signer_addresses();

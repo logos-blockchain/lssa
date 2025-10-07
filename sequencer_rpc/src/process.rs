@@ -14,8 +14,8 @@ use common::{
         requests::{
             GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
             GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-            GetInitialTestnetAccountsRequest, GetProofByCommitmentRequest,
-            GetProofByCommitmentResponse, GetTransactionByHashRequest,
+            GetInitialTestnetAccountsRequest, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
             GetTransactionByHashResponse,
         },
     },
@@ -77,7 +77,7 @@ impl JsonHandler {
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
-        let tx = EncodedTransaction::from_bytes(send_tx_req.transaction);
+        let tx = borsh::from_slice::<EncodedTransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = hex::encode(tx.hash());
 
         {
@@ -107,7 +107,7 @@ impl JsonHandler {
         };
 
         let helperstruct = GetBlockDataResponse {
-            block: HashableBlockData::from(block).to_bytes(),
+            block: borsh::to_vec(&HashableBlockData::from(block)).unwrap(),
         };
 
         respond(helperstruct)
@@ -243,7 +243,7 @@ impl JsonHandler {
                 .store
                 .block_store
                 .get_transaction_by_hash(hash)
-                .map(|tx| tx.to_bytes())
+                .map(|tx| borsh::to_vec(&tx).unwrap())
         };
         let base64_encoded = transaction.map(|tx| general_purpose::STANDARD.encode(tx));
         let helperstruct = GetTransactionByHashResponse {
@@ -254,7 +254,7 @@ impl JsonHandler {
 
     /// Returns the commitment proof, corresponding to commitment
     async fn process_get_proof_by_commitment(&self, request: Request) -> Result<Value, RpcErr> {
-        let get_proof_req = GetProofByCommitmentRequest::parse(Some(request.params))?;
+        let get_proof_req = GetProofForCommitmentRequest::parse(Some(request.params))?;
 
         let membership_proof = {
             let state = self.sequencer_state.lock().await;
@@ -263,7 +263,7 @@ impl JsonHandler {
                 .state
                 .get_proof_for_commitment(&get_proof_req.commitment)
         };
-        let helperstruct = GetProofByCommitmentResponse { membership_proof };
+        let helperstruct = GetProofForCommitmentResponse { membership_proof };
         respond(helperstruct)
     }
 
@@ -308,13 +308,13 @@ mod tests {
         let tempdir = tempdir().unwrap();
         let home = tempdir.path().to_path_buf();
         let acc1_addr = vec![
-            27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30, 24,
-            52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
+            14, 238, 36, 40, 114, 150, 186, 85, 39, 143, 30, 84, 3, 190, 1, 71, 84, 134, 99, 102,
+            56, 135, 48, 48, 60, 40, 137, 190, 23, 173, 160, 101,
         ];
 
         let acc2_addr = vec![
-            77, 75, 108, 209, 54, 16, 50, 202, 155, 210, 174, 185, 217, 0, 170, 77, 69, 217, 234,
-            216, 10, 201, 66, 51, 116, 196, 81, 167, 37, 77, 7, 102,
+            158, 61, 142, 101, 77, 68, 14, 149, 41, 58, 162, 220, 236, 235, 19, 120, 153, 165, 149,
+            53, 233, 82, 247, 71, 6, 142, 122, 14, 227, 9, 101, 242,
         ];
 
         let initial_acc1 = AccountInitialData {
@@ -352,8 +352,8 @@ mod tests {
         let balance_to_move = 10;
         let tx = common::test_utils::create_transaction_native_token_transfer(
             [
-                27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30,
-                24, 52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
+                14, 238, 36, 40, 114, 150, 186, 85, 39, 143, 30, 84, 3, 190, 1, 71, 84, 134, 99,
+                102, 56, 135, 48, 48, 60, 40, 137, 190, 23, 173, 160, 101,
             ],
             0,
             [2; 32],
@@ -644,7 +644,7 @@ mod tests {
     async fn test_get_transaction_by_hash_for_existing_transaction() {
         let (json_handler, _, tx) = components_for_tests();
         let tx_hash_hex = hex::encode(tx.hash());
-        let expected_base64_encoded = general_purpose::STANDARD.encode(tx.to_bytes());
+        let expected_base64_encoded = general_purpose::STANDARD.encode(borsh::to_vec(&tx).unwrap());
 
         let request = serde_json::json!({
             "jsonrpc": "2.0",

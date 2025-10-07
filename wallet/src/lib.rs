@@ -14,11 +14,12 @@ use log::info;
 use nssa::{Account, Address};
 
 use clap::{Parser, Subcommand};
+use nssa_core::Commitment;
 
 use crate::{
     helperfunctions::{
         HumanReadableAccount, fetch_config, fetch_persistent_accounts, get_home,
-        produce_account_addr_from_hex, produce_data_for_storage,
+        produce_data_for_storage,
     },
     poller::TxPoller,
 };
@@ -180,16 +181,29 @@ impl WalletCore {
     }
 
     ///Get account
-    pub async fn get_account(&self, addr: Address) -> Result<Account> {
+    pub async fn get_account_public(&self, addr: Address) -> Result<Account> {
         let response = self.sequencer_client.get_account(addr.to_string()).await?;
         Ok(response.account)
+    }
+
+    pub fn get_account_private(&self, addr: &Address) -> Option<Account> {
+        self.storage
+            .user_data
+            .user_private_accounts
+            .get(addr)
+            .map(|value| value.1.clone())
+    }
+
+    pub fn get_private_account_commitment(&self, addr: &Address) -> Option<Commitment> {
+        let (keys, account) = self.storage.user_data.user_private_accounts.get(addr)?;
+        Some(Commitment::new(&keys.nullifer_public_key, account))
     }
 
     ///Poll transactions
     pub async fn poll_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
         let transaction_encoded = self.poller.poll_tx(hash).await?;
         let tx_base64_decode = BASE64.decode(transaction_encoded)?;
-        let pub_tx = EncodedTransaction::from_bytes(tx_base64_decode);
+        let pub_tx = borsh::from_slice::<EncodedTransaction>(&tx_base64_decode).unwrap();
 
         Ok(NSSATransaction::try_from(&pub_tx)?)
     }
@@ -216,7 +230,7 @@ pub enum Command {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Private operation
-    SendNativeTokenTransferPrivate {
+    SendNativeTokenTransferPrivateOwnedAccount {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -290,16 +304,21 @@ pub enum Command {
         amount: u128,
     },
     ///Claim account `acc_addr` generated in transaction `tx_hash`, using secret `sh_secret` at ciphertext id `ciph_id`
-    ClaimPrivateAccount {
+    FetchPrivateAccount {
         ///tx_hash - valid 32 byte hex string
         #[arg(long)]
         tx_hash: String,
         ///acc_addr - valid 32 byte hex string
         #[arg(long)]
         acc_addr: String,
-        ///ciph_id - id of cipher in transaction
+        ///output_id - id of the output in the transaction
         #[arg(long)]
-        ciph_id: usize,
+        output_id: usize,
+    },
+    ///Get private account with `addr` from storage
+    GetPrivateAccount {
+        #[arg(short, long)]
+        addr: String,
     },
     ///Register new public account
     RegisterAccountPublic {},
@@ -311,17 +330,17 @@ pub enum Command {
         tx_hash: String,
     },
     ///Get account `addr` balance
-    GetAccountBalance {
+    GetPublicAccountBalance {
         #[arg(short, long)]
         addr: String,
     },
     ///Get account `addr` nonce
-    GetAccountNonce {
+    GetPublicAccountNonce {
         #[arg(short, long)]
         addr: String,
     },
     ///Get account at address `addr`
-    GetAccount {
+    GetPublicAccount {
         #[arg(short, long)]
         addr: String,
     },
@@ -373,6 +392,7 @@ pub struct Args {
 pub enum SubcommandReturnValue {
     PrivacyPreservingTransfer { tx_hash: String },
     RegisterAccount { addr: nssa::Address },
+    Account(nssa::Account),
     Empty,
 }
 
@@ -382,8 +402,8 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
     let subcommand_ret = match command {
         Command::SendNativeTokenTransferPublic { from, to, amount } => {
-            let from = produce_account_addr_from_hex(from)?;
-            let to = produce_account_addr_from_hex(to)?;
+            let from: Address = from.parse().unwrap();
+            let to: Address = to.parse().unwrap();
 
             let res = wallet_core
                 .send_public_native_token_transfer(from, to, amount)
@@ -401,12 +421,12 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::SendNativeTokenTransferPrivate { from, to, amount } => {
-            let from = produce_account_addr_from_hex(from)?;
-            let to = produce_account_addr_from_hex(to)?;
+        Command::SendNativeTokenTransferPrivateOwnedAccount { from, to, amount } => {
+            let from: Address = from.parse().unwrap();
+            let to: Address = to.parse().unwrap();
 
-            let (res, secret) = wallet_core
-                .send_private_native_token_transfer(from, to, amount)
+            let (res, [secret_from, secret_to]) = wallet_core
+                .send_private_native_token_transfer_owned_account(from, to, amount)
                 .await?;
 
             println!("Results of tx send is {res:#?}");
@@ -425,15 +445,19 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
                 let res_acc_from = nssa_core::EncryptionScheme::decrypt(
                     &from_ebc.ciphertext,
-                    &secret,
+                    &secret_from,
                     &from_comm,
                     0,
                 )
                 .unwrap();
 
-                let res_acc_to =
-                    nssa_core::EncryptionScheme::decrypt(&to_ebc.ciphertext, &secret, &to_comm, 1)
-                        .unwrap();
+                let res_acc_to = nssa_core::EncryptionScheme::decrypt(
+                    &to_ebc.ciphertext,
+                    &secret_to,
+                    &to_comm,
+                    1,
+                )
+                .unwrap();
 
                 println!("Received new from acc {res_acc_from:#?}");
                 println!("Received new to acc {res_acc_to:#?}");
@@ -460,7 +484,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             to_ipk,
             amount,
         } => {
-            let from = produce_account_addr_from_hex(from)?;
+            let from: Address = from.parse().unwrap();
             let to_npk_res = hex::decode(to_npk)?;
             let mut to_npk = [0; 32];
             to_npk.copy_from_slice(&to_npk_res);
@@ -472,7 +496,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             let to_ipk =
                 nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
 
-            let (res, secret) = wallet_core
+            let (res, [secret_from, secret_to]) = wallet_core
                 .send_private_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
                 .await?;
 
@@ -492,15 +516,19 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
                 let res_acc_from = nssa_core::EncryptionScheme::decrypt(
                     &from_ebc.ciphertext,
-                    &secret,
+                    &secret_from,
                     &from_comm,
                     0,
                 )
                 .unwrap();
 
-                let res_acc_to =
-                    nssa_core::EncryptionScheme::decrypt(&to_ebc.ciphertext, &secret, &to_comm, 1)
-                        .unwrap();
+                let res_acc_to = nssa_core::EncryptionScheme::decrypt(
+                    &to_ebc.ciphertext,
+                    &secret_to,
+                    &to_comm,
+                    1,
+                )
+                .unwrap();
 
                 println!("RES acc {res_acc_from:#?}");
                 println!("RES acc to {res_acc_to:#?}");
@@ -519,8 +547,8 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash }
         }
         Command::SendNativeTokenTransferDeshielded { from, to, amount } => {
-            let from = produce_account_addr_from_hex(from)?;
-            let to = produce_account_addr_from_hex(to)?;
+            let from: Address = from.parse().unwrap();
+            let to: Address = to.parse().unwrap();
 
             let (res, secret) = wallet_core
                 .send_deshielded_native_token_transfer(from, to, amount)
@@ -561,11 +589,11 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash }
         }
         Command::SendNativeTokenTransferShielded { from, to, amount } => {
-            let from = produce_account_addr_from_hex(from)?;
-            let to = produce_account_addr_from_hex(to)?;
+            let from: Address = from.parse().unwrap();
+            let to: Address = to.parse().unwrap();
 
             let (res, secret) = wallet_core
-                .send_shiedled_native_token_transfer(from, to, amount)
+                .send_shielded_native_token_transfer(from, to, amount)
                 .await?;
 
             println!("Results of tx send is {res:#?}");
@@ -600,7 +628,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             to_ipk,
             amount,
         } => {
-            let from = produce_account_addr_from_hex(from)?;
+            let from: Address = from.parse().unwrap();
 
             let to_npk_res = hex::decode(to_npk)?;
             let mut to_npk = [0; 32];
@@ -614,9 +642,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
 
             let (res, secret) = wallet_core
-                .send_shielded_native_token_transfer_maybe_outer_account(
-                    from, to_npk, to_ipk, amount,
-                )
+                .send_shielded_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
                 .await?;
 
             println!("Results of tx send is {res:#?}");
@@ -645,12 +671,12 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash }
         }
-        Command::ClaimPrivateAccount {
+        Command::FetchPrivateAccount {
             tx_hash,
             acc_addr,
-            ciph_id,
+            output_id: ciph_id,
         } => {
-            let acc_addr = produce_account_addr_from_hex(acc_addr)?;
+            let acc_addr: Address = acc_addr.parse().unwrap();
 
             let account_key_chain = wallet_core
                 .storage
@@ -706,15 +732,18 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
         Command::RegisterAccountPrivate {} => {
             let addr = wallet_core.create_new_account_private();
 
-            let (key, account) = wallet_core
+            let (key, _) = wallet_core
                 .storage
                 .user_data
                 .get_private_account(&addr)
                 .unwrap();
 
-            println!("Generated new account with addr {addr:#?}");
-            println!("With key {key:#?}");
-            println!("With account {account:#?}");
+            println!("Generated new account with addr {addr}");
+            println!("With npk {}", hex::encode(&key.nullifer_public_key));
+            println!(
+                "With ipk {}",
+                hex::encode(key.incoming_viewing_public_key.to_bytes())
+            );
 
             let path = wallet_core.store_persistent_accounts()?;
 
@@ -732,7 +761,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::GetAccountBalance { addr } => {
+        Command::GetPublicAccountBalance { addr } => {
             let addr = Address::from_str(&addr)?;
 
             let balance = wallet_core.get_account_balance(addr).await?;
@@ -740,7 +769,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::GetAccountNonce { addr } => {
+        Command::GetPublicAccountNonce { addr } => {
             let addr = Address::from_str(&addr)?;
 
             let nonce = wallet_core.get_accounts_nonces(vec![addr]).await?[0];
@@ -748,11 +777,21 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::GetAccount { addr } => {
+        Command::GetPublicAccount { addr } => {
             let addr: Address = addr.parse()?;
-            let account: HumanReadableAccount = wallet_core.get_account(addr).await?.into();
-            println!("{}", serde_json::to_string(&account).unwrap());
+            let account = wallet_core.get_account_public(addr).await?;
+            let account_hr: HumanReadableAccount = account.clone().into();
+            println!("{}", serde_json::to_string(&account_hr).unwrap());
 
+            SubcommandReturnValue::Account(account)
+        }
+        Command::GetPrivateAccount { addr } => {
+            let addr: Address = addr.parse()?;
+            if let Some(account) = wallet_core.get_account_private(&addr) {
+                println!("{}", serde_json::to_string(&account).unwrap());
+            } else {
+                println!("Private account not found.");
+            }
             SubcommandReturnValue::Empty
         }
         Command::CreateNewToken {

@@ -94,7 +94,7 @@ impl PrivacyPreservingTransaction {
                 AccountWithMetadata::new(
                     state.get_account_by_address(address),
                     signer_addresses.contains(address),
-                    address,
+                    *address,
                 )
             })
             .collect();
