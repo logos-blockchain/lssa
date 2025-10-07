@@ -45,10 +45,18 @@ pub type NullifierSecretKey = [u8; 32];
 pub struct Nullifier(pub(super) [u8; 32]);
 
 impl Nullifier {
-    pub fn new(commitment: &Commitment, nsk: &NullifierSecretKey) -> Self {
-        let mut bytes = Vec::new();
+    pub fn for_account_update(commitment: &Commitment, nsk: &NullifierSecretKey) -> Self {
+        const UPDATE_PREFIX: &[u8; 32] = b"/NSSA/v0.1/Nullifier/Update/\x00\x00\x00\x00";
+        let mut bytes = UPDATE_PREFIX.to_vec();
         bytes.extend_from_slice(&commitment.to_byte_array());
         bytes.extend_from_slice(nsk);
+        Self(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
+    }
+
+    pub fn for_account_initialization(npk: &NullifierPublicKey) -> Self {
+        const INIT_PREFIX: &[u8; 32] = b"/NSSA/v0.1/Nullifier/Initialize/";
+        let mut bytes = INIT_PREFIX.to_vec();
+        bytes.extend_from_slice(&npk.to_byte_array());
         Self(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
     }
 }
@@ -58,14 +66,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_constructor() {
+    fn test_constructor_for_account_update() {
         let commitment = Commitment((0..32u8).collect::<Vec<_>>().try_into().unwrap());
         let nsk = [0x42; 32];
         let expected_nullifier = Nullifier([
-            97, 87, 111, 191, 0, 44, 125, 145, 237, 104, 31, 230, 203, 254, 68, 176, 126, 17, 240,
-            205, 249, 143, 11, 43, 15, 198, 189, 219, 191, 49, 36, 61,
+            235, 128, 185, 229, 74, 74, 83, 13, 165, 48, 239, 24, 48, 101, 71, 251, 253, 92, 88,
+            201, 103, 43, 250, 135, 193, 54, 175, 82, 245, 171, 90, 135,
         ]);
-        let nullifier = Nullifier::new(&commitment, &nsk);
+        let nullifier = Nullifier::for_account_update(&commitment, &nsk);
+        assert_eq!(nullifier, expected_nullifier);
+    }
+
+    #[test]
+    fn test_constructor_for_account_initialization() {
+        let npk = NullifierPublicKey([
+            112, 188, 193, 129, 150, 55, 228, 67, 88, 168, 29, 151, 5, 92, 23, 190, 17, 162, 164,
+            255, 29, 105, 42, 186, 43, 11, 157, 168, 132, 225, 17, 163,
+        ]);
+        let expected_nullifier = Nullifier([
+            96, 99, 33, 1, 116, 84, 169, 18, 85, 201, 17, 243, 123, 240, 242, 34, 116, 233, 92,
+            203, 247, 92, 161, 162, 135, 66, 127, 108, 230, 149, 105, 157,
+        ]);
+        let nullifier = Nullifier::for_account_initialization(&npk);
         assert_eq!(nullifier, expected_nullifier);
     }
 

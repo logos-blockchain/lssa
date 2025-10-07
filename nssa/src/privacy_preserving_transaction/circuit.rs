@@ -91,7 +91,7 @@ impl Proof {
 #[cfg(test)]
 mod tests {
     use nssa_core::{
-        Commitment, EncryptionScheme, Nullifier,
+        Commitment, DUMMY_COMMITMENT_HASH, EncryptionScheme, Nullifier,
         account::{Account, AccountId, AccountWithMetadata},
     };
 
@@ -165,7 +165,7 @@ mod tests {
         assert_eq!(sender_pre, expected_sender_pre);
         assert_eq!(sender_post, expected_sender_post);
         assert_eq!(output.new_commitments.len(), 1);
-        assert_eq!(output.new_nullifiers.len(), 0);
+        assert_eq!(output.new_nullifiers.len(), 1);
         assert_eq!(output.ciphertexts.len(), 1);
 
         let recipient_post = EncryptionScheme::decrypt(
@@ -206,10 +206,16 @@ mod tests {
         let mut commitment_set = CommitmentSet::with_capacity(2);
         commitment_set.extend(std::slice::from_ref(&commitment_sender));
 
-        let expected_new_nullifiers = vec![(
-            Nullifier::new(&commitment_sender, &sender_keys.nsk),
-            commitment_set.digest(),
-        )];
+        let expected_new_nullifiers = vec![
+            (
+                Nullifier::for_account_update(&commitment_sender, &sender_keys.nsk),
+                commitment_set.digest(),
+            ),
+            (
+                Nullifier::for_account_initialization(&recipient_keys.npk()),
+                DUMMY_COMMITMENT_HASH,
+            ),
+        ];
 
         let program = Program::authenticated_transfer_program();
 

@@ -82,7 +82,7 @@ mod tests {
                 &Account::default(),
             )],
             new_nullifiers: vec![(
-                Nullifier::new(
+                Nullifier::for_account_update(
                     &Commitment::new(&NullifierPublicKey::from(&[2; 32]), &Account::default()),
                     &[1; 32],
                 ),

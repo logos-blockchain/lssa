@@ -4,7 +4,7 @@ use crate::{
     public_transaction::PublicTransaction,
 };
 use nssa_core::{
-    Commitment, CommitmentSetDigest, MembershipProof, Nullifier,
+    Commitment, CommitmentSetDigest, DUMMY_COMMITMENT, MembershipProof, Nullifier,
     account::Account,
     address::Address,
     program::{DEFAULT_PROGRAM_ID, ProgramId},
@@ -84,6 +84,7 @@ impl V01State {
             .collect();
 
         let mut private_state = CommitmentSet::with_capacity(32);
+        private_state.extend(&[DUMMY_COMMITMENT]);
         private_state.extend(initial_commitments);
 
         let mut this = Self {
@@ -1026,7 +1027,8 @@ pub mod tests {
         );
 
         let sender_pre_commitment = Commitment::new(&sender_keys.npk(), &sender_private_account);
-        let expected_new_nullifier = Nullifier::new(&sender_pre_commitment, &sender_keys.nsk);
+        let expected_new_nullifier =
+            Nullifier::for_account_update(&sender_pre_commitment, &sender_keys.nsk);
 
         let expected_new_commitment_2 = Commitment::new(
             &recipient_keys.npk(),
@@ -1100,7 +1102,8 @@ pub mod tests {
         );
 
         let sender_pre_commitment = Commitment::new(&sender_keys.npk(), &sender_private_account);
-        let expected_new_nullifier = Nullifier::new(&sender_pre_commitment, &sender_keys.nsk);
+        let expected_new_nullifier =
+            Nullifier::for_account_update(&sender_pre_commitment, &sender_keys.nsk);
 
         assert!(state.private_state.0.contains(&sender_pre_commitment));
         assert!(!state.private_state.0.contains(&expected_new_commitment));
@@ -1940,6 +1943,61 @@ pub mod tests {
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_private_accounts_can_only_be_initialized_once() {
+        let sender_keys = test_private_account_keys_1();
+        let sender_private_account = Account {
+            program_owner: Program::authenticated_transfer_program().id(),
+            balance: 100,
+            nonce: 0xdeadbeef,
+            data: vec![],
+        };
+        let recipient_keys = test_private_account_keys_2();
+
+        let mut state = V01State::new_with_genesis_accounts(&[], &[])
+            .with_private_account(&sender_keys, &sender_private_account);
+
+        let balance_to_move = 37;
+
+        let tx = private_balance_transfer_for_tests(
+            &sender_keys,
+            &sender_private_account,
+            &recipient_keys,
+            balance_to_move,
+            [0xcafecafe, 0xfecafeca],
+            &state,
+        );
+
+        state
+            .transition_from_privacy_preserving_transaction(&tx)
+            .unwrap();
+
+        let sender_private_account = Account {
+            program_owner: Program::authenticated_transfer_program().id(),
+            balance: 100 - balance_to_move,
+            nonce: 0xcafecafe,
+            data: vec![],
+        };
+
+        let tx = private_balance_transfer_for_tests(
+            &sender_keys,
+            &sender_private_account,
+            &recipient_keys,
+            balance_to_move,
+            [0x1234, 0x5678],
+            &state,
+        );
+
+        let result = state.transition_from_privacy_preserving_transaction(&tx);
+
+        assert!(matches!(result, Err(NssaError::InvalidInput(_))));
+        let NssaError::InvalidInput(error_message) = result.err().unwrap() else {
+            panic!("Incorrect message error");
+        };
+        let expected_error_message = "Nullifier already seen".to_string();
+        assert_eq!(error_message, expected_error_message);
     }
 
     #[test]

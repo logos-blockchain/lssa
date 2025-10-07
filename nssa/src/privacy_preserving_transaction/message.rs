@@ -125,7 +125,10 @@ pub mod tests {
         let new_commitments = vec![Commitment::new(&npk2, &account2)];
 
         let old_commitment = Commitment::new(&npk1, &account1);
-        let new_nullifiers = vec![(Nullifier::new(&old_commitment, &nsk1), [0; 32])];
+        let new_nullifiers = vec![(
+            Nullifier::for_account_update(&old_commitment, &nsk1),
+            [0; 32],
+        )];
 
         Message {
             public_addresses: public_addresses.clone(),
