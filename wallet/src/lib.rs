@@ -456,6 +456,19 @@ pub enum Command {
         #[arg(long)]
         solution: u128,
     },
+    // TODO: Testnet only. Refactor to prevent compilation on mainnet.
+    // Claim piñata prize
+    ClaimPinataPrivateReceiverOwned {
+        ///pinata_addr - valid 32 byte hex string
+        #[arg(long)]
+        pinata_addr: String,
+        ///winner_addr - valid 32 byte hex string
+        #[arg(long)]
+        winner_addr: String,
+        ///solution - solution to pinata challenge
+        #[arg(long)]
+        solution: u128,
+    },
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -925,6 +938,51 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             info!("Results of tx send is {res:#?}");
 
             SubcommandReturnValue::Empty
+        }
+        Command::ClaimPinataPrivateReceiverOwned {
+            pinata_addr,
+            winner_addr,
+            solution,
+        } => {
+            let pinata_addr = pinata_addr.parse().unwrap();
+            let winner_addr = winner_addr.parse().unwrap();
+
+            let (res, [secret_winner]) = wallet_core
+                .claim_pinata_private_owned_account(pinata_addr, winner_addr, solution)
+                .await?;
+            info!("Results of tx send is {res:#?}");
+
+            let tx_hash = res.tx_hash;
+            let transfer_tx = wallet_core
+                .poll_native_token_transfer(tx_hash.clone())
+                .await?;
+
+            if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                let winner_ead = tx.message.encrypted_private_post_states[0].clone();
+                let winner_comm = tx.message.new_commitments[0].clone();
+
+                let res_acc_winner = nssa_core::EncryptionScheme::decrypt(
+                    &winner_ead.ciphertext,
+                    &secret_winner,
+                    &winner_comm,
+                    0,
+                )
+                .unwrap();
+
+                println!("Received new from acc {res_acc_winner:#?}");
+
+                println!("Transaction data is {:?}", tx.message);
+
+                wallet_core
+                    .storage
+                    .insert_private_account_data(winner_addr, res_acc_winner);
+            }
+
+            let path = wallet_core.store_persistent_accounts()?;
+
+            println!("Stored persistent accounts at {path:#?}");
+
+            SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash }
         }
     };
 
