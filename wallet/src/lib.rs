@@ -11,7 +11,7 @@ use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
 use log::info;
-use nssa::{program::Program, Account, Address};
+use nssa::{Account, Address, program::Program};
 
 use clap::{Parser, Subcommand};
 use nssa_core::Commitment;
@@ -379,7 +379,7 @@ pub enum Command {
     },
     // Check the wallet can connect to the node and builtin local programs
     // match the remote versions
-    CheckHealth { }
+    CheckHealth {},
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -850,9 +850,14 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::CheckHealth {  } => {
-            let remote_program_ids = wallet_core.sequencer_client.get_program_ids().await.expect("Error fetching program ids");
-            let Some(authenticated_transfer_id) = remote_program_ids.get("authenticated_transfer") else {
+        Command::CheckHealth {} => {
+            let remote_program_ids = wallet_core
+                .sequencer_client
+                .get_program_ids()
+                .await
+                .expect("Error fetching program ids");
+            let Some(authenticated_transfer_id) = remote_program_ids.get("authenticated_transfer")
+            else {
                 panic!("Missing authenticated transfer ID from remote");
             };
             if authenticated_transfer_id != &Program::authenticated_transfer_program().id() {
