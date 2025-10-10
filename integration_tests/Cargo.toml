@@ -36,4 +36,4 @@ path = "../common"
 
 [dependencies.nssa]
 path = "../nssa"
-features = ["no-docker"]
+features = ["no_docker"]

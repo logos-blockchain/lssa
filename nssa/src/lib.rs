@@ -15,6 +15,7 @@ pub mod public_transaction;
 mod signature;
 mod state;
 
+pub use program_methods::PRIVACY_PRESERVING_CIRCUIT_ID;
 pub use nssa_core::account::{Account, AccountId};
 pub use nssa_core::address::Address;
 pub use privacy_preserving_transaction::{
