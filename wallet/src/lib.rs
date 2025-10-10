@@ -11,7 +11,7 @@ use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
 use log::info;
-use nssa::{Account, Address};
+use nssa::{program::Program, Account, Address};
 
 use clap::{Parser, Subcommand};
 use nssa_core::Commitment;
@@ -377,6 +377,9 @@ pub enum Command {
         #[arg(long)]
         solution: u128,
     },
+    // Check the wallet can connect to the node and builtin local programs
+    // match the remote versions
+    CheckHealth { }
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -844,6 +847,31 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 )
                 .await?;
             info!("Results of tx send is {res:#?}");
+
+            SubcommandReturnValue::Empty
+        }
+        Command::CheckHealth {  } => {
+            let remote_program_ids = wallet_core.sequencer_client.get_program_ids().await.expect("Error fetching program ids");
+            let Some(authenticated_transfer_id) = remote_program_ids.get("authenticated_transfer") else {
+                panic!("Missing authenticated transfer ID from remote");
+            };
+            if authenticated_transfer_id != &Program::authenticated_transfer_program().id() {
+                panic!("Local ID for authenticated transfer program is different from remote");
+            }
+            let Some(token_id) = remote_program_ids.get("token") else {
+                panic!("Missing token program ID from remote");
+            };
+            if token_id != &Program::token().id() {
+                panic!("Local ID for token program is different from remote");
+            }
+            let Some(circuit_id) = remote_program_ids.get("privacy_preserving_circuit") else {
+                panic!("Missing privacy preserving circuit ID from remote");
+            };
+            if circuit_id != &nssa::PRIVACY_PRESERVING_CIRCUIT_ID {
+                panic!("Local ID for privacy preserving circuit is different from remote");
+            }
+
+            println!("✅All looks good!");
 
             SubcommandReturnValue::Empty
         }

@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 use crate::parse_request;
 
 use super::errors::RpcParseError;
 use super::parser::RpcRequest;
 use super::parser::parse_params;
+use nssa_core::program::ProgramId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -58,6 +61,9 @@ pub struct GetProofForCommitmentRequest {
     pub commitment: nssa_core::Commitment,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetProgramIdsRequest {}
+
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -70,6 +76,7 @@ parse_request!(GetTransactionByHashRequest);
 parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
+parse_request!(GetProgramIdsRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -125,4 +132,9 @@ pub struct GetAccountResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProofForCommitmentResponse {
     pub membership_proof: Option<nssa_core::MembershipProof>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetProgramIdsResponse {
+    pub program_ids: HashMap<String, ProgramId>,
 }

@@ -1,16 +1,19 @@
+use std::collections::HashMap;
+
 use super::rpc_primitives::requests::{
     GetAccountBalanceRequest, GetAccountBalanceResponse, GetBlockDataRequest, GetBlockDataResponse,
     GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest,
 };
 use anyhow::Result;
 use json::{SendTxRequest, SendTxResponse, SequencerRpcRequest, SequencerRpcResponse};
+use nssa_core::program::ProgramId;
 use reqwest::Client;
 use serde_json::Value;
 
 use crate::rpc_primitives::requests::{
     GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-    GetProofForCommitmentRequest, GetProofForCommitmentResponse, GetTransactionByHashRequest,
-    GetTransactionByHashResponse,
+    GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+    GetProofForCommitmentResponse, GetTransactionByHashRequest, GetTransactionByHashResponse,
 };
 use crate::sequencer_client::json::AccountInitialData;
 use crate::transaction::{EncodedTransaction, NSSATransaction};
@@ -234,6 +237,26 @@ impl SequencerClient {
         let resp_deser = serde_json::from_value::<GetProofForCommitmentResponse>(resp)
             .unwrap()
             .membership_proof;
+
+        Ok(resp_deser)
+    }
+
+    // Get Ids of the programs used by the node
+    pub async fn get_program_ids(
+        &self,
+    ) -> Result<HashMap<String, ProgramId>, SequencerClientError> {
+        let acc_req = GetProgramIdsRequest {};
+
+        let req = serde_json::to_value(acc_req).unwrap();
+
+        let resp = self
+            .call_method_with_payload("get_program_ids", req)
+            .await
+            .unwrap();
+
+        let resp_deser = serde_json::from_value::<GetProgramIdsResponse>(resp)
+            .unwrap()
+            .program_ids;
 
         Ok(resp_deser)
     }
