@@ -19,5 +19,9 @@ hex.workspace = true
 nssa-core = { path = "../nssa/core", features = ["host"] }
 borsh.workspace = true
 
+[dependencies.generic-array]
+version = "1.3.3"
+features = ["zeroize"]
+
 [dependencies.nssa]
 path = "../nssa"
