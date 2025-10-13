@@ -4,6 +4,7 @@ pub mod program_methods {
 }
 
 #[cfg(feature = "no_docker")]
+#[allow(clippy::single_component_path_imports)]
 use program_methods;
 
 pub mod encoding;
