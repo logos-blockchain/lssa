@@ -3,13 +3,10 @@ use k256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use log::info;
 use serde::{Deserialize, Serialize};
 
-use sha2::{Digest, digest::FixedOutput};
-
-use elliptic_curve::{
-    consts::{B0, B1},
-    generic_array::GenericArray,
-};
+use generic_array::GenericArray;
+use sha2::digest::typenum::{B0, B1};
 use sha2::digest::typenum::{UInt, UTerm};
+use sha2::{Digest, digest::FixedOutput};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NSSATransaction {

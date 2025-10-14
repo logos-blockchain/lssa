@@ -213,7 +213,7 @@ impl WalletCore {
 
             let res_acc = nssa_core::EncryptionScheme::decrypt(
                 &acc_ead.ciphertext,
-                &secret,
+                secret,
                 &acc_comm,
                 output_index as u32,
             )
