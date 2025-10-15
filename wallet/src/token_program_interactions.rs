@@ -2,7 +2,7 @@ use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use nssa::{Address, privacy_preserving_transaction::circuit, program::Program};
 use nssa_core::{
-    Commitment, NullifierPublicKey, SharedSecretKey, account::AccountWithMetadata,
+    Commitment, MembershipProof, NullifierPublicKey, SharedSecretKey, account::AccountWithMetadata,
     encryption::IncomingViewingPublicKey,
 };
 
@@ -146,6 +146,7 @@ impl WalletCore {
         sender_address: Address,
         recipient_address: Address,
         amount: u128,
+        recipient_proof: MembershipProof,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
         let Some((sender_keys, sender_acc)) = self
             .storage
@@ -173,7 +174,6 @@ impl WalletCore {
         let program = Program::token();
 
         let sender_commitment = Commitment::new(&sender_npk, &sender_acc);
-        let receiver_commitment = Commitment::new(&recipient_npk, &recipient_acc);
 
         let sender_pre = AccountWithMetadata::new(sender_acc.clone(), true, &sender_npk);
         let recipient_pre = AccountWithMetadata::new(recipient_acc.clone(), true, &recipient_npk);
@@ -210,11 +210,7 @@ impl WalletCore {
                 ),
                 (
                     recipient_keys.private_key_holder.nullifier_secret_key,
-                    self.sequencer_client
-                        .get_proof_for_commitment(receiver_commitment)
-                        .await
-                        .unwrap()
-                        .unwrap(),
+                    recipient_proof,
                 ),
             ],
             &program,

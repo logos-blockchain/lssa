@@ -188,27 +188,29 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 let sender_addr: Address = sender_addr.parse().unwrap();
                 let recipient_addr: Address = recipient_addr.parse().unwrap();
 
-                let recipient_initialized = wallet_core
+                let recipient_initialization = wallet_core
                     .check_private_account_initialized(&recipient_addr)
-                    .await;
+                    .await?;
 
-                let (res, [secret_sender, secret_recipient]) = if recipient_initialized {
-                    wallet_core
+                let (res, [secret_sender, secret_recipient]) =
+                    if let Some(recipient_proof) = recipient_initialization {
+                        wallet_core
                         .send_transfer_token_transaction_private_owned_account_already_initialized(
                             sender_addr,
                             recipient_addr,
                             balance_to_move,
+                            recipient_proof,
                         )
                         .await?
-                } else {
-                    wallet_core
-                        .send_transfer_token_transaction_private_owned_account_not_initialized(
-                            sender_addr,
-                            recipient_addr,
-                            balance_to_move,
-                        )
-                        .await?
-                };
+                    } else {
+                        wallet_core
+                            .send_transfer_token_transaction_private_owned_account_not_initialized(
+                                sender_addr,
+                                recipient_addr,
+                                balance_to_move,
+                            )
+                            .await?
+                    };
 
                 println!("Results of tx send is {res:#?}");
 
