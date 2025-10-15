@@ -1,7 +1,7 @@
 use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use nssa::{Address, privacy_preserving_transaction::circuit};
-use nssa_core::{Commitment, SharedSecretKey, account::AccountWithMetadata};
+use nssa_core::{MembershipProof, SharedSecretKey, account::AccountWithMetadata};
 
 use crate::{WalletCore, helperfunctions::produce_random_nonces};
 
@@ -29,6 +29,7 @@ impl WalletCore {
         pinata_addr: Address,
         winner_addr: Address,
         solution: u128,
+        winner_proof: MembershipProof,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
         let Some((winner_keys, winner_acc)) = self
             .storage
@@ -46,8 +47,6 @@ impl WalletCore {
 
         let program = nssa::program::Program::pinata();
 
-        let winner_commitment = Commitment::new(&winner_npk, &winner_acc);
-
         let pinata_pre = AccountWithMetadata::new(pinata_acc.clone(), false, pinata_addr);
         let winner_pre = AccountWithMetadata::new(winner_acc.clone(), true, &winner_npk);
 
@@ -62,11 +61,7 @@ impl WalletCore {
             &[(winner_npk.clone(), shared_secret_winner.clone())],
             &[(
                 winner_keys.private_key_holder.nullifier_secret_key,
-                self.sequencer_client
-                    .get_proof_for_commitment(winner_commitment)
-                    .await
-                    .unwrap()
-                    .unwrap(),
+                winner_proof,
             )],
             &program,
         )

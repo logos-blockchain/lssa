@@ -14,7 +14,7 @@ use log::info;
 use nssa::{Account, Address};
 
 use clap::{Parser, Subcommand};
-use nssa_core::Commitment;
+use nssa_core::{Commitment, MembershipProof};
 
 use crate::{
     helperfunctions::{
@@ -189,16 +189,17 @@ impl WalletCore {
         Ok(NSSATransaction::try_from(&pub_tx)?)
     }
 
-    pub async fn check_private_account_initialized(&self, addr: &Address) -> bool {
+    pub async fn check_private_account_initialized(
+        &self,
+        addr: &Address,
+    ) -> Result<Option<MembershipProof>> {
         if let Some(acc_comm) = self.get_private_account_commitment(addr) {
-            matches!(
-                self.sequencer_client
-                    .get_proof_for_commitment(acc_comm)
-                    .await,
-                Ok(Some(_))
-            )
+            self.sequencer_client
+                .get_proof_for_commitment(acc_comm)
+                .await
+                .map_err(anyhow::Error::from)
         } else {
-            false
+            Ok(None)
         }
     }
 
@@ -799,16 +800,17 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             let pinata_addr = pinata_addr.parse().unwrap();
             let winner_addr = winner_addr.parse().unwrap();
 
-            let winner_intialized = wallet_core
+            let winner_initialization = wallet_core
                 .check_private_account_initialized(&winner_addr)
-                .await;
+                .await?;
 
-            let (res, [secret_winner]) = if winner_intialized {
+            let (res, [secret_winner]) = if let Some(winner_proof) = winner_initialization {
                 wallet_core
                     .claim_pinata_private_owned_account_already_initialized(
                         pinata_addr,
                         winner_addr,
                         solution,
+                        winner_proof,
                     )
                     .await?
             } else {
