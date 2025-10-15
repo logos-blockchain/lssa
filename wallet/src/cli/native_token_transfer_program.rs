@@ -126,9 +126,17 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
             let from: Address = from.parse().unwrap();
             let to: Address = to.parse().unwrap();
 
-            let (res, [secret_from, secret_to]) = wallet_core
-                .send_private_native_token_transfer_owned_account(from, to, amount)
-                .await?;
+            let to_initialization = wallet_core.check_private_account_initialized(&to).await?;
+
+            let (res, [secret_from, secret_to]) = if let Some(to_proof) = to_initialization {
+                wallet_core
+                .send_private_native_token_transfer_owned_account_already_initialized(from, to, amount, to_proof)
+                .await?
+            } else {
+                wallet_core
+                .send_private_native_token_transfer_owned_account_not_initialized(from, to, amount)
+                .await?
+            };
 
             println!("Results of tx send is {res:#?}");
 
@@ -206,9 +214,17 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
             let from: Address = from.parse().unwrap();
             let to: Address = to.parse().unwrap();
 
-            let (res, secret) = wallet_core
-                .send_shielded_native_token_transfer(from, to, amount)
-                .await?;
+            let to_initialization = wallet_core.check_private_account_initialized(&to).await?;
+
+            let (res, secret) = if let Some(to_proof) = to_initialization {
+                wallet_core
+                .send_shielded_native_token_transfer_already_initialized(from, to, amount, to_proof)
+                .await?
+            } else {
+                wallet_core
+                .send_shielded_native_token_transfer_not_initialized(from, to, amount)
+                .await?
+            };
 
             println!("Results of tx send is {res:#?}");
 

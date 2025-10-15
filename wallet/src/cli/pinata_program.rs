@@ -102,7 +102,7 @@ impl WalletSubcommand for PinataProgramSubcommandPrivate {
                             pinata_addr,
                             winner_addr,
                             solution,
-                            winner_proof
+                            winner_proof,
                         )
                         .await?
                 } else {
