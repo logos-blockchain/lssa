@@ -9,7 +9,10 @@ use common::{
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use log::{info, warn};
-use nssa::{Address, PrivacyPreservingTransaction, ProgramDeploymentTransaction, program::Program};
+use nssa::{
+    Address, PrivacyPreservingTransaction, PrivateKey, ProgramDeploymentTransaction,
+    privacy_preserving_transaction::witness_set, program::Program,
+};
 use nssa_core::{
     Commitment, NullifierPublicKey, encryption::shared_key_derivation::Secp256k1Point,
 };
@@ -42,7 +45,7 @@ pub const ACC_RECEIVER_PRIVATE: &str =
 
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 
-pub const NSSA_PROGRAM_FOR_TEST: &[u8] = include_bytes!("simple_balance_transfer.bin");
+pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &[u8] = include_bytes!("data_changer.bin");
 
 #[allow(clippy::type_complexity)]
 pub async fn pre_test(
@@ -795,16 +798,42 @@ pub async fn test_pinata() {
 
 pub async fn test_program_deployment() {
     info!("test program deployment");
-    println!("{}", NSSA_PROGRAM_FOR_TEST.len());
-    let bytecode = NSSA_PROGRAM_FOR_TEST.to_vec();
-    let message = nssa::program_deployment_transaction::Message::new(bytecode);
+    let bytecode = NSSA_PROGRAM_FOR_TEST_DATA_CHANGER.to_vec();
+    let message = nssa::program_deployment_transaction::Message::new(bytecode.clone());
     let transaction = ProgramDeploymentTransaction::new(message);
 
     let wallet_config = fetch_config().unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
-    let response = seq_client.send_tx_program(transaction).await.unwrap();
-    println!("response: {:?}", response);
+    let _response = seq_client.send_tx_program(transaction).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    // The program is the data changer and takes one account as input.
+    // We pass an uninitialized account and we expect after execution to be owned by the data
+    // changer program (NSSA account claiming mechanism) with data equal to [0] (due to program logic)
+    let data_changer = Program::new(bytecode).unwrap();
+    let address: Address = "deadbeef".repeat(8).parse().unwrap();
+    let message =
+        nssa::public_transaction::Message::try_new(data_changer.id(), vec![address], vec![], ())
+            .unwrap();
+    let witness_set = nssa::public_transaction::WitnessSet::for_message(&message, &[]);
+    let transaction = nssa::PublicTransaction::new(message, witness_set);
+    let _response = seq_client.send_tx_public(transaction).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let post_state_account = seq_client
+        .get_account(address.to_string())
+        .await
+        .unwrap()
+        .account;
+    assert_eq!(post_state_account.program_owner, data_changer.id());
+    assert_eq!(post_state_account.balance, 0);
+    assert_eq!(post_state_account.data, vec![0]);
+    assert_eq!(post_state_account.nonce, 0);
 }
 
 macro_rules! test_cleanup_wrap {

@@ -19,7 +19,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub(crate) fn new(bytecode: Vec<u8>) -> Result<Self, NssaError> {
+    pub fn new(bytecode: Vec<u8>) -> Result<Self, NssaError> {
         let binary = risc0_binfmt::ProgramBinary::decode(&bytecode)
             .map_err(|_| NssaError::InvalidProgramBytecode)?;
         let id = binary
@@ -33,7 +33,7 @@ impl Program {
         self.id
     }
 
-    pub(crate) fn elf(&self) -> &[u8] {
+    pub fn elf(&self) -> &[u8] {
         &self.elf
     }
 
