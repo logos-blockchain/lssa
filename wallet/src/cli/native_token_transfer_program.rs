@@ -152,7 +152,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     .decode_insert_privacy_preserving_transaction_results(tx, &acc_decode_data)?;
             }
 
-            let path = wallet_core.store_persistent_accounts()?;
+            let path = wallet_core.store_persistent_accounts().await?;
 
             println!("Stored persistent accounts at {path:#?}");
 
@@ -194,7 +194,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     .decode_insert_privacy_preserving_transaction_results(tx, &acc_decode_data)?;
             }
 
-            let path = wallet_core.store_persistent_accounts()?;
+            let path = wallet_core.store_persistent_accounts().await?;
 
             println!("Stored persistent accounts at {path:#?}");
 
@@ -240,7 +240,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
                     .decode_insert_privacy_preserving_transaction_results(tx, &acc_decode_data)?;
             }
 
-            let path = wallet_core.store_persistent_accounts()?;
+            let path = wallet_core.store_persistent_accounts().await?;
 
             println!("Stored persistent accounts at {path:#?}");
 
@@ -273,7 +273,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
 
             let tx_hash = res.tx_hash;
 
-            let path = wallet_core.store_persistent_accounts()?;
+            let path = wallet_core.store_persistent_accounts().await?;
 
             println!("Stored persistent accounts at {path:#?}");
 
@@ -323,7 +323,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -347,7 +347,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
 
                 println!("Transaction data is {transfer_tx:?}");
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 

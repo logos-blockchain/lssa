@@ -118,7 +118,7 @@ pub async fn test_success() {
         },
     );
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
@@ -152,13 +152,13 @@ pub async fn test_success_move_to_another_account() {
         RegisterSubcommand::RegisterAccountPublic {},
     ));
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
     wallet::execute_subcommand(command).await.unwrap();
 
-    let persistent_accounts = fetch_persistent_accounts().unwrap();
+    let persistent_accounts = fetch_persistent_accounts().await.unwrap();
 
     let mut new_persistent_account_addr = String::new();
 
@@ -216,7 +216,7 @@ pub async fn test_failure() {
         },
     );
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
@@ -256,7 +256,7 @@ pub async fn test_success_two_transactions() {
         },
     );
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
@@ -317,7 +317,7 @@ pub async fn test_success_two_transactions() {
 
 pub async fn test_get_account() {
     info!("test_get_account");
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
     let account = seq_client
@@ -338,7 +338,7 @@ pub async fn test_get_account() {
 /// This test creates a new token using the token program. After creating the token, the test executes a
 /// token transfer to a new account.
 pub async fn test_success_token_program() {
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     // Create new account for the token definition
     wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
@@ -359,7 +359,7 @@ pub async fn test_success_token_program() {
     .await
     .unwrap();
 
-    let persistent_accounts = fetch_persistent_accounts().unwrap();
+    let persistent_accounts = fetch_persistent_accounts().await.unwrap();
 
     let mut new_persistent_accounts_addr = Vec::new();
 
@@ -485,7 +485,7 @@ pub async fn test_success_token_program() {
 /// This test creates a new private token using the token program. After creating the token, the test executes a
 /// private token transfer to a new account. All accounts are owned except definition.
 pub async fn test_success_token_program_private_owned() {
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     // Create new account for the token definition (public)
     let SubcommandReturnValue::RegisterAccount {
@@ -556,8 +556,10 @@ pub async fn test_success_token_program_private_owned() {
         ]
     );
 
-    let wallet_config = fetch_config().unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_config = fetch_config().await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&supply_addr)
@@ -579,8 +581,10 @@ pub async fn test_success_token_program_private_owned() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let wallet_config = fetch_config().unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_config = fetch_config().await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&supply_addr)
@@ -607,8 +611,10 @@ pub async fn test_success_token_program_private_owned() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let wallet_config = fetch_config().unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_config = fetch_config().await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&supply_addr)
@@ -624,7 +630,7 @@ pub async fn test_success_token_program_private_owned() {
 /// This test creates a new private token using the token program. After creating the token, the test executes a
 /// private token transfer to a new account.
 pub async fn test_success_token_program_private_claiming_path() {
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     // Create new account for the token definition (public)
     let SubcommandReturnValue::RegisterAccount {
@@ -695,8 +701,10 @@ pub async fn test_success_token_program_private_claiming_path() {
         ]
     );
 
-    let wallet_config = fetch_config().unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_config = fetch_config().await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&supply_addr)
@@ -740,8 +748,10 @@ pub async fn test_success_token_program_private_claiming_path() {
 
     wallet::execute_subcommand(command).await.unwrap();
 
-    let wallet_config = fetch_config().unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_config = fetch_config().await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&supply_addr)
@@ -772,9 +782,11 @@ pub async fn test_success_private_transfer_to_another_owned_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&from)
@@ -812,9 +824,11 @@ pub async fn test_success_private_transfer_to_another_foreign_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&from)
@@ -844,9 +858,11 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
         panic!("FAILED TO REGISTER ACCOUNT");
     };
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone())
+        .await
+        .unwrap();
 
     let (to_keys, _) = wallet_storage
         .storage
@@ -880,7 +896,9 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
         },
     ));
     wallet::execute_subcommand(command).await.unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&from)
@@ -899,6 +917,78 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
     info!("Success!");
 }
 
+pub async fn test_success_private_transfer_to_another_owned_account_cont_run_path() {
+    info!("test_success_private_transfer_to_another_owned_account_cont_run_path");
+    let continious_run_handle = tokio::spawn(wallet::execute_continious_run());
+
+    let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
+
+    let command = Command::Chain(ChainSubcommand::Register(
+        RegisterSubcommand::RegisterAccountPrivate {},
+    ));
+
+    let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+    let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
+        panic!("FAILED TO REGISTER ACCOUNT");
+    };
+
+    let wallet_config = fetch_config().await.unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone())
+        .await
+        .unwrap();
+
+    let (to_keys, _) = wallet_storage
+        .storage
+        .user_data
+        .user_private_accounts
+        .get(&to_addr)
+        .cloned()
+        .unwrap();
+
+    let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
+        NativeTokenTransferProgramSubcommandPrivate::SendNativeTokenTransferPrivateForeignAccount {
+            from: from.to_string(),
+            to_npk: hex::encode(to_keys.nullifer_public_key.0),
+            to_ipk: hex::encode(to_keys.incoming_viewing_public_key.0),
+            amount: 100,
+        },
+    ));
+
+    let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } = sub_ret else {
+        panic!("FAILED TO SEND TX");
+    };
+
+    let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
+
+    println!("Waiting for next blocks to check if continoius run fetch account");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&from)
+        .unwrap();
+    assert_eq!(tx.message.new_commitments[0], new_commitment1);
+
+    assert_eq!(tx.message.new_commitments.len(), 2);
+    for commitment in tx.message.new_commitments.into_iter() {
+        assert!(verify_commitment_is_in_state(commitment, &seq_client).await);
+    }
+
+    let to_res_acc = wallet_storage.get_account_private(&to_addr).unwrap();
+
+    assert_eq!(to_res_acc.balance, 100);
+
+    continious_run_handle.abort();
+
+    info!("Success!");
+}
+
 pub async fn test_success_deshielded_transfer_to_another_account() {
     info!("test_success_deshielded_transfer_to_another_account");
     let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
@@ -911,9 +1001,11 @@ pub async fn test_success_deshielded_transfer_to_another_account() {
         },
     );
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone())
+        .await
+        .unwrap();
 
     let from_acc = wallet_storage.get_account_private(&from).unwrap();
     assert_eq!(from_acc.balance, 10000);
@@ -923,7 +1015,9 @@ pub async fn test_success_deshielded_transfer_to_another_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let from_acc = wallet_storage.get_account_private(&from).unwrap();
     let new_commitment = wallet_storage
@@ -954,7 +1048,7 @@ pub async fn test_success_shielded_transfer_to_another_owned_account() {
         },
     ));
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
     wallet::execute_subcommand(command).await.unwrap();
@@ -962,8 +1056,10 @@ pub async fn test_success_shielded_transfer_to_another_owned_account() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let wallet_config = fetch_config().unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_config = fetch_config().await.unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let acc_to = wallet_storage.get_account_private(&to).unwrap();
     let new_commitment = wallet_storage.get_private_account_commitment(&to).unwrap();
@@ -995,7 +1091,7 @@ pub async fn test_success_shielded_transfer_to_another_foreign_account() {
         amount: 100,
     }));
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
@@ -1037,7 +1133,7 @@ pub async fn test_pinata() {
         },
     ));
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
@@ -1085,7 +1181,7 @@ pub async fn test_pinata_private_receiver() {
         },
     ));
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
@@ -1120,9 +1216,11 @@ pub async fn test_pinata_private_receiver() {
     ));
     wallet::execute_subcommand(command).await.unwrap();
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&ACC_SENDER_PRIVATE.parse().unwrap())
@@ -1159,7 +1257,7 @@ pub async fn test_pinata_private_receiver_new_account() {
         },
     ));
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
 
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
@@ -1181,9 +1279,11 @@ pub async fn test_pinata_private_receiver_new_account() {
         .unwrap()
         .balance;
 
-    let wallet_config = fetch_config().unwrap();
+    let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+        .await
+        .unwrap();
 
     let new_commitment1 = wallet_storage
         .get_private_account_commitment(&winner_addr)
@@ -1287,6 +1387,12 @@ pub async fn main_tests_runner() -> Result<()> {
         "test_pinata_private_receiver_new_account" => {
             test_cleanup_wrap!(home_dir, test_pinata_private_receiver_new_account);
         }
+        "test_success_private_transfer_to_another_owned_account_cont_run_path" => {
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_owned_account_cont_run_path
+            );
+        }
         "all" => {
             test_cleanup_wrap!(home_dir, test_success_move_to_another_account);
             test_cleanup_wrap!(home_dir, test_success);
@@ -1322,6 +1428,10 @@ pub async fn main_tests_runner() -> Result<()> {
             test_cleanup_wrap!(home_dir, test_success_token_program_private_owned);
             test_cleanup_wrap!(home_dir, test_success_token_program_private_claiming_path);
             test_cleanup_wrap!(home_dir, test_pinata_private_receiver_new_account);
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_owned_account_cont_run_path
+            );
         }
         "all_private" => {
             test_cleanup_wrap!(
@@ -1352,6 +1462,10 @@ pub async fn main_tests_runner() -> Result<()> {
             test_cleanup_wrap!(home_dir, test_success_token_program_private_owned);
             test_cleanup_wrap!(home_dir, test_success_token_program_private_claiming_path);
             test_cleanup_wrap!(home_dir, test_pinata_private_receiver_new_account);
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_owned_account_cont_run_path
+            );
         }
         _ => {
             anyhow::bail!("Unknown test name");

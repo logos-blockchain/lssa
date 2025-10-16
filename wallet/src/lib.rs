@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use common::{
@@ -15,6 +15,7 @@ use nssa::{Account, Address, privacy_preserving_transaction::message::EncryptedA
 
 use clap::{Parser, Subcommand};
 use nssa_core::{Commitment, MembershipProof};
+use tokio::io::AsyncWriteExt;
 
 use crate::cli::{
     WalletSubcommand, chain::ChainSubcommand,
@@ -47,13 +48,13 @@ pub struct WalletCore {
 }
 
 impl WalletCore {
-    pub fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
+    pub async fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
         let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
         let tx_poller = TxPoller::new(config.clone(), client.clone());
 
         let mut storage = WalletChainStore::new(config)?;
 
-        let persistent_accounts = fetch_persistent_accounts()?;
+        let persistent_accounts = fetch_persistent_accounts().await?;
         for pers_acc_data in persistent_accounts {
             storage.insert_account_data(pers_acc_data);
         }
@@ -66,15 +67,15 @@ impl WalletCore {
     }
 
     ///Store persistent accounts at home
-    pub fn store_persistent_accounts(&self) -> Result<PathBuf> {
+    pub async fn store_persistent_accounts(&self) -> Result<PathBuf> {
         let home = get_home()?;
         let accs_path = home.join("curr_accounts.json");
 
         let data = produce_data_for_storage(&self.storage.user_data);
         let accs = serde_json::to_vec_pretty(&data)?;
 
-        let mut accs_file = File::create(accs_path.as_path())?;
-        accs_file.write_all(&accs)?;
+        let mut accs_file = tokio::fs::File::create(accs_path.as_path()).await?;
+        accs_file.write_all(&accs).await?;
 
         info!("Stored accounts data at {accs_path:#?}");
 
@@ -221,8 +222,8 @@ pub enum SubcommandReturnValue {
 }
 
 pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValue> {
-    let wallet_config = fetch_config()?;
-    let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config)?;
+    let wallet_config = fetch_config().await?;
+    let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
     let subcommand_ret = match command {
         Command::Transfer(transfer_subcommand) => {
@@ -247,9 +248,9 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 }
 
 pub async fn execute_continious_run() -> Result<()> {
-    let config = fetch_config()?;
+    let config = fetch_config().await?;
     let seq_client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
-    let mut wallet_core = WalletCore::start_from_config_update_chain(config.clone())?;
+    let mut wallet_core = WalletCore::start_from_config_update_chain(config.clone()).await?;
 
     let mut latest_block_num = seq_client.get_last_block().await?.last_block;
     let mut curr_last_block = latest_block_num;
@@ -312,7 +313,7 @@ pub async fn execute_continious_run() -> Result<()> {
                 }
             }
 
-            wallet_core.store_persistent_accounts()?;
+            wallet_core.store_persistent_accounts().await?;
 
             println!(
                 "Block at id {block_id} with timestamp {} parsed",

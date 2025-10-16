@@ -131,7 +131,7 @@ impl WalletSubcommand for PinataProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 

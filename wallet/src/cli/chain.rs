@@ -180,7 +180,7 @@ impl WalletSubcommand for FetchSubcommand {
                         .insert_private_account_data(acc_addr, res_acc_to);
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -201,7 +201,7 @@ impl WalletSubcommand for RegisterSubcommand {
 
                 println!("Generated new account with addr {addr}");
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -223,7 +223,7 @@ impl WalletSubcommand for RegisterSubcommand {
                     hex::encode(key.incoming_viewing_public_key.to_bytes())
                 );
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
