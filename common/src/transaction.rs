@@ -1,15 +1,10 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use k256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use log::info;
 use serde::{Deserialize, Serialize};
 
 use sha2::{Digest, digest::FixedOutput};
 
-use elliptic_curve::{
-    consts::{B0, B1},
-    generic_array::GenericArray,
-};
-use sha2::digest::typenum::{UInt, UTerm};
+pub type TreeHashType = [u8; 32];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NSSATransaction {
@@ -28,12 +23,6 @@ impl From<nssa::PrivacyPreservingTransaction> for NSSATransaction {
         Self::PrivacyPreserving(value)
     }
 }
-
-use crate::TreeHashType;
-
-pub type CipherText = Vec<u8>;
-pub type Nonce = GenericArray<u8, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>>;
-pub type Tag = u8;
 
 #[derive(
     Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize,
@@ -81,99 +70,6 @@ impl TryFrom<&EncodedTransaction> for NSSATransaction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MintMoneyPublicTx {
-    pub acc: [u8; 32],
-    pub amount: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SendMoneyShieldedTx {
-    pub acc_sender: [u8; 32],
-    pub amount: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SendMoneyDeshieldedTx {
-    pub receiver_data: Vec<(u128, [u8; 32])>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct OwnedUTXO {
-    pub hash: [u8; 32],
-    pub owner: [u8; 32],
-    pub amount: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct OwnedUTXOForPublication {
-    pub hash: String,
-    pub owner: String,
-    pub amount: u128,
-}
-
-impl From<OwnedUTXO> for OwnedUTXOForPublication {
-    fn from(value: OwnedUTXO) -> Self {
-        Self {
-            hash: hex::encode(value.hash),
-            owner: hex::encode(value.owner),
-            amount: value.amount,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UTXOPublication {
-    pub utxos: Vec<OwnedUTXO>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ActionData {
-    MintMoneyPublicTx(MintMoneyPublicTx),
-    SendMoneyShieldedTx(SendMoneyShieldedTx),
-    SendMoneyDeshieldedTx(SendMoneyDeshieldedTx),
-    UTXOPublication(UTXOPublication),
-}
-
-impl ActionData {
-    pub fn into_hexed_print(self) -> String {
-        match self {
-            ActionData::MintMoneyPublicTx(action) => {
-                format!(
-                    "Account {:?} minted {:?} balance",
-                    hex::encode(action.acc),
-                    action.amount
-                )
-            }
-            ActionData::SendMoneyDeshieldedTx(action) => {
-                format!(
-                    "Receivers receipt {:?}",
-                    action
-                        .receiver_data
-                        .into_iter()
-                        .map(|(amount, rec)| (amount, hex::encode(rec)))
-                        .collect::<Vec<_>>()
-                )
-            }
-            ActionData::SendMoneyShieldedTx(action) => {
-                format!(
-                    "Shielded send from {:?} for {:?} balance",
-                    hex::encode(action.acc_sender),
-                    action.amount
-                )
-            }
-            ActionData::UTXOPublication(action) => {
-                let pub_own_utxo: Vec<OwnedUTXOForPublication> = action
-                    .utxos
-                    .into_iter()
-                    .map(|owned_utxo| owned_utxo.into())
-                    .collect();
-                format!("Published utxos {pub_own_utxo:?}")
-            }
-        }
-    }
-}
-
 impl EncodedTransaction {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
     pub fn hash(&self) -> TreeHashType {
@@ -189,9 +85,6 @@ impl EncodedTransaction {
     }
 }
 
-pub type TransactionSignature = Signature;
-pub type SignaturePublicKey = VerifyingKey;
-pub type SignaturePrivateKey = SigningKey;
 
 #[cfg(test)]
 mod tests {
