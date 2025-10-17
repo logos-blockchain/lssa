@@ -1,6 +1,4 @@
-use rs_merkle::Hasher;
 use serde::Deserialize;
-use sha2::{Digest, Sha256, digest::FixedOutput};
 
 pub mod block;
 pub mod rpc_primitives;
@@ -13,23 +11,6 @@ pub mod test_utils;
 use rpc_primitives::errors::RpcError;
 
 pub type HashType = [u8; 32];
-pub type CommitmentHashType = Vec<u8>;
-
-#[derive(Debug, Clone)]
-///Our own hasher.
-/// Currently it is SHA256 hasher wrapper. May change in a future.
-pub struct OwnHasher {}
-
-impl Hasher for OwnHasher {
-    type Hash = HashType;
-
-    fn hash(data: &[u8]) -> HashType {
-        let mut hasher = Sha256::new();
-
-        hasher.update(data);
-        <HashType>::from(hasher.finalize_fixed())
-    }
-}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequencerRpcError {
