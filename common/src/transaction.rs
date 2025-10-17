@@ -91,7 +91,7 @@ mod tests {
     use sha2::{Digest, digest::FixedOutput};
 
     use crate::{
-        TreeHashType,
+        HashType,
         transaction::{EncodedTransaction, TxKind},
     };
 
@@ -109,7 +109,7 @@ mod tests {
             let data = borsh::to_vec(&body).unwrap();
             let mut hasher = sha2::Sha256::new();
             hasher.update(&data);
-            TreeHashType::from(hasher.finalize_fixed())
+            HashType::from(hasher.finalize_fixed())
         };
 
         let hash = body.hash();

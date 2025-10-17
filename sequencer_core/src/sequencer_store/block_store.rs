@@ -1,13 +1,13 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{TreeHashType, block::Block, transaction::EncodedTransaction};
+use common::{HashType, block::Block, transaction::EncodedTransaction};
 use storage::RocksDBIO;
 
 pub struct SequecerBlockStore {
     dbio: RocksDBIO,
     // TODO: Consider adding the hashmap to the database for faster recovery.
-    tx_hash_to_block_map: HashMap<TreeHashType, u64>,
+    tx_hash_to_block_map: HashMap<HashType, u64>,
     pub genesis_id: u64,
     pub signing_key: nssa::PrivateKey,
 }
@@ -57,7 +57,7 @@ impl SequecerBlockStore {
     }
 
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
-    pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<EncodedTransaction> {
+    pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<EncodedTransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
         let block = block_id.map(|&id| self.get_block_at_id(id));
         if let Some(Ok(block)) = block {
@@ -71,7 +71,7 @@ impl SequecerBlockStore {
     }
 }
 
-fn block_to_transactions_map(block: &Block) -> HashMap<TreeHashType, u64> {
+fn block_to_transactions_map(block: &Block) -> HashMap<HashType, u64> {
     block
         .body
         .transactions

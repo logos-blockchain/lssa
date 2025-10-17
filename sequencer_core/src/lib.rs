@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use common::{
-    TreeHashType,
+    HashType,
     block::HashableBlockData,
     transaction::{EncodedTransaction, NSSATransaction},
 };
@@ -26,7 +26,7 @@ pub struct SequencerCore {
 pub enum TransactionMalformationError {
     MempoolFullForRound,
     InvalidSignature,
-    FailedToDecode { tx: TreeHashType },
+    FailedToDecode { tx: HashType },
 }
 
 impl Display for TransactionMalformationError {

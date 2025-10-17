@@ -12,7 +12,7 @@ pub mod test_utils;
 
 use rpc_primitives::errors::RpcError;
 
-pub type TreeHashType = [u8; 32];
+pub type HashType = [u8; 32];
 pub type CommitmentHashType = Vec<u8>;
 
 #[derive(Debug, Clone)]
@@ -21,18 +21,15 @@ pub type CommitmentHashType = Vec<u8>;
 pub struct OwnHasher {}
 
 impl Hasher for OwnHasher {
-    type Hash = TreeHashType;
+    type Hash = HashType;
 
-    fn hash(data: &[u8]) -> TreeHashType {
+    fn hash(data: &[u8]) -> HashType {
         let mut hasher = Sha256::new();
 
         hasher.update(data);
-        <TreeHashType>::from(hasher.finalize_fixed())
+        <HashType>::from(hasher.finalize_fixed())
     }
 }
-
-///Account id on blockchain
-pub type AccountId = TreeHashType;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SequencerRpcError {
