@@ -9,11 +9,9 @@ thiserror.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 reqwest.workspace = true
-k256.workspace = true
 
 sha2.workspace = true
 log.workspace = true
-elliptic-curve.workspace = true
 hex.workspace = true
 nssa-core = { path = "../nssa/core", features = ["host"] }
 borsh.workspace = true

@@ -14,7 +14,6 @@ tempfile.workspace = true
 clap.workspace = true
 nssa-core = { path = "../nssa/core" }
 base64.workspace = true
-k256 = { version = "0.13.3" }
 bytemuck = "1.23.2"
 borsh.workspace = true
 hex.workspace = true
