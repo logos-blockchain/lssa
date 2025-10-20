@@ -7,7 +7,7 @@ edition = "2024"
 thiserror = "2.0.12"
 risc0-zkvm = { version = "3.0.3", features = ['std'] }
 nssa-core = { path = "core", features = ["host"] }
-program-methods = { path = "program_methods" }
+program-methods = { path = "program_methods", optional = true }
 serde = "1.0.219"
 sha2 = "0.10.9"
 secp256k1 = "0.31.1"
@@ -15,9 +15,14 @@ rand = "0.8"
 borsh = "1.5.7"
 hex = "0.4.3"
 
+[build-dependencies]
+risc0-build = "3.0.3"
+risc0-binfmt = "3.0.2"
+
 [dev-dependencies]
 test-program-methods = { path = "test_program_methods" }
 hex-literal = "1.0.0"
 
 [features]
 default = []
+no_docker = ["program-methods"]

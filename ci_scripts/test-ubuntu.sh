@@ -4,7 +4,7 @@ curl -L https://risczero.com/install | bash
 /home/runner/.risc0/bin/rzup install 
 source env.sh
 
-RISC0_DEV_MODE=1 cargo test --release
+RISC0_DEV_MODE=1 cargo test --release --features no_docker
 
 cd integration_tests
 export NSSA_WALLET_HOME_DIR=$(pwd)/configs/debug/wallet/

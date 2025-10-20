@@ -8,7 +8,7 @@ use risc0_zkvm::{ExecutorEnv, InnerReceipt, Receipt, default_prover};
 
 use crate::{error::NssaError, program::Program};
 
-use program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID};
+use crate::program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID};
 
 /// Proof of the privacy preserving execution circuit
 #[derive(Debug, Clone, PartialEq, Eq)]

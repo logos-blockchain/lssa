@@ -1,11 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use generic_array::GenericArray;
 use k256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use log::info;
 use serde::{Deserialize, Serialize};
 
-use sha2::digest::typenum::{B0, B1};
-use sha2::digest::typenum::{UInt, UTerm};
 use sha2::{Digest, digest::FixedOutput};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,7 +26,6 @@ impl From<nssa::PrivacyPreservingTransaction> for NSSATransaction {
 use crate::TreeHashType;
 
 pub type CipherText = Vec<u8>;
-pub type Nonce = GenericArray<u8, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>>;
 pub type Tag = u8;
 
 #[derive(
