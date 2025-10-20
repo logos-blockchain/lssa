@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use actix_web::Error as HttpError;
 use base64::{Engine, engine::general_purpose};
-use nssa;
+use nssa::{self, program::Program};
 use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
 
@@ -14,9 +16,9 @@ use common::{
         requests::{
             GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
             GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-            GetInitialTestnetAccountsRequest, GetProofForCommitmentRequest,
-            GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse,
+            GetInitialTestnetAccountsRequest, GetProgramIdsRequest, GetProgramIdsResponse,
+            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetTransactionByHashRequest, GetTransactionByHashResponse,
         },
     },
     transaction::EncodedTransaction,
@@ -40,6 +42,7 @@ pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
 pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT: &str = "get_account";
 pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
+pub const GET_PROGRAM_IDS: &str = "get_program_ids";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -267,6 +270,24 @@ impl JsonHandler {
         respond(helperstruct)
     }
 
+    async fn process_get_program_ids(&self, request: Request) -> Result<Value, RpcErr> {
+        let _get_proof_req = GetProgramIdsRequest::parse(Some(request.params))?;
+
+        let mut program_ids = HashMap::new();
+        program_ids.insert(
+            "authenticated_transfer".to_string(),
+            Program::authenticated_transfer_program().id(),
+        );
+        program_ids.insert("token".to_string(), Program::token().id());
+        program_ids.insert("pinata".to_string(), Program::pinata().id());
+        program_ids.insert(
+            "privacy_preserving_circuit".to_string(),
+            nssa::PRIVACY_PRESERVING_CIRCUIT_ID,
+        );
+        let helperstruct = GetProgramIdsResponse { program_ids };
+        respond(helperstruct)
+    }
+
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -280,6 +301,7 @@ impl JsonHandler {
             GET_ACCOUNT => self.process_get_account(request).await,
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
+            GET_PROGRAM_IDS => self.process_get_program_ids(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }

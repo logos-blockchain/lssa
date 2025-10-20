@@ -19,6 +19,10 @@ use tempfile::TempDir;
 use tokio::task::JoinHandle;
 use wallet::{
     Command, SubcommandReturnValue, WalletCore,
+    cli::token_program::{
+        TokenProgramSubcommand, TokenProgramSubcommandDeshielded, TokenProgramSubcommandPrivate,
+        TokenProgramSubcommandPublic, TokenProgramSubcommandShielded,
+    },
     config::PersistentAccountData,
     helperfunctions::{fetch_config, fetch_persistent_accounts},
 };
@@ -350,13 +354,15 @@ pub async fn test_success_token_program() {
         .expect("Failed to produce new account, not present in persistent accounts");
 
     // Create new token
-    let command = Command::CreateNewToken {
+    let subcommand = TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::CreateNewToken {
         definition_addr: definition_addr.to_string(),
         supply_addr: supply_addr.to_string(),
         name: "A NAME".to_string(),
         total_supply: 37,
-    };
-    wallet::execute_subcommand(command).await.unwrap();
+    });
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
@@ -402,12 +408,14 @@ pub async fn test_success_token_program() {
     );
 
     // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-    let command = Command::TransferToken {
+    let subcommand = TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::TransferToken {
         sender_addr: supply_addr.to_string(),
         recipient_addr: recipient_addr.to_string(),
         balance_to_move: 7,
-    };
-    wallet::execute_subcommand(command).await.unwrap();
+    });
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
@@ -447,6 +455,504 @@ pub async fn test_success_token_program() {
     );
 }
 
+/// This test creates a new private token using the token program. After creating the token, the test executes a
+/// private token transfer to a new account. All accounts are owned except definition.
+pub async fn test_success_token_program_private_owned() {
+    let wallet_config = fetch_config().unwrap();
+
+    // Create new account for the token definition (public)
+    let SubcommandReturnValue::RegisterAccount {
+        addr: definition_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPublic {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for the token supply holder (private)
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
+        wallet::execute_subcommand(Command::RegisterAccountPrivate {})
+            .await
+            .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for receiving a token transaction
+    let SubcommandReturnValue::RegisterAccount {
+        addr: recipient_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPrivate {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+
+    // Create new token
+    let subcommand = TokenProgramSubcommand::Private(
+        TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+            definition_addr: definition_addr.to_string(),
+            supply_addr: supply_addr.to_string(),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        },
+    );
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    // Check the status of the token definition account is the expected after the execution
+    let definition_acc = seq_client
+        .get_account(definition_addr.to_string())
+        .await
+        .unwrap()
+        .account;
+
+    assert_eq!(definition_acc.program_owner, Program::token().id());
+    // The data of a token definition account has the following layout:
+    // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+    assert_eq!(
+        definition_acc.data,
+        vec![
+            0, 65, 32, 78, 65, 77, 69, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ]
+    );
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
+    let subcommand =
+        TokenProgramSubcommand::Private(TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        });
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    let new_commitment2 = wallet_storage
+        .get_private_account_commitment(&recipient_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+    // Transfer additional 7 tokens from `supply_acc` to the account at address `recipient_addr`
+    let subcommand =
+        TokenProgramSubcommand::Private(TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        });
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    let new_commitment2 = wallet_storage
+        .get_private_account_commitment(&recipient_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+}
+
+/// This test creates a new private token using the token program. After creating the token, the test executes a
+/// private token transfer to a new account.
+pub async fn test_success_token_program_private_claiming_path() {
+    let wallet_config = fetch_config().unwrap();
+
+    // Create new account for the token definition (public)
+    let SubcommandReturnValue::RegisterAccount {
+        addr: definition_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPublic {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for the token supply holder (private)
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
+        wallet::execute_subcommand(Command::RegisterAccountPrivate {})
+            .await
+            .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for receiving a token transaction
+    let SubcommandReturnValue::RegisterAccount {
+        addr: recipient_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPrivate {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+
+    // Create new token
+    let subcommand = TokenProgramSubcommand::Private(
+        TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+            definition_addr: definition_addr.to_string(),
+            supply_addr: supply_addr.to_string(),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        },
+    );
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    // Check the status of the token definition account is the expected after the execution
+    let definition_acc = seq_client
+        .get_account(definition_addr.to_string())
+        .await
+        .unwrap()
+        .account;
+
+    assert_eq!(definition_acc.program_owner, Program::token().id());
+    // The data of a token definition account has the following layout:
+    // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+    assert_eq!(
+        definition_acc.data,
+        vec![
+            0, 65, 32, 78, 65, 77, 69, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ]
+    );
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    let (recipient_keys, _) = wallet_storage
+        .storage
+        .user_data
+        .get_private_account(&recipient_addr)
+        .unwrap();
+
+    // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
+    let subcommand = TokenProgramSubcommand::Private(
+        TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
+            sender_addr: supply_addr.to_string(),
+            recipient_npk: hex::encode(recipient_keys.nullifer_public_key.0),
+            recipient_ipk: hex::encode(recipient_keys.incoming_viewing_public_key.0.clone()),
+            balance_to_move: 7,
+        },
+    );
+
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+            .await
+            .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let command = Command::FetchPrivateAccount {
+        tx_hash,
+        acc_addr: recipient_addr.to_string(),
+        output_id: 1,
+    };
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    let new_commitment2 = wallet_storage
+        .get_private_account_commitment(&recipient_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+}
+
+/// This test creates a new public token using the token program. After creating the token, the test executes a
+/// shielded token transfer to a new account. All accounts are owned except definition.
+pub async fn test_success_token_program_shielded_owned() {
+    let wallet_config = fetch_config().unwrap();
+
+    // Create new account for the token definition (public)
+    let SubcommandReturnValue::RegisterAccount {
+        addr: definition_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPublic {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for the token supply holder (private)
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
+        wallet::execute_subcommand(Command::RegisterAccountPublic {})
+            .await
+            .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for receiving a token transaction
+    let SubcommandReturnValue::RegisterAccount {
+        addr: recipient_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPrivate {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+
+    // Create new token
+    let subcommand = TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::CreateNewToken {
+        definition_addr: definition_addr.to_string(),
+        supply_addr: supply_addr.to_string(),
+        name: "A NAME".to_string(),
+        total_supply: 37,
+    });
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    // Check the status of the token definition account is the expected after the execution
+    let definition_acc = seq_client
+        .get_account(definition_addr.to_string())
+        .await
+        .unwrap()
+        .account;
+
+    assert_eq!(definition_acc.program_owner, Program::token().id());
+    // The data of a token definition account has the following layout:
+    // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+    assert_eq!(
+        definition_acc.data,
+        vec![
+            0, 65, 32, 78, 65, 77, 69, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ]
+    );
+
+    // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
+    let subcommand = TokenProgramSubcommand::Shielded(
+        TokenProgramSubcommandShielded::TransferTokenShieldedOwned {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        },
+    );
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment2 = wallet_storage
+        .get_private_account_commitment(&recipient_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+    // Transfer additional 7 tokens from `supply_acc` to the account at address `recipient_addr`
+    let subcommand = TokenProgramSubcommand::Shielded(
+        TokenProgramSubcommandShielded::TransferTokenShieldedOwned {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        },
+    );
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment2 = wallet_storage
+        .get_private_account_commitment(&recipient_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+}
+
+/// This test creates a new private token using the token program. After creating the token, the test executes a
+/// deshielded token transfer to a new account. All accounts are owned except definition.
+pub async fn test_success_token_program_deshielded_owned() {
+    let wallet_config = fetch_config().unwrap();
+
+    // Create new account for the token definition (public)
+    let SubcommandReturnValue::RegisterAccount {
+        addr: definition_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPublic {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for the token supply holder (private)
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
+        wallet::execute_subcommand(Command::RegisterAccountPrivate {})
+            .await
+            .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+    // Create new account for receiving a token transaction
+    let SubcommandReturnValue::RegisterAccount {
+        addr: recipient_addr,
+    } = wallet::execute_subcommand(Command::RegisterAccountPublic {})
+        .await
+        .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+
+    // Create new token
+    let subcommand = TokenProgramSubcommand::Private(
+        TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+            definition_addr: definition_addr.to_string(),
+            supply_addr: supply_addr.to_string(),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        },
+    );
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    // Check the status of the token definition account is the expected after the execution
+    let definition_acc = seq_client
+        .get_account(definition_addr.to_string())
+        .await
+        .unwrap()
+        .account;
+
+    assert_eq!(definition_acc.program_owner, Program::token().id());
+    // The data of a token definition account has the following layout:
+    // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+    assert_eq!(
+        definition_acc.data,
+        vec![
+            0, 65, 32, 78, 65, 77, 69, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ]
+    );
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
+    let subcommand = TokenProgramSubcommand::Deshielded(
+        TokenProgramSubcommandDeshielded::TransferTokenDeshielded {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        },
+    );
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    // Transfer additional 7 tokens from `supply_acc` to the account at address `recipient_addr`
+    let subcommand = TokenProgramSubcommand::Deshielded(
+        TokenProgramSubcommandDeshielded::TransferTokenDeshielded {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        },
+    );
+
+    wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        .await
+        .unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let wallet_config = fetch_config().unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&supply_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+}
+
 pub async fn test_success_private_transfer_to_another_owned_account() {
     info!("test_success_private_transfer_to_another_owned_account");
     let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
@@ -458,28 +964,10 @@ pub async fn test_success_private_transfer_to_another_owned_account() {
         amount: 100,
     };
 
-    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
-        wallet::execute_subcommand(command).await.unwrap()
-    else {
-        panic!("invalid subcommand return value");
-    };
+    wallet::execute_subcommand(command).await.unwrap();
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-    let command = Command::FetchPrivateAccount {
-        tx_hash: tx_hash.clone(),
-        acc_addr: from.to_string(),
-        output_id: 0,
-    };
-    wallet::execute_subcommand(command).await.unwrap();
-
-    let command = Command::FetchPrivateAccount {
-        tx_hash,
-        acc_addr: to.to_string(),
-        output_id: 1,
-    };
-    wallet::execute_subcommand(command).await.unwrap();
 
     let wallet_config = fetch_config().unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
@@ -518,13 +1006,6 @@ pub async fn test_success_private_transfer_to_another_foreign_account() {
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-    let command = Command::FetchPrivateAccount {
-        tx_hash: tx_hash.clone(),
-        acc_addr: from.to_string(),
-        output_id: 0,
-    };
-    wallet::execute_subcommand(command).await.unwrap();
 
     let wallet_config = fetch_config().unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
@@ -624,21 +1105,11 @@ pub async fn test_success_deshielded_transfer_to_another_account() {
     let from_acc = wallet_storage.get_account_private(&from).unwrap();
     assert_eq!(from_acc.balance, 10000);
 
-    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
-        wallet::execute_subcommand(command).await.unwrap()
-    else {
-        panic!("invalid subcommand return value");
-    };
+    wallet::execute_subcommand(command).await.unwrap();
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let command = Command::FetchPrivateAccount {
-        tx_hash,
-        acc_addr: from.to_string(),
-        output_id: 0,
-    };
-    wallet::execute_subcommand(command).await.unwrap();
     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
     let from_acc = wallet_storage.get_account_private(&from).unwrap();
@@ -671,21 +1142,12 @@ pub async fn test_success_shielded_transfer_to_another_owned_account() {
     let wallet_config = fetch_config().unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
 
-    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
-        wallet::execute_subcommand(command).await.unwrap()
-    else {
-        panic!("invalid subcommand return value");
-    };
+    wallet::execute_subcommand(command).await.unwrap();
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let command = Command::FetchPrivateAccount {
-        tx_hash,
-        acc_addr: to.to_string(),
-        output_id: 0,
-    };
-    wallet::execute_subcommand(command).await.unwrap();
+    let wallet_config = fetch_config().unwrap();
     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
 
     let acc_to = wallet_storage.get_account_private(&to).unwrap();
@@ -821,6 +1283,122 @@ pub async fn test_authenticated_transfer_initialize_function() {
     info!("Success!");
 }
 
+pub async fn test_pinata_private_receiver() {
+    info!("test_pinata_private_receiver");
+    let pinata_addr = "cafe".repeat(16);
+    let pinata_prize = 150;
+    let solution = 989106;
+
+    let command = Command::ClaimPinataPrivateReceiverOwned {
+        pinata_addr: pinata_addr.clone(),
+        winner_addr: ACC_SENDER_PRIVATE.to_string(),
+        solution,
+    };
+
+    let wallet_config = fetch_config().unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    let pinata_balance_pre = seq_client
+        .get_account_balance(pinata_addr.clone())
+        .await
+        .unwrap()
+        .balance;
+
+    let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        wallet::execute_subcommand(command).await.unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    info!("Checking correct balance move");
+    let pinata_balance_post = seq_client
+        .get_account_balance(pinata_addr.clone())
+        .await
+        .unwrap()
+        .balance;
+
+    let command = Command::FetchPrivateAccount {
+        tx_hash: tx_hash.clone(),
+        acc_addr: ACC_SENDER_PRIVATE.to_string(),
+        output_id: 0,
+    };
+    wallet::execute_subcommand(command).await.unwrap();
+
+    let wallet_config = fetch_config().unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&ACC_SENDER_PRIVATE.parse().unwrap())
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    assert_eq!(pinata_balance_post, pinata_balance_pre - pinata_prize);
+
+    info!("Success!");
+}
+
+pub async fn test_pinata_private_receiver_new_account() {
+    info!("test_pinata_private_receiver");
+    let pinata_addr = "cafe".repeat(16);
+    let pinata_prize = 150;
+    let solution = 989106;
+
+    // Create new account for the token supply holder (private)
+    let SubcommandReturnValue::RegisterAccount { addr: winner_addr } =
+        wallet::execute_subcommand(Command::RegisterAccountPrivate {})
+            .await
+            .unwrap()
+    else {
+        panic!("invalid subcommand return value");
+    };
+
+    let command = Command::ClaimPinataPrivateReceiverOwned {
+        pinata_addr: pinata_addr.clone(),
+        winner_addr: winner_addr.to_string(),
+        solution,
+    };
+
+    let wallet_config = fetch_config().unwrap();
+
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+    let pinata_balance_pre = seq_client
+        .get_account_balance(pinata_addr.clone())
+        .await
+        .unwrap()
+        .balance;
+
+    wallet::execute_subcommand(command).await.unwrap();
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    info!("Checking correct balance move");
+    let pinata_balance_post = seq_client
+        .get_account_balance(pinata_addr.clone())
+        .await
+        .unwrap()
+        .balance;
+
+    let wallet_config = fetch_config().unwrap();
+    let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config).unwrap();
+
+    let new_commitment1 = wallet_storage
+        .get_private_account_commitment(&winner_addr)
+        .unwrap();
+    assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+    assert_eq!(pinata_balance_post, pinata_balance_pre - pinata_prize);
+
+    info!("Success!");
+}
+
 macro_rules! test_cleanup_wrap {
     ($home_dir:ident, $test_func:ident) => {{
         let res = pre_test($home_dir.clone()).await.unwrap();
@@ -904,10 +1482,29 @@ pub async fn main_tests_runner() -> Result<()> {
         "test_authenticated_transfer_initialize_function" => {
             test_cleanup_wrap!(home_dir, test_authenticated_transfer_initialize_function);
         }
+        "test_pinata_private_receiver" => {
+            test_cleanup_wrap!(home_dir, test_pinata_private_receiver);
+        }
+        "test_success_token_program_private_owned" => {
+            test_cleanup_wrap!(home_dir, test_success_token_program_private_owned);
+        }
+        "test_success_token_program_private_claiming_path" => {
+            test_cleanup_wrap!(home_dir, test_success_token_program_private_claiming_path);
+        }
+        "test_pinata_private_receiver_new_account" => {
+            test_cleanup_wrap!(home_dir, test_pinata_private_receiver_new_account);
+        }
+        "test_success_token_program_shielded_owned" => {
+            test_cleanup_wrap!(home_dir, test_success_token_program_shielded_owned);
+        }
+        "test_success_token_program_deshielded_owned" => {
+            test_cleanup_wrap!(home_dir, test_success_token_program_deshielded_owned);
+        }
         "all" => {
             test_cleanup_wrap!(home_dir, test_success_move_to_another_account);
             test_cleanup_wrap!(home_dir, test_success);
             test_cleanup_wrap!(home_dir, test_failure);
+            test_cleanup_wrap!(home_dir, test_get_account);
             test_cleanup_wrap!(home_dir, test_success_two_transactions);
             test_cleanup_wrap!(home_dir, test_success_token_program);
             test_cleanup_wrap!(
@@ -934,8 +1531,44 @@ pub async fn main_tests_runner() -> Result<()> {
                 home_dir,
                 test_success_private_transfer_to_another_owned_account_claiming_path
             );
+            test_cleanup_wrap!(home_dir, test_success_token_program_shielded_owned);
             test_cleanup_wrap!(home_dir, test_pinata);
             test_cleanup_wrap!(home_dir, test_authenticated_transfer_initialize_function);
+            test_cleanup_wrap!(home_dir, test_pinata_private_receiver);
+            test_cleanup_wrap!(home_dir, test_success_token_program_private_owned);
+            test_cleanup_wrap!(home_dir, test_success_token_program_deshielded_owned);
+            test_cleanup_wrap!(home_dir, test_success_token_program_private_claiming_path);
+            test_cleanup_wrap!(home_dir, test_pinata_private_receiver_new_account);
+        }
+        "all_private" => {
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_owned_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_foreign_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_deshielded_transfer_to_another_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_shielded_transfer_to_another_owned_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_shielded_transfer_to_another_foreign_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_private_transfer_to_another_owned_account_claiming_path
+            );
+            test_cleanup_wrap!(home_dir, test_pinata_private_receiver);
+            test_cleanup_wrap!(home_dir, test_success_token_program_private_owned);
+            test_cleanup_wrap!(home_dir, test_success_token_program_private_claiming_path);
+            test_cleanup_wrap!(home_dir, test_pinata_private_receiver_new_account);
         }
         _ => {
             anyhow::bail!("Unknown test name");
