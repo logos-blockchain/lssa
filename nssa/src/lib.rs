@@ -21,6 +21,7 @@ pub use nssa_core::address::Address;
 pub use privacy_preserving_transaction::{
     PrivacyPreservingTransaction, circuit::execute_and_prove,
 };
+pub use program_methods::PRIVACY_PRESERVING_CIRCUIT_ID;
 pub use public_transaction::PublicTransaction;
 pub use signature::PrivateKey;
 pub use signature::PublicKey;
