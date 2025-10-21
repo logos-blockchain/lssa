@@ -326,6 +326,7 @@ pub enum Command {
         #[arg(long)]
         solution: u128,
     },
+    AuthenticatedTransferInitializePublicAccount {},
     // Check the wallet can connect to the node and builtin local programs
     // match the remote versions
     CheckHealth {},
@@ -665,7 +666,8 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
         Command::GetPrivateAccount { addr } => {
             let addr: Address = addr.parse()?;
             if let Some(account) = wallet_core.get_account_private(&addr) {
-                println!("{}", serde_json::to_string(&account).unwrap());
+                let account_hr: HumanReadableAccount = account.into();
+                println!("{}", serde_json::to_string(&account_hr).unwrap());
             } else {
                 println!("Private account not found.");
             }
@@ -767,6 +769,25 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
             println!("Stored persistent accounts at {path:#?}");
 
             SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash }
+        }
+        Command::AuthenticatedTransferInitializePublicAccount {} => {
+            let addr = wallet_core.create_new_account_public();
+
+            println!("Generated new account with addr {addr}");
+
+            let path = wallet_core.store_persistent_accounts()?;
+
+            println!("Stored persistent accounts at {path:#?}");
+
+            let res = wallet_core
+                .register_account_under_authenticated_transfers_programs(addr)
+                .await?;
+
+            println!("Results of tx send is {res:#?}");
+
+            let _transfer_tx = wallet_core.poll_native_token_transfer(res.tx_hash).await?;
+
+            SubcommandReturnValue::RegisterAccount { addr }
         }
         Command::TokenProgram(token_subcommand) => {
             token_subcommand.handle_subcommand(&mut wallet_core).await?

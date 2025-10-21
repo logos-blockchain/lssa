@@ -42,4 +42,30 @@ impl WalletCore {
             Err(ExecutionFailureKind::InsufficientFundsError)
         }
     }
+
+    pub async fn register_account_under_authenticated_transfers_programs(
+        &self,
+        from: Address,
+    ) -> Result<SendTxResponse, ExecutionFailureKind> {
+        let Ok(nonces) = self.get_accounts_nonces(vec![from]).await else {
+            return Err(ExecutionFailureKind::SequencerError);
+        };
+
+        let instruction: u128 = 0;
+        let addresses = vec![from];
+        let program_id = Program::authenticated_transfer_program().id();
+        let message = Message::try_new(program_id, addresses, nonces, instruction).unwrap();
+
+        let signing_key = self.storage.user_data.get_pub_account_signing_key(&from);
+
+        let Some(signing_key) = signing_key else {
+            return Err(ExecutionFailureKind::KeyNotFoundError);
+        };
+
+        let witness_set = WitnessSet::for_message(&message, &[signing_key]);
+
+        let tx = PublicTransaction::new(message, witness_set);
+
+        Ok(self.sequencer_client.send_tx_public(tx).await?)
+    }
 }
