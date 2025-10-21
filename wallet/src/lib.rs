@@ -43,6 +43,7 @@ pub mod pinata_interactions;
 pub mod poller;
 pub mod token_program_interactions;
 pub mod token_transfers;
+pub mod transaction_utils;
 
 pub struct WalletCore {
     pub storage: WalletChainStore,

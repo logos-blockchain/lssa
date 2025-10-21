@@ -224,7 +224,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
 
                 let to_initialization = wallet_core.check_private_account_initialized(&to).await?;
 
-                let (res, secret) = if let Some(to_proof) = to_initialization {
+                let (res, [secret]) = if let Some(to_proof) = to_initialization {
                     wallet_core
                         .send_shielded_native_token_transfer_already_initialized(
                             from, to, amount, to_proof,
@@ -277,7 +277,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
                 let to_ipk =
                     nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
 
-                let (res, _) = wallet_core
+                let res = wallet_core
                     .send_shielded_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
                     .await?;
 
@@ -311,7 +311,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
                 let from: Address = from.parse().unwrap();
                 let to: Address = to.parse().unwrap();
 
-                let (res, secret) = wallet_core
+                let (res, [secret]) = wallet_core
                     .send_deshielded_native_token_transfer(from, to, amount)
                     .await?;
 
