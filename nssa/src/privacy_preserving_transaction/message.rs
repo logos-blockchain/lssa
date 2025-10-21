@@ -31,10 +31,10 @@ impl EncryptedAccountData {
         }
     }
 
-    /// Computes the tag as the first byte of SHA256("/NSSA/v0.1/ViewTag" || Npk || Ivk)
+    /// Computes the tag as the first byte of SHA256("/NSSA/v0.2/ViewTag/" || Npk || Ivk)
     pub fn compute_view_tag(npk: NullifierPublicKey, ivk: IncomingViewingPublicKey) -> ViewTag {
         let mut hasher = Sha256::new();
-        hasher.update(b"/NSSA/v0.1/ViewTag");
+        hasher.update(b"/NSSA/v0.2/ViewTag/");
         hasher.update(npk.to_byte_array());
         hasher.update(ivk.to_bytes());
         let digest: [u8; 32] = hasher.finalize().into();
@@ -166,7 +166,7 @@ pub mod tests {
 
         let expected_view_tag = {
             let mut hasher = Sha256::new();
-            hasher.update(b"/NSSA/v0.1/ViewTag");
+            hasher.update(b"/NSSA/v0.2/ViewTag/");
             hasher.update(npk.to_byte_array());
             hasher.update(ivk.to_bytes());
             let digest: [u8; 32] = hasher.finalize().into();

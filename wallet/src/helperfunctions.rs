@@ -1,7 +1,8 @@
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use nssa_core::account::Nonce;
 use rand::{RngCore, rngs::OsRng};
-use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr};
+use tokio::io::AsyncReadExt;
 
 use anyhow::Result;
 use key_protocol::key_protocol_core::NSSAUserData;
@@ -22,25 +23,25 @@ pub fn get_home() -> Result<PathBuf> {
 }
 
 /// Fetch config from `NSSA_WALLET_HOME_DIR`
-pub fn fetch_config() -> Result<WalletConfig> {
+pub async fn fetch_config() -> Result<WalletConfig> {
     let config_home = get_home()?;
-    let file = File::open(config_home.join("wallet_config.json"))?;
-    let reader = BufReader::new(file);
+    let config_contents = tokio::fs::read(config_home.join("wallet_config.json")).await?;
 
-    Ok(serde_json::from_reader(reader)?)
+    Ok(serde_json::from_slice(&config_contents)?)
 }
 
 /// Fetch list of accounts stored at `NSSA_WALLET_HOME_DIR/curr_accounts.json`
 ///
 /// If file not present, it is considered as empty list of persistent accounts
-pub fn fetch_persistent_accounts() -> Result<Vec<PersistentAccountData>> {
+pub async fn fetch_persistent_accounts() -> Result<Vec<PersistentAccountData>> {
     let home = get_home()?;
     let accs_path = home.join("curr_accounts.json");
+    let mut persistent_accounts_content = vec![];
 
-    match File::open(accs_path) {
-        Ok(file) => {
-            let reader = BufReader::new(file);
-            Ok(serde_json::from_reader(reader)?)
+    match tokio::fs::File::open(accs_path).await {
+        Ok(mut file) => {
+            file.read_to_end(&mut persistent_accounts_content).await?;
+            Ok(serde_json::from_slice(&persistent_accounts_content)?)
         }
         Err(err) => match err.kind() {
             std::io::ErrorKind::NotFound => Ok(vec![]),

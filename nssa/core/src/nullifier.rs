@@ -9,7 +9,7 @@ pub struct NullifierPublicKey(pub [u8; 32]);
 
 impl From<&NullifierPublicKey> for AccountId {
     fn from(value: &NullifierPublicKey) -> Self {
-        const PRIVATE_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.1/AccountId/Private/\x00\x00\x00";
+        const PRIVATE_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.2/AccountId/Private/\x00\x00\x00";
 
         let mut bytes = [0; 64];
         bytes[0..32].copy_from_slice(PRIVATE_ACCOUNT_ID_PREFIX);
@@ -46,7 +46,7 @@ pub struct Nullifier(pub(super) [u8; 32]);
 
 impl Nullifier {
     pub fn for_account_update(commitment: &Commitment, nsk: &NullifierSecretKey) -> Self {
-        const UPDATE_PREFIX: &[u8; 32] = b"/NSSA/v0.1/Nullifier/Update/\x00\x00\x00\x00";
+        const UPDATE_PREFIX: &[u8; 32] = b"/NSSA/v0.2/Nullifier/Update/\x00\x00\x00\x00";
         let mut bytes = UPDATE_PREFIX.to_vec();
         bytes.extend_from_slice(&commitment.to_byte_array());
         bytes.extend_from_slice(nsk);
@@ -54,7 +54,7 @@ impl Nullifier {
     }
 
     pub fn for_account_initialization(npk: &NullifierPublicKey) -> Self {
-        const INIT_PREFIX: &[u8; 32] = b"/NSSA/v0.1/Nullifier/Initialize/";
+        const INIT_PREFIX: &[u8; 32] = b"/NSSA/v0.2/Nullifier/Initialize/";
         let mut bytes = INIT_PREFIX.to_vec();
         bytes.extend_from_slice(&npk.to_byte_array());
         Self(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
@@ -70,8 +70,8 @@ mod tests {
         let commitment = Commitment((0..32u8).collect::<Vec<_>>().try_into().unwrap());
         let nsk = [0x42; 32];
         let expected_nullifier = Nullifier([
-            235, 128, 185, 229, 74, 74, 83, 13, 165, 48, 239, 24, 48, 101, 71, 251, 253, 92, 88,
-            201, 103, 43, 250, 135, 193, 54, 175, 82, 245, 171, 90, 135,
+            148, 243, 116, 209, 140, 231, 211, 61, 35, 62, 114, 110, 143, 224, 82, 201, 221, 34,
+            53, 80, 185, 48, 174, 28, 203, 43, 94, 187, 85, 199, 115, 81,
         ]);
         let nullifier = Nullifier::for_account_update(&commitment, &nsk);
         assert_eq!(nullifier, expected_nullifier);
@@ -84,8 +84,8 @@ mod tests {
             255, 29, 105, 42, 186, 43, 11, 157, 168, 132, 225, 17, 163,
         ]);
         let expected_nullifier = Nullifier([
-            96, 99, 33, 1, 116, 84, 169, 18, 85, 201, 17, 243, 123, 240, 242, 34, 116, 233, 92,
-            203, 247, 92, 161, 162, 135, 66, 127, 108, 230, 149, 105, 157,
+            1, 6, 59, 168, 16, 146, 65, 252, 255, 91, 48, 85, 116, 189, 110, 218, 110, 136, 163,
+            193, 245, 103, 51, 27, 235, 170, 215, 115, 97, 144, 36, 238,
         ]);
         let nullifier = Nullifier::for_account_initialization(&npk);
         assert_eq!(nullifier, expected_nullifier);
@@ -113,8 +113,8 @@ mod tests {
         ];
         let npk = NullifierPublicKey::from(&nsk);
         let expected_account_id = AccountId::new([
-            69, 160, 50, 67, 12, 56, 150, 116, 62, 145, 17, 161, 17, 45, 24, 53, 33, 167, 83, 178,
-            47, 114, 111, 233, 251, 30, 54, 244, 184, 22, 100, 236,
+            18, 153, 225, 78, 35, 214, 212, 205, 152, 83, 18, 246, 69, 41, 20, 217, 85, 1, 108, 7,
+            87, 133, 181, 53, 247, 221, 174, 12, 112, 194, 34, 121,
         ]);
 
         let account_id = AccountId::from(&npk);

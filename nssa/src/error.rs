@@ -48,4 +48,10 @@ pub enum NssaError {
 
     #[error("Circuit proving error")]
     CircuitProvingError(String),
+
+    #[error("Invalid program bytecode")]
+    InvalidProgramBytecode,
+
+    #[error("Program already exists")]
+    ProgramAlreadyExists,
 }

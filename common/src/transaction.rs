@@ -10,6 +10,7 @@ pub type HashType = [u8; 32];
 pub enum NSSATransaction {
     Public(nssa::PublicTransaction),
     PrivacyPreserving(nssa::PrivacyPreservingTransaction),
+    ProgramDeployment(nssa::ProgramDeploymentTransaction),
 }
 
 impl From<nssa::PublicTransaction> for NSSATransaction {
@@ -24,12 +25,19 @@ impl From<nssa::PrivacyPreservingTransaction> for NSSATransaction {
     }
 }
 
+impl From<nssa::ProgramDeploymentTransaction> for NSSATransaction {
+    fn from(value: nssa::ProgramDeploymentTransaction) -> Self {
+        Self::ProgramDeployment(value)
+    }
+}
+
 #[derive(
     Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize,
 )]
 pub enum TxKind {
     Public,
     PrivacyPreserving,
+    ProgramDeployment,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -51,6 +59,10 @@ impl From<NSSATransaction> for EncodedTransaction {
                 tx_kind: TxKind::PrivacyPreserving,
                 encoded_transaction_data: tx.to_bytes(),
             },
+            NSSATransaction::ProgramDeployment(tx) => Self {
+                tx_kind: TxKind::ProgramDeployment,
+                encoded_transaction_data: tx.to_bytes(),
+            },
         }
     }
 }
@@ -64,6 +76,10 @@ impl TryFrom<&EncodedTransaction> for NSSATransaction {
                 .map(|tx| tx.into()),
             TxKind::PrivacyPreserving => {
                 nssa::PrivacyPreservingTransaction::from_bytes(&value.encoded_transaction_data)
+                    .map(|tx| tx.into())
+            }
+            TxKind::ProgramDeployment => {
+                nssa::ProgramDeploymentTransaction::from_bytes(&value.encoded_transaction_data)
                     .map(|tx| tx.into())
             }
         }

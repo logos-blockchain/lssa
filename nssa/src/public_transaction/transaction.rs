@@ -8,7 +8,7 @@ use nssa_core::{
 use sha2::{Digest, digest::FixedOutput};
 
 use crate::{
-    V01State,
+    V02State,
     error::NssaError,
     public_transaction::{Message, WitnessSet},
 };
@@ -52,7 +52,7 @@ impl PublicTransaction {
 
     pub(crate) fn validate_and_produce_public_state_diff(
         &self,
-        state: &V01State,
+        state: &V02State,
     ) -> Result<HashMap<Address, Account>, NssaError> {
         let message = self.message();
         let witness_set = self.witness_set();
@@ -100,9 +100,8 @@ impl PublicTransaction {
             })
             .collect();
 
-        // Check the `program_id` corresponds to a built-in program
-        // Only allowed program so far is the authenticated transfer program
-        let Some(program) = state.builtin_programs().get(&message.program_id) else {
+        // Check the `program_id` corresponds to a deployed program
+        let Some(program) = state.programs().get(&message.program_id) else {
             return Err(NssaError::InvalidInput("Unknown program".into()));
         };
 
@@ -124,7 +123,7 @@ pub mod tests {
     use sha2::{Digest, digest::FixedOutput};
 
     use crate::{
-        Address, PrivateKey, PublicKey, PublicTransaction, Signature, V01State,
+        Address, PrivateKey, PublicKey, PublicTransaction, Signature, V02State,
         error::NssaError,
         program::Program,
         public_transaction::{Message, WitnessSet},
@@ -138,10 +137,10 @@ pub mod tests {
         (key1, key2, addr1, addr2)
     }
 
-    fn state_for_tests() -> V01State {
+    fn state_for_tests() -> V02State {
         let (_, _, addr1, addr2) = keys_for_tests();
         let initial_data = [(addr1, 10000), (addr2, 20000)];
-        V01State::new_with_genesis_accounts(&initial_data, &[])
+        V02State::new_with_genesis_accounts(&initial_data, &[])
     }
 
     fn transaction_for_tests() -> PublicTransaction {
@@ -187,12 +186,12 @@ pub mod tests {
         let tx = transaction_for_tests();
         let expected_signer_addresses = vec![
             Address::new([
-                14, 238, 36, 40, 114, 150, 186, 85, 39, 143, 30, 84, 3, 190, 1, 71, 84, 134, 99,
-                102, 56, 135, 48, 48, 60, 40, 137, 190, 23, 173, 160, 101,
+                208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202, 9,
+                115, 84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
             ]),
             Address::new([
-                158, 61, 142, 101, 77, 68, 14, 149, 41, 58, 162, 220, 236, 235, 19, 120, 153, 165,
-                149, 53, 233, 82, 247, 71, 6, 142, 122, 14, 227, 9, 101, 242,
+                231, 174, 119, 197, 239, 26, 5, 153, 147, 68, 175, 73, 159, 199, 138, 23, 5, 57,
+                141, 98, 237, 6, 207, 46, 20, 121, 246, 222, 248, 154, 57, 188,
             ]),
         ];
         let signer_addresses = tx.signer_addresses();

@@ -8,7 +8,7 @@ use nssa_core::{
 use crate::error::NssaError;
 use crate::privacy_preserving_transaction::circuit::Proof;
 use crate::privacy_preserving_transaction::message::EncryptedAccountData;
-use crate::{Address, V01State};
+use crate::{Address, V02State};
 
 use super::message::Message;
 use super::witness_set::WitnessSet;
@@ -29,7 +29,7 @@ impl PrivacyPreservingTransaction {
 
     pub(crate) fn validate_and_produce_public_state_diff(
         &self,
-        state: &mut V01State,
+        state: &V02State,
     ) -> Result<HashMap<Address, Account>, NssaError> {
         let message = &self.message;
         let witness_set = &self.witness_set;

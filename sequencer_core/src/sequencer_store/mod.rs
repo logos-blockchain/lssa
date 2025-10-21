@@ -10,7 +10,7 @@ use crate::config::AccountInitialData;
 pub mod block_store;
 
 pub struct SequecerChainStore {
-    pub state: nssa::V01State,
+    pub state: nssa::V02State,
     pub block_store: SequecerBlockStore,
 }
 
@@ -29,12 +29,12 @@ impl SequecerChainStore {
             .collect();
 
         #[cfg(not(feature = "testnet"))]
-        let state = nssa::V01State::new_with_genesis_accounts(&init_accs, initial_commitments);
+        let state = nssa::V02State::new_with_genesis_accounts(&init_accs, initial_commitments);
 
         #[cfg(feature = "testnet")]
         let state = {
             let mut this =
-                nssa::V01State::new_with_genesis_accounts(&init_accs, initial_commitments);
+                nssa::V02State::new_with_genesis_accounts(&init_accs, initial_commitments);
             this.add_pinata_program("cafe".repeat(16).parse().unwrap());
             this
         };

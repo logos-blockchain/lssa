@@ -21,9 +21,6 @@ fn main() {
         program_id,
     } = env::read();
 
-    // TODO: Check that `program_execution_proof` is one of the allowed built-in programs
-    // assert_eq!(program_id, AUTHENTICATED_TRANSFER_PROGRAM_ID);
-
     // Check that `program_output` is consistent with the execution of the corresponding program.
     env::verify(program_id, &to_vec(&program_output).unwrap()).unwrap();
 

@@ -16,8 +16,9 @@ use crate::{
     },
 };
 
-const MESSAGE_ENCODING_PREFIX_LEN: usize = 22;
-const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] = b"\x01/NSSA/v0.1/TxMessage/";
+const MESSAGE_ENCODING_PREFIX_LEN: usize = 32;
+const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] =
+    b"/NSSA/v0.2/TxMessage/Private/\x00\x00\x00";
 
 impl EncryptedAccountData {
     pub fn to_bytes(&self) -> Vec<u8> {

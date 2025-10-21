@@ -54,7 +54,7 @@ impl EncryptionScheme {
     ) -> [u8; 32] {
         let mut bytes = Vec::new();
 
-        bytes.extend_from_slice(b"NSSA/v0.1/KDF-SHA256");
+        bytes.extend_from_slice(b"NSSA/v0.2/KDF-SHA256/");
         bytes.extend_from_slice(&shared_secret.0);
         bytes.extend_from_slice(&commitment.to_byte_array());
         bytes.extend_from_slice(&output_index.to_le_bytes());

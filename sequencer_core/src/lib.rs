@@ -88,6 +88,7 @@ impl SequencerCore {
                     Err(TransactionMalformationError::InvalidSignature)
                 }
             }
+            NSSATransaction::ProgramDeployment(tx) => Ok(NSSATransaction::ProgramDeployment(tx)),
         }
     }
 
@@ -130,6 +131,12 @@ impl SequencerCore {
                 self.store
                     .state
                     .transition_from_privacy_preserving_transaction(tx)
+                    .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
+            }
+            NSSATransaction::ProgramDeployment(tx) => {
+                self.store
+                    .state
+                    .transition_from_program_deployment_transaction(tx)
                     .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
             }
         }
@@ -221,13 +228,13 @@ mod tests {
 
     fn setup_sequencer_config() -> SequencerConfig {
         let acc1_addr = vec![
-            14, 238, 36, 40, 114, 150, 186, 85, 39, 143, 30, 84, 3, 190, 1, 71, 84, 134, 99, 102,
-            56, 135, 48, 48, 60, 40, 137, 190, 23, 173, 160, 101,
+            208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202, 9, 115,
+            84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
         ];
 
         let acc2_addr = vec![
-            158, 61, 142, 101, 77, 68, 14, 149, 41, 58, 162, 220, 236, 235, 19, 120, 153, 165, 149,
-            53, 233, 82, 247, 71, 6, 142, 122, 14, 227, 9, 101, 242,
+            231, 174, 119, 197, 239, 26, 5, 153, 147, 68, 175, 73, 159, 199, 138, 23, 5, 57, 141,
+            98, 237, 6, 207, 46, 20, 121, 246, 222, 248, 154, 57, 188,
         ];
 
         let initial_acc1 = AccountInitialData {

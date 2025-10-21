@@ -77,14 +77,14 @@ mod tests {
     fn create_initial_accounts() -> Vec<InitialAccountData> {
         let initial_acc1 = serde_json::from_str(r#"{
             "Public": {
-                "address": "0eee24287296ba55278f1e5403be014754866366388730303c2889be17ada065",
+                "address": "d07ad2e84b27fa00c262f0a1eea0ff35ca0973547e6a106f72f193c2dc838b44",
                 "pub_sign_key": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
             }
         }"#).unwrap();
 
         let initial_acc2 = serde_json::from_str(r#"{
             "Public": {
-                "address": "9e3d8e654d440e95293aa2dceceb137899a59535e952f747068e7a0ee30965f2",
+                "address": "e7ae77c5ef1a05999344af499fc78a1705398d62ed06cf2e1479f6def89a39bc",
                 "pub_sign_key": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
             }
         }"#).unwrap();

@@ -221,7 +221,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -278,7 +278,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -328,7 +328,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -376,7 +376,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -431,7 +431,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     println!("Transaction data is {:?}", tx.message);
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -485,7 +485,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts()?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 

@@ -8,11 +8,11 @@
     "port": 3040,
     "initial_accounts": [
         {
-            "addr": "0eee24287296ba55278f1e5403be014754866366388730303c2889be17ada065",
+            "addr": "d07ad2e84b27fa00c262f0a1eea0ff35ca0973547e6a106f72f193c2dc838b44",
             "balance": 10000
         },
         {
-            "addr": "9e3d8e654d440e95293aa2dceceb137899a59535e952f747068e7a0ee30965f2",
+            "addr": "e7ae77c5ef1a05999344af499fc78a1705398d62ed06cf2e1479f6def89a39bc",
             "balance": 20000
         }
     ],
