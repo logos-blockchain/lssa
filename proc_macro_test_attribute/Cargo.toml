@@ -1,0 +1,9 @@
+[package]
+name = "proc_macro_test_attribute"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[lib]
+proc-macro = true

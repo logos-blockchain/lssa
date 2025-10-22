@@ -10,7 +10,8 @@ members = [
   "wallet",
   "sequencer_core",
   "common",
-  "nssa",
+  "nssa", 
+  "proc_macro_test_attribute",
 ]
 
 [workspace.dependencies]
