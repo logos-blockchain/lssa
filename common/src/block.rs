@@ -1,7 +1,23 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use rs_merkle::Hasher;
+use sha2::{Digest, Sha256, digest::FixedOutput};
 
-use crate::{OwnHasher, transaction::EncodedTransaction};
+use crate::transaction::EncodedTransaction;
+
+pub type HashType = [u8; 32];
+
+#[derive(Debug, Clone)]
+///Our own hasher.
+/// Currently it is SHA256 hasher wrapper. May change in a future.
+pub struct OwnHasher {}
+
+impl OwnHasher {
+    fn hash(data: &[u8]) -> HashType {
+        let mut hasher = Sha256::new();
+
+        hasher.update(data);
+        <HashType>::from(hasher.finalize_fixed())
+    }
+}
 
 pub type BlockHash = [u8; 32];
 pub type BlockId = u64;

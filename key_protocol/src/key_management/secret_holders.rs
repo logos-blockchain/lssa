@@ -1,5 +1,5 @@
 use bip39::Mnemonic;
-use common::TreeHashType;
+use common::HashType;
 use nssa_core::{
     NullifierPublicKey, NullifierSecretKey,
     encryption::{IncomingViewingPublicKey, Scalar},
@@ -44,7 +44,7 @@ impl SeedHolder {
         }
     }
 
-    pub fn generate_secret_spending_key_hash(&self) -> TreeHashType {
+    pub fn generate_secret_spending_key_hash(&self) -> HashType {
         let mut hash = hmac_sha512::HMAC::mac(&self.seed, "NSSA_seed");
 
         for _ in 1..2048 {
@@ -80,7 +80,7 @@ impl SecretSpendingKey {
         hasher.update([2u8]);
         hasher.update([0u8; 22]);
 
-        <TreeHashType>::from(hasher.finalize_fixed())
+        <HashType>::from(hasher.finalize_fixed())
     }
 
     pub fn generate_outgoing_viewing_secret_key(&self) -> OutgoingViewingSecretKey {
@@ -91,7 +91,7 @@ impl SecretSpendingKey {
         hasher.update([3u8]);
         hasher.update([0u8; 22]);
 
-        <TreeHashType>::from(hasher.finalize_fixed())
+        <HashType>::from(hasher.finalize_fixed())
     }
 
     pub fn produce_private_key_holder(&self) -> PrivateKeyHolder {

@@ -26,8 +26,6 @@ pub const DB_META_FIRST_BLOCK_IN_DB_KEY: &str = "first_block_in_db";
 pub const DB_META_LAST_BLOCK_IN_DB_KEY: &str = "last_block_in_db";
 ///Key base for storing metainformation which describe if first block has been set
 pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
-///Key to list of all known smart contract addresses
-pub const DB_META_SC_LIST: &str = "sc_list";
 
 ///Key base for storing snapshot which describe block id
 pub const DB_SNAPSHOT_BLOCK_ID_KEY: &str = "block_id";
@@ -36,8 +34,6 @@ pub const DB_SNAPSHOT_BLOCK_ID_KEY: &str = "block_id";
 pub const CF_BLOCK_NAME: &str = "cf_block";
 ///Name of meta column family
 pub const CF_META_NAME: &str = "cf_meta";
-///Name of smart contract column family
-pub const CF_SC_NAME: &str = "cf_sc";
 ///Name of snapshot column family
 pub const CF_SNAPSHOT_NAME: &str = "cf_snapshot";
 
@@ -54,7 +50,6 @@ impl RocksDBIO {
         //ToDo: Add more column families for different data
         let cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
-        let cfsc = ColumnFamilyDescriptor::new(CF_SC_NAME, cf_opts.clone());
         let cfsnapshot = ColumnFamilyDescriptor::new(CF_SNAPSHOT_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
@@ -63,7 +58,7 @@ impl RocksDBIO {
         let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(
             &db_opts,
             path,
-            vec![cfb, cfmeta, cfsc, cfsnapshot],
+            vec![cfb, cfmeta, cfsnapshot],
         );
 
         let dbio = Self {
@@ -81,8 +76,6 @@ impl RocksDBIO {
             dbio.put_meta_is_first_block_set()?;
 
             dbio.put_meta_last_block_in_db(block_id)?;
-
-            dbio.put_meta_sc_list(vec![])?;
 
             Ok(dbio)
         } else {
@@ -112,10 +105,6 @@ impl RocksDBIO {
 
     pub fn block_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_BLOCK_NAME).unwrap()
-    }
-
-    pub fn sc_column(&self) -> Arc<BoundColumnFamily<'_>> {
-        self.db.cf_handle(CF_SC_NAME).unwrap()
     }
 
     pub fn snapshot_column(&self) -> Arc<BoundColumnFamily<'_>> {
@@ -244,29 +233,6 @@ impl RocksDBIO {
         Ok(())
     }
 
-    ///Setting list of known smart contracts in a DB as a `sc_list`
-    pub fn put_meta_sc_list(&self, sc_list: Vec<String>) -> DbResult<()> {
-        let cf_meta = self.meta_column();
-        self.db
-            .put_cf(
-                &cf_meta,
-                borsh::to_vec(&DB_META_SC_LIST).map_err(|err| {
-                    DbError::borsh_cast_message(
-                        err,
-                        Some("Failed to serialize DB_META_SC_LIST".to_string()),
-                    )
-                })?,
-                borsh::to_vec(&sc_list).map_err(|err| {
-                    DbError::borsh_cast_message(
-                        err,
-                        Some("Failed to serialize list of sc".to_string()),
-                    )
-                })?,
-            )
-            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
-        Ok(())
-    }
-
     pub fn put_meta_is_first_block_set(&self) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
@@ -344,45 +310,6 @@ impl RocksDBIO {
                 "Block on this id not found".to_string(),
             ))
         }
-    }
-
-    ///Getting list of known smart contracts in a DB
-    pub fn get_meta_sc_list(&self) -> DbResult<Vec<String>> {
-        let cf_meta = self.meta_column();
-        let sc_list = self
-            .db
-            .get_cf(
-                &cf_meta,
-                borsh::to_vec(&DB_META_SC_LIST).map_err(|err| {
-                    DbError::borsh_cast_message(
-                        err,
-                        Some("Failed to serialize DB_META_SC_LIST".to_string()),
-                    )
-                })?,
-            )
-            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
-        if let Some(data) = sc_list {
-            Ok(borsh::from_slice::<Vec<String>>(&data).map_err(|serr| {
-                DbError::borsh_cast_message(
-                    serr,
-                    Some("List of Sc Deserialization failed".to_string()),
-                )
-            })?)
-        } else {
-            Err(DbError::db_interaction_error(
-                "Sc list not found".to_string(),
-            ))
-        }
-    }
-
-    ///Push additional contract into list of known contracts in a DB
-    pub fn put_meta_sc(&self, sc_addr: String) -> DbResult<()> {
-        let mut sc_list = self.get_meta_sc_list()?;
-        if !sc_list.contains(&sc_addr) {
-            sc_list.push(sc_addr);
-        }
-        self.put_meta_sc_list(sc_list)?;
-        Ok(())
     }
 
     pub fn get_snapshot_block_id(&self) -> DbResult<u64> {

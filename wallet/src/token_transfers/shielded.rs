@@ -1,4 +1,4 @@
-use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
+use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use nssa::{
     Account, Address, PrivacyPreservingTransaction,

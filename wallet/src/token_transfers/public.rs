@@ -1,4 +1,4 @@
-use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
+use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use nssa::{
     Address, PublicTransaction,
     program::Program,
