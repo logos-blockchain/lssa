@@ -1,4 +1,4 @@
-use common::ExecutionFailureKind;
+use common::error::ExecutionFailureKind;
 use nssa::{Account, program::Program};
 use nssa_core::program::InstructionData;
 

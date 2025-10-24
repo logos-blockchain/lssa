@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use common::{
-    TreeHashType,
+    HashType,
     block::HashableBlockData,
     transaction::{EncodedTransaction, NSSATransaction},
 };
@@ -23,29 +23,19 @@ pub struct SequencerCore {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum TransactionMalformationErrorKind {
-    PublicTransactionChangedPrivateData { tx: TreeHashType },
-    PrivateTransactionChangedPublicData { tx: TreeHashType },
-    TxHashAlreadyPresentInTree { tx: TreeHashType },
-    NullifierAlreadyPresentInTree { tx: TreeHashType },
-    UTXOCommitmentAlreadyPresentInTree { tx: TreeHashType },
+pub enum TransactionMalformationError {
     MempoolFullForRound,
-    ChainStateFurtherThanTransactionState { tx: TreeHashType },
-    FailedToInsert { tx: TreeHashType, details: String },
     InvalidSignature,
-    IncorrectSender,
-    BalanceMismatch { tx: TreeHashType },
-    NonceMismatch { tx: TreeHashType },
-    FailedToDecode { tx: TreeHashType },
+    FailedToDecode { tx: HashType },
 }
 
-impl Display for TransactionMalformationErrorKind {
+impl Display for TransactionMalformationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:#?}")
     }
 }
 
-impl std::error::Error for TransactionMalformationErrorKind {}
+impl std::error::Error for TransactionMalformationError {}
 
 impl SequencerCore {
     pub fn start_from_config(config: SequencerConfig) -> Self {
@@ -81,21 +71,21 @@ impl SequencerCore {
     pub fn transaction_pre_check(
         &mut self,
         tx: NSSATransaction,
-    ) -> Result<NSSATransaction, TransactionMalformationErrorKind> {
+    ) -> Result<NSSATransaction, TransactionMalformationError> {
         // Stateless checks here
         match tx {
             NSSATransaction::Public(tx) => {
                 if tx.witness_set().is_valid_for(tx.message()) {
                     Ok(NSSATransaction::Public(tx))
                 } else {
-                    Err(TransactionMalformationErrorKind::InvalidSignature)
+                    Err(TransactionMalformationError::InvalidSignature)
                 }
             }
             NSSATransaction::PrivacyPreserving(tx) => {
                 if tx.witness_set().signatures_are_valid_for(tx.message()) {
                     Ok(NSSATransaction::PrivacyPreserving(tx))
                 } else {
-                    Err(TransactionMalformationErrorKind::InvalidSignature)
+                    Err(TransactionMalformationError::InvalidSignature)
                 }
             }
             NSSATransaction::ProgramDeployment(tx) => Ok(NSSATransaction::ProgramDeployment(tx)),
@@ -105,16 +95,16 @@ impl SequencerCore {
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
         transaction: EncodedTransaction,
-    ) -> Result<(), TransactionMalformationErrorKind> {
+    ) -> Result<(), TransactionMalformationError> {
         let transaction = NSSATransaction::try_from(&transaction).map_err(|_| {
-            TransactionMalformationErrorKind::FailedToDecode {
+            TransactionMalformationError::FailedToDecode {
                 tx: transaction.hash(),
             }
         })?;
 
         let mempool_size = self.mempool.len();
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
-            return Err(TransactionMalformationErrorKind::MempoolFullForRound);
+            return Err(TransactionMalformationError::MempoolFullForRound);
         }
 
         let authenticated_tx = self
@@ -163,7 +153,7 @@ impl SequencerCore {
 
         while let Some(tx) = self.mempool.pop_last() {
             let nssa_transaction = NSSATransaction::try_from(&tx)
-                .map_err(|_| TransactionMalformationErrorKind::FailedToDecode { tx: tx.hash() })?;
+                .map_err(|_| TransactionMalformationError::FailedToDecode { tx: tx.hash() })?;
 
             if let Ok(valid_tx) = self.execute_check_transaction_on_state(nssa_transaction) {
                 valid_transactions.push(valid_tx.into());
@@ -212,7 +202,7 @@ mod tests {
 
     fn parse_unwrap_tx_body_into_nssa_tx(tx_body: EncodedTransaction) -> NSSATransaction {
         NSSATransaction::try_from(&tx_body)
-            .map_err(|_| TransactionMalformationErrorKind::FailedToDecode { tx: tx_body.hash() })
+            .map_err(|_| TransactionMalformationError::FailedToDecode { tx: tx_body.hash() })
             .unwrap()
     }
 
@@ -537,7 +527,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(TransactionMalformationErrorKind::MempoolFullForRound)
+            Err(TransactionMalformationError::MempoolFullForRound)
         ));
     }
 

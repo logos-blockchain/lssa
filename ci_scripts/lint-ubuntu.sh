@@ -1,6 +1,5 @@
 set -e
 
-source env.sh
 cargo install taplo-cli --locked
 
 cargo fmt -- --check

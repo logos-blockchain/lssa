@@ -1,4 +1,4 @@
-use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
+use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use nssa::{Account, Address, program::Program};
 use nssa_core::{
     MembershipProof, NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey,

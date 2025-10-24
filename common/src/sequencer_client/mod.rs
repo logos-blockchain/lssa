@@ -10,6 +10,7 @@ use nssa_core::program::ProgramId;
 use reqwest::Client;
 use serde_json::Value;
 
+use crate::error::{SequencerClientError, SequencerRpcError};
 use crate::rpc_primitives::requests::{
     GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
     GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
@@ -18,7 +19,6 @@ use crate::rpc_primitives::requests::{
 };
 use crate::sequencer_client::json::AccountInitialData;
 use crate::transaction::{EncodedTransaction, NSSATransaction};
-use crate::{SequencerClientError, SequencerRpcError};
 
 pub mod json;
 
