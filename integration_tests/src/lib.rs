@@ -1842,6 +1842,7 @@ pub async fn main_tests_runner() -> Result<()> {
                 home_dir,
                 test_success_private_transfer_to_another_owned_account_cont_run_path
             );
+            tps_test().await;
         }
         "all_private" => {
             test_cleanup_wrap!(

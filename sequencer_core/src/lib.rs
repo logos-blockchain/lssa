@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::Instant};
 
 use anyhow::Result;
 use common::{
@@ -146,6 +146,7 @@ impl SequencerCore {
 
     ///Produces new block from transactions in mempool
     pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<u64> {
+        let now = Instant::now();
         let new_block_height = self.chain_height + 1;
 
         let mut num_valid_transactions_in_block = 0;
@@ -175,6 +176,8 @@ impl SequencerCore {
 
         let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
+        let num_txs_in_block = valid_transactions.len();
+
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
             transactions: valid_transactions,
@@ -187,6 +190,12 @@ impl SequencerCore {
         self.store.block_store.put_block_at_id(block)?;
 
         self.chain_height = new_block_height;
+
+        log::info!(
+            "Created block with {} transactions in {} seconds",
+            num_txs_in_block,
+            now.elapsed().as_secs()
+        );
 
         Ok(self.chain_height)
     }
