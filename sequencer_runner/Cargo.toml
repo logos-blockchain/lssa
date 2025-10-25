@@ -22,6 +22,7 @@ path = "../sequencer_rpc"
 
 [dependencies.sequencer_core]
 path = "../sequencer_core"
+features = ["testnet"]
 
 [dependencies.common]
 path = "../common"

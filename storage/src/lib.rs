@@ -44,7 +44,7 @@ pub struct RocksDBIO {
 }
 
 impl RocksDBIO {
-    pub fn new(path: &Path, start_block: Option<Block>) -> DbResult<Self> {
+    pub fn open_or_create(path: &Path, start_block: Option<Block>) -> DbResult<Self> {
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         //ToDo: Add more column families for different data
@@ -74,7 +74,6 @@ impl RocksDBIO {
             let block_id = block.header.block_id;
             dbio.put_meta_first_block_in_db(block)?;
             dbio.put_meta_is_first_block_set()?;
-
             dbio.put_meta_last_block_in_db(block_id)?;
 
             Ok(dbio)

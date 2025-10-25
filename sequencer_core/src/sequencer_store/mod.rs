@@ -1,11 +1,11 @@
 use std::path::Path;
 
 use block_store::SequecerBlockStore;
-use common::block::HashableBlockData;
+use common::{block::HashableBlockData, transaction::{self, NSSATransaction}};
 use nssa::{self, Address};
 use rand::{RngCore, rngs::OsRng};
 
-use crate::config::AccountInitialData;
+use crate::{config::AccountInitialData, sequencer_store::block_store::block_to_transactions_map};
 
 pub mod block_store;
 
@@ -39,21 +39,11 @@ impl SequecerChainStore {
             this
         };
 
-        let mut data = [0; 32];
-        let mut prev_block_hash = [0; 32];
-
-        if is_genesis_random {
-            OsRng.fill_bytes(&mut data);
-            OsRng.fill_bytes(&mut prev_block_hash);
-        }
-
-        let curr_time = chrono::Utc::now().timestamp_millis() as u64;
-
         let hashable_data = HashableBlockData {
             block_id: genesis_id,
             transactions: vec![],
-            prev_block_hash,
-            timestamp: curr_time,
+            prev_block_hash: [0; 32],
+            timestamp: 0,
         };
 
         let genesis_block = hashable_data.into_block(&signing_key);
@@ -66,6 +56,7 @@ impl SequecerChainStore {
             signing_key,
         )
         .unwrap();
+
 
         Self { state, block_store }
     }

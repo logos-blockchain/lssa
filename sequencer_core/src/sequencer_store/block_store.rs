@@ -7,7 +7,7 @@ use storage::RocksDBIO;
 pub struct SequecerBlockStore {
     dbio: RocksDBIO,
     // TODO: Consider adding the hashmap to the database for faster recovery.
-    tx_hash_to_block_map: HashMap<HashType, u64>,
+    pub tx_hash_to_block_map: HashMap<HashType, u64>,
     pub genesis_id: u64,
     pub signing_key: nssa::PrivateKey,
 }
@@ -28,7 +28,7 @@ impl SequecerBlockStore {
             HashMap::new()
         };
 
-        let dbio = RocksDBIO::new(location, genesis_block)?;
+        let dbio = RocksDBIO::open_or_create(location, genesis_block)?;
 
         let genesis_id = dbio.get_meta_first_block_in_db()?;
 
@@ -71,7 +71,7 @@ impl SequecerBlockStore {
     }
 }
 
-fn block_to_transactions_map(block: &Block) -> HashMap<HashType, u64> {
+pub(crate) fn block_to_transactions_map(block: &Block) -> HashMap<HashType, u64> {
     block
         .body
         .transactions

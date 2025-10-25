@@ -12,6 +12,8 @@ use mempool::MemPool;
 use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
 
+use crate::sequencer_store::block_store::block_to_transactions_map;
+
 pub mod config;
 pub mod sequencer_store;
 
@@ -53,19 +55,39 @@ impl SequencerCore {
             initial_commitments.push(comm);
         }
 
-        Self {
-            store: SequecerChainStore::new_with_genesis(
-                &config.home,
-                config.genesis_id,
-                config.is_genesis_random,
-                &config.initial_accounts,
-                &initial_commitments,
-                nssa::PrivateKey::try_new(config.signing_key).unwrap(),
-            ),
+        let store = SequecerChainStore::new_with_genesis(
+            &config.home,
+            config.genesis_id,
+            config.is_genesis_random,
+            &config.initial_accounts,
+            &initial_commitments,
+            nssa::PrivateKey::try_new(config.signing_key).unwrap(),
+        );
+
+        let mut block_id = config.genesis_id;
+
+        let mut this = Self {
+            store,
             mempool: MemPool::default(),
             chain_height: config.genesis_id,
             sequencer_config: config,
+        };
+
+        loop {
+            let Ok(block) = this.store.block_store.get_block_at_id(block_id) else {
+                break;
+            };
+            for encoded_transaction in block.body.transactions {
+                let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
+                let transaction = this.transaction_pre_check(transaction).unwrap();
+                this.execute_check_transaction_on_state(transaction).unwrap();
+                this.store.block_store.tx_hash_to_block_map.insert(encoded_transaction.hash(), block_id);
+
+            }
+            block_id +=1;
         }
+
+        this
     }
 
     pub fn transaction_pre_check(
