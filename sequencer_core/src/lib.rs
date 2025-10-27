@@ -80,11 +80,14 @@ impl SequencerCore {
             for encoded_transaction in block.body.transactions {
                 let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
                 let transaction = this.transaction_pre_check(transaction).unwrap();
-                this.execute_check_transaction_on_state(transaction).unwrap();
-                this.store.block_store.tx_hash_to_block_map.insert(encoded_transaction.hash(), block_id);
-
+                this.execute_check_transaction_on_state(transaction)
+                    .unwrap();
+                this.store
+                    .block_store
+                    .tx_hash_to_block_map
+                    .insert(encoded_transaction.hash(), block_id);
             }
-            block_id +=1;
+            block_id += 1;
         }
 
         this

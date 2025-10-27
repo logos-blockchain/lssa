@@ -1,7 +1,10 @@
 use std::path::Path;
 
 use block_store::SequecerBlockStore;
-use common::{block::HashableBlockData, transaction::{self, NSSATransaction}};
+use common::{
+    block::HashableBlockData,
+    transaction::{self, NSSATransaction},
+};
 use nssa::{self, Address};
 use rand::{RngCore, rngs::OsRng};
 
@@ -56,7 +59,6 @@ impl SequecerChainStore {
             signing_key,
         )
         .unwrap();
-
 
         Self { state, block_store }
     }
