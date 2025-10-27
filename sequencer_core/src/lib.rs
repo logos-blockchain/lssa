@@ -73,10 +73,7 @@ impl SequencerCore {
             sequencer_config: config,
         };
 
-        loop {
-            let Ok(block) = this.store.block_store.get_block_at_id(block_id) else {
-                break;
-            };
+        while let Ok(block) = this.store.block_store.get_block_at_id(block_id) {
             for encoded_transaction in block.body.transactions {
                 let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
                 let transaction = this.transaction_pre_check(transaction).unwrap();
@@ -87,6 +84,7 @@ impl SequencerCore {
                     .tx_hash_to_block_map
                     .insert(encoded_transaction.hash(), block_id);
             }
+            this.chain_height = block_id;
             block_id += 1;
         }
 
