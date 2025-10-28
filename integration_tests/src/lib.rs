@@ -43,11 +43,11 @@ pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &[u8] = include_bytes!("data_changer.bin");
 
 fn make_public_account_input_from_str(addr: &str) -> String {
-    format!("Public/{addr:?}")
+    format!("Public/{addr}")
 }
 
 fn make_private_account_input_from_str(addr: &str) -> String {
-    format!("Private/{addr:?}")
+    format!("Private/{addr}")
 }
 
 #[allow(clippy::type_complexity)]
@@ -92,7 +92,7 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
     seq_http_server_handle.stop(true).await;
 
     let wallet_home = wallet::helperfunctions::get_home().unwrap();
-    let persistent_data_home = wallet_home.join("curr_accounts.json");
+    let persistent_data_home = wallet_home.join("storage.json");
 
     //Removing persistent accounts after run to not affect other executions
     //Not necessary an error, if fails as there is tests for failure scenario
@@ -162,4 +162,21 @@ async fn verify_commitment_is_in_state(
         seq_client.get_proof_for_commitment(commitment).await,
         Ok(Some(_))
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{make_private_account_input_from_str, make_public_account_input_from_str};
+
+    #[test]
+    fn correct_addr_from_prefix() {
+        let addr1 = "cafecafe";
+        let addr2 = "deadbeaf";
+
+        let addr1_pub = make_public_account_input_from_str(addr1);
+        let addr2_priv = make_private_account_input_from_str(addr2);
+
+        assert_eq!(addr1_pub, "Public/cafecafe".to_string());
+        assert_eq!(addr2_priv, "Private/deadbeaf".to_string());
+    }
 }

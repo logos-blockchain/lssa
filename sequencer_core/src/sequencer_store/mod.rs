@@ -9,8 +9,6 @@ use crate::config::AccountInitialData;
 
 pub mod block_store;
 
-pub const PINATA_BASE58: &str = "EfQhKQAkX2FJiwNii2WFQsGndjvF1Mzd7RuVe7QdPLw7";
-
 pub struct SequecerChainStore {
     pub state: nssa::V02State,
     pub block_store: SequecerBlockStore,
@@ -35,6 +33,8 @@ impl SequecerChainStore {
 
         #[cfg(feature = "testnet")]
         let state = {
+            use common::PINATA_BASE58;
+
             let mut this =
                 nssa::V02State::new_with_genesis_accounts(&init_accs, initial_commitments);
             this.add_pinata_program(PINATA_BASE58.parse().unwrap());

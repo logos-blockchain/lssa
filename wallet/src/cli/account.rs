@@ -1,7 +1,6 @@
 use anyhow::Result;
 use base58::ToBase58;
 use clap::Subcommand;
-use common::transaction::NSSATransaction;
 use nssa::{Address, program::Program};
 use serde::Serialize;
 
@@ -9,6 +8,7 @@ use crate::{
     SubcommandReturnValue, WalletCore,
     cli::WalletSubcommand,
     helperfunctions::{AddressPrivacyKind, HumanReadableAccount, parse_addr_with_privacy_prefix},
+    parse_block_range,
 };
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;
@@ -76,36 +76,11 @@ pub enum AccountSubcommand {
         #[arg(short, long)]
         addr: String,
     },
-    ///Fetch
-    #[command(subcommand)]
-    Fetch(FetchSubcommand),
     ///New
     #[command(subcommand)]
     New(NewSubcommand),
     ///Sync private accounts
     SyncPrivate {},
-}
-
-///Represents generic getter CLI subcommand
-#[derive(Subcommand, Debug, Clone)]
-pub enum FetchSubcommand {
-    ///Fetch transaction by `hash`
-    Tx {
-        #[arg(short, long)]
-        tx_hash: String,
-    },
-    ///Claim account `acc_addr` generated in transaction `tx_hash`, using secret `sh_secret` at ciphertext id `ciph_id`
-    PrivateAccount {
-        ///tx_hash - valid 32 byte hex string
-        #[arg(long)]
-        tx_hash: String,
-        ///acc_addr - valid 32 byte hex string
-        #[arg(long)]
-        acc_addr: String,
-        ///output_id - id of the output in the transaction
-        #[arg(long)]
-        output_id: usize,
-    },
 }
 
 ///Represents generic register CLI subcommand
@@ -115,74 +90,6 @@ pub enum NewSubcommand {
     Public {},
     ///Register new private account
     Private {},
-}
-
-impl WalletSubcommand for FetchSubcommand {
-    async fn handle_subcommand(
-        self,
-        wallet_core: &mut WalletCore,
-    ) -> Result<SubcommandReturnValue> {
-        match self {
-            FetchSubcommand::Tx { tx_hash } => {
-                let tx_obj = wallet_core
-                    .sequencer_client
-                    .get_transaction_by_hash(tx_hash)
-                    .await?;
-
-                println!("Transaction object {tx_obj:#?}");
-
-                Ok(SubcommandReturnValue::Empty)
-            }
-            FetchSubcommand::PrivateAccount {
-                tx_hash,
-                acc_addr,
-                output_id: ciph_id,
-            } => {
-                let acc_addr: Address = acc_addr.parse().unwrap();
-
-                let account_key_chain = wallet_core
-                    .storage
-                    .user_data
-                    .user_private_accounts
-                    .get(&acc_addr);
-
-                let Some((account_key_chain, _)) = account_key_chain else {
-                    anyhow::bail!("Account not found");
-                };
-
-                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
-
-                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let to_ebc = tx.message.encrypted_private_post_states[ciph_id].clone();
-                    let to_comm = tx.message.new_commitments[ciph_id].clone();
-                    let shared_secret =
-                        account_key_chain.calculate_shared_secret_receiver(to_ebc.epk);
-
-                    let res_acc_to = nssa_core::EncryptionScheme::decrypt(
-                        &to_ebc.ciphertext,
-                        &shared_secret,
-                        &to_comm,
-                        ciph_id as u32,
-                    )
-                    .unwrap();
-
-                    println!("RES acc to {res_acc_to:#?}");
-
-                    println!("Transaction data is {:?}", tx.message);
-
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(acc_addr, res_acc_to);
-                }
-
-                let path = wallet_core.store_persistent_accounts().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
-
-                Ok(SubcommandReturnValue::Empty)
-            }
-        }
-    }
 }
 
 impl WalletSubcommand for NewSubcommand {
@@ -196,7 +103,7 @@ impl WalletSubcommand for NewSubcommand {
 
                 println!("Generated new account with addr {addr}");
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -221,7 +128,7 @@ impl WalletSubcommand for NewSubcommand {
                     hex::encode(key.incoming_viewing_public_key.to_bytes())
                 );
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -287,6 +194,8 @@ impl WalletSubcommand for AccountSubcommand {
             AccountSubcommand::Get { raw, addr } => {
                 let (addr, addr_kind) = parse_addr_with_privacy_prefix(&addr)?;
 
+                let addr = addr.parse()?;
+
                 let account = match addr_kind {
                     AddressPrivacyKind::Public => wallet_core.get_account_public(addr).await?,
                     AddressPrivacyKind::Private => wallet_core
@@ -333,14 +242,39 @@ impl WalletSubcommand for AccountSubcommand {
 
                 Ok(SubcommandReturnValue::Empty)
             }
-            AccountSubcommand::Fetch(fetch_subcommand) => {
-                fetch_subcommand.handle_subcommand(wallet_core).await
-            }
             AccountSubcommand::New(new_subcommand) => {
                 new_subcommand.handle_subcommand(wallet_core).await
             }
             AccountSubcommand::SyncPrivate {} => {
-                todo!();
+                let last_synced_block = wallet_core.last_synced_block;
+                let curr_last_block = wallet_core
+                    .sequencer_client
+                    .get_last_block()
+                    .await?
+                    .last_block;
+
+                if !wallet_core
+                    .storage
+                    .user_data
+                    .user_private_accounts
+                    .is_empty()
+                {
+                    parse_block_range(
+                        last_synced_block,
+                        curr_last_block,
+                        wallet_core.sequencer_client.clone(),
+                        wallet_core,
+                    )
+                    .await?;
+                } else {
+                    wallet_core.last_synced_block = curr_last_block;
+
+                    let path = wallet_core.store_persistent_data().await?;
+
+                    println!("Stored persistent data at {path:#?}");
+                }
+
+                Ok(SubcommandReturnValue::SyncedToBlock(curr_last_block))
             }
         }
     }

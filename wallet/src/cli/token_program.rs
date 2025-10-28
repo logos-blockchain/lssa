@@ -64,8 +64,8 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                     (AddressPrivacyKind::Public, AddressPrivacyKind::Public) => {
                         TokenProgramSubcommand::Public(
                             TokenProgramSubcommandPublic::CreateNewToken {
-                                definition_addr: definition_addr.to_string(),
-                                supply_addr: supply_addr.to_string(),
+                                definition_addr,
+                                supply_addr,
                                 name,
                                 total_supply,
                             },
@@ -74,18 +74,20 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                     (AddressPrivacyKind::Public, AddressPrivacyKind::Private) => {
                         TokenProgramSubcommand::Private(
                             TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
-                                definition_addr: definition_addr.to_string(),
-                                supply_addr: supply_addr.to_string(),
+                                definition_addr,
+                                supply_addr,
                                 name,
                                 total_supply,
                             },
                         )
                     }
                     (AddressPrivacyKind::Private, AddressPrivacyKind::Private) => {
-                        todo!();
+                        //ToDo: maybe implement this one. It is not immediately clear why definition should be private.
+                        anyhow::bail!("Unavailable privacy pairing")
                     }
                     (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
-                        todo!();
+                        //Probably valid. If definition is not public, but supply is it is very suspicious.
+                        anyhow::bail!("Unavailable privacy pairing")
                     }
                 };
 
@@ -120,8 +122,8 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                             (AddressPrivacyKind::Public, AddressPrivacyKind::Public) => {
                                 TokenProgramSubcommand::Public(
                                     TokenProgramSubcommandPublic::TransferToken {
-                                        sender_addr: from.to_string(),
-                                        recipient_addr: to.to_string(),
+                                        sender_addr: from,
+                                        recipient_addr: to,
                                         balance_to_move: amount,
                                     },
                                 )
@@ -129,8 +131,8 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                             (AddressPrivacyKind::Private, AddressPrivacyKind::Private) => {
                                 TokenProgramSubcommand::Private(
                                     TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
-                                        sender_addr: from.to_string(),
-                                        recipient_addr: to.to_string(),
+                                        sender_addr: from,
+                                        recipient_addr: to,
                                         balance_to_move: amount,
                                     },
                                 )
@@ -138,8 +140,8 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                             (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
                                 TokenProgramSubcommand::Deshielded(
                                     TokenProgramSubcommandDeshielded::TransferTokenDeshielded {
-                                        sender_addr: from.to_string(),
-                                        recipient_addr: to.to_string(),
+                                        sender_addr: from,
+                                        recipient_addr: to,
                                         balance_to_move: amount,
                                     },
                                 )
@@ -147,8 +149,8 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                             (AddressPrivacyKind::Public, AddressPrivacyKind::Private) => {
                                 TokenProgramSubcommand::Shielded(
                                     TokenProgramSubcommandShielded::TransferTokenShieldedOwned {
-                                        sender_addr: from.to_string(),
-                                        recipient_addr: to.to_string(),
+                                        sender_addr: from,
+                                        recipient_addr: to,
                                         balance_to_move: amount,
                                     },
                                 )
@@ -161,7 +163,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                         match from_privacy {
                             AddressPrivacyKind::Private => TokenProgramSubcommand::Private(
                                 TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
-                                    sender_addr: from.to_string(),
+                                    sender_addr: from,
                                     recipient_npk: to_npk,
                                     recipient_ipk: to_ipk,
                                     balance_to_move: amount,
@@ -169,7 +171,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                             ),
                             AddressPrivacyKind::Public => TokenProgramSubcommand::Shielded(
                                 TokenProgramSubcommandShielded::TransferTokenShieldedForeign {
-                                    sender_addr: from.to_string(),
+                                    sender_addr: from,
                                     recipient_npk: to_npk,
                                     recipient_ipk: to_ipk,
                                     balance_to_move: amount,
@@ -401,7 +403,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -458,7 +460,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -508,7 +510,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -556,7 +558,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -611,7 +613,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     println!("Transaction data is {:?}", tx.message);
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -665,7 +667,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 

@@ -12,8 +12,7 @@ use serde::Serialize;
 use crate::{
     HOME_DIR_ENV_VAR,
     config::{
-        PersistentAccountData, PersistentAccountDataPrivate, PersistentAccountDataPublic,
-        WalletConfig,
+        PersistentAccountDataPrivate, PersistentAccountDataPublic, PersistentStorage, WalletConfig,
     },
 };
 
@@ -30,21 +29,24 @@ pub async fn fetch_config() -> Result<WalletConfig> {
     Ok(serde_json::from_slice(&config_contents)?)
 }
 
-/// Fetch list of accounts stored at `NSSA_WALLET_HOME_DIR/curr_accounts.json`
+/// Fetch data stored at `NSSA_WALLET_HOME_DIR/storage.json`
 ///
 /// If file not present, it is considered as empty list of persistent accounts
-pub async fn fetch_persistent_accounts() -> Result<Vec<PersistentAccountData>> {
+pub async fn fetch_persistent_storage() -> Result<PersistentStorage> {
     let home = get_home()?;
-    let accs_path = home.join("curr_accounts.json");
-    let mut persistent_accounts_content = vec![];
+    let accs_path = home.join("storage.json");
+    let mut storage_content = vec![];
 
     match tokio::fs::File::open(accs_path).await {
         Ok(mut file) => {
-            file.read_to_end(&mut persistent_accounts_content).await?;
-            Ok(serde_json::from_slice(&persistent_accounts_content)?)
+            file.read_to_end(&mut storage_content).await?;
+            Ok(serde_json::from_slice(&storage_content)?)
         }
         Err(err) => match err.kind() {
-            std::io::ErrorKind::NotFound => Ok(vec![]),
+            std::io::ErrorKind::NotFound => Ok(PersistentStorage {
+                accounts: vec![],
+                last_synced_block: 0,
+            }),
             _ => {
                 anyhow::bail!("IO error {err:#?}");
             }
@@ -52,8 +54,11 @@ pub async fn fetch_persistent_accounts() -> Result<Vec<PersistentAccountData>> {
     }
 }
 
-/// Produces a list of accounts for storage
-pub fn produce_data_for_storage(user_data: &NSSAUserData) -> Vec<PersistentAccountData> {
+/// Produces data for storage
+pub fn produce_data_for_storage(
+    user_data: &NSSAUserData,
+    last_synced_block: u64,
+) -> PersistentStorage {
     let mut vec_for_storage = vec![];
 
     for (addr, key) in &user_data.pub_account_signing_keys {
@@ -77,7 +82,10 @@ pub fn produce_data_for_storage(user_data: &NSSAUserData) -> Vec<PersistentAccou
         );
     }
 
-    vec_for_storage
+    PersistentStorage {
+        accounts: vec_for_storage,
+        last_synced_block,
+    }
 }
 
 pub(crate) fn produce_random_nonces(size: usize) -> Vec<Nonce> {

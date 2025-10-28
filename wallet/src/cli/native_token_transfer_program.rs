@@ -60,11 +60,13 @@ impl WalletSubcommand for AuthTransferSubcommand {
 
                         println!("Transaction data is {transfer_tx:?}");
 
-                        let path = wallet_core.store_persistent_accounts().await?;
+                        let path = wallet_core.store_persistent_data().await?;
 
                         println!("Stored persistent accounts at {path:#?}");
                     }
                     AddressPrivacyKind::Private => {
+                        let addr = addr.parse()?;
+
                         let (res, [secret]) = wallet_core
                             .register_account_under_authenticated_transfers_programs_private(addr)
                             .await?;
@@ -85,7 +87,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                             )?;
                         }
 
-                        let path = wallet_core.store_persistent_accounts().await?;
+                        let path = wallet_core.store_persistent_data().await?;
 
                         println!("Stored persistent accounts at {path:#?}");
                     }
@@ -120,33 +122,29 @@ impl WalletSubcommand for AuthTransferSubcommand {
 
                         match (from_privacy, to_privacy) {
                             (AddressPrivacyKind::Public, AddressPrivacyKind::Public) => {
-                                NativeTokenTransferProgramSubcommand::Public {
-                                    from: from.to_string(),
-                                    to: to.to_string(),
-                                    amount,
-                                }
+                                NativeTokenTransferProgramSubcommand::Public { from, to, amount }
                             }
                             (AddressPrivacyKind::Private, AddressPrivacyKind::Private) => {
                                 NativeTokenTransferProgramSubcommand::Private(
                                     NativeTokenTransferProgramSubcommandPrivate::PrivateOwned {
-                                        from: from.to_string(),
-                                        to: to.to_string(),
+                                        from,
+                                        to,
                                         amount,
                                     },
                                 )
                             }
                             (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
                                 NativeTokenTransferProgramSubcommand::Deshielded {
-                                    from: from.to_string(),
-                                    to: to.to_string(),
+                                    from,
+                                    to,
                                     amount,
                                 }
                             }
                             (AddressPrivacyKind::Public, AddressPrivacyKind::Private) => {
                                 NativeTokenTransferProgramSubcommand::Shielded(
                                     NativeTokenTransferProgramSubcommandShielded::ShieldedOwned {
-                                        from: from.to_string(),
-                                        to: to.to_string(),
+                                        from,
+                                        to,
                                         amount,
                                     },
                                 )
@@ -160,7 +158,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                             AddressPrivacyKind::Private => {
                                 NativeTokenTransferProgramSubcommand::Private(
                                     NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
-                                        from: from.to_string(),
+                                        from,
                                         to_npk,
                                         to_ipk,
                                         amount,
@@ -170,7 +168,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                             AddressPrivacyKind::Public => {
                                 NativeTokenTransferProgramSubcommand::Shielded(
                                     NativeTokenTransferProgramSubcommandShielded::ShieldedForeign {
-                                        from: from.to_string(),
+                                        from,
                                         to_npk,
                                         to_ipk,
                                         amount,
@@ -340,7 +338,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -384,7 +382,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -434,7 +432,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -467,7 +465,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
 
                 let tx_hash = res.tx_hash;
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -513,7 +511,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -533,7 +531,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
 
                 println!("Transaction data is {transfer_tx:?}");
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 

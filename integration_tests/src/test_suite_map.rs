@@ -1,24 +1,20 @@
 use std::{collections::HashMap, path::PathBuf, pin::Pin, time::Duration};
 
-use common::sequencer_client::SequencerClient;
+use common::{PINATA_BASE58, sequencer_client::SequencerClient};
 use log::info;
 use nssa::{Address, ProgramDeploymentTransaction, program::Program};
 use nssa_core::{NullifierPublicKey, encryption::shared_key_derivation::Secp256k1Point};
 use wallet::{
     Command, SubcommandReturnValue, WalletCore,
     cli::{
-        account::{AccountSubcommand, FetchSubcommand, NewSubcommand},
+        account::{AccountSubcommand, NewSubcommand},
         native_token_transfer_program::AuthTransferSubcommand,
-        pinata_program::{
-            PinataProgramSubcommand, PinataProgramSubcommandPrivate, PinataProgramSubcommandPublic,
-        },
+        pinata_program::PinataProgramAgnosticSubcommand,
         token_program::TokenProgramAgnosticSubcommand,
     },
-    config::PersistentAccountData,
-    helperfunctions::{fetch_config, fetch_persistent_accounts},
+    config::{PersistentAccountData, PersistentStorage},
+    helperfunctions::{fetch_config, fetch_persistent_storage},
 };
-
-use sequencer_core::sequencer_store::PINATA_BASE58;
 
 use crate::{
     ACC_RECEIVER, ACC_RECEIVER_PRIVATE, ACC_SENDER, ACC_SENDER_PRIVATE,
@@ -83,7 +79,10 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         wallet::execute_subcommand(command).await.unwrap();
 
-        let persistent_accounts = fetch_persistent_accounts().await.unwrap();
+        let PersistentStorage {
+            accounts: persistent_accounts,
+            last_synced_block: _,
+        } = fetch_persistent_storage().await.unwrap();
 
         let mut new_persistent_account_addr = String::new();
 
@@ -290,7 +289,10 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         .await
         .unwrap();
 
-        let persistent_accounts = fetch_persistent_accounts().await.unwrap();
+        let PersistentStorage {
+            accounts: persistent_accounts,
+            last_synced_block: _,
+        } = fetch_persistent_storage().await.unwrap();
 
         let mut new_persistent_accounts_addr = Vec::new();
 
@@ -668,7 +670,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             amount: 7,
         };
 
-        let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash: _ } =
             wallet::execute_subcommand(Command::Token(subcommand))
                 .await
                 .unwrap()
@@ -679,11 +681,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Waiting for next block creation");
         tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-        let command = Command::Account(AccountSubcommand::Fetch(FetchSubcommand::PrivateAccount {
-            tx_hash,
-            acc_addr: recipient_addr.to_string(),
-            output_id: 1,
-        }));
+        let command = Command::Account(AccountSubcommand::SyncPrivate {});
 
         wallet::execute_subcommand(command).await.unwrap();
 
@@ -1096,11 +1094,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
 
-        let command = Command::Account(AccountSubcommand::Fetch(FetchSubcommand::PrivateAccount {
-            tx_hash,
-            acc_addr: to_addr.to_string(),
-            output_id: 1,
-        }));
+        let command = Command::Account(AccountSubcommand::SyncPrivate {});
         wallet::execute_subcommand(command).await.unwrap();
         let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
             .await
@@ -1335,13 +1329,10 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let pinata_addr = PINATA_BASE58;
         let pinata_prize = 150;
         let solution = 989106;
-        let command = Command::Pinata(PinataProgramSubcommand::Public(
-            PinataProgramSubcommandPublic::Claim {
-                pinata_addr: pinata_addr.to_string(),
-                winner_addr: ACC_SENDER.to_string(),
-                solution,
-            },
-        ));
+        let command = Command::Pinata(PinataProgramAgnosticSubcommand::Claim {
+            to_addr: make_public_account_input_from_str(ACC_SENDER),
+            solution,
+        });
 
         let wallet_config = fetch_config().await.unwrap();
 
@@ -1427,13 +1418,17 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[nssa_integration_test]
     pub async fn test_authenticated_transfer_initialize_function() {
         info!("test initialize account for authenticated transfer");
-        let command = Command::AuthenticatedTransferInitializePublicAccount {};
-
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {}));
         let SubcommandReturnValue::RegisterAccount { addr } =
             wallet::execute_subcommand(command).await.unwrap()
         else {
             panic!("Error creating account");
         };
+
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Init {
+            addr: addr.to_string(),
+        });
+        wallet::execute_subcommand(command).await.unwrap();
 
         info!("Checking correct execution");
         let wallet_config = fetch_config().await.unwrap();
@@ -1463,13 +1458,10 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let pinata_prize = 150;
         let solution = 989106;
 
-        let command = Command::Pinata(PinataProgramSubcommand::Private(
-            PinataProgramSubcommandPrivate::ClaimPrivateOwned {
-                pinata_addr: pinata_addr.to_string(),
-                winner_addr: ACC_SENDER_PRIVATE.to_string(),
-                solution,
-            },
-        ));
+        let command = Command::Pinata(PinataProgramAgnosticSubcommand::Claim {
+            to_addr: make_private_account_input_from_str(ACC_SENDER_PRIVATE),
+            solution,
+        });
 
         let wallet_config = fetch_config().await.unwrap();
 
@@ -1481,7 +1473,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .unwrap()
             .balance;
 
-        let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
+        let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash: _ } =
             wallet::execute_subcommand(command).await.unwrap()
         else {
             panic!("invalid subcommand return value");
@@ -1497,11 +1489,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .unwrap()
             .balance;
 
-        let command = Command::Account(AccountSubcommand::Fetch(FetchSubcommand::PrivateAccount {
-            tx_hash: tx_hash.clone(),
-            acc_addr: ACC_SENDER_PRIVATE.to_string(),
-            output_id: 0,
-        }));
+        let command = Command::Account(AccountSubcommand::SyncPrivate {});
         wallet::execute_subcommand(command).await.unwrap();
 
         let wallet_config = fetch_config().await.unwrap();
@@ -1538,13 +1526,10 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             panic!("invalid subcommand return value");
         };
 
-        let command = Command::Pinata(PinataProgramSubcommand::Private(
-            PinataProgramSubcommandPrivate::ClaimPrivateOwned {
-                pinata_addr: pinata_addr.to_string(),
-                winner_addr: winner_addr.to_string(),
-                solution,
-            },
-        ));
+        let command = Command::Pinata(PinataProgramAgnosticSubcommand::Claim {
+            to_addr: make_private_account_input_from_str(&winner_addr.to_string()),
+            solution,
+        });
 
         let wallet_config = fetch_config().await.unwrap();
 
