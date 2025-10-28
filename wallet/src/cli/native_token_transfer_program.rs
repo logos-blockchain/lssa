@@ -47,6 +47,8 @@ impl WalletSubcommand for AuthTransferSubcommand {
 
                 match addr_privacy {
                     AddressPrivacyKind::Public => {
+                        let addr = addr.parse()?;
+
                         let res = wallet_core
                             .register_account_under_authenticated_transfers_programs(addr)
                             .await?;

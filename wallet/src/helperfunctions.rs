@@ -6,7 +6,7 @@ use tokio::io::AsyncReadExt;
 
 use anyhow::Result;
 use key_protocol::key_protocol_core::NSSAUserData;
-use nssa::{Account, Address};
+use nssa::Account;
 use serde::Serialize;
 
 use crate::{
@@ -94,15 +94,15 @@ pub enum AddressPrivacyKind {
 
 pub(crate) fn parse_addr_with_privacy_prefix(
     addr_base58: &str,
-) -> Result<(Address, AddressPrivacyKind)> {
+) -> Result<(String, AddressPrivacyKind)> {
     if addr_base58.starts_with("Public/") {
         Ok((
-            addr_base58.strip_prefix("Public/").unwrap().parse()?,
+            addr_base58.strip_prefix("Public/").unwrap().to_string(),
             AddressPrivacyKind::Public,
         ))
     } else if addr_base58.starts_with("Private/") {
         Ok((
-            addr_base58.strip_prefix("Private/").unwrap().parse()?,
+            addr_base58.strip_prefix("Private/").unwrap().to_string(),
             AddressPrivacyKind::Private,
         ))
     } else {
