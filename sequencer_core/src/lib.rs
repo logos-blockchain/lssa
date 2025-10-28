@@ -9,16 +9,16 @@ use common::{
 use config::SequencerConfig;
 use log::warn;
 use mempool::MemPool;
-use sequencer_store::SequecerChainStore;
 use serde::{Deserialize, Serialize};
 
-use crate::sequencer_store::block_store::block_to_transactions_map;
+use crate::block_store::SequecerBlockStore;
 
 pub mod config;
-pub mod sequencer_store;
+pub mod block_store;
 
 pub struct SequencerCore {
-    pub store: SequecerChainStore,
+    pub state: nssa::V02State,
+    pub block_store: SequecerBlockStore,
     pub mempool: MemPool<EncodedTransaction>,
     pub sequencer_config: SequencerConfig,
     pub chain_height: u64,
@@ -41,6 +41,24 @@ impl std::error::Error for TransactionMalformationError {}
 
 impl SequencerCore {
     pub fn start_from_config(config: SequencerConfig) -> Self {
+        let hashable_data = HashableBlockData {
+            block_id: config.genesis_id,
+            transactions: vec![],
+            prev_block_hash: [0; 32],
+            timestamp: 0,
+        };
+
+        let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
+        let genesis_block = hashable_data.into_block(&signing_key);
+
+        //Sequencer should panic if unable to open db,
+        //as fixing this issue may require actions non-native to program scope
+        let block_store = SequecerBlockStore::open_db_with_genesis(
+            &config.home.join("rocksdb"),
+            Some(genesis_block),
+            signing_key,
+        )
+        .unwrap();
         let mut initial_commitments = vec![];
 
         for init_comm_data in config.initial_commitments.clone() {
@@ -55,40 +73,44 @@ impl SequencerCore {
             initial_commitments.push(comm);
         }
 
-        let store = SequecerChainStore::new_with_genesis(
-            &config.home,
-            config.genesis_id,
-            config.is_genesis_random,
-            &config.initial_accounts,
-            &initial_commitments,
-            nssa::PrivateKey::try_new(config.signing_key).unwrap(),
-        );
+        let init_accs: Vec<(nssa::Address, u128)> = config
+            .initial_accounts
+            .iter()
+            .map(|acc_data| (acc_data.addr.parse().unwrap(), acc_data.balance))
+            .collect();
 
-        let mut block_id = config.genesis_id;
+        let mut state = nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments);
+
+        #[cfg(feature = "testnet")]
+        state.add_pinata_program("cafe".repeat(16).parse().unwrap());
 
         let mut this = Self {
-            store,
+            state,
+            block_store,
             mempool: MemPool::default(),
             chain_height: config.genesis_id,
             sequencer_config: config,
         };
 
-        while let Ok(block) = this.store.block_store.get_block_at_id(block_id) {
-            for encoded_transaction in block.body.transactions {
-                let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
-                let transaction = this.transaction_pre_check(transaction).unwrap();
-                this.execute_check_transaction_on_state(transaction)
-                    .unwrap();
-                this.store
-                    .block_store
-                    .tx_hash_to_block_map
-                    .insert(encoded_transaction.hash(), block_id);
-            }
-            this.chain_height = block_id;
-            block_id += 1;
-        }
+        this.sync_state_with_stored_blocks();
 
         this
+    }
+
+    fn sync_state_with_stored_blocks(&mut self) {
+        let mut next_block_id = self.sequencer_config.genesis_id + 1;
+        while let Ok(block) = self.block_store.get_block_at_id(next_block_id) {
+            for encoded_transaction in block.body.transactions {
+                let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
+                self.execute_check_transaction_on_state(transaction)
+                    .unwrap();
+                self.block_store
+                    .tx_hash_to_block_map
+                    .insert(encoded_transaction.hash(), next_block_id);
+            }
+            self.chain_height = next_block_id;
+            next_block_id += 1;
+        }
     }
 
     pub fn transaction_pre_check(
@@ -145,20 +167,17 @@ impl SequencerCore {
     ) -> Result<NSSATransaction, nssa::error::NssaError> {
         match &tx {
             NSSATransaction::Public(tx) => {
-                self.store
-                    .state
+                self.state
                     .transition_from_public_transaction(tx)
                     .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
             }
             NSSATransaction::PrivacyPreserving(tx) => {
-                self.store
-                    .state
+                self.state
                     .transition_from_privacy_preserving_transaction(tx)
                     .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
             }
             NSSATransaction::ProgramDeployment(tx) => {
-                self.store
-                    .state
+                self.state
                     .transition_from_program_deployment_transaction(tx)
                     .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
             }
@@ -190,7 +209,6 @@ impl SequencerCore {
         }
 
         let prev_block_hash = self
-            .store
             .block_store
             .get_block_at_id(self.chain_height)?
             .header
@@ -205,9 +223,9 @@ impl SequencerCore {
             timestamp: curr_time,
         };
 
-        let block = hashable_data.into_block(&self.store.block_store.signing_key);
+        let block = hashable_data.into_block(&self.block_store.signing_key);
 
-        self.store.block_store.put_block_at_id(block)?;
+        self.block_store.put_block_at_id(block)?;
 
         self.chain_height = new_block_height;
 
@@ -311,12 +329,10 @@ mod tests {
             .unwrap();
 
         let balance_acc_1 = sequencer
-            .store
             .state
             .get_account_by_address(&nssa::Address::new(acc1_addr))
             .balance;
         let balance_acc_2 = sequencer
-            .store
             .state
             .get_account_by_address(&nssa::Address::new(acc2_addr))
             .balance;
@@ -364,7 +380,6 @@ mod tests {
         assert_eq!(
             10000,
             sequencer
-                .store
                 .state
                 .get_account_by_address(&nssa::Address::new(acc1_addr))
                 .balance
@@ -372,7 +387,6 @@ mod tests {
         assert_eq!(
             20000,
             sequencer
-                .store
                 .state
                 .get_account_by_address(&nssa::Address::new(acc2_addr))
                 .balance
@@ -517,12 +531,10 @@ mod tests {
             .unwrap();
 
         let bal_from = sequencer
-            .store
             .state
             .get_account_by_address(&nssa::Address::new(acc1))
             .balance;
         let bal_to = sequencer
-            .store
             .state
             .get_account_by_address(&nssa::Address::new(acc2))
             .balance;
@@ -615,7 +627,6 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap();
         let block = sequencer
-            .store
             .block_store
             .get_block_at_id(current_height)
             .unwrap();
@@ -652,7 +663,6 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap();
         let block = sequencer
-            .store
             .block_store
             .get_block_at_id(current_height)
             .unwrap();
@@ -664,7 +674,6 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap();
         let block = sequencer
-            .store
             .block_store
             .get_block_at_id(current_height)
             .unwrap();
