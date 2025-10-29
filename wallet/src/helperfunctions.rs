@@ -1,8 +1,11 @@
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use nssa_core::account::Nonce;
 use rand::{RngCore, rngs::OsRng};
-use std::{path::PathBuf, str::FromStr};
-use tokio::io::AsyncReadExt;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use anyhow::Result;
 use key_protocol::key_protocol_core::NSSAUserData;
@@ -19,6 +22,61 @@ use crate::{
 /// Get home dir for wallet. Env var `NSSA_WALLET_HOME_DIR` must be set before execution to succeed.
 pub fn get_home() -> Result<PathBuf> {
     Ok(PathBuf::from_str(&std::env::var(HOME_DIR_ENV_VAR)?)?)
+}
+
+pub fn get_home_default_path_linux() -> PathBuf {
+    let home = std::env::var("HOME").unwrap();
+    Path::new(&home).join(".nssa").join("wallet")
+}
+
+/// Fetch config from `NSSA_WALLET_HOME_DIR`
+pub async fn fetch_config_default_path_linux() -> Result<WalletConfig> {
+    let config_home = get_home_default_path_linux();
+    let mut config_needs_setup = false;
+
+    let config = match tokio::fs::OpenOptions::new()
+        .read(true)
+        .open(config_home.join("wallet_config.json"))
+        .await
+    {
+        Ok(mut file) => {
+            let mut config_contents = vec![];
+            file.read_to_end(&mut config_contents).await?;
+
+            serde_json::from_slice(&config_contents)?
+        }
+        Err(err) => match err.kind() {
+            std::io::ErrorKind::NotFound => {
+                config_needs_setup = true;
+
+                println!("Config not found, setting up default config");
+
+                WalletConfig::default()
+            }
+            _ => anyhow::bail!("IO error {err:#?}"),
+        },
+    };
+
+    if config_needs_setup {
+        tokio::fs::create_dir_all(&config_home).await?;
+
+        println!("Created configs dir at path {config_home:#?}");
+
+        let mut file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(config_home.join("wallet_config.json"))
+            .await?;
+
+        let default_config_serialized =
+            serde_json::to_vec_pretty(&WalletConfig::default()).unwrap();
+
+        file.write_all(&default_config_serialized).await?;
+
+        println!("Configs setted up");
+    }
+
+    Ok(config)
 }
 
 /// Fetch config from `NSSA_WALLET_HOME_DIR`

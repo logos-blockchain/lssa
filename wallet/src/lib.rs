@@ -28,7 +28,7 @@ use crate::{
         token_program::TokenProgramAgnosticSubcommand,
     },
     config::PersistentStorage,
-    helperfunctions::fetch_persistent_storage,
+    helperfunctions::{fetch_config_default_path_linux, fetch_persistent_storage},
 };
 use crate::{
     helperfunctions::{fetch_config, get_home, produce_data_for_storage},
@@ -216,6 +216,7 @@ pub enum Command {
     /// Check the wallet can connect to the node and builtin local programs
     /// match the remote versions
     CheckHealth {},
+    TestCommand {},
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -245,7 +246,7 @@ pub enum SubcommandReturnValue {
 }
 
 pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValue> {
-    let wallet_config = fetch_config().await?;
+    let wallet_config = fetch_config_default_path_linux().await?;
     let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
     let subcommand_ret = match command {
@@ -299,6 +300,11 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
         }
         Command::Token(token_subcommand) => {
             token_subcommand.handle_subcommand(&mut wallet_core).await?
+        }
+        Command::TestCommand {} => {
+            println!("Hello from test");
+
+            SubcommandReturnValue::Empty
         }
     };
 

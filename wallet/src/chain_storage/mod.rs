@@ -71,8 +71,6 @@ mod tests {
     use crate::config::InitialAccountData;
 
     use super::*;
-    use std::path::PathBuf;
-    use tempfile::tempdir;
 
     fn create_initial_accounts() -> Vec<InitialAccountData> {
         let initial_acc1 = serde_json::from_str(
@@ -166,9 +164,8 @@ mod tests {
         initial_accounts
     }
 
-    fn create_sample_wallet_config(home: PathBuf) -> WalletConfig {
+    fn create_sample_wallet_config() -> WalletConfig {
         WalletConfig {
-            home,
             override_rust_log: None,
             sequencer_addr: "http://127.0.0.1".to_string(),
             seq_poll_timeout_millis: 12000,
@@ -181,10 +178,7 @@ mod tests {
 
     #[test]
     fn test_new_initializes_correctly() {
-        let temp_dir = tempdir().unwrap();
-        let path = temp_dir.path();
-
-        let config = create_sample_wallet_config(path.to_path_buf());
+        let config = create_sample_wallet_config();
 
         let _ = WalletChainStore::new(config.clone()).unwrap();
     }
