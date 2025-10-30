@@ -5,6 +5,8 @@ use risc0_zkvm::serde::to_vec;
 
 type Instruction = (u128, ProgramId);
 
+/// A program that calls another program.
+/// It permutes the order of the input accounts on the subsequent call
 fn main() {
     let ProgramInput {
         pre_states,
@@ -21,7 +23,7 @@ fn main() {
     let chained_call = Some(ChainedCall {
         program_id,
         instruction_data,
-        account_indices: vec![1, 0],
+        account_indices: vec![1, 0], // <- Account order permutation here
     });
 
     write_nssa_outputs_with_chained_call(

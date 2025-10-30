@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use nssa_core::{
     account::{Account, AccountWithMetadata},
     address::Address,
-    program::{ChainedCall, validate_execution},
+    program::{ChainedCall, DEFAULT_PROGRAM_ID, validate_execution},
 };
 use sha2::{Digest, digest::FixedOutput};
 
@@ -131,25 +131,32 @@ impl PublicTransaction {
                 })
                 .collect::<Result<Vec<_>, NssaError>>()?;
 
-            let program_output =
+            let mut program_output =
                 program.execute(&pre_states_chained_call, &chained_call.instruction_data)?;
 
             // Verify execution corresponds to a well-behaved program.
             // See the # Programs section for the definition of the `validate_execution` method.
-            if validate_execution(
+            if !validate_execution(
                 &program_output.pre_states,
                 &program_output.post_states,
                 chained_call.program_id,
             ) {
-                for (pre, post) in program_output
-                    .pre_states
-                    .iter()
-                    .zip(program_output.post_states)
-                {
-                    state_diff.insert(pre.account_id, post);
-                }
-            } else {
                 return Err(NssaError::InvalidProgramBehavior);
+            }
+
+            for post in program_output.post_states.iter_mut() {
+                // The invoked program claims the accounts with default program id.
+                if post.program_owner == DEFAULT_PROGRAM_ID {
+                    post.program_owner = chained_call.program_id;
+                }
+            }
+
+            for (pre, post) in program_output
+                .pre_states
+                .iter()
+                .zip(program_output.post_states)
+            {
+                state_diff.insert(pre.account_id, post);
             }
 
             if let Some(next_chained_call) = program_output.chained_call {

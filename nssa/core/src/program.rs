@@ -102,9 +102,14 @@ pub fn validate_execution(
         {
             return false;
         }
+
+        // 6. If a post state has default program owner, the pre state must have been a default account
+        if post.program_owner == DEFAULT_PROGRAM_ID && pre.account != Account::default() {
+            return false;
+        }
     }
 
-    // 6. Total balance is preserved
+    // 7. Total balance is preserved
     let total_balance_pre_states: u128 = pre_states.iter().map(|pre| pre.account.balance).sum();
     let total_balance_post_states: u128 = post_states.iter().map(|post| post.balance).sum();
     if total_balance_pre_states != total_balance_post_states {
