@@ -6,9 +6,7 @@ use crate::{
 };
 use nssa_core::{
     Commitment, CommitmentSetDigest, DUMMY_COMMITMENT, MembershipProof, Nullifier,
-    account::Account,
-    address::Address,
-    program::ProgramId,
+    account::Account, address::Address, program::ProgramId,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -2097,7 +2095,7 @@ pub mod tests {
             (amount, Program::authenticated_transfer_program().id());
 
         let expected_to_post = Account {
-            program_owner: Program::authenticated_transfer_program().id(),
+            program_owner: Program::chain_caller().id(),
             balance: amount,
             ..Account::default()
         };
