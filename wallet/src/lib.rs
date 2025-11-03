@@ -23,7 +23,7 @@ use tokio::io::AsyncWriteExt;
 use crate::{
     cli::{
         WalletSubcommand, account::AccountSubcommand, chain::ChainSubcommand,
-        native_token_transfer_program::AuthTransferSubcommand,
+        config::ConfigSubcommand, native_token_transfer_program::AuthTransferSubcommand,
         pinata_program::PinataProgramAgnosticSubcommand,
         token_program::TokenProgramAgnosticSubcommand,
     },
@@ -91,6 +91,20 @@ impl WalletCore {
         info!("Stored data at {storage_path:#?}");
 
         Ok(storage_path)
+    }
+
+    ///Store persistent data at home
+    pub async fn store_config_changes(&self) -> Result<PathBuf> {
+        let home = get_home()?;
+        let config_path = home.join("wallet_config.json");
+        let config = serde_json::to_vec_pretty(&self.storage.wallet_config)?;
+
+        let mut config_file = tokio::fs::File::create(config_path.as_path()).await?;
+        config_file.write_all(&config).await?;
+
+        info!("Stored data at {config_path:#?}");
+
+        Ok(config_path)
     }
 
     pub fn create_new_account_public(&mut self) -> Address {
@@ -216,10 +230,9 @@ pub enum Command {
     /// Check the wallet can connect to the node and builtin local programs
     /// match the remote versions
     CheckHealth {},
-    /// Command to explicitly setup config and storage
-    ///
-    /// Does nothing in case if both already present
-    Setup {},
+    /// Command to setup config, get and set config fields
+    #[command(subcommand)]
+    Config(ConfigSubcommand),
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -304,12 +317,10 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
         Command::Token(token_subcommand) => {
             token_subcommand.handle_subcommand(&mut wallet_core).await?
         }
-        Command::Setup {} => {
-            let path = wallet_core.store_persistent_data().await?;
-
-            println!("Stored persistent accounts at {path:#?}");
-
-            SubcommandReturnValue::Empty
+        Command::Config(config_subcommand) => {
+            config_subcommand
+                .handle_subcommand(&mut wallet_core)
+                .await?
         }
     };
 

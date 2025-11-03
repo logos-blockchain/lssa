@@ -8,6 +8,7 @@ use wallet::{
     Command, SubcommandReturnValue, WalletCore,
     cli::{
         account::{AccountSubcommand, NewSubcommand},
+        config::ConfigSubcommand,
         native_token_transfer_program::AuthTransferSubcommand,
         pinata_program::PinataProgramAgnosticSubcommand,
         token_program::TokenProgramAgnosticSubcommand,
@@ -1574,6 +1575,34 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
 
         assert_eq!(pinata_balance_post, pinata_balance_pre - pinata_prize);
+
+        info!("Success!");
+    }
+
+    #[nssa_integration_test]
+    pub async fn test_modify_config_fields() {
+        info!("########## test_modify_config_fields ##########");
+
+        let wallet_config = fetch_config().await.unwrap();
+        let old_seq_poll_retry_delay_millis = wallet_config.seq_poll_retry_delay_millis;
+
+        //Change config field
+        let command = Command::Config(ConfigSubcommand::Set {
+            key: "seq_poll_retry_delay_millis".to_string(),
+            value: "1000".to_string(),
+        });
+        wallet::execute_subcommand(command).await.unwrap();
+
+        let wallet_config = fetch_config().await.unwrap();
+
+        assert_eq!(wallet_config.seq_poll_retry_delay_millis, 1000);
+
+        //Return how it was at the beginning
+        let command = Command::Config(ConfigSubcommand::Set {
+            key: "seq_poll_retry_delay_millis".to_string(),
+            value: old_seq_poll_retry_delay_millis.to_string(),
+        });
+        wallet::execute_subcommand(command).await.unwrap();
 
         info!("Success!");
     }
