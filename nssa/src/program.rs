@@ -1,6 +1,6 @@
 use crate::program_methods::{AUTHENTICATED_TRANSFER_ELF, PINATA_ELF, TOKEN_ELF};
 use nssa_core::{
-    account::{Account, AccountWithMetadata},
+    account::AccountWithMetadata,
     program::{InstructionData, ProgramId, ProgramOutput},
 };
 
@@ -48,7 +48,7 @@ impl Program {
         &self,
         pre_states: &[AccountWithMetadata],
         instruction_data: &InstructionData,
-    ) -> Result<Vec<Account>, NssaError> {
+    ) -> Result<ProgramOutput, NssaError> {
         // Write inputs to the program
         let mut env_builder = ExecutorEnv::builder();
         env_builder.session_limit(Some(MAX_NUM_CYCLES_PUBLIC_EXECUTION));
@@ -62,12 +62,12 @@ impl Program {
             .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
 
         // Get outputs
-        let ProgramOutput { post_states, .. } = session_info
+        let program_output = session_info
             .journal
             .decode()
             .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
 
-        Ok(post_states)
+        Ok(program_output)
     }
 
     /// Writes inputs to `env_builder` in the order expected by the programs
@@ -107,11 +107,11 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
-    use nssa_core::account::{Account, AccountId, AccountWithMetadata};
-    use program_methods::{
+    use crate::program_methods::{
         AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID, PINATA_ELF, PINATA_ID, TOKEN_ELF,
         TOKEN_ID,
     };
+    use nssa_core::account::{Account, AccountId, AccountWithMetadata};
 
     use crate::program::Program;
 
@@ -195,6 +195,15 @@ mod tests {
                 elf: BURNER_ELF.to_vec(),
             }
         }
+
+        pub fn chain_caller() -> Self {
+            use test_program_methods::{CHAIN_CALLER_ELF, CHAIN_CALLER_ID};
+
+            Program {
+                id: CHAIN_CALLER_ID,
+                elf: CHAIN_CALLER_ELF.to_vec(),
+            }
+        }
     }
 
     #[test]
@@ -221,11 +230,11 @@ mod tests {
             balance: balance_to_move,
             ..Account::default()
         };
-        let [sender_post, recipient_post] = program
+        let program_output = program
             .execute(&[sender, recipient], &instruction_data)
-            .unwrap()
-            .try_into()
             .unwrap();
+
+        let [sender_post, recipient_post] = program_output.post_states.try_into().unwrap();
 
         assert_eq!(sender_post, expected_sender_post);
         assert_eq!(recipient_post, expected_recipient_post);

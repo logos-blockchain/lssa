@@ -1,0 +1,34 @@
+use nssa_core::program::{
+    ChainedCall, ProgramId, ProgramInput, read_nssa_inputs, write_nssa_outputs_with_chained_call,
+};
+use risc0_zkvm::serde::to_vec;
+
+type Instruction = (u128, ProgramId);
+
+/// A program that calls another program.
+/// It permutes the order of the input accounts on the subsequent call
+fn main() {
+    let ProgramInput {
+        pre_states,
+        instruction: (balance, program_id),
+    } = read_nssa_inputs::<Instruction>();
+
+    let [sender_pre, receiver_pre] = match pre_states.try_into() {
+        Ok(array) => array,
+        Err(_) => return,
+    };
+
+    let instruction_data = to_vec(&balance).unwrap();
+
+    let chained_call = Some(ChainedCall {
+        program_id,
+        instruction_data,
+        account_indices: vec![1, 0], // <- Account order permutation here
+    });
+
+    write_nssa_outputs_with_chained_call(
+        vec![sender_pre.clone(), receiver_pre.clone()],
+        vec![sender_pre.account, receiver_pre.account],
+        chained_call,
+    );
+}

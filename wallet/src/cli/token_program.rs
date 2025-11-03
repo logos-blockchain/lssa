@@ -12,7 +12,7 @@ use crate::{
 ///Represents generic CLI subcommand for a wallet working with token program
 #[derive(Subcommand, Debug, Clone)]
 pub enum TokenProgramAgnosticSubcommand {
-    ///Produce new ERC-20 token
+    ///Produce a new token
     ///
     ///Currently the only supported privacy options is for public definition
     New {
@@ -94,7 +94,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                         anyhow::bail!("Unavailable privacy pairing")
                     }
                     (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
-                        //Probably valid. If definition is not public, but supply is it is very suspicious.
+                        //ToDo: Probably valid. If definition is not public, but supply is it is very suspicious.
                         anyhow::bail!("Unavailable privacy pairing")
                     }
                 };

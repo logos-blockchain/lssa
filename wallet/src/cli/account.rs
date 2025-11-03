@@ -1,7 +1,7 @@
 use anyhow::Result;
 use base58::ToBase58;
 use clap::Subcommand;
-use nssa::{Address, program::Program};
+use nssa::{Account, Address, program::Program};
 use serde::Serialize;
 
 use crate::{
@@ -103,7 +103,7 @@ impl WalletSubcommand for NewSubcommand {
             NewSubcommand::Public {} => {
                 let addr = wallet_core.create_new_account_public();
 
-                println!("Generated new account with addr {addr}");
+                println!("Generated new account with addr Public/{addr}");
 
                 let path = wallet_core.store_persistent_data().await?;
 
@@ -121,7 +121,7 @@ impl WalletSubcommand for NewSubcommand {
                     .unwrap();
 
                 println!(
-                    "Generated new account with addr {}",
+                    "Generated new account with addr Private/{}",
                     addr.to_bytes().to_base58()
                 );
                 println!("With npk {}", hex::encode(key.nullifer_public_key.0));
@@ -205,6 +205,12 @@ impl WalletSubcommand for AccountSubcommand {
                         .ok_or(anyhow::anyhow!("Private account not found in storage"))?,
                 };
 
+                if account == Account::default() {
+                    println!("Account is Uninitialized");
+
+                    return Ok(SubcommandReturnValue::Empty);
+                }
+
                 if raw {
                     let account_hr: HumanReadableAccount = account.clone().into();
                     println!("{}", serde_json::to_string(&account_hr).unwrap());
@@ -219,15 +225,21 @@ impl WalletSubcommand for AccountSubcommand {
                     _ if account.program_owner == auth_tr_prog_id => {
                         let acc_view: AuthenticatedTransferAccountView = account.into();
 
+                        println!("Account owned by authenticated transfer program");
+
                         serde_json::to_string(&acc_view)?
                     }
                     _ if account.program_owner == token_prog_id => {
                         if let Some(token_def) = TokenDefinition::parse(&account.data) {
                             let acc_view: TokedDefinitionAccountView = token_def.into();
 
+                            println!("Definition account owned by token program");
+
                             serde_json::to_string(&acc_view)?
                         } else if let Some(token_hold) = TokenHolding::parse(&account.data) {
                             let acc_view: TokedHoldingAccountView = token_hold.into();
+
+                            println!("Holding account owned by token program");
 
                             serde_json::to_string(&acc_view)?
                         } else {

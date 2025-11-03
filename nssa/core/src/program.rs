@@ -14,9 +14,18 @@ pub struct ProgramInput<T> {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+pub struct ChainedCall {
+    pub program_id: ProgramId,
+    pub instruction_data: InstructionData,
+    pub account_indices: Vec<usize>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct ProgramOutput {
     pub pre_states: Vec<AccountWithMetadata>,
     pub post_states: Vec<Account>,
+    pub chained_call: Option<ChainedCall>,
 }
 
 pub fn read_nssa_inputs<T: DeserializeOwned>() -> ProgramInput<T> {
@@ -33,6 +42,20 @@ pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec
     let output = ProgramOutput {
         pre_states,
         post_states,
+        chained_call: None,
+    };
+    env::commit(&output);
+}
+
+pub fn write_nssa_outputs_with_chained_call(
+    pre_states: Vec<AccountWithMetadata>,
+    post_states: Vec<Account>,
+    chained_call: Option<ChainedCall>,
+) {
+    let output = ProgramOutput {
+        pre_states,
+        post_states,
+        chained_call,
     };
     env::commit(&output);
 }
@@ -79,9 +102,14 @@ pub fn validate_execution(
         {
             return false;
         }
+
+        // 6. If a post state has default program owner, the pre state must have been a default account
+        if post.program_owner == DEFAULT_PROGRAM_ID && pre.account != Account::default() {
+            return false;
+        }
     }
 
-    // 6. Total balance is preserved
+    // 7. Total balance is preserved
     let total_balance_pre_states: u128 = pre_states.iter().map(|pre| pre.account.balance).sum();
     let total_balance_post_states: u128 = post_states.iter().map(|post| post.balance).sum();
     if total_balance_pre_states != total_balance_post_states {
