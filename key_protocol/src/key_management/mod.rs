@@ -39,6 +39,25 @@ impl KeyChain {
         }
     }
 
+    pub fn new_mnemonic(passphrase: String) -> Self {
+        //Currently dropping SeedHolder at the end of initialization.
+        //Now entirely sure if we need it in the future.
+        let seed_holder = SeedHolder::new_mnemonic(passphrase);
+        let secret_spending_key = seed_holder.produce_top_secret_key_holder();
+
+        let private_key_holder = secret_spending_key.produce_private_key_holder();
+
+        let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
+        let incoming_viewing_public_key = private_key_holder.generate_incoming_viewing_public_key();
+
+        Self {
+            secret_spending_key,
+            private_key_holder,
+            nullifer_public_key,
+            incoming_viewing_public_key,
+        }
+    }
+
     pub fn calculate_shared_secret_receiver(
         &self,
         ephemeral_public_key_sender: EphemeralPublicKey,

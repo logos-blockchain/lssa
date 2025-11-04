@@ -14,6 +14,8 @@ pub struct NSSAUserData {
     pub pub_account_signing_keys: HashMap<nssa::Address, nssa::PrivateKey>,
     ///Map for all user private accounts
     pub user_private_accounts: HashMap<nssa::Address, (KeyChain, nssa_core::account::Account)>,
+    ///Mnemonic passphrase
+    pub password: String,
 }
 
 impl NSSAUserData {
@@ -64,6 +66,31 @@ impl NSSAUserData {
         Ok(Self {
             pub_account_signing_keys: accounts_keys,
             user_private_accounts: accounts_key_chains,
+            password: "mnemonic".to_string(),
+        })
+    }
+
+    pub fn new_with_accounts_and_password(
+        accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
+        accounts_key_chains: HashMap<nssa::Address, (KeyChain, nssa_core::account::Account)>,
+        password: String,
+    ) -> Result<Self> {
+        if !Self::valid_public_key_transaction_pairing_check(&accounts_keys) {
+            anyhow::bail!(
+                "Key transaction pairing check not satisfied, there is addresses, which is not derived from keys"
+            );
+        }
+
+        if !Self::valid_private_key_transaction_pairing_check(&accounts_key_chains) {
+            anyhow::bail!(
+                "Key transaction pairing check not satisfied, there is addresses, which is not derived from keys"
+            );
+        }
+
+        Ok(Self {
+            pub_account_signing_keys: accounts_keys,
+            user_private_accounts: accounts_key_chains,
+            password,
         })
     }
 
@@ -92,6 +119,21 @@ impl NSSAUserData {
     /// Returns the address of new account
     pub fn generate_new_privacy_preserving_transaction_key_chain(&mut self) -> nssa::Address {
         let key_chain = KeyChain::new_os_random();
+        let address = nssa::Address::from(&key_chain.nullifer_public_key);
+
+        self.user_private_accounts
+            .insert(address, (key_chain, nssa_core::account::Account::default()));
+
+        address
+    }
+
+    /// Generated new private key for privacy preserving transactions
+    ///
+    /// Returns the address of new account
+    pub fn generate_new_privacy_preserving_transaction_key_chain_mnemonic(
+        &mut self,
+    ) -> nssa::Address {
+        let key_chain = KeyChain::new_mnemonic(self.password.clone());
         let address = nssa::Address::from(&key_chain.nullifer_public_key);
 
         self.user_private_accounts

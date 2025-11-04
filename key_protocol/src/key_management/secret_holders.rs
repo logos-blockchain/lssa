@@ -44,6 +44,18 @@ impl SeedHolder {
         }
     }
 
+    pub fn new_mnemonic(passphrase: String) -> Self {
+        let mut enthopy_bytes: [u8; 32] = [0; 32];
+        OsRng.fill_bytes(&mut enthopy_bytes);
+
+        let mnemonic = Mnemonic::from_entropy(&enthopy_bytes).unwrap();
+        let seed_wide = mnemonic.to_seed(passphrase);
+
+        Self {
+            seed: seed_wide.to_vec(),
+        }
+    }
+
     pub fn generate_secret_spending_key_hash(&self) -> HashType {
         let mut hash = hmac_sha512::HMAC::mac(&self.seed, "NSSA_seed");
 
