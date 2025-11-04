@@ -1,9 +1,59 @@
 use anyhow::Result;
 use clap::Subcommand;
-use common::transaction::NSSATransaction;
+use common::{PINATA_BASE58, transaction::NSSATransaction};
 use log::info;
 
-use crate::{SubcommandReturnValue, WalletCore, cli::WalletSubcommand};
+use crate::{
+    SubcommandReturnValue, WalletCore,
+    cli::WalletSubcommand,
+    helperfunctions::{AddressPrivacyKind, parse_addr_with_privacy_prefix},
+};
+
+///Represents generic CLI subcommand for a wallet working with pinata program
+#[derive(Subcommand, Debug, Clone)]
+pub enum PinataProgramAgnosticSubcommand {
+    ///Claim pinata
+    Claim {
+        ///to_addr - valid 32 byte base58 string with privacy prefix
+        #[arg(long)]
+        to_addr: String,
+        ///solution - solution to pinata challenge
+        #[arg(long)]
+        solution: u128,
+    },
+}
+
+impl WalletSubcommand for PinataProgramAgnosticSubcommand {
+    async fn handle_subcommand(
+        self,
+        wallet_core: &mut WalletCore,
+    ) -> Result<SubcommandReturnValue> {
+        let underlying_subcommand = match self {
+            PinataProgramAgnosticSubcommand::Claim { to_addr, solution } => {
+                let (to_addr, to_addr_privacy) = parse_addr_with_privacy_prefix(&to_addr)?;
+
+                match to_addr_privacy {
+                    AddressPrivacyKind::Public => {
+                        PinataProgramSubcommand::Public(PinataProgramSubcommandPublic::Claim {
+                            pinata_addr: PINATA_BASE58.to_string(),
+                            winner_addr: to_addr,
+                            solution,
+                        })
+                    }
+                    AddressPrivacyKind::Private => PinataProgramSubcommand::Private(
+                        PinataProgramSubcommandPrivate::ClaimPrivateOwned {
+                            pinata_addr: PINATA_BASE58.to_string(),
+                            winner_addr: to_addr,
+                            solution,
+                        },
+                    ),
+                }
+            }
+        };
+
+        underlying_subcommand.handle_subcommand(wallet_core).await
+    }
+}
 
 ///Represents generic CLI subcommand for a wallet working with pinata program
 #[derive(Subcommand, Debug, Clone)]
@@ -131,7 +181,7 @@ impl WalletSubcommand for PinataProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 

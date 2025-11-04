@@ -537,4 +537,53 @@ impl WalletCore {
 
         Ok(self.sequencer_client.send_tx_private(tx).await?)
     }
+
+    pub async fn register_account_under_authenticated_transfers_programs_private(
+        &self,
+        from: Address,
+    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
+        let AccountPreparedData {
+            nsk: _,
+            npk: from_npk,
+            ipk: from_ipk,
+            auth_acc: sender_pre,
+            proof: _,
+        } = self.private_acc_preparation(from, false, false).await?;
+
+        let eph_holder_from = EphemeralKeyHolder::new(&from_npk);
+        let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_ipk);
+
+        let instruction: u128 = 0;
+
+        let (output, proof) = circuit::execute_and_prove(
+            &[sender_pre],
+            &Program::serialize_instruction(instruction).unwrap(),
+            &[2],
+            &produce_random_nonces(1),
+            &[(from_npk.clone(), shared_secret_from.clone())],
+            &[],
+            &Program::authenticated_transfer_program(),
+        )
+        .unwrap();
+
+        let message = Message::try_from_circuit_output(
+            vec![],
+            vec![],
+            vec![(
+                from_npk.clone(),
+                from_ipk.clone(),
+                eph_holder_from.generate_ephemeral_public_key(),
+            )],
+            output,
+        )
+        .unwrap();
+
+        let witness_set = WitnessSet::for_message(&message, proof, &[]);
+        let tx = PrivacyPreservingTransaction::new(message, witness_set);
+
+        Ok((
+            self.sequencer_client.send_tx_private(tx).await?,
+            [shared_secret_from],
+        ))
+    }
 }

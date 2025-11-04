@@ -32,17 +32,23 @@ struct Args {
     test_name: String,
 }
 
-pub const ACC_SENDER: &str = "d07ad2e84b27fa00c262f0a1eea0ff35ca0973547e6a106f72f193c2dc838b44";
-pub const ACC_RECEIVER: &str = "e7ae77c5ef1a05999344af499fc78a1705398d62ed06cf2e1479f6def89a39bc";
+pub const ACC_SENDER: &str = "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy";
+pub const ACC_RECEIVER: &str = "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw";
 
-pub const ACC_SENDER_PRIVATE: &str =
-    "d360d6b5763f71ac6af56253687fd7d556d5c6c64312e53c0b92ef039a4375df";
-pub const ACC_RECEIVER_PRIVATE: &str =
-    "f27087ffc29b99035303697dcf6c8e323b1847d4261e6afd49e0d71c6dfa31ea";
+pub const ACC_SENDER_PRIVATE: &str = "3oCG8gqdKLMegw4rRfyaMQvuPHpcASt7xwttsmnZLSkw";
+pub const ACC_RECEIVER_PRIVATE: &str = "AKTcXgJ1xoynta1Ec7y6Jso1z1JQtHqd7aPQ1h9er6xX";
 
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 
 pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &[u8] = include_bytes!("data_changer.bin");
+
+fn make_public_account_input_from_str(addr: &str) -> String {
+    format!("Public/{addr}")
+}
+
+fn make_private_account_input_from_str(addr: &str) -> String {
+    format!("Private/{addr}")
+}
 
 #[allow(clippy::type_complexity)]
 pub async fn pre_test(
@@ -86,7 +92,7 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
     seq_http_server_handle.stop(true).await;
 
     let wallet_home = wallet::helperfunctions::get_home().unwrap();
-    let persistent_data_home = wallet_home.join("curr_accounts.json");
+    let persistent_data_home = wallet_home.join("storage.json");
 
     //Removing persistent accounts after run to not affect other executions
     //Not necessary an error, if fails as there is tests for failure scenario
@@ -156,4 +162,21 @@ async fn verify_commitment_is_in_state(
         seq_client.get_proof_for_commitment(commitment).await,
         Ok(Some(_))
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{make_private_account_input_from_str, make_public_account_input_from_str};
+
+    #[test]
+    fn correct_addr_from_prefix() {
+        let addr1 = "cafecafe";
+        let addr2 = "deadbeaf";
+
+        let addr1_pub = make_public_account_input_from_str(addr1);
+        let addr2_priv = make_private_account_input_from_str(addr2);
+
+        assert_eq!(addr1_pub, "Public/cafecafe".to_string());
+        assert_eq!(addr2_priv, "Private/deadbeaf".to_string());
+    }
 }

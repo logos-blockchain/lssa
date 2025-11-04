@@ -16,7 +16,8 @@ nssa-core = { path = "../nssa/core" }
 base64.workspace = true
 bytemuck = "1.23.2"
 borsh.workspace = true
-hex.workspace = true
+base58.workspace = true
+hex = "0.4.3"
 rand.workspace = true
 
 [dependencies.key_protocol]

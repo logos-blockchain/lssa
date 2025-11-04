@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "host")]
 use std::{fmt::Display, str::FromStr};
 
+#[cfg(feature = "host")]
+use base58::{FromBase58, ToBase58};
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     any(feature = "host", test),
@@ -31,8 +34,8 @@ impl AsRef<[u8]> for Address {
 #[cfg(feature = "host")]
 #[derive(Debug, thiserror::Error)]
 pub enum AddressError {
-    #[error("invalid hex")]
-    InvalidHex(#[from] hex::FromHexError),
+    #[error("invalid base58")]
+    InvalidBase58(#[from] anyhow::Error),
     #[error("invalid length: expected 32 bytes, got {0}")]
     InvalidLength(usize),
 }
@@ -41,7 +44,9 @@ pub enum AddressError {
 impl FromStr for Address {
     type Err = AddressError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = hex::decode(s)?;
+        let bytes = s
+            .from_base58()
+            .map_err(|err| anyhow::anyhow!("Invalid base58 err {err:?}"))?;
         if bytes.len() != 32 {
             return Err(AddressError::InvalidLength(bytes.len()));
         }
@@ -54,7 +59,7 @@ impl FromStr for Address {
 #[cfg(feature = "host")]
 impl Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(self.value))
+        write!(f, "{}", self.value.to_base58())
     }
 }
 
@@ -65,29 +70,29 @@ mod tests {
 
     #[test]
     fn parse_valid_address() {
-        let hex_str = "00".repeat(32); // 64 hex chars = 32 bytes
-        let addr: Address = hex_str.parse().unwrap();
+        let base58_str = "11111111111111111111111111111111";
+        let addr: Address = base58_str.parse().unwrap();
         assert_eq!(addr.value, [0u8; 32]);
     }
 
     #[test]
-    fn parse_invalid_hex() {
-        let hex_str = "zz".repeat(32); // invalid hex chars
-        let result = hex_str.parse::<Address>().unwrap_err();
-        assert!(matches!(result, AddressError::InvalidHex(_)));
+    fn parse_invalid_base58() {
+        let base58_str = "00".repeat(32); // invalid base58 chars
+        let result = base58_str.parse::<Address>().unwrap_err();
+        assert!(matches!(result, AddressError::InvalidBase58(_)));
     }
 
     #[test]
     fn parse_wrong_length_short() {
-        let hex_str = "00".repeat(31); // 62 chars = 31 bytes
-        let result = hex_str.parse::<Address>().unwrap_err();
+        let base58_str = "11".repeat(31); // 62 chars = 31 bytes
+        let result = base58_str.parse::<Address>().unwrap_err();
         assert!(matches!(result, AddressError::InvalidLength(_)));
     }
 
     #[test]
     fn parse_wrong_length_long() {
-        let hex_str = "00".repeat(33); // 66 chars = 33 bytes
-        let result = hex_str.parse::<Address>().unwrap_err();
+        let base58_str = "11".repeat(33); // 66 chars = 33 bytes
+        let result = base58_str.parse::<Address>().unwrap_err();
         assert!(matches!(result, AddressError::InvalidLength(_)));
     }
 }

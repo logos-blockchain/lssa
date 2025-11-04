@@ -75,19 +75,91 @@ mod tests {
     use tempfile::tempdir;
 
     fn create_initial_accounts() -> Vec<InitialAccountData> {
-        let initial_acc1 = serde_json::from_str(r#"{
+        let initial_acc1 = serde_json::from_str(
+            r#"{
             "Public": {
-                "address": "d07ad2e84b27fa00c262f0a1eea0ff35ca0973547e6a106f72f193c2dc838b44",
-                "pub_sign_key": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                "address": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+                "pub_sign_key": [
+                    16,
+                    162,
+                    106,
+                    154,
+                    236,
+                    125,
+                    52,
+                    184,
+                    35,
+                    100,
+                    238,
+                    174,
+                    69,
+                    197,
+                    41,
+                    77,
+                    187,
+                    10,
+                    118,
+                    75,
+                    0,
+                    11,
+                    148,
+                    238,
+                    185,
+                    181,
+                    133,
+                    17,
+                    220,
+                    72,
+                    124,
+                    77
+                ]
             }
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
 
-        let initial_acc2 = serde_json::from_str(r#"{
+        let initial_acc2 = serde_json::from_str(
+            r#"{
             "Public": {
-                "address": "e7ae77c5ef1a05999344af499fc78a1705398d62ed06cf2e1479f6def89a39bc",
-                "pub_sign_key": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+                "address": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+                "pub_sign_key": [
+                    113,
+                    121,
+                    64,
+                    177,
+                    204,
+                    85,
+                    229,
+                    214,
+                    178,
+                    6,
+                    109,
+                    191,
+                    29,
+                    154,
+                    63,
+                    38,
+                    242,
+                    18,
+                    244,
+                    219,
+                    8,
+                    208,
+                    35,
+                    136,
+                    23,
+                    127,
+                    207,
+                    237,
+                    216,
+                    169,
+                    190,
+                    27
+                ]
             }
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
 
         let initial_accounts = vec![initial_acc1, initial_acc2];
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use actix_web::Error as HttpError;
+use base58::FromBase58;
 use base64::{Engine, engine::general_purpose};
 use nssa::{self, program::Program};
 use sequencer_core::config::AccountInitialData;
@@ -160,8 +161,10 @@ impl JsonHandler {
     /// The address must be a valid hex string of the correct length.
     async fn process_get_account_balance(&self, request: Request) -> Result<Value, RpcErr> {
         let get_account_req = GetAccountBalanceRequest::parse(Some(request.params))?;
-        let address_bytes = hex::decode(get_account_req.address)
-            .map_err(|_| RpcError::invalid_params("invalid hex".to_string()))?;
+        let address_bytes = get_account_req
+            .address
+            .from_base58()
+            .map_err(|_| RpcError::invalid_params("invalid base58".to_string()))?;
         let address = nssa::Address::new(
             address_bytes
                 .try_into()
@@ -307,6 +310,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{JsonHandler, rpc_handler};
+    use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
     use common::{
         rpc_primitives::RpcPollingConfig, test_utils::sequencer_sign_key_for_testing,
@@ -324,23 +328,23 @@ mod tests {
     fn sequencer_config_for_tests() -> SequencerConfig {
         let tempdir = tempdir().unwrap();
         let home = tempdir.path().to_path_buf();
-        let acc1_addr = vec![
+        let acc1_addr: Vec<u8> = vec![
             208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202, 9, 115,
             84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
         ];
 
-        let acc2_addr = vec![
+        let acc2_addr: Vec<u8> = vec![
             231, 174, 119, 197, 239, 26, 5, 153, 147, 68, 175, 73, 159, 199, 138, 23, 5, 57, 141,
             98, 237, 6, 207, 46, 20, 121, 246, 222, 248, 154, 57, 188,
         ];
 
         let initial_acc1 = AccountInitialData {
-            addr: hex::encode(acc1_addr),
+            addr: acc1_addr.to_base58(),
             balance: 10000,
         };
 
         let initial_acc2 = AccountInitialData {
-            addr: hex::encode(acc2_addr),
+            addr: acc2_addr.to_base58(),
             balance: 20000,
         };
 
@@ -425,7 +429,7 @@ mod tests {
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_account_balance",
-            "params": { "address": "efac".repeat(16) },
+            "params": { "address": "11".repeat(16) },
             "id": 1
         });
         let expected_response = serde_json::json!({
@@ -442,12 +446,12 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_get_account_balance_for_invalid_hex() {
+    async fn test_get_account_balance_for_invalid_base58() {
         let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_account_balance",
-            "params": { "address": "not_a_valid_hex" },
+            "params": { "address": "not_a_valid_base58" },
             "id": 1
         });
         let expected_response = serde_json::json!({
@@ -456,7 +460,7 @@ mod tests {
             "error": {
                 "code": -32602,
                 "message": "Invalid params",
-                "data": "invalid hex"
+                "data": "invalid base58"
             }
         });
         let response = call_rpc_handler_with_json(json_handler, request).await;
@@ -518,7 +522,7 @@ mod tests {
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_accounts_nonces",
-            "params": { "addresses": ["efac".repeat(16)] },
+            "params": { "addresses": ["11".repeat(16)] },
             "id": 1
         });
         let expected_response = serde_json::json!({
@@ -566,7 +570,7 @@ mod tests {
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_account",
-            "params": { "address": "efac".repeat(16) },
+            "params": { "address": "11".repeat(16) },
             "id": 1
         });
         let expected_response = serde_json::json!({

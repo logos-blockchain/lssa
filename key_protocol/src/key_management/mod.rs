@@ -55,6 +55,7 @@ impl KeyChain {
 #[cfg(test)]
 mod tests {
     use aes_gcm::aead::OsRng;
+    use base58::ToBase58;
     use k256::AffinePoint;
     use k256::elliptic_curve::group::GroupEncoding;
     use rand::RngCore;
@@ -119,7 +120,7 @@ mod tests {
 
         println!("======Public data======");
         println!();
-        println!("Address{:?}", hex::encode(address.value()));
+        println!("Address{:?}", address.value().to_base58());
         println!(
             "Nulifier public key {:?}",
             hex::encode(nullifer_public_key.to_byte_array())

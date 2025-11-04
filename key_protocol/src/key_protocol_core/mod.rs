@@ -142,5 +142,10 @@ mod tests {
         let is_key_chain_generated = user_data.get_private_account(&addr_private).is_some();
 
         assert!(is_key_chain_generated);
+
+        let addr_private_str = addr_private.to_string();
+        println!("{addr_private_str:#?}");
+        let key_chain = &user_data.get_private_account(&addr_private).unwrap().0;
+        println!("{key_chain:#?}");
     }
 }

@@ -20,16 +20,18 @@ use clap::{Parser, Subcommand};
 use nssa_core::{Commitment, MembershipProof};
 use tokio::io::AsyncWriteExt;
 
-use crate::cli::{
-    WalletSubcommand, account::AccountSubcommand, chain::ChainSubcommand,
-    native_token_transfer_program::NativeTokenTransferProgramSubcommand,
-    pinata_program::PinataProgramSubcommand,
+use crate::{
+    cli::{
+        WalletSubcommand, account::AccountSubcommand, chain::ChainSubcommand,
+        native_token_transfer_program::AuthTransferSubcommand,
+        pinata_program::PinataProgramAgnosticSubcommand,
+        token_program::TokenProgramAgnosticSubcommand,
+    },
+    config::PersistentStorage,
+    helperfunctions::fetch_persistent_storage,
 };
 use crate::{
-    cli::token_program::TokenProgramSubcommand,
-    helperfunctions::{
-        fetch_config, fetch_persistent_accounts, get_home, produce_data_for_storage,
-    },
+    helperfunctions::{fetch_config, get_home, produce_data_for_storage},
     poller::TxPoller,
 };
 
@@ -49,6 +51,7 @@ pub struct WalletCore {
     pub storage: WalletChainStore,
     pub poller: TxPoller,
     pub sequencer_client: Arc<SequencerClient>,
+    pub last_synced_block: u64,
 }
 
 impl WalletCore {
@@ -58,7 +61,10 @@ impl WalletCore {
 
         let mut storage = WalletChainStore::new(config)?;
 
-        let persistent_accounts = fetch_persistent_accounts().await?;
+        let PersistentStorage {
+            accounts: persistent_accounts,
+            last_synced_block,
+        } = fetch_persistent_storage().await?;
         for pers_acc_data in persistent_accounts {
             storage.insert_account_data(pers_acc_data);
         }
@@ -67,23 +73,24 @@ impl WalletCore {
             storage,
             poller: tx_poller,
             sequencer_client: client.clone(),
+            last_synced_block,
         })
     }
 
-    ///Store persistent accounts at home
-    pub async fn store_persistent_accounts(&self) -> Result<PathBuf> {
+    ///Store persistent data at home
+    pub async fn store_persistent_data(&self) -> Result<PathBuf> {
         let home = get_home()?;
-        let accs_path = home.join("curr_accounts.json");
+        let storage_path = home.join("storage.json");
 
-        let data = produce_data_for_storage(&self.storage.user_data);
-        let accs = serde_json::to_vec_pretty(&data)?;
+        let data = produce_data_for_storage(&self.storage.user_data, self.last_synced_block);
+        let storage = serde_json::to_vec_pretty(&data)?;
 
-        let mut accs_file = tokio::fs::File::create(accs_path.as_path()).await?;
-        accs_file.write_all(&accs).await?;
+        let mut storage_file = tokio::fs::File::create(storage_path.as_path()).await?;
+        storage_file.write_all(&storage).await?;
 
-        info!("Stored accounts data at {accs_path:#?}");
+        info!("Stored data at {storage_path:#?}");
 
-        Ok(accs_path)
+        Ok(storage_path)
     }
 
     pub fn create_new_account_public(&mut self) -> Address {
@@ -191,28 +198,32 @@ impl WalletCore {
 #[derive(Subcommand, Debug, Clone)]
 #[clap(about)]
 pub enum Command {
-    ///Transfer command
+    ///Authenticated transfer subcommand
     #[command(subcommand)]
-    Transfer(NativeTokenTransferProgramSubcommand),
-    ///Chain command
+    AuthTransfer(AuthTransferSubcommand),
+    ///Generic chain info subcommand
     #[command(subcommand)]
-    Chain(ChainSubcommand),
-    ///Chain command
+    ChainInfo(ChainSubcommand),
+    ///Account view and sync subcommand
     #[command(subcommand)]
     Account(AccountSubcommand),
-    ///Pinata command
+    ///Pinata program interaction subcommand
     #[command(subcommand)]
-    PinataProgram(PinataProgramSubcommand),
-    ///Token command
+    Pinata(PinataProgramAgnosticSubcommand),
+    ///Token program interaction subcommand
     #[command(subcommand)]
-    TokenProgram(TokenProgramSubcommand),
-    AuthenticatedTransferInitializePublicAccount {},
-    // Check the wallet can connect to the node and builtin local programs
-    // match the remote versions
+    Token(TokenProgramAgnosticSubcommand),
+    /// Check the wallet can connect to the node and builtin local programs
+    /// match the remote versions
     CheckHealth {},
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
+///
+/// All account adresses must be valid 32 byte base58 strings.
+///
+/// All account addresses must be provided as {privacy_prefix}/{addr},
+/// where valid options for `privacy_prefix` is `Public` and `Private`
 #[derive(Parser, Debug)]
 #[clap(version, about)]
 pub struct Args {
@@ -230,6 +241,7 @@ pub enum SubcommandReturnValue {
     RegisterAccount { addr: nssa::Address },
     Account(nssa::Account),
     Empty,
+    SyncedToBlock(u64),
 }
 
 pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValue> {
@@ -237,12 +249,12 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
     let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
     let subcommand_ret = match command {
-        Command::Transfer(transfer_subcommand) => {
+        Command::AuthTransfer(transfer_subcommand) => {
             transfer_subcommand
                 .handle_subcommand(&mut wallet_core)
                 .await?
         }
-        Command::Chain(chain_subcommand) => {
+        Command::ChainInfo(chain_subcommand) => {
             chain_subcommand.handle_subcommand(&mut wallet_core).await?
         }
         Command::Account(account_subcommand) => {
@@ -250,7 +262,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 .handle_subcommand(&mut wallet_core)
                 .await?
         }
-        Command::PinataProgram(pinata_subcommand) => {
+        Command::Pinata(pinata_subcommand) => {
             pinata_subcommand
                 .handle_subcommand(&mut wallet_core)
                 .await?
@@ -285,31 +297,86 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::AuthenticatedTransferInitializePublicAccount {} => {
-            let addr = wallet_core.create_new_account_public();
-
-            println!("Generated new account with addr {addr}");
-
-            let path = wallet_core.store_persistent_accounts().await?;
-
-            println!("Stored persistent accounts at {path:#?}");
-
-            let res = wallet_core
-                .register_account_under_authenticated_transfers_programs(addr)
-                .await?;
-
-            println!("Results of tx send is {res:#?}");
-
-            let _transfer_tx = wallet_core.poll_native_token_transfer(res.tx_hash).await?;
-
-            SubcommandReturnValue::RegisterAccount { addr }
-        }
-        Command::TokenProgram(token_subcommand) => {
+        Command::Token(token_subcommand) => {
             token_subcommand.handle_subcommand(&mut wallet_core).await?
         }
     };
 
     Ok(subcommand_ret)
+}
+
+pub async fn parse_block_range(
+    start: u64,
+    stop: u64,
+    seq_client: Arc<SequencerClient>,
+    wallet_core: &mut WalletCore,
+) -> Result<()> {
+    for block_id in start..(stop + 1) {
+        let block =
+            borsh::from_slice::<HashableBlockData>(&seq_client.get_block(block_id).await?.block)?;
+
+        for tx in block.transactions {
+            let nssa_tx = NSSATransaction::try_from(&tx)?;
+
+            if let NSSATransaction::PrivacyPreserving(tx) = nssa_tx {
+                let mut affected_accounts = vec![];
+
+                for (acc_addr, (key_chain, _)) in
+                    &wallet_core.storage.user_data.user_private_accounts
+                {
+                    let view_tag = EncryptedAccountData::compute_view_tag(
+                        key_chain.nullifer_public_key.clone(),
+                        key_chain.incoming_viewing_public_key.clone(),
+                    );
+
+                    for (ciph_id, encrypted_data) in tx
+                        .message()
+                        .encrypted_private_post_states
+                        .iter()
+                        .enumerate()
+                    {
+                        if encrypted_data.view_tag == view_tag {
+                            let ciphertext = &encrypted_data.ciphertext;
+                            let commitment = &tx.message.new_commitments[ciph_id];
+                            let shared_secret = key_chain
+                                .calculate_shared_secret_receiver(encrypted_data.epk.clone());
+
+                            let res_acc = nssa_core::EncryptionScheme::decrypt(
+                                ciphertext,
+                                &shared_secret,
+                                commitment,
+                                ciph_id as u32,
+                            );
+
+                            if let Some(res_acc) = res_acc {
+                                println!(
+                                    "Received new account for addr {acc_addr:#?} with account object {res_acc:#?}"
+                                );
+
+                                affected_accounts.push((*acc_addr, res_acc));
+                            }
+                        }
+                    }
+                }
+
+                for (affected_addr, new_acc) in affected_accounts {
+                    wallet_core
+                        .storage
+                        .insert_private_account_data(affected_addr, new_acc);
+                }
+            }
+        }
+
+        wallet_core.last_synced_block = block_id;
+        wallet_core.store_persistent_data().await?;
+
+        println!(
+            "Block at id {block_id} with timestamp {} parsed",
+            block.timestamp
+        );
+    }
+
+    Ok(())
 }
 
 pub async fn execute_continious_run() -> Result<()> {
@@ -321,70 +388,13 @@ pub async fn execute_continious_run() -> Result<()> {
     let mut curr_last_block = latest_block_num;
 
     loop {
-        for block_id in curr_last_block..(latest_block_num + 1) {
-            let block = borsh::from_slice::<HashableBlockData>(
-                &seq_client.get_block(block_id).await?.block,
-            )?;
-
-            for tx in block.transactions {
-                let nssa_tx = NSSATransaction::try_from(&tx)?;
-
-                if let NSSATransaction::PrivacyPreserving(tx) = nssa_tx {
-                    let mut affected_accounts = vec![];
-
-                    for (acc_addr, (key_chain, _)) in
-                        &wallet_core.storage.user_data.user_private_accounts
-                    {
-                        let view_tag = EncryptedAccountData::compute_view_tag(
-                            key_chain.nullifer_public_key.clone(),
-                            key_chain.incoming_viewing_public_key.clone(),
-                        );
-
-                        for (ciph_id, encrypted_data) in tx
-                            .message()
-                            .encrypted_private_post_states
-                            .iter()
-                            .enumerate()
-                        {
-                            if encrypted_data.view_tag == view_tag {
-                                let ciphertext = &encrypted_data.ciphertext;
-                                let commitment = &tx.message.new_commitments[ciph_id];
-                                let shared_secret = key_chain
-                                    .calculate_shared_secret_receiver(encrypted_data.epk.clone());
-
-                                let res_acc = nssa_core::EncryptionScheme::decrypt(
-                                    ciphertext,
-                                    &shared_secret,
-                                    commitment,
-                                    ciph_id as u32,
-                                );
-
-                                if let Some(res_acc) = res_acc {
-                                    println!(
-                                        "Received new account for addr {acc_addr:#?} with account object {res_acc:#?}"
-                                    );
-
-                                    affected_accounts.push((*acc_addr, res_acc));
-                                }
-                            }
-                        }
-                    }
-
-                    for (affected_addr, new_acc) in affected_accounts {
-                        wallet_core
-                            .storage
-                            .insert_private_account_data(affected_addr, new_acc);
-                    }
-                }
-            }
-
-            wallet_core.store_persistent_accounts().await?;
-
-            println!(
-                "Block at id {block_id} with timestamp {} parsed",
-                block.timestamp
-            );
-        }
+        parse_block_range(
+            curr_last_block,
+            latest_block_num,
+            seq_client.clone(),
+            &mut wallet_core,
+        )
+        .await?;
 
         curr_last_block = latest_block_num + 1;
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-hex.workspace = true
+base58.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 rand.workspace = true

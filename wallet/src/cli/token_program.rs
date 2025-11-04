@@ -3,7 +3,197 @@ use clap::Subcommand;
 use common::transaction::NSSATransaction;
 use nssa::Address;
 
-use crate::{SubcommandReturnValue, WalletCore, cli::WalletSubcommand};
+use crate::{
+    SubcommandReturnValue, WalletCore,
+    cli::WalletSubcommand,
+    helperfunctions::{AddressPrivacyKind, parse_addr_with_privacy_prefix},
+};
+
+///Represents generic CLI subcommand for a wallet working with token program
+#[derive(Subcommand, Debug, Clone)]
+pub enum TokenProgramAgnosticSubcommand {
+    ///Produce a new token
+    ///
+    ///Currently the only supported privacy options is for public definition
+    New {
+        ///definition_addr - valid 32 byte base58 string with privacy prefix
+        #[arg(long)]
+        definition_addr: String,
+        ///supply_addr - valid 32 byte base58 string with privacy prefix
+        #[arg(long)]
+        supply_addr: String,
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        total_supply: u128,
+    },
+    ///Send tokens from one account to another with variable privacy
+    ///
+    ///If receiver is private, then `to` and (`to_npk` , `to_ipk`) is a mutually exclusive patterns.
+    ///
+    ///First is used for owned accounts, second otherwise.
+    Send {
+        ///from - valid 32 byte base58 string with privacy prefix
+        #[arg(long)]
+        from: String,
+        ///to - valid 32 byte base58 string with privacy prefix
+        #[arg(long)]
+        to: Option<String>,
+        ///to_npk - valid 32 byte hex string
+        #[arg(long)]
+        to_npk: Option<String>,
+        ///to_ipk - valid 33 byte hex string
+        #[arg(long)]
+        to_ipk: Option<String>,
+        ///amount - amount of balance to move
+        #[arg(long)]
+        amount: u128,
+    },
+}
+
+impl WalletSubcommand for TokenProgramAgnosticSubcommand {
+    async fn handle_subcommand(
+        self,
+        wallet_core: &mut WalletCore,
+    ) -> Result<SubcommandReturnValue> {
+        match self {
+            TokenProgramAgnosticSubcommand::New {
+                definition_addr,
+                supply_addr,
+                name,
+                total_supply,
+            } => {
+                let (definition_addr, definition_addr_privacy) =
+                    parse_addr_with_privacy_prefix(&definition_addr)?;
+                let (supply_addr, supply_addr_privacy) =
+                    parse_addr_with_privacy_prefix(&supply_addr)?;
+
+                let underlying_subcommand = match (definition_addr_privacy, supply_addr_privacy) {
+                    (AddressPrivacyKind::Public, AddressPrivacyKind::Public) => {
+                        TokenProgramSubcommand::Public(
+                            TokenProgramSubcommandPublic::CreateNewToken {
+                                definition_addr,
+                                supply_addr,
+                                name,
+                                total_supply,
+                            },
+                        )
+                    }
+                    (AddressPrivacyKind::Public, AddressPrivacyKind::Private) => {
+                        TokenProgramSubcommand::Private(
+                            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+                                definition_addr,
+                                supply_addr,
+                                name,
+                                total_supply,
+                            },
+                        )
+                    }
+                    (AddressPrivacyKind::Private, AddressPrivacyKind::Private) => {
+                        //ToDo: maybe implement this one. It is not immediately clear why definition should be private.
+                        anyhow::bail!("Unavailable privacy pairing")
+                    }
+                    (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
+                        //ToDo: Probably valid. If definition is not public, but supply is it is very suspicious.
+                        anyhow::bail!("Unavailable privacy pairing")
+                    }
+                };
+
+                underlying_subcommand.handle_subcommand(wallet_core).await
+            }
+            TokenProgramAgnosticSubcommand::Send {
+                from,
+                to,
+                to_npk,
+                to_ipk,
+                amount,
+            } => {
+                let underlying_subcommand = match (to, to_npk, to_ipk) {
+                    (None, None, None) => {
+                        anyhow::bail!(
+                            "Provide either account address of receiver or their public keys"
+                        );
+                    }
+                    (Some(_), Some(_), Some(_)) => {
+                        anyhow::bail!(
+                            "Provide only one variant: either account address of receiver or their public keys"
+                        );
+                    }
+                    (_, Some(_), None) | (_, None, Some(_)) => {
+                        anyhow::bail!("List of public keys is uncomplete");
+                    }
+                    (Some(to), None, None) => {
+                        let (from, from_privacy) = parse_addr_with_privacy_prefix(&from)?;
+                        let (to, to_privacy) = parse_addr_with_privacy_prefix(&to)?;
+
+                        match (from_privacy, to_privacy) {
+                            (AddressPrivacyKind::Public, AddressPrivacyKind::Public) => {
+                                TokenProgramSubcommand::Public(
+                                    TokenProgramSubcommandPublic::TransferToken {
+                                        sender_addr: from,
+                                        recipient_addr: to,
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                            (AddressPrivacyKind::Private, AddressPrivacyKind::Private) => {
+                                TokenProgramSubcommand::Private(
+                                    TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
+                                        sender_addr: from,
+                                        recipient_addr: to,
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                            (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
+                                TokenProgramSubcommand::Deshielded(
+                                    TokenProgramSubcommandDeshielded::TransferTokenDeshielded {
+                                        sender_addr: from,
+                                        recipient_addr: to,
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                            (AddressPrivacyKind::Public, AddressPrivacyKind::Private) => {
+                                TokenProgramSubcommand::Shielded(
+                                    TokenProgramSubcommandShielded::TransferTokenShieldedOwned {
+                                        sender_addr: from,
+                                        recipient_addr: to,
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    (None, Some(to_npk), Some(to_ipk)) => {
+                        let (from, from_privacy) = parse_addr_with_privacy_prefix(&from)?;
+
+                        match from_privacy {
+                            AddressPrivacyKind::Private => TokenProgramSubcommand::Private(
+                                TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
+                                    sender_addr: from,
+                                    recipient_npk: to_npk,
+                                    recipient_ipk: to_ipk,
+                                    balance_to_move: amount,
+                                },
+                            ),
+                            AddressPrivacyKind::Public => TokenProgramSubcommand::Shielded(
+                                TokenProgramSubcommandShielded::TransferTokenShieldedForeign {
+                                    sender_addr: from,
+                                    recipient_npk: to_npk,
+                                    recipient_ipk: to_ipk,
+                                    balance_to_move: amount,
+                                },
+                            ),
+                        }
+                    }
+                };
+
+                underlying_subcommand.handle_subcommand(wallet_core).await
+            }
+        }
+    }
+}
 
 ///Represents generic CLI subcommand for a wallet working with token_program
 #[derive(Subcommand, Debug, Clone)]
@@ -221,7 +411,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -278,7 +468,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -328,7 +518,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -376,7 +566,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -431,7 +621,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     println!("Transaction data is {:?}", tx.message);
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 
@@ -485,7 +675,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_accounts().await?;
+                let path = wallet_core.store_persistent_data().await?;
 
                 println!("Stored persistent accounts at {path:#?}");
 

@@ -46,6 +46,12 @@ pub enum PersistentAccountData {
     Private(PersistentAccountDataPrivate),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistentStorage {
+    pub accounts: Vec<PersistentAccountData>,
+    pub last_synced_block: u64,
+}
+
 impl InitialAccountData {
     pub fn address(&self) -> nssa::Address {
         match &self {

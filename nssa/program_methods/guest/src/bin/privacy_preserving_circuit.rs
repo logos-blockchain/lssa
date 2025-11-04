@@ -27,7 +27,13 @@ fn main() {
     let ProgramOutput {
         pre_states,
         post_states,
+        chained_call,
     } = program_output;
+
+    // TODO: implement chained calls for privacy preserving transactions
+    if chained_call.is_some() {
+        panic!("Privacy preserving transactions do not support yet chained calls.")
+    }
 
     // Check that there are no repeated account ids
     if !validate_uniqueness_of_account_ids(&pre_states) {
