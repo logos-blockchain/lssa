@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub type PublicAccountSigningKey = [u8; 32];
 
 pub mod ephemeral_key_holder;
+pub mod key_tree;
 pub mod secret_holders;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
