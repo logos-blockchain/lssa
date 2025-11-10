@@ -80,7 +80,7 @@ impl<Node: KeyNode> KeyTree<Node> {
         }
     }
 
-    pub fn generate_new_pub_keys(&mut self, parent_cci: ChainIndex) -> Option<nssa::Address> {
+    pub fn generate_new_node(&mut self, parent_cci: ChainIndex) -> Option<nssa::Address> {
         if !self.key_map.contains_key(&parent_cci) {
             return None;
         }
@@ -99,10 +99,21 @@ impl<Node: KeyNode> KeyTree<Node> {
         Some(address)
     }
 
-    pub fn get_pub_keys(&self, addr: nssa::Address) -> Option<&Node> {
+    pub fn get_node(&self, addr: nssa::Address) -> Option<&Node> {
         self.addr_map
             .get(&addr)
             .and_then(|chain_id| self.key_map.get(chain_id))
+    }
+
+    pub fn get_node_mut(&mut self, addr: nssa::Address) -> Option<&mut Node> {
+        self.addr_map
+            .get(&addr)
+            .and_then(|chain_id| self.key_map.get_mut(chain_id))
+    }
+
+    pub fn insert(&mut self, addr: nssa::Address, chain_index: ChainIndex, node: Node) {
+        self.addr_map.insert(addr, chain_index.clone());
+        self.key_map.insert(chain_index, node);
     }
 }
 
@@ -145,7 +156,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 0);
 
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -158,12 +169,12 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 1);
 
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
 
         let next_last_child_for_parent_id = tree
             .find_next_last_child_of_id(&ChainIndex::root())
@@ -184,7 +195,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 0);
 
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -197,7 +208,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 1);
 
-        let key_opt = tree.generate_new_pub_keys(ChainIndex::from_str("03000000").unwrap());
+        let key_opt = tree.generate_new_node(ChainIndex::from_str("03000000").unwrap());
 
         assert_eq!(key_opt, None);
     }
@@ -214,7 +225,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 0);
 
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -227,7 +238,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 1);
 
-        tree.generate_new_pub_keys(ChainIndex::root()).unwrap();
+        tree.generate_new_node(ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -240,7 +251,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 2);
 
-        tree.generate_new_pub_keys(ChainIndex::from_str("00000000").unwrap())
+        tree.generate_new_node(ChainIndex::from_str("00000000").unwrap())
             .unwrap();
 
         let next_last_child_for_parent_id = tree
@@ -254,7 +265,7 @@ mod tests {
                 .contains_key(&ChainIndex::from_str("0000000000000000").unwrap())
         );
 
-        tree.generate_new_pub_keys(ChainIndex::from_str("00000000").unwrap())
+        tree.generate_new_node(ChainIndex::from_str("00000000").unwrap())
             .unwrap();
 
         let next_last_child_for_parent_id = tree
@@ -268,7 +279,7 @@ mod tests {
                 .contains_key(&ChainIndex::from_str("0000000001000000").unwrap())
         );
 
-        tree.generate_new_pub_keys(ChainIndex::from_str("00000000").unwrap())
+        tree.generate_new_node(ChainIndex::from_str("00000000").unwrap())
             .unwrap();
 
         let next_last_child_for_parent_id = tree
@@ -282,7 +293,7 @@ mod tests {
                 .contains_key(&ChainIndex::from_str("0000000002000000").unwrap())
         );
 
-        tree.generate_new_pub_keys(ChainIndex::from_str("0000000001000000").unwrap())
+        tree.generate_new_node(ChainIndex::from_str("0000000001000000").unwrap())
             .unwrap();
 
         assert!(

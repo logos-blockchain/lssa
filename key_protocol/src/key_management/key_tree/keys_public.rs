@@ -59,6 +59,12 @@ impl KeyNode for ChildKeysPublic {
     }
 }
 
+impl<'a> From<&'a ChildKeysPublic> for &'a nssa::PrivateKey {
+    fn from(value: &'a ChildKeysPublic) -> Self {
+        &value.csk
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

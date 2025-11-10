@@ -14,7 +14,7 @@ pub mod secret_holders;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 ///Entrypoint to key management
 pub struct KeyChain {
-    secret_spending_key: SecretSpendingKey,
+    pub secret_spending_key: SecretSpendingKey,
     pub private_key_holder: PrivateKeyHolder,
     pub nullifer_public_key: NullifierPublicKey,
     pub incoming_viewing_public_key: IncomingViewingPublicKey,

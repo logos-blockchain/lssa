@@ -1,6 +1,7 @@
 use anyhow::Result;
 use base58::ToBase58;
 use clap::Subcommand;
+use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use nssa::{Account, Address, program::Program};
 use serde::Serialize;
 
@@ -89,9 +90,15 @@ pub enum AccountSubcommand {
 #[derive(Subcommand, Debug, Clone)]
 pub enum NewSubcommand {
     ///Register new public account
-    Public {},
+    Public { 
+        #[arg(long)]
+        cci: ChainIndex
+    },
     ///Register new private account
-    Private {},
+    Private {
+        #[arg(long)]
+        cci: ChainIndex
+    },
 }
 
 impl WalletSubcommand for NewSubcommand {
@@ -100,8 +107,8 @@ impl WalletSubcommand for NewSubcommand {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            NewSubcommand::Public {} => {
-                let addr = wallet_core.create_new_account_public();
+            NewSubcommand::Public { cci } => {
+                let addr = wallet_core.create_new_account_public(cci);
 
                 println!("Generated new account with addr Public/{addr}");
 
@@ -111,8 +118,8 @@ impl WalletSubcommand for NewSubcommand {
 
                 Ok(SubcommandReturnValue::RegisterAccount { addr })
             }
-            NewSubcommand::Private {} => {
-                let addr = wallet_core.create_new_account_private();
+            NewSubcommand::Private { cci } => {
+                let addr = wallet_core.create_new_account_private(cci);
 
                 let (key, _) = wallet_core
                     .storage
@@ -270,7 +277,8 @@ impl WalletSubcommand for AccountSubcommand {
                 if !wallet_core
                     .storage
                     .user_data
-                    .user_private_accounts
+                    .private_key_tree
+                    .addr_map
                     .is_empty()
                 {
                     parse_block_range(

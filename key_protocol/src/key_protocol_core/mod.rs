@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::key_management::{
     KeyChain,
     key_tree::{KeyTreePrivate, KeyTreePublic, chain_index::ChainIndex},
+    secret_holders::SeedHolder,
 };
 
 pub type PublicKey = AffinePoint;
@@ -56,48 +57,62 @@ impl NSSAUserData {
     }
 
     pub fn new_with_accounts(
-        accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
-        accounts_key_chains: HashMap<nssa::Address, (KeyChain, nssa_core::account::Account)>,
+        default_accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
+        default_accounts_key_chains: HashMap<
+            nssa::Address,
+            (KeyChain, nssa_core::account::Account),
+        >,
+        public_key_tree: KeyTreePublic,
+        private_key_tree: KeyTreePrivate,
     ) -> Result<Self> {
-        if !Self::valid_public_key_transaction_pairing_check(&accounts_keys) {
+        if !Self::valid_public_key_transaction_pairing_check(&default_accounts_keys) {
             anyhow::bail!(
                 "Key transaction pairing check not satisfied, there is addresses, which is not derived from keys"
             );
         }
 
-        if !Self::valid_private_key_transaction_pairing_check(&accounts_key_chains) {
+        if !Self::valid_private_key_transaction_pairing_check(&default_accounts_key_chains) {
             anyhow::bail!(
                 "Key transaction pairing check not satisfied, there is addresses, which is not derived from keys"
             );
         }
 
         Ok(Self {
-            pub_account_signing_keys: accounts_keys,
-            user_private_accounts: accounts_key_chains,
+            default_pub_account_signing_keys: default_accounts_keys,
+            default_user_private_accounts: default_accounts_key_chains,
+            public_key_tree,
+            private_key_tree,
             password: "mnemonic".to_string(),
         })
     }
 
     pub fn new_with_accounts_and_password(
-        accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
-        accounts_key_chains: HashMap<nssa::Address, (KeyChain, nssa_core::account::Account)>,
+        default_accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
+        default_accounts_key_chains: HashMap<
+            nssa::Address,
+            (KeyChain, nssa_core::account::Account),
+        >,
+        public_key_tree: KeyTreePublic,
+        private_key_tree: KeyTreePrivate,
         password: String,
     ) -> Result<Self> {
-        if !Self::valid_public_key_transaction_pairing_check(&accounts_keys) {
+        if !Self::valid_public_key_transaction_pairing_check(&default_accounts_keys) {
             anyhow::bail!(
                 "Key transaction pairing check not satisfied, there is addresses, which is not derived from keys"
             );
         }
 
-        if !Self::valid_private_key_transaction_pairing_check(&accounts_key_chains) {
+        if !Self::valid_private_key_transaction_pairing_check(&default_accounts_key_chains) {
             anyhow::bail!(
                 "Key transaction pairing check not satisfied, there is addresses, which is not derived from keys"
             );
         }
 
         Ok(Self {
-            pub_account_signing_keys: accounts_keys,
-            user_private_accounts: accounts_key_chains,
+            default_pub_account_signing_keys: default_accounts_keys,
+            default_user_private_accounts: default_accounts_key_chains,
+            public_key_tree,
+            private_key_tree,
             password,
         })
     }
@@ -109,9 +124,7 @@ impl NSSAUserData {
         &mut self,
         parent_cci: ChainIndex,
     ) -> nssa::Address {
-        self.public_key_tree
-            .generate_new_pub_keys(parent_cci)
-            .unwrap()
+        self.public_key_tree.generate_new_node(parent_cci).unwrap()
     }
 
     /// Returns the signing key for public transaction signatures
@@ -119,35 +132,25 @@ impl NSSAUserData {
         &self,
         address: &nssa::Address,
     ) -> Option<&nssa::PrivateKey> {
-        self.public_key_tree.get_pub_keys(address)
+        //First seek in defaults
+        if let Some(key) = self.default_pub_account_signing_keys.get(address) {
+            Some(key)
+        //Then seek in tree
+        } else {
+            self.public_key_tree
+                .get_node(*address)
+                .and_then(|chain_keys| Some(chain_keys.into()))
+        }
     }
 
     /// Generated new private key for privacy preserving transactions
     ///
     /// Returns the address of new account
-    pub fn generate_new_privacy_preserving_transaction_key_chain(&mut self) -> nssa::Address {
-        let key_chain = KeyChain::new_os_random();
-        let address = nssa::Address::from(&key_chain.nullifer_public_key);
-
-        self.user_private_accounts
-            .insert(address, (key_chain, nssa_core::account::Account::default()));
-
-        address
-    }
-
-    /// Generated new private key for privacy preserving transactions
-    ///
-    /// Returns the address of new account
-    pub fn generate_new_privacy_preserving_transaction_key_chain_mnemonic(
+    pub fn generate_new_privacy_preserving_transaction_key_chain(
         &mut self,
+        parent_cci: ChainIndex,
     ) -> nssa::Address {
-        let key_chain = KeyChain::new_mnemonic(self.password.clone());
-        let address = nssa::Address::from(&key_chain.nullifer_public_key);
-
-        self.user_private_accounts
-            .insert(address, (key_chain, nssa_core::account::Account::default()));
-
-        address
+        self.private_key_tree.generate_new_node(parent_cci).unwrap()
     }
 
     /// Returns the signing key for public transaction signatures
@@ -155,7 +158,15 @@ impl NSSAUserData {
         &self,
         address: &nssa::Address,
     ) -> Option<&(KeyChain, nssa_core::account::Account)> {
-        self.user_private_accounts.get(address)
+        //First seek in defaults
+        if let Some(key) = self.default_user_private_accounts.get(address) {
+            Some(key)
+        //Then seek in tree
+        } else {
+            self.private_key_tree
+                .get_node(*address)
+                .and_then(|chain_keys| Some(chain_keys.into()))
+        }
     }
 
     /// Returns the signing key for public transaction signatures
@@ -163,14 +174,27 @@ impl NSSAUserData {
         &mut self,
         address: &nssa::Address,
     ) -> Option<&mut (KeyChain, nssa_core::account::Account)> {
-        self.user_private_accounts.get_mut(address)
+        //First seek in defaults
+        if let Some(key) = self.default_user_private_accounts.get_mut(address) {
+            Some(key)
+        //Then seek in tree
+        } else {
+            self.private_key_tree
+                .get_node_mut(*address)
+                .and_then(|chain_keys| Some(chain_keys.into()))
+        }
     }
 }
 
 impl Default for NSSAUserData {
     fn default() -> Self {
-        //Safe unwrap as maps are empty
-        Self::new_with_accounts(HashMap::default(), HashMap::default()).unwrap()
+        Self::new_with_accounts(
+            HashMap::new(),
+            HashMap::new(),
+            KeyTreePublic::new(&SeedHolder::new_mnemonic("default".to_string())),
+            KeyTreePrivate::new(&SeedHolder::new_mnemonic("default".to_string())),
+        )
+        .unwrap()
     }
 }
 
@@ -182,8 +206,9 @@ mod tests {
     fn test_new_account() {
         let mut user_data = NSSAUserData::default();
 
-        let addr_pub = user_data.generate_new_public_transaction_private_key();
-        let addr_private = user_data.generate_new_privacy_preserving_transaction_key_chain();
+        let addr_pub = user_data.generate_new_public_transaction_private_key(ChainIndex::root());
+        let addr_private =
+            user_data.generate_new_privacy_preserving_transaction_key_chain(ChainIndex::root());
 
         let is_private_key_generated = user_data.get_pub_account_signing_key(&addr_pub).is_some();
 

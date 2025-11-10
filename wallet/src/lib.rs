@@ -10,6 +10,7 @@ use common::{
 use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
+use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use log::info;
 use nssa::{
     Account, Address, privacy_preserving_transaction::message::EncryptedAccountData,
@@ -59,15 +60,13 @@ impl WalletCore {
         let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
         let tx_poller = TxPoller::new(config.clone(), client.clone());
 
-        let mut storage = WalletChainStore::new(config)?;
-
         let PersistentStorage {
             accounts: persistent_accounts,
+            password,
             last_synced_block,
         } = fetch_persistent_storage().await?;
-        for pers_acc_data in persistent_accounts {
-            storage.insert_account_data(pers_acc_data);
-        }
+
+        let storage = WalletChainStore::new(config, persistent_accounts, password)?;
 
         Ok(Self {
             storage,
@@ -107,16 +106,16 @@ impl WalletCore {
         Ok(config_path)
     }
 
-    pub fn create_new_account_public(&mut self) -> Address {
+    pub fn create_new_account_public(&mut self, chain_index: ChainIndex) -> Address {
         self.storage
             .user_data
-            .generate_new_public_transaction_private_key()
+            .generate_new_public_transaction_private_key(chain_index)
     }
 
-    pub fn create_new_account_private(&mut self) -> Address {
+    pub fn create_new_account_private(&mut self, chain_index: ChainIndex) -> Address {
         self.storage
             .user_data
-            .generate_new_privacy_preserving_transaction_key_chain()
+            .generate_new_privacy_preserving_transaction_key_chain(chain_index)
     }
 
     ///Get account balance
@@ -146,13 +145,12 @@ impl WalletCore {
     pub fn get_account_private(&self, addr: &Address) -> Option<Account> {
         self.storage
             .user_data
-            .user_private_accounts
-            .get(addr)
+            .get_private_account(addr)
             .map(|value| value.1.clone())
     }
 
     pub fn get_private_account_commitment(&self, addr: &Address) -> Option<Commitment> {
-        let (keys, account) = self.storage.user_data.user_private_accounts.get(addr)?;
+        let (keys, account) = self.storage.user_data.get_private_account(addr)?;
         Some(Commitment::new(&keys.nullifer_public_key, account))
     }
 

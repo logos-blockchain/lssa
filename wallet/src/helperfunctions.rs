@@ -104,6 +104,7 @@ pub async fn fetch_persistent_storage() -> Result<PersistentStorage> {
         Err(err) => match err.kind() {
             std::io::ErrorKind::NotFound => Ok(PersistentStorage {
                 accounts: vec![],
+                password: "default".to_string(),
                 last_synced_block: 0,
             }),
             _ => {
@@ -120,29 +121,29 @@ pub fn produce_data_for_storage(
 ) -> PersistentStorage {
     let mut vec_for_storage = vec![];
 
-    for (addr, key) in &user_data.pub_account_signing_keys {
-        vec_for_storage.push(
-            PersistentAccountDataPublic {
+    for (addr, key) in &user_data.public_key_tree.addr_map {
+        if let Some(data) = user_data.public_key_tree.key_map.get(key) {
+            vec_for_storage.push(PersistentAccountDataPublic {
                 address: *addr,
-                pub_sign_key: key.clone(),
-            }
-            .into(),
-        );
+                chain_index: key.clone(),
+                data: data.clone(),
+            }.into());
+        }
     }
 
-    for (addr, (key, acc)) in &user_data.user_private_accounts {
-        vec_for_storage.push(
-            PersistentAccountDataPrivate {
+    for (addr, key) in &user_data.private_key_tree.addr_map {
+        if let Some(data) = user_data.private_key_tree.key_map.get(key) {
+            vec_for_storage.push(PersistentAccountDataPrivate {
                 address: *addr,
-                account: acc.clone(),
-                key_chain: key.clone(),
-            }
-            .into(),
-        );
+                chain_index: key.clone(),
+                data: data.clone(),
+            }.into());
+        }
     }
 
     PersistentStorage {
         accounts: vec_for_storage,
+        password: user_data.password.clone(),
         last_synced_block,
     }
 }
