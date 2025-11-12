@@ -1,7 +1,10 @@
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use tokio::runtime::Builder;
-use wallet::{Args, OverCommand, execute_continious_run, execute_keys_restoration, execute_setup, execute_subcommand};
+use wallet::{
+    Args, OverCommand, execute_continious_run, execute_keys_restoration, execute_setup,
+    execute_subcommand,
+};
 
 pub const NUM_THREADS: usize = 2;
 

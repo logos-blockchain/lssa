@@ -42,10 +42,13 @@ impl FromStr for ChainIndex {
 impl Display for ChainIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "/")?;
-        for cci in &self.0[..(self.0.len() - 1)] {
-            write!(f, "{cci}/")?;
+        if *self != Self::root() {
+            for cci in &self.0[..(self.0.len() - 1)] {
+                write!(f, "{cci}/")?;
+            }
+            write!(f, "{}", self.0.last().unwrap())?;
         }
-        write!(f, "{}", self.0.last().unwrap())
+        Ok(())
     }
 }
 
@@ -73,6 +76,16 @@ impl ChainIndex {
         chain.push(child_id);
 
         ChainIndex(chain)
+    }
+
+    pub fn depth(&self) -> u32 {
+        let mut res = 0;
+
+        for cci in &self.0 {
+            res += cci + 1;
+        }
+
+        res
     }
 }
 

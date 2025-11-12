@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     pin::Pin,
+    str::FromStr,
     time::{Duration, Instant},
 };
 
@@ -1643,6 +1644,136 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             value: old_seq_poll_retry_delay_millis.to_string(),
         });
         wallet::execute_subcommand(command).await.unwrap();
+
+        info!("Success!");
+    }
+
+    #[nssa_integration_test]
+    pub async fn test_keys_restoration() {
+        info!("########## test_keys_restoration ##########");
+        let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
+
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
+            cci: ChainIndex::root(),
+        }));
+
+        let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+        let SubcommandReturnValue::RegisterAccount { addr: to_addr1 } = sub_ret else {
+            panic!("FAILED TO REGISTER ACCOUNT");
+        };
+
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
+            cci: ChainIndex::from_str("/0").unwrap(),
+        }));
+
+        let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+        let SubcommandReturnValue::RegisterAccount { addr: to_addr2 } = sub_ret else {
+            panic!("FAILED TO REGISTER ACCOUNT");
+        };
+
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_private_account_input_from_str(&from.to_string()),
+            to: Some(make_private_account_input_from_str(&to_addr1.to_string())),
+            to_npk: None,
+            to_ipk: None,
+            amount: 100,
+        });
+
+        wallet::execute_subcommand(command).await.unwrap();
+
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_private_account_input_from_str(&from.to_string()),
+            to: Some(make_private_account_input_from_str(&to_addr2.to_string())),
+            to_npk: None,
+            to_ipk: None,
+            amount: 100,
+        });
+
+        wallet::execute_subcommand(command).await.unwrap();
+
+        let from: Address = ACC_SENDER.parse().unwrap();
+
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: ChainIndex::root(),
+        }));
+
+        let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+        let SubcommandReturnValue::RegisterAccount { addr: to_addr3 } = sub_ret else {
+            panic!("FAILED TO REGISTER ACCOUNT");
+        };
+
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: ChainIndex::from_str("/0").unwrap(),
+        }));
+
+        let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+        let SubcommandReturnValue::RegisterAccount { addr: to_addr4 } = sub_ret else {
+            panic!("FAILED TO REGISTER ACCOUNT");
+        };
+
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(&from.to_string()),
+            to: Some(make_public_account_input_from_str(&to_addr3.to_string())),
+            to_npk: None,
+            to_ipk: None,
+            amount: 100,
+        });
+
+        wallet::execute_subcommand(command).await.unwrap();
+
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(&from.to_string()),
+            to: Some(make_public_account_input_from_str(&to_addr4.to_string())),
+            to_npk: None,
+            to_ipk: None,
+            amount: 100,
+        });
+
+        wallet::execute_subcommand(command).await.unwrap();
+
+        info!("########## PREPARATION END ##########");
+
+        wallet::execute_keys_restoration("test_pass".to_string(), 10)
+            .await
+            .unwrap();
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone())
+            .await
+            .unwrap();
+
+        assert!(
+            wallet_storage
+                .storage
+                .user_data
+                .private_key_tree
+                .get_node(to_addr1)
+                .is_some()
+        );
+        assert!(
+            wallet_storage
+                .storage
+                .user_data
+                .private_key_tree
+                .get_node(to_addr2)
+                .is_some()
+        );
+        assert!(
+            wallet_storage
+                .storage
+                .user_data
+                .public_key_tree
+                .get_node(to_addr3)
+                .is_some()
+        );
+        assert!(
+            wallet_storage
+                .storage
+                .user_data
+                .public_key_tree
+                .get_node(to_addr4)
+                .is_some()
+        );
 
         info!("Success!");
     }

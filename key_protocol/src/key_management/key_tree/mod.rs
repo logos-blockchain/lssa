@@ -1,5 +1,10 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
+use anyhow::Result;
+use common::sequencer_client::SequencerClient;
 use serde::{Deserialize, Serialize};
 
 use crate::key_management::{
@@ -128,21 +133,77 @@ impl<Node: KeyNode> KeyTree<Node> {
         self.key_map.insert(chain_index, node);
     }
 
+    pub fn remove(&mut self, addr: nssa::Address) -> Option<Node> {
+        let chain_index = self.addr_map.remove(&addr).unwrap();
+        self.key_map.remove(&chain_index)
+    }
+
     pub fn generate_tree_for_depth(&mut self, depth: u32) {
         let mut id_stack = vec![ChainIndex::root()];
 
-        while !id_stack.is_empty() {
-            let curr_id = id_stack.pop().unwrap();
-
+        while let Some(curr_id) = id_stack.pop() {
             self.generate_new_node(curr_id.clone());
 
             let mut next_id = curr_id.n_th_child(0);
 
-            while (next_id.chain().iter().sum::<u32>()) < depth - 1 {
+            while (next_id.depth()) < depth - 1 {
                 id_stack.push(next_id.clone());
                 next_id = next_id.next_in_line();
-            } 
+            }
         }
+    }
+}
+
+impl KeyTree<ChildKeysPrivate> {
+    pub fn cleanup_tree_for_depth(&mut self, depth: u32) {
+        let mut id_stack = vec![ChainIndex::root()];
+
+        while let Some(curr_id) = id_stack.pop() {
+            if let Some(node) = self.key_map.get(&curr_id)
+                && node.value.1 == nssa::Account::default()
+                && curr_id != ChainIndex::root()
+            {
+                let addr = node.address();
+                self.remove(addr);
+            }
+
+            let mut next_id = curr_id.n_th_child(0);
+
+            while (next_id.depth()) < depth - 1 {
+                id_stack.push(next_id.clone());
+                next_id = next_id.next_in_line();
+            }
+        }
+    }
+}
+
+impl KeyTree<ChildKeysPublic> {
+    pub async fn cleanup_tree_for_depth(
+        &mut self,
+        depth: u32,
+        client: Arc<SequencerClient>,
+    ) -> Result<()> {
+        let mut id_stack = vec![ChainIndex::root()];
+
+        while let Some(curr_id) = id_stack.pop() {
+            if let Some(node) = self.key_map.get(&curr_id) {
+                let address = node.address();
+                let node_acc = client.get_account(address.to_string()).await?.account;
+
+                if node_acc == nssa::Account::default() && curr_id != ChainIndex::root() {
+                    self.remove(address);
+                }
+            }
+
+            let mut next_id = curr_id.n_th_child(0);
+
+            while (next_id.depth()) < depth - 1 {
+                id_stack.push(next_id.clone());
+                next_id = next_id.next_in_line();
+            }
+        }
+
+        Ok(())
     }
 }
 
