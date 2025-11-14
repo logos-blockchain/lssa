@@ -133,11 +133,21 @@ impl AccountManager {
             .collect()
     }
 
-    pub fn private_account_auth(&self) -> Vec<(NullifierSecretKey, MembershipProof)> {
+    pub fn private_account_auth(&self) -> Vec<NullifierSecretKey> {
         self.states
             .iter()
             .filter_map(|state| match state {
-                State::Private(pre) => Some((pre.nsk?, pre.proof.clone()?)),
+                State::Private(pre) => pre.nsk,
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn private_account_membership_proofs(&self) -> Vec<MembershipProof> {
+        self.states
+            .iter()
+            .filter_map(|state| match state {
+                State::Private(pre) => pre.proof.clone(),
                 _ => None,
             })
             .collect()
@@ -153,7 +163,7 @@ impl AccountManager {
             .collect()
     }
 
-    pub fn witness_signing_keys(&self) -> Vec<&PrivateKey> {
+    pub fn public_account_auth(&self) -> Vec<&PrivateKey> {
         self.states
             .iter()
             .filter_map(|state| match state {

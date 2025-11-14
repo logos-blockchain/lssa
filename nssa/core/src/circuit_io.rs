@@ -14,7 +14,8 @@ pub struct PrivacyPreservingCircuitInput {
     pub visibility_mask: Vec<u8>,
     pub private_account_nonces: Vec<Nonce>,
     pub private_account_keys: Vec<(NullifierPublicKey, SharedSecretKey)>,
-    pub private_account_auth: Vec<(NullifierSecretKey, MembershipProof)>,
+    pub private_account_nsks: Vec<NullifierSecretKey>,
+    pub private_account_membership_proofs: Vec<MembershipProof>,
     pub program_id: ProgramId,
 }
 
