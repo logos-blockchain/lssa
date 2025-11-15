@@ -17,7 +17,7 @@ To the best of our knowledge, this approach is unique to Nescience. Other progra
 ### Example: creating and transferring tokens across states
 
 1. Token creation (public execution):
-   - Alice submits a transaction to execute the token program `Create` function on-chain.
+   - Alice submits a transaction to execute the token program `New` function on-chain.
    - A new public token account is created, representing the token.
    - The minted tokens are recorded on-chain and fully visible on Alice's public account.
 2. Transfer from public to private (local / privacy-preserving execution)
@@ -482,7 +482,7 @@ Holding account owned by token program
 {"account_type":"Token holding","definition_id":"4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7","balance":1337}
 ```
 
-##### New token with both definition and supply accounts set as public
+##### New token with public account definition but private holding account for initial supply
 
 Let’s create a new token, but this time using a public definition account and a private holding account to store the entire supply.
 
