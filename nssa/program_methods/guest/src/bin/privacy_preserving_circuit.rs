@@ -56,12 +56,11 @@ fn main() {
         {
             if !state_diff.contains_key(&pre.account_id) {
                 pre_states.push(pre.clone());
-            } else {
-                state_diff.insert(pre.account_id, post.clone());
             }
+            state_diff.insert(pre.account_id.clone(), post.clone());
         }
 
-        if let Some(next_chained_call) = program_output.chained_call {
+        if let Some(next_chained_call) = &program_output.chained_call {
             program_id = next_chained_call.program_id;
 
             // // Build post states with metadata for next call
@@ -115,7 +114,7 @@ fn main() {
                 // Public account
                 public_pre_states.push(pre_states[i].clone());
 
-                let mut post = post_states[i].clone();
+                let mut post = state_diff.get(&pre_states[i].account_id).unwrap().clone();
                 if pre_states[i].is_authorized {
                     post.nonce += 1;
                 }
@@ -171,7 +170,8 @@ fn main() {
                 }
 
                 // Update post-state with new nonce
-                let mut post_with_updated_values = post_states[i].clone();
+                let mut post_with_updated_values =
+                    state_diff.get(&pre_states[i].account_id).unwrap().clone();
                 post_with_updated_values.nonce = *new_nonce;
 
                 if post_with_updated_values.program_owner == DEFAULT_PROGRAM_ID {
