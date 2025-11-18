@@ -8,7 +8,7 @@ use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata},
     compute_digest_for_path,
     encryption::Ciphertext,
-    program::{DEFAULT_PROGRAM_ID, MAX_NUMBER_CHAINED_CALLS, ProgramOutput, validate_execution},
+    program::{DEFAULT_PROGRAM_ID, MAX_NUMBER_CHAINED_CALLS, validate_execution},
 };
 
 fn main() {
@@ -24,12 +24,30 @@ fn main() {
     let mut pre_states: Vec<AccountWithMetadata> = Vec::new();
     let mut state_diff: HashMap<AccountId, Account> = HashMap::new();
 
-    let mut program_output = program_outputs[0].clone();
+    let num_calls = program_outputs.len();
+    if num_calls > MAX_NUMBER_CHAINED_CALLS {
+        panic!("Max deapth is exceeded");
+    }
 
-    for _i in 0..MAX_NUMBER_CHAINED_CALLS {
+    if program_outputs[num_calls - 1].chained_call.is_some() {
+        panic!("Call stack is incomplete");
+    }
+
+    for i in 0..(program_outputs.len() - 1) {
+        let Some(chained_call) = program_outputs[i].chained_call.clone() else {
+            panic!("Expected chained call");
+        };
+
+        // Check that instruction data in caller is the instruction data in callee
+        if chained_call.instruction_data != program_outputs[i + 1].instruction_data {
+            panic!("Invalid instruction data");
+        }
+    }
+
+    for program_output in program_outputs {
+        let mut program_output = program_output.clone();
+
         // Check that `program_output` is consistent with the execution of the corresponding program.
-        // TODO: Program output should contain the instruction data to verify the chain of call si
-        // performed correctly.
         env::verify(program_id, &to_vec(&program_output).unwrap()).unwrap();
 
         // Check that the program is well behaved.
@@ -54,7 +72,11 @@ fn main() {
             .iter()
             .zip(&program_output.post_states)
         {
-            if !state_diff.contains_key(&pre.account_id) {
+            if let Some(account_pre) = state_diff.get(&pre.account_id) {
+                if account_pre != &pre.account {
+                    panic!("Invalid input");
+                }
+            } else {
                 pre_states.push(pre.clone());
             }
             state_diff.insert(pre.account_id.clone(), post.clone());
@@ -62,29 +84,6 @@ fn main() {
 
         if let Some(next_chained_call) = &program_output.chained_call {
             program_id = next_chained_call.program_id;
-
-            // // Build post states with metadata for next call
-            // let mut post_states_with_metadata = Vec::new();
-            // for (pre, post) in program_output
-            //     .pre_states
-            //     .iter()
-            //     .zip(program_output.post_states)
-            // {
-            //     let mut post_with_metadata = pre.clone();
-            //     post_with_metadata.account = post.clone();
-            //     post_states_with_metadata.push(post_with_metadata);
-            // }
-
-            // input_pre_states = next_chained_call
-            //     .account_indices
-            //     .iter()
-            //     .map(|&i| {
-            //         post_states_with_metadata
-            //             .get(i)
-            //             .ok_or_else(|| NssaError::InvalidInput("Invalid account indices".into()))
-            //             .cloned()
-            //     })
-            //     .collect::<Result<Vec<_>, NssaError>>()?;
         } else {
             break;
         };

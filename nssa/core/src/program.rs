@@ -26,23 +26,32 @@ pub struct ChainedCall {
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct ProgramOutput {
+    pub instruction_data: InstructionData,
     pub pre_states: Vec<AccountWithMetadata>,
     pub post_states: Vec<Account>,
     pub chained_call: Option<ChainedCall>,
 }
 
-pub fn read_nssa_inputs<T: DeserializeOwned>() -> ProgramInput<T> {
+pub fn read_nssa_inputs<T: DeserializeOwned>() -> (ProgramInput<T>, InstructionData) {
     let pre_states: Vec<AccountWithMetadata> = env::read();
     let instruction_words: InstructionData = env::read();
     let instruction = T::deserialize(&mut Deserializer::new(instruction_words.as_ref())).unwrap();
-    ProgramInput {
-        pre_states,
-        instruction,
-    }
+    (
+        ProgramInput {
+            pre_states,
+            instruction,
+        },
+        instruction_words,
+    )
 }
 
-pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec<Account>) {
+pub fn write_nssa_outputs(
+    instruction_data: InstructionData,
+    pre_states: Vec<AccountWithMetadata>,
+    post_states: Vec<Account>,
+) {
     let output = ProgramOutput {
+        instruction_data,
         pre_states,
         post_states,
         chained_call: None,
@@ -51,11 +60,13 @@ pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec
 }
 
 pub fn write_nssa_outputs_with_chained_call(
+    instruction_data: InstructionData,
     pre_states: Vec<AccountWithMetadata>,
     post_states: Vec<Account>,
     chained_call: Option<ChainedCall>,
 ) {
     let output = ProgramOutput {
+        instruction_data,
         pre_states,
         post_states,
         chained_call,

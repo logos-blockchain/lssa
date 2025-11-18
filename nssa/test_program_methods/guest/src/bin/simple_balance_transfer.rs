@@ -1,12 +1,15 @@
-use nssa_core::program::{read_nssa_inputs, write_nssa_outputs, ProgramInput};
+use nssa_core::program::{ProgramInput, read_nssa_inputs, write_nssa_outputs};
 
 type Instruction = u128;
 
 fn main() {
-    let ProgramInput {
-        pre_states,
-        instruction: balance,
-    } = read_nssa_inputs::<Instruction>();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction: balance,
+        },
+        instruction_words,
+    ) = read_nssa_inputs::<Instruction>();
 
     let [sender_pre, receiver_pre] = match pre_states.try_into() {
         Ok(array) => array,
@@ -19,6 +22,7 @@ fn main() {
     receiver_post.balance += balance;
 
     write_nssa_outputs(
+        instruction_words,
         vec![sender_pre, receiver_pre],
         vec![sender_post, receiver_post],
     );

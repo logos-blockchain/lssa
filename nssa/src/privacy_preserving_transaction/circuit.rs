@@ -27,6 +27,7 @@ pub fn execute_and_prove(
 ) -> Result<(PrivacyPreservingCircuitOutput, Proof), NssaError> {
     let mut env_builder = ExecutorEnv::builder();
     let mut program_outputs = Vec::new();
+
     for _i in 0..MAX_NUMBER_CHAINED_CALLS {
         let inner_receipt = execute_and_prove_program(program, pre_states, instruction_data)?;
 

@@ -8,10 +8,13 @@ type Instruction = (u128, ProgramId);
 /// A program that calls another program.
 /// It permutes the order of the input accounts on the subsequent call
 fn main() {
-    let ProgramInput {
-        pre_states,
-        instruction: (balance, program_id),
-    } = read_nssa_inputs::<Instruction>();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction: (balance, program_id),
+        },
+        instruction_words,
+    ) = read_nssa_inputs::<Instruction>();
 
     let [sender_pre, receiver_pre] = match pre_states.try_into() {
         Ok(array) => array,
@@ -27,6 +30,7 @@ fn main() {
     });
 
     write_nssa_outputs_with_chained_call(
+        instruction_words,
         vec![sender_pre.clone(), receiver_pre.clone()],
         vec![sender_pre.account, receiver_pre.account],
         chained_call,

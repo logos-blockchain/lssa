@@ -170,10 +170,13 @@ fn new_definition(
 type Instruction = [u8; 23];
 
 fn main() {
-    let ProgramInput {
-        pre_states,
-        instruction,
-    } = read_nssa_inputs::<Instruction>();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction,
+        },
+        instruction_words,
+    ) = read_nssa_inputs::<Instruction>();
 
     match instruction[0] {
         0 => {
@@ -184,7 +187,7 @@ fn main() {
 
             // Execute
             let post_states = new_definition(&pre_states, name, total_supply);
-            write_nssa_outputs(pre_states, post_states);
+            write_nssa_outputs(instruction_words, pre_states, post_states);
         }
         1 => {
             // Parse instruction
@@ -194,7 +197,7 @@ fn main() {
 
             // Execute
             let post_states = transfer(&pre_states, balance_to_move);
-            write_nssa_outputs(pre_states, post_states);
+            write_nssa_outputs(instruction_words, pre_states, post_states);
         }
         _ => panic!("Invalid instruction"),
     };
@@ -204,7 +207,7 @@ fn main() {
 mod tests {
     use nssa_core::account::{Account, AccountId, AccountWithMetadata};
 
-    use crate::{new_definition, transfer, TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_TYPE};
+    use crate::{TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_TYPE, new_definition, transfer};
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
