@@ -477,6 +477,7 @@ pub mod tests {
             self.insert_program(Program::minter());
             self.insert_program(Program::burner());
             self.insert_program(Program::chain_caller());
+            self.insert_program(Program::amm());
             self
         }
 
@@ -2162,4 +2163,257 @@ pub mod tests {
             Err(NssaError::MaxChainedCallsDepthExceeded)
         ));
     }
+
+
+    //TODO: repeated code needs to be cleaned up
+    //from token.rs
+    const TOKEN_DEFINITION_TYPE: u8 = 0;
+    const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
+
+    const TOKEN_HOLDING_TYPE: u8 = 1;
+    const TOKEN_HOLDING_DATA_SIZE: usize = 49;
+
+    struct TokenDefinition {
+    account_type: u8,
+    name: [u8; 6],
+    total_supply: u128,
+}
+
+struct TokenHolding {
+    account_type: u8,
+    definition_id: AccountId,
+    balance: u128,
+}
+
+impl TokenDefinition {
+    fn into_data(self) -> Vec<u8> {
+        let mut bytes = [0; TOKEN_DEFINITION_DATA_SIZE];
+        bytes[0] = self.account_type;
+        bytes[1..7].copy_from_slice(&self.name);
+        bytes[7..].copy_from_slice(&self.total_supply.to_le_bytes());
+        bytes.into()
+    }
+}
+
+impl TokenHolding {
+    fn new(definition_id: &AccountId) -> Self {
+        Self {
+            account_type: TOKEN_HOLDING_TYPE,
+            definition_id: definition_id.clone(),
+            balance: 0,
+        }
+    }
+
+    fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
+            None
+        } else {
+            let account_type = data[0];
+            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
+            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
+            Some(Self {
+                definition_id,
+                balance,
+                account_type,
+            })
+        }
+    }
+
+    fn into_data(self) -> Data {
+        let mut bytes = [0; TOKEN_HOLDING_DATA_SIZE];
+        bytes[0] = self.account_type;
+        bytes[1..33].copy_from_slice(&self.definition_id.to_bytes());
+        bytes[33..].copy_from_slice(&self.balance.to_le_bytes());
+        bytes.into()
+    }
+}
+
+#[derive(Serialize)]
+struct NewAMMInstructions {
+    option: u8,
+    balance_a: u128,
+    balance_b: u128,
+    token_id: ProgramId,
+}
+    #[test]
+    fn test_simple_amm_initialized() {
+        let token_program_id = program_methods::TOKEN_ID;
+        let program = Program::amm();
+
+        //initialize AMM accounts
+        let mut token_a_definition_data =  TokenDefinition::into_data(TokenDefinition{
+            account_type: TOKEN_DEFINITION_TYPE,
+            name: [1u8;6],
+            total_supply: 1000u128
+        });
+
+        let mut token_b_definition_data =  TokenDefinition::into_data(TokenDefinition{
+            account_type: TOKEN_DEFINITION_TYPE,
+            name: [2u8;6],
+            total_supply: 1000u128
+        });
+
+        let mut pool_lp_definition_data =  TokenDefinition::into_data(TokenDefinition{
+            account_type: TOKEN_DEFINITION_TYPE,
+            name: [2u8;6],
+            total_supply: u128::MAX
+        });
+
+        let amm_key = PrivateKey::try_new([1; 32]).unwrap();
+        let vault_a_key = PrivateKey::try_new([2; 32]).unwrap();
+        let vault_b_key = PrivateKey::try_new([3; 32]).unwrap();
+        let user_a_key = PrivateKey::try_new([4; 32]).unwrap();
+        let user_b_key = PrivateKey::try_new([5; 32]).unwrap();
+        let user_lp_key = PrivateKey::try_new([6; 32]).unwrap();
+        let pool_lp_key = PrivateKey::try_new([7; 32]).unwrap();
+
+        let mut definition_a_account = Account::default();
+        let mut definition_b_account = Account::default();
+        let mut pool_lp_account = Account::default();
+
+        let definition_a_address = Address::new([1u8;32]);
+        let definition_b_address= Address::new([2u8;32]);
+        let definition_lp_address = Address::new([3u8;32]);
+        let vault_a_address = Address::from(&PublicKey::new_from_private_key(&vault_a_key));
+        let vault_b_address = Address::from(&PublicKey::new_from_private_key(&vault_b_key));
+        let user_a_address = Address::from(&PublicKey::new_from_private_key(&user_a_key));
+        let user_b_address = Address::from(&PublicKey::new_from_private_key(&user_b_key));
+        let user_lp_address= Address::from(&PublicKey::new_from_private_key(&pool_lp_key));
+        let pool_lp_address = Address::from(&PublicKey::new_from_private_key(&user_lp_key));
+        let amm_pool_address= Address::from(&PublicKey::new_from_private_key(&amm_key));
+
+        definition_a_account.data = token_a_definition_data;
+        definition_b_account.data = token_b_definition_data;
+        pool_lp_account.data = pool_lp_definition_data;
+
+        let mut vault_a_account = Account::default();
+        let mut vault_b_account = Account::default();
+        let mut user_a_account = Account::default();
+        let mut user_b_account = Account::default();
+        let mut pool_lp_account = Account::default();
+        let mut user_lp_account = Account::default();
+
+        vault_a_account.program_owner = program_methods::TOKEN_ID;
+        vault_b_account.program_owner = program_methods::TOKEN_ID;
+        user_a_account.program_owner = program_methods::TOKEN_ID;
+        user_b_account.program_owner = program_methods::TOKEN_ID;
+        pool_lp_account.program_owner = program_methods::TOKEN_ID;
+        user_lp_account.program_owner = program_methods::TOKEN_ID;
+
+        user_lp_account.data = TokenHolding::into_data(
+            TokenHolding{
+                account_type: TOKEN_HOLDING_TYPE,
+                definition_id: definition_lp_address.clone(),
+                balance: 0u128
+
+            }
+        );
+
+        vault_a_account.data = TokenHolding::into_data(
+            TokenHolding{
+                account_type: TOKEN_HOLDING_TYPE,
+                definition_id: definition_a_address.clone(),
+                balance: 0u128
+
+            }
+        );
+
+        vault_b_account.data = TokenHolding::into_data(
+            TokenHolding{
+                account_type: TOKEN_HOLDING_TYPE,
+                definition_id: definition_b_address.clone(),
+                balance: 0u128
+
+            }
+        );
+
+        user_a_account.data = TokenHolding::into_data(
+            TokenHolding{
+                account_type: TOKEN_HOLDING_TYPE,
+                definition_id: definition_a_address.clone(),
+                balance: 30u128
+
+            }
+        );
+
+        user_b_account.data = TokenHolding::into_data(
+            TokenHolding{
+                account_type: TOKEN_HOLDING_TYPE,
+                definition_id: definition_b_address.clone(), //TODO
+                balance: 30u128
+
+            }
+        );
+
+        let amm_pool = AccountWithMetadata::default();
+        let mut user_a_meta = AccountWithMetadata::default();
+        let mut user_b_meta = AccountWithMetadata::default();
+        let mut vault_a_meta = AccountWithMetadata::default();
+        let mut vault_b_meta = AccountWithMetadata::default();
+        let mut pool_lp_meta = AccountWithMetadata::default();
+        let mut user_lp_meta = AccountWithMetadata::default();
+
+        user_a_meta.account = user_a_account.clone();
+        user_a_meta.account_id = user_a_address;
+
+        user_b_meta.account = user_b_account.clone();
+        user_a_meta.account_id = user_b_address;
+
+        vault_a_meta.account = vault_a_account.clone();
+        vault_a_meta.account_id = vault_a_address;
+
+        vault_b_meta.account = vault_b_account.clone();
+        vault_b_meta.account_id = vault_b_address;
+
+        pool_lp_meta.account = pool_lp_account.clone();
+        pool_lp_meta.account_id = pool_lp_address;
+
+        user_lp_meta.account = user_lp_account.clone();
+        user_lp_meta.account_id = user_lp_address;
+
+
+        let key = PrivateKey::try_new([1; 32]).unwrap();
+        let from_address = Address::from(&PublicKey::new_from_private_key(&key));
+        let to_address = Address::new([2; 32]);
+        let initial_balance = 100;
+        let initial_data = [(from_address, initial_balance), (to_address, 0)];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+
+
+        state.force_insert_account(user_a_address, user_a_account.clone());
+        state.force_insert_account(user_b_address, user_b_account.clone());
+        state.force_insert_account(vault_a_address, vault_a_account.clone());
+        state.force_insert_account(vault_b_address, vault_b_account.clone());
+        state.force_insert_account(pool_lp_address, pool_lp_account.clone());
+        state.force_insert_account(user_lp_address, user_lp_account.clone());
+   
+        let amount_a: u128 = 10;
+        let amount_b: u128 = 10;
+
+        let u8_token_program_id : [u8;32] = bytemuck::cast(token_program_id);
+        let mut instruction= NewAMMInstructions {
+            option: 0u8,
+            balance_a: amount_a,
+            balance_b: amount_b,
+            token_id: token_program_id,
+        };
+
+        let message = public_transaction::Message::try_new(
+            program.id(),
+            vec![amm_pool_address, vault_a_address, vault_b_address, pool_lp_address, user_a_address, user_b_address, user_lp_address],
+            vec![0],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[&amm_key, &vault_a_key, &vault_b_key, &pool_lp_key, &user_a_key, &user_b_key, &user_lp_key]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+       /* assert!(matches!(
+            result,
+            Err(NssaError::MaxChainedCallsDepthExceeded)
+        ));*/
+    }
+
 }
