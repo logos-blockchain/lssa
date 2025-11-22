@@ -1,6 +1,6 @@
 use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata, Data},
-    program::{ProgramId, ProgramInput, ChainedCall, read_nssa_inputs, write_nssa_outputs, write_nssa_outputs_with_chained_call},
+    program::{ProgramId, ProgramInput, ChainedCall, read_nssa_inputs, write_nssa_outputs_with_chained_call},
 };
 
 use bytemuck;
@@ -17,7 +17,7 @@ use bytemuck;
 //        user_holding_b is a token holding account for token b
 //        user_holding_lp is a token holding account for lp token
 //        TODO: ideally, vault_holding_a, vault_holding_b, pool_lp and user_holding_lp are uninitated.
-//      * An instruction data of 55-bytes, indicating the initial amm reserves' balances and token_program_id with
+//      * An instruction data of 65-bytes, indicating the initial amm reserves' balances and token_program_id with
 //        the following layout:
 //        [0x00 || array of balances (little-endian 16 bytes) || TOKEN_PROGRAM_ID)]
 // 2. Swap assets
@@ -97,8 +97,6 @@ impl PoolDefinition {
 
 
 //TODO: remove repeated code for Token_Definition and TokenHoldling
-const TOKEN_DEFINITION_TYPE: u8 = 0;
-const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
 const TOKEN_HOLDING_TYPE: u8 = 1;
 const TOKEN_HOLDING_DATA_SIZE: usize = 49;
 
@@ -109,14 +107,6 @@ struct TokenHolding {
 }
 
 impl TokenHolding {
-    fn new(definition_id: &AccountId) -> Self {
-        Self {
-            account_type: TOKEN_HOLDING_TYPE,
-            definition_id: definition_id.clone(),
-            balance: 0,
-        }
-    }
-
     fn parse(data: &[u8]) -> Option<Self> {
         if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
             None
@@ -191,8 +181,7 @@ fn new_definition(
     // Verify token_a and token_b are different
     let definition_token_a_id = TokenHolding::parse(&vault_a.account.data).unwrap().definition_id;
     let definition_token_b_id = TokenHolding::parse(&vault_b.account.data).unwrap().definition_id;
-    let user1_id = TokenHolding::parse(&vault_a.account.data).unwrap().definition_id;
-
+   
     if definition_token_a_id == definition_token_b_id {
         panic!("Vaults are for the same token")
     }
@@ -224,7 +213,6 @@ fn new_definition(
             instruction_data: bytemuck::cast_slice(&instruction_data).to_vec(),
             pre_states: vec![user_a.clone(), vault_a.clone()]
         };
-
 
     instruction_data[1..17].copy_from_slice(&amount_b.to_le_bytes());
     let call_token_b = ChainedCall{
@@ -331,12 +319,12 @@ fn swap(
     let mut vault_b = AccountWithMetadata::default();
 
     if vault1_data.definition_id == pool_def_data.definition_token_a_id {
-            vault_a = vault1.clone();
-        } else if vault2_data.definition_id == pool_def_data.definition_token_a_id {
-            vault_a = vault2.clone();
-        } else {
-            panic!("Vault A was not provided");
-        }
+        vault_a = vault1.clone();
+    } else if vault2_data.definition_id == pool_def_data.definition_token_a_id {
+        vault_a = vault2.clone();
+    } else {
+        panic!("Vault A was not provided");
+    }
         
     if vault1_data.definition_id == pool_def_data.definition_token_b_id {
        vault_b = vault1.clone();
@@ -513,11 +501,11 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
 
 
     if main_token == pool_def_data.definition_token_a_id {
-        actual_amount_a = max_amount_a;
-        actual_amount_b = (pool_def_data.reserve_b*actual_amount_a)/pool_def_data.reserve_a;
+        actual_amount_a += max_amount_a;
+        actual_amount_b += (pool_def_data.reserve_b*actual_amount_a)/pool_def_data.reserve_a;
     } else if main_token == pool_def_data.definition_token_b_id {
-        actual_amount_b = max_amount_b;
-        actual_amount_a = (pool_def_data.reserve_a*actual_amount_b)/pool_def_data.reserve_b;
+        actual_amount_b += max_amount_b;
+        actual_amount_a += (pool_def_data.reserve_a*actual_amount_b)/pool_def_data.reserve_b;
     } else {
         panic!("Mismatch of token types"); //main token does not match with vaults.
     }
@@ -539,8 +527,7 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
     
 
     // 4. Calculate LP to mint
-    let mut delta_lp: u128 = 0;
-    delta_lp = (pool_def_data.liquidity_pool_cap *actual_amount_b)/pool_def_data.reserve_b;
+    let delta_lp = (pool_def_data.liquidity_pool_cap *actual_amount_b)/pool_def_data.reserve_b;
 
     // 5. Update pool account
     let mut pool_post = pool.account.clone();
@@ -716,7 +703,7 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
 mod tests {
     use nssa_core::account::{Account, AccountId, AccountWithMetadata};
 
-    use crate::{POOL_DEFINITION_DATA_SIZE, PoolDefinition, TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_TYPE, TokenHolding, add_liquidity, new_definition, remove_liquidity, swap};
+    use crate::{PoolDefinition, TOKEN_HOLDING_TYPE, TokenHolding, add_liquidity, new_definition, remove_liquidity, swap};
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]    
@@ -1880,7 +1867,7 @@ mod tests {
             account_id: AccountId::new([7; 32])},
         ];
         let balance_a = 15u128;
-        let balance_b = 15u128;
+        let _balance_b = 15u128;
         let main_token = definition_token_a_id.clone();
         let _post_states = add_liquidity(&pre_states, &[balance_a], main_token);
     }
@@ -3012,7 +2999,7 @@ mod tests {
 
 
         let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
+        let _definition_token_b_id = AccountId::new([2;32]); 
 
         vault1.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,

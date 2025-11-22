@@ -15,6 +15,7 @@ rand = "0.8"
 borsh = "1.5.7"
 hex = "0.4.3"
 risc0-binfmt = "3.0.2"
+bytemuck = "1.24.0"
 
 [build-dependencies]
 risc0-build = "3.0.3"
