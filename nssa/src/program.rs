@@ -98,27 +98,6 @@ impl Program {
     }
 }
 
-pub struct ProgramWithDependencies {
-    pub program: Program,
-    // TODO: this will have a copy of each dependency bytecode in each program
-    pub dependencies: HashMap<ProgramId, Program>,
-}
-
-impl ProgramWithDependencies {
-    pub fn new(program: Program, dependencies: HashMap<ProgramId, Program>) -> Self {
-        Self {
-            program,
-            dependencies,
-        }
-    }
-}
-
-impl From<Program> for ProgramWithDependencies {
-    fn from(program: Program) -> Self {
-        ProgramWithDependencies::new(program, HashMap::new())
-    }
-}
-
 // TODO: Testnet only. Refactor to prevent compilation on mainnet.
 impl Program {
     pub fn pinata() -> Self {

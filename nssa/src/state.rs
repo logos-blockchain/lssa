@@ -244,15 +244,9 @@ pub mod tests {
     use std::collections::HashMap;
 
     use crate::{
-        Address, PublicKey, PublicTransaction, V02State,
-        error::NssaError,
-        execute_and_prove,
-        privacy_preserving_transaction::{
-            PrivacyPreservingTransaction, circuit, message::Message, witness_set::WitnessSet,
-        },
-        program::{Program, ProgramWithDependencies},
-        public_transaction,
-        signature::PrivateKey,
+        error::NssaError, execute_and_prove, privacy_preserving_transaction::{
+            circuit::{self, ProgramWithDependencies}, message::Message, witness_set::WitnessSet, PrivacyPreservingTransaction
+        }, program::Program, public_transaction, signature::PrivateKey, Address, PublicKey, PublicTransaction, V02State
     };
 
     use nssa_core::{

@@ -34,7 +34,7 @@ fn main() {
     }
 
     for i in 0..(program_outputs.len() - 1) {
-        let Some(chained_call) = program_outputs[i].chained_call.clone() else {
+        let Some(chained_call) = &program_outputs[i].chained_call else {
             panic!("Expected chained call");
         };
 

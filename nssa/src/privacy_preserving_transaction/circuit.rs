@@ -8,17 +8,34 @@ use nssa_core::{
 };
 use risc0_zkvm::{ExecutorEnv, InnerReceipt, Receipt, default_prover};
 
-use crate::{
-    error::NssaError,
-    program::{Program, ProgramWithDependencies},
-    state::MAX_NUMBER_CHAINED_CALLS,
-};
+use crate::{error::NssaError, program::Program, state::MAX_NUMBER_CHAINED_CALLS};
 
 use crate::program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID};
 
 /// Proof of the privacy preserving execution circuit
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Proof(pub(crate) Vec<u8>);
+
+pub struct ProgramWithDependencies {
+    pub program: Program,
+    // TODO: this will have a copy of each dependency bytecode in each program
+    pub dependencies: HashMap<ProgramId, Program>,
+}
+
+impl ProgramWithDependencies {
+    pub fn new(program: Program, dependencies: HashMap<ProgramId, Program>) -> Self {
+        Self {
+            program,
+            dependencies,
+        }
+    }
+}
+
+impl From<Program> for ProgramWithDependencies {
+    fn from(program: Program) -> Self {
+        ProgramWithDependencies::new(program, HashMap::new())
+    }
+}
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution
 /// circuit
