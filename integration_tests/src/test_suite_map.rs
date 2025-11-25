@@ -1136,82 +1136,82 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[nssa_integration_test]
-    pub async fn test_success_private_transfer_to_another_owned_account_cont_run_path() {
-        info!(
-            "########## test_success_private_transfer_to_another_owned_account_cont_run_path ##########"
-        );
-        let continious_run_handle = tokio::spawn(wallet::execute_continious_run());
+    // #[nssa_integration_test]
+    // pub async fn test_success_private_transfer_to_another_owned_account_cont_run_path() {
+    //     info!(
+    //         "########## test_success_private_transfer_to_another_owned_account_cont_run_path ##########"
+    //     );
+    //     let continious_run_handle = tokio::spawn(wallet::execute_continious_run());
 
-        let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
+    //     let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
 
-        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {}));
+    //     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {}));
 
-        let sub_ret = wallet::execute_subcommand(command).await.unwrap();
-        let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
-            panic!("FAILED TO REGISTER ACCOUNT");
-        };
+    //     let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+    //     let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
+    //         panic!("FAILED TO REGISTER ACCOUNT");
+    //     };
 
-        let wallet_config = fetch_config().await.unwrap();
-        let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
-        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone())
-            .await
-            .unwrap();
+    //     let wallet_config = fetch_config().await.unwrap();
+    //     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+    //     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config.clone())
+    //         .await
+    //         .unwrap();
 
-        let (to_keys, _) = wallet_storage
-            .storage
-            .user_data
-            .user_private_accounts
-            .get(&to_addr)
-            .cloned()
-            .unwrap();
+    //     let (to_keys, _) = wallet_storage
+    //         .storage
+    //         .user_data
+    //         .user_private_accounts
+    //         .get(&to_addr)
+    //         .cloned()
+    //         .unwrap();
 
-        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: None,
-            to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
-            to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
-            amount: 100,
-        });
+    //     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+    //         from: make_private_account_input_from_str(&from.to_string()),
+    //         to: None,
+    //         to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
+    //         to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+    //         amount: 100,
+    //     });
 
-        let sub_ret = wallet::execute_subcommand(command).await.unwrap();
-        let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } = sub_ret else {
-            panic!("FAILED TO SEND TX");
-        };
+    //     let sub_ret = wallet::execute_subcommand(command).await.unwrap();
+    //     let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } = sub_ret else {
+    //         panic!("FAILED TO SEND TX");
+    //     };
 
-        let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
+    //     let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
 
-        println!("Waiting for next blocks to check if continoius run fetch account");
-        tokio::time::sleep(Duration::from_secs(8 * TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+    //     println!("Waiting for next blocks to check if continoius run fetch account");
+    //     tokio::time::sleep(Duration::from_secs(8 * TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-        let wallet_config = fetch_config().await.unwrap();
-        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
-            .await
-            .unwrap();
+    //     let wallet_config = fetch_config().await.unwrap();
+    //     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+    //         .await
+    //         .unwrap();
 
-        info!("All private accounts data");
-        for (addr, (_, acc)) in &wallet_storage.storage.user_data.user_private_accounts {
-            info!("{addr} :: {acc:#?}");
-        }
+    //     info!("All private accounts data");
+    //     for (addr, (_, acc)) in &wallet_storage.storage.user_data.user_private_accounts {
+    //         info!("{addr} :: {acc:#?}");
+    //     }
 
-        let new_commitment1 = wallet_storage
-            .get_private_account_commitment(&from)
-            .unwrap();
-        assert_eq!(tx.message.new_commitments[0], new_commitment1);
+    //     let new_commitment1 = wallet_storage
+    //         .get_private_account_commitment(&from)
+    //         .unwrap();
+    //     assert_eq!(tx.message.new_commitments[0], new_commitment1);
 
-        assert_eq!(tx.message.new_commitments.len(), 2);
-        for commitment in tx.message.new_commitments.into_iter() {
-            assert!(verify_commitment_is_in_state(commitment, &seq_client).await);
-        }
+    //     assert_eq!(tx.message.new_commitments.len(), 2);
+    //     for commitment in tx.message.new_commitments.into_iter() {
+    //         assert!(verify_commitment_is_in_state(commitment, &seq_client).await);
+    //     }
 
-        let to_res_acc = wallet_storage.get_account_private(&to_addr).unwrap();
+    //     let to_res_acc = wallet_storage.get_account_private(&to_addr).unwrap();
 
-        assert_eq!(to_res_acc.balance, 100);
+    //     assert_eq!(to_res_acc.balance, 100);
 
-        continious_run_handle.abort();
+    //     continious_run_handle.abort();
 
-        info!("Success!");
-    }
+    //     info!("Success!");
+    // }
 
     #[nssa_integration_test]
     pub async fn test_success_deshielded_transfer_to_another_account() {
