@@ -2167,7 +2167,7 @@ pub mod tests {
         let to_esk = [3; 32];
         let to_ss = SharedSecretKey::new(&to_esk, &to_keys.ivk());
         let to_epk = EphemeralPublicKey::from_scalar(to_esk);
-        //
+
         let mut dependencies = HashMap::new();
 
         dependencies.insert(auth_transfers.id(), auth_transfers);
