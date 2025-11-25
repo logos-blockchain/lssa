@@ -26,7 +26,7 @@ fn main() {
 
     let num_calls = program_outputs.len();
     if num_calls > MAX_NUMBER_CHAINED_CALLS {
-        panic!("Max depth is exceeded");
+        panic!("Max chained calls depth is exceeded");
     }
 
     if program_outputs[num_calls - 1].chained_call.is_some() {
