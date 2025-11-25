@@ -52,7 +52,7 @@ fn main() {
             pre_states,
             instruction: solution,
         },
-        _,
+        instruction_words,
     ) = read_nssa_inputs::<Instruction>();
 
     let [pinata, winner] = match pre_states.try_into() {
@@ -73,7 +73,7 @@ fn main() {
     winner_post.balance += PRIZE;
 
     write_nssa_outputs(
-        to_vec(&solution).unwrap(),
+        instruction_words,
         vec![pinata, winner],
         vec![pinata_post, winner_post],
     );
