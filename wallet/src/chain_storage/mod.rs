@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use anyhow::Result;
 use key_protocol::{
@@ -128,10 +128,12 @@ impl WalletChainStore {
     ) {
         println!("inserting at address {addr}, this account {account:?}");
 
-        let entry = self.user_data
-                .default_user_private_accounts
-                .entry(addr)
-                .and_modify(|data| data.1 = account);
+        let entry = self
+            .user_data
+            .default_user_private_accounts
+            .entry(addr)
+            .and_modify(|data| data.1 = account.clone());
+
         if matches!(entry, Entry::Vacant(_)) {
         } else {
             self.user_data
@@ -268,7 +270,7 @@ mod tests {
     fn create_sample_persistent_accounts() -> Vec<PersistentAccountData> {
         let public_data = ChildKeysPublic::root([42; 64]);
         let private_data = ChildKeysPrivate::root([47; 64]);
-        
+
         vec![
             PersistentAccountData::Public(PersistentAccountDataPublic {
                 address: public_data.address(),
@@ -279,7 +281,7 @@ mod tests {
                 address: private_data.address(),
                 chain_index: ChainIndex::root(),
                 data: private_data,
-            })
+            }),
         ]
     }
 

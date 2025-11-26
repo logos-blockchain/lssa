@@ -18,14 +18,24 @@ impl FromStr for ChainIndex {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if !s.starts_with('/') {
-            return  Err(ChainIndexError:NoRootFound);
+            return Err(ChainIndexError::NoRootFound);
         }
-        
-        s
-            .split("/")
-            .map(u32::from_str)
-            .collect()
-            .map_err(Into::into)
+
+        if s == "/" {
+            return Ok(ChainIndex(vec![]));
+        }
+
+        let uprooted_substring = s.strip_prefix("/").unwrap();
+
+        let splitted_chain: Vec<&str> = uprooted_substring.split("/").collect();
+        let mut res = vec![];
+
+        for split_ch in splitted_chain {
+            let cci = split_ch.parse()?;
+            res.push(cci);
+        }
+
+        Ok(Self(res))
     }
 }
 
@@ -96,7 +106,7 @@ mod tests {
     #[test]
     fn test_chain_id_child_correct() {
         let chain_id = ChainIndex::from_str("/257").unwrap();
-        let child = chain_id.n_th_child(3);
+        let child = chain_id.nth_child(3);
 
         assert_eq!(child, ChainIndex::from_str("/257/3").unwrap());
     }

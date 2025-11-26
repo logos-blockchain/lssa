@@ -54,37 +54,36 @@ impl<Node: KeyNode> KeyTree<Node> {
             return None;
         }
 
-        let leftmost_child = parent_id.n_th_child(u32::MIN);
+        let leftmost_child = parent_id.nth_child(u32::MIN);
 
         if !self.key_map.contains_key(&leftmost_child) {
-            return Some(0)
+            return Some(0);
         }
-        } else {
-            let mut right = u32::MAX - 1;
-            let mut left_border = u32::MIN;
-            let mut right_border = u32::MAX;
 
-            loop {
-                let rightmost_child = parent_id.n_th_child(right);
+        let mut right = u32::MAX - 1;
+        let mut left_border = u32::MIN;
+        let mut right_border = u32::MAX;
 
-                let rightmost_ref = self.key_map.get(&rightmost_child);
-                let rightmost_ref_next = self.key_map.get(&rightmost_child.next_in_line());
+        loop {
+            let rightmost_child = parent_id.nth_child(right);
 
-                match (&rightmost_ref, &rightmost_ref_next) {
-                    (Some(_), Some(_)) => {
-                        left_border = right;
-                        right = (right + right_border) / 2;
-                    }
-                    (Some(_), None) => {
-                        break Some(right + 1);
-                    }
-                    (None, None) => {
-                        right_border = right;
-                        right = (left_border + right) / 2;
-                    }
-                    (None, Some(_)) => {
-                        unreachable!();
-                    }
+            let rightmost_ref = self.key_map.get(&rightmost_child);
+            let rightmost_ref_next = self.key_map.get(&rightmost_child.next_in_line());
+
+            match (&rightmost_ref, &rightmost_ref_next) {
+                (Some(_), Some(_)) => {
+                    left_border = right;
+                    right = (right + right_border) / 2;
+                }
+                (Some(_), None) => {
+                    break Some(right + 1);
+                }
+                (None, None) => {
+                    right_border = right;
+                    right = (left_border + right) / 2;
+                }
+                (None, Some(_)) => {
+                    unreachable!();
                 }
             }
         }
@@ -93,9 +92,9 @@ impl<Node: KeyNode> KeyTree<Node> {
     pub fn generate_new_node(&mut self, parent_cci: ChainIndex) -> Option<nssa::Address> {
         let father_keys = self.key_map.get(&parent_cci)?;
         let next_child_id = self.find_next_last_child_of_id(&parent_cci).unwrap();
-        let next_cci = parent_cci.n_th_child(next_child_id);
+        let next_cci = parent_cci.nth_child(next_child_id);
 
-        let child_keys = father_keys.n_th_child(next_child_id);
+        let child_keys = father_keys.nth_child(next_child_id);
 
         let address = child_keys.address();
 

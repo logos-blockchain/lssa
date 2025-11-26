@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn test_keys_deterministic_generation() {
         let root_keys = ChildKeysPrivate::root([42; 64]);
-        let child_keys = root_keys.n_th_child(5);
+        let child_keys = root_keys.nth_child(5);
 
         assert_eq!(root_keys.cci, None);
         assert_eq!(child_keys.cci, Some(5));
