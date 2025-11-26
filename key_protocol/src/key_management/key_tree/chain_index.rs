@@ -49,9 +49,15 @@ impl Display for ChainIndex {
     }
 }
 
+impl Default for ChainIndex {
+    fn default() -> Self {
+        ChainIndex::from_str("/").expect("Root parsing failure")
+    }
+}
+
 impl ChainIndex {
     pub fn root() -> Self {
-        ChainIndex::from_str("/").unwrap()
+        ChainIndex::default()
     }
 
     pub fn chain(&self) -> &[u32] {
@@ -93,6 +99,23 @@ mod tests {
         let chain_id = ChainIndex::from_str("/257").unwrap();
 
         assert_eq!(chain_id.chain(), &[257]);
+    }
+
+    #[test]
+    fn test_chain_id_deser_failure_no_root() {
+        let chain_index_error = ChainIndex::from_str("257").err().unwrap();
+
+        assert!(matches!(chain_index_error, ChainIndexError::NoRootFound));
+    }
+
+    #[test]
+    fn test_chain_id_deser_failure_int_parsing_failure() {
+        let chain_index_error = ChainIndex::from_str("/hello").err().unwrap();
+
+        assert!(matches!(
+            chain_index_error,
+            ChainIndexError::ParseIntError(_)
+        ));
     }
 
     #[test]

@@ -20,8 +20,14 @@ impl KeyNode for ChildKeysPrivate {
     fn root(seed: [u8; 64]) -> Self {
         let hash_value = hmac_sha512::HMAC::mac(seed, "NSSA_master_priv");
 
-        let ssk = SecretSpendingKey(*hash_value.first_chunk::<32>().unwrap());
-        let ccc = *hash_value.last_chunk::<32>().unwrap();
+        let ssk = SecretSpendingKey(
+            *hash_value
+                .first_chunk::<32>()
+                .expect("hash_value is 64 bytes, must be safe to get first 32"),
+        );
+        let ccc = *hash_value
+            .last_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get last 32");
 
         let nsk = ssk.generate_nullifier_secret_key();
         let isk = ssk.generate_incoming_viewing_secret_key();
@@ -57,9 +63,9 @@ impl KeyNode for ChildKeysPrivate {
                 .outgoing_viewing_secret_key
                 .into(),
         )
-        .unwrap()
+        .expect("Key generated as scalar, must be valid representation")
             + Scalar::from_repr(self.value.0.private_key_holder.nullifier_secret_key.into())
-                .unwrap()
+                .expect("Key generated as scalar, must be valid representation")
                 * Scalar::from_repr(
                     self.value
                         .0
@@ -67,7 +73,7 @@ impl KeyNode for ChildKeysPrivate {
                         .incoming_viewing_secret_key
                         .into(),
                 )
-                .unwrap();
+                .expect("Key generated as scalar, must be valid representation");
         let mut input = vec![];
 
         input.extend_from_slice(b"NSSA_seed_priv");
@@ -76,8 +82,14 @@ impl KeyNode for ChildKeysPrivate {
 
         let hash_value = hmac_sha512::HMAC::mac(input, self.ccc);
 
-        let ssk = SecretSpendingKey(*hash_value.first_chunk::<32>().unwrap());
-        let ccc = *hash_value.last_chunk::<32>().unwrap();
+        let ssk = SecretSpendingKey(
+            *hash_value
+                .first_chunk::<32>()
+                .expect("hash_value is 64 bytes, must be safe to get first 32"),
+        );
+        let ccc = *hash_value
+            .last_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get last 32");
 
         let nsk = ssk.generate_nullifier_secret_key();
         let isk = ssk.generate_incoming_viewing_secret_key();
