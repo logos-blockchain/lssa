@@ -2110,7 +2110,7 @@ pub mod tests {
         let message = public_transaction::Message::try_new(
             program.id(),
             vec![to, from], // The chain_caller program permutes the account order in the chain
-                            // call
+            // call
             vec![0],
             instruction,
         )
@@ -2148,7 +2148,7 @@ pub mod tests {
         let message = public_transaction::Message::try_new(
             program.id(),
             vec![to, from], // The chain_caller program permutes the account order in the chain
-                            // call
+            // call
             vec![0],
             instruction,
         )
