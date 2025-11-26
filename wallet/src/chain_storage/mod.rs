@@ -36,7 +36,7 @@ impl WalletChainStore {
                 _ => false,
             })
             .cloned()
-            .unwrap();
+            .expect("Malformed persistent account data, must have public root");
 
         let private_root = persistent_accounts
             .iter()
@@ -45,7 +45,7 @@ impl WalletChainStore {
                 _ => false,
             })
             .cloned()
-            .unwrap();
+            .expect("Malformed persistent account data, must have private root");
 
         let mut public_tree = KeyTreePublic::new_from_root(match public_root {
             PersistentAccountData::Public(data) => data.data,

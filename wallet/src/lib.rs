@@ -249,12 +249,14 @@ pub enum Command {
     Config(ConfigSubcommand),
 }
 
-/// Represents CLI command for a wallet with setup included
+/// Represents overarching CLI command for a wallet with setup included
 #[derive(Debug, Subcommand, Clone)]
 #[clap(about)]
 pub enum OverCommand {
+    /// Represents CLI command for a wallet
     #[command(subcommand)]
     Command(Command),
+    /// Setup of a storage. Initializes rots for public and private trees from `password`.
     Setup {
         #[arg(short, long)]
         password: String,
@@ -369,11 +371,8 @@ pub async fn parse_block_range(
             if let NSSATransaction::PrivacyPreserving(tx) = nssa_tx {
                 let mut affected_accounts = vec![];
 
-                for (acc_addr, (key_chain, _)) in wallet_core
-                    .storage
-                    .user_data
-                    .default_user_private_accounts
-                    .iter()
+                for (acc_addr, (key_chain, _)) in
+                    &wallet_core.storage.user_data.default_user_private_accounts
                 {
                     let view_tag = EncryptedAccountData::compute_view_tag(
                         key_chain.nullifer_public_key.clone(),

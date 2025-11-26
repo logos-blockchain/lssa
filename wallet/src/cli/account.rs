@@ -92,11 +92,13 @@ pub enum NewSubcommand {
     ///Register new public account
     Public {
         #[arg(long)]
+        /// Chain index of a parent node
         cci: ChainIndex,
     },
     ///Register new private account
     Private {
         #[arg(long)]
+        /// Chain index of a parent node
         cci: ChainIndex,
     },
 }
@@ -274,13 +276,19 @@ impl WalletSubcommand for AccountSubcommand {
                     .await?
                     .last_block;
 
-                if !wallet_core
+                if wallet_core
                     .storage
                     .user_data
                     .private_key_tree
                     .addr_map
                     .is_empty()
                 {
+                    wallet_core.last_synced_block = curr_last_block;
+
+                    let path = wallet_core.store_persistent_data().await?;
+
+                    println!("Stored persistent data at {path:#?}");
+                } else {
                     parse_block_range(
                         last_synced_block + 1,
                         curr_last_block,
@@ -288,12 +296,6 @@ impl WalletSubcommand for AccountSubcommand {
                         wallet_core,
                     )
                     .await?;
-                } else {
-                    wallet_core.last_synced_block = curr_last_block;
-
-                    let path = wallet_core.store_persistent_data().await?;
-
-                    println!("Stored persistent data at {path:#?}");
                 }
 
                 Ok(SubcommandReturnValue::SyncedToBlock(curr_last_block))

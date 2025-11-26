@@ -91,7 +91,7 @@ pub async fn fetch_config() -> Result<WalletConfig> {
 
 /// Fetch data stored at home
 ///
-/// If file not present, it is considered as empty list of persistent accounts
+/// File must be created through setup beforehand.
 pub async fn fetch_persistent_storage() -> Result<PersistentStorage> {
     let home = get_home()?;
     let accs_path = home.join("storage.json");
