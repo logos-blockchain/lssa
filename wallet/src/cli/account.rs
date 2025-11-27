@@ -1,6 +1,7 @@
 use anyhow::Result;
 use base58::ToBase58;
 use clap::Subcommand;
+use itertools::Itertools as _;
 use nssa::{Account, AccountId, program::Program};
 use serde::Serialize;
 
@@ -83,6 +84,9 @@ pub enum AccountSubcommand {
     New(NewSubcommand),
     /// Sync private accounts
     SyncPrivate {},
+    /// List all accounts owned by the wallet
+    #[command(visible_alias = "ls")]
+    List {},
 }
 
 /// Represents generic register CLI subcommand
@@ -293,6 +297,23 @@ impl WalletSubcommand for AccountSubcommand {
                 }
 
                 Ok(SubcommandReturnValue::SyncedToBlock(curr_last_block))
+            }
+            AccountSubcommand::List {} => {
+                let user_data = &wallet_core.storage.user_data;
+                let accounts = user_data
+                    .pub_account_signing_keys
+                    .keys()
+                    .map(|id| format!("Public/{id}"))
+                    .chain(
+                        user_data
+                            .user_private_accounts
+                            .keys()
+                            .map(|id| format!("Private/{id}")),
+                    )
+                    .format(",\n");
+
+                println!("{accounts}");
+                Ok(SubcommandReturnValue::Empty)
             }
         }
     }
