@@ -1,7 +1,7 @@
 use risc0_zkvm::{DeserializeOwned, guest::env, serde::Deserializer};
 use serde::{Deserialize, Serialize};
 
-use crate::account::{Account, AccountWithMetadata};
+use crate::account::{Account, AccountId, AccountWithMetadata};
 
 pub type ProgramId = [u32; 8];
 pub type InstructionData = Vec<u32>;
@@ -16,13 +16,35 @@ pub struct ProgramInput<T> {
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct PdaSeed([u8; 32]);
 
+#[cfg(feature = "host")]
+impl From<(&ProgramId, &PdaSeed)> for AccountId {
+    fn from(value: (&ProgramId, &PdaSeed)) -> Self {
+        use risc0_zkvm::sha::{Impl, Sha256};
+        const PROGRAM_DERIVED_ACCOUNT_ID_PREFIX: &[u8; 32] =
+            b"/NSSA/v0.2/AccountId/PDA/\x00\x00\x00\x00\x00\x00\x00";
+
+        let mut bytes = [0; 96];
+        bytes[0..32].copy_from_slice(PROGRAM_DERIVED_ACCOUNT_ID_PREFIX);
+        let program_id_bytes: &[u8] =
+            bytemuck::try_cast_slice(value.0).expect("ProgramId should be castable to &[u8]");
+        bytes[32..64].copy_from_slice(program_id_bytes);
+        bytes[64..].copy_from_slice(&value.1.0);
+        AccountId::new(
+            Impl::hash_bytes(&bytes)
+                .as_bytes()
+                .try_into()
+                .expect("Hash output must be exactly 32 bytes long"),
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct ChainedCall {
     pub program_id: ProgramId,
     pub instruction_data: InstructionData,
     pub pre_states: Vec<AccountWithMetadata>,
-    pub pda_seeds: Vec<PdaSeed>
+    pub pda_seeds: Vec<PdaSeed>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
