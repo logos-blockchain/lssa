@@ -258,7 +258,7 @@ fn new_definition(
             definition_token_b_id,
             vault_a_addr: vault_a.account_id.clone(),
             vault_b_addr: vault_b.account_id.clone(),
-            liquidity_pool_id: pool_lp.account_id.clone(),
+            liquidity_pool_id: TokenHolding::parse(&pool_lp.account.data).unwrap().definition_id,
             liquidity_pool_cap: amount_a,
             reserve_a: amount_a,
             reserve_b: amount_b,
@@ -269,6 +269,7 @@ fn new_definition(
 
     let mut chained_call = Vec::new();
    
+    //Chain call for Token A (User_A -> Vault_A)
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&amount_a.to_le_bytes());
@@ -280,6 +281,7 @@ fn new_definition(
             pre_states: vec![user_a.clone(), vault_a.clone()]
         };
         
+    //Chain call for Token B (User_B -> Vault_B)
     instruction[1..17].copy_from_slice(&amount_b.to_le_bytes());
     let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
 
@@ -289,6 +291,7 @@ fn new_definition(
             pre_states: vec![user_b.clone(), vault_b.clone()]
         };
 
+    //Chain call for LP (Pool_LP -> User_LP)
     instruction[1..17].copy_from_slice(&amount_a.to_le_bytes());
     let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
 
@@ -335,38 +338,32 @@ fn swap(
     let vault1_data = TokenHolding::parse(&vault1.account.data).unwrap();
     let vault2_data = TokenHolding::parse(&vault2.account.data).unwrap();
 
-    let mut vault_a = AccountWithMetadata::default();
-    let mut vault_b = AccountWithMetadata::default();
-
-    if vault1_data.definition_id == pool_def_data.definition_token_a_id {
-        vault_a = vault1.clone();
+    let vault_a = if vault1_data.definition_id == pool_def_data.definition_token_a_id {
+        vault1.clone()
     } else if vault2_data.definition_id == pool_def_data.definition_token_a_id {
-        vault_a = vault2.clone();
+        vault2.clone()
     } else {
         panic!("Vault A was not provided");
-    }
+    };
         
-    if vault1_data.definition_id == pool_def_data.definition_token_b_id {
-       vault_b = vault1.clone();
+    let vault_b = if vault1_data.definition_id == pool_def_data.definition_token_b_id {
+       vault1.clone()
     } else if vault2_data.definition_id == pool_def_data.definition_token_b_id {
-        vault_b = vault2.clone();
+        vault2.clone()
     } else {
         panic!("Vault B was not provided");
-    }
+    };
 
     // 1. Identify swap direction (a -> b or b -> a)
-    let mut deposit_a = 0;
-    let mut deposit_b = 0;
-    let a_to_b;
-    if token_id == pool_def_data.definition_token_a_id {
-        deposit_a = amount;
-        a_to_b = true;
-    } else if token_id == pool_def_data.definition_token_b_id {
-        deposit_b = amount;
-        a_to_b = false;
-    } else {
+    let a_to_b = if token_id == pool_def_data.definition_token_a_id {
+        true
+    } else if token_id == pool_def_data.definition_token_b_id { false }
+    else {
         panic!("Address is not a token type for the pool");
-    }
+    };
+
+    let deposit_a = if a_to_b { amount } else { 0 };
+    let deposit_b = if a_to_b { 0 } else { amount }; 
 
     // 2. fetch pool reserves
     //validates reserves is at least the vaults' balances
@@ -387,8 +384,10 @@ fn swap(
 
     // 4. Slippage check
     if a_to_b {
+        assert!(withdraw_b != 0);
         assert!(withdraw_a == 0); }
     else {
+        assert!(withdraw_a != 0);
         assert!(withdraw_b == 0); }
 
     // 5. Update pool account
@@ -409,57 +408,54 @@ fn swap(
 
     let mut chained_call = Vec::new();
     
-    let call_token_a = ChainedCall::default();
-    let call_token_b = ChainedCall::default();
-
-    if a_to_b {
+    let call_token_a = if a_to_b { 
         let mut instruction_data = [0; 23];
         instruction_data[0] = 1;
         instruction_data[1..17].copy_from_slice(&deposit_a.to_le_bytes());
         let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
 
-        let call_token_a = ChainedCall{
+        ChainedCall{
                 program_id: pool_def_data.token_program_id,
                 instruction_data: instruction_data,
                 pre_states: vec![user_a.clone(), vault_a.clone()]
-            };
-
-        let mut instruction_data = [0; 23];
-        instruction_data[0] = 1;
-        instruction_data[1..17].copy_from_slice(&withdraw_b.to_le_bytes());
-        let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
-
-        let call_token_b = ChainedCall{
-                program_id: pool_def_data.token_program_id,
-                instruction_data: instruction_data,
-                pre_states: vec![user_b.clone(), vault_b.clone()]
-            };
-     
+            }
     } else {
         let mut instruction_data = [0; 23];
         instruction_data[0] = 1;
         instruction_data[1..17].copy_from_slice(&withdraw_a.to_le_bytes());
         let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
 
-        let call_token_a = ChainedCall{
+        ChainedCall{
                 program_id: pool_def_data.token_program_id,
                 instruction_data: instruction_data,
                 pre_states: vec![vault_a.clone(), user_a.clone()]
-            };
-
+            }
+    };
+    
+    let call_token_b = if a_to_b {
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&withdraw_b.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+        ChainedCall{
+                program_id: pool_def_data.token_program_id,
+                instruction_data: instruction_data,
+                pre_states: vec![vault_b.clone(), user_b.clone()]
+            }
+    } else {
         let mut instruction_data = [0; 23];
         instruction_data[0] = 1;
         instruction_data[1..17].copy_from_slice(&deposit_b.to_le_bytes());
         let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
 
-        let call_token_b = ChainedCall{
+        ChainedCall{
                 program_id: pool_def_data.token_program_id,
                 instruction_data: instruction_data,
-                pre_states: vec![vault_b.clone(), user_b.clone()]
-            };
-    }
-    
-    
+                pre_states: vec![user_b.clone(), vault_b.clone()]
+            }
+
+    };
+
     chained_call.push(call_token_a);
     chained_call.push(call_token_b);
     
@@ -523,10 +519,7 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
         panic!("Both max-balances must be nonzero");
     }
     
-    // 2. Determine deposit amounts
-    let mut actual_amount_a = 0;
-    let mut actual_amount_b = 0;
-
+    // 2. Determine deposit amount
     let vault_b_balance = TokenHolding::parse(&vault_b.account.data).unwrap().balance;
     let vault_a_balance = TokenHolding::parse(&vault_a.account.data).unwrap().balance;
     if vault_a_balance == 0 || vault_b_balance == 0 {
@@ -537,15 +530,22 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
         panic!("Reserves must be nonzero");
     }
 
-    if main_token == pool_def_data.definition_token_a_id {
-        actual_amount_a += max_amount_a;
-        actual_amount_b += (pool_def_data.reserve_b*actual_amount_a)/pool_def_data.reserve_a;
+    //Calculate actual_amounts
+    let actual_amount_a = if main_token == pool_def_data.definition_token_a_id {
+        max_amount_a
     } else if main_token == pool_def_data.definition_token_b_id {
-        actual_amount_b += max_amount_b;
-        actual_amount_a += (pool_def_data.reserve_a*actual_amount_b)/pool_def_data.reserve_b;
+        (pool_def_data.reserve_a*max_amount_b)/pool_def_data.reserve_b
     } else {
         panic!("Mismatch of token types"); //main token does not match with vaults.
-    }
+    };
+
+    let actual_amount_b = if main_token == pool_def_data.definition_token_a_id {
+        (pool_def_data.reserve_b*max_amount_a)/pool_def_data.reserve_a
+    } else if main_token == pool_def_data.definition_token_b_id {
+        max_amount_b
+    } else {
+        panic!("Mismatch of token types"); //main token does not match with vaults.
+    };
 
     // 3. Validate amounts
     let user_a_balance = TokenHolding::parse(&user_a.account.data).unwrap().balance;
@@ -583,6 +583,7 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
     pool_post.data = pool_post_definition.into_data();
     let mut chained_call = Vec::new();
 
+    // Chain call for Token A (User_A -> Vault_A)
     let mut instruction_data = [0; 23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&actual_amount_a.to_le_bytes());
@@ -593,6 +594,7 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
             pre_states: vec![user_a.clone(), vault_a]
         };
 
+    // Chain call for Token B (User_B -> Vault_B)        
     let mut instruction_data = [0; 23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&actual_amount_b.to_le_bytes());
@@ -602,7 +604,8 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
             instruction_data: instruction_data,
             pre_states: vec![user_b.clone(), vault_b]
         };
-        
+
+    // Chain call for LP (User_LP -> Pool_LP)    
     let mut instruction_data = [0; 23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&delta_lp.to_le_bytes());
@@ -702,6 +705,7 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
     let mut instruction_data = [0; 23];
     instruction_data[0] = 1;
 
+    //Chaincall for Token A withdraw
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&withdraw_amount_a.to_le_bytes());
@@ -712,6 +716,7 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
             pre_states: vec![vault_a, user_a.clone()]
         };
 
+    //Chaincall for Token B withdraw
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&withdraw_amount_b.to_le_bytes());
@@ -722,6 +727,7 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
             pre_states: vec![vault_b, user_b.clone()]
         };
 
+    //Chaincall for LP adjustment        
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&delta_lp.to_le_bytes());
@@ -736,7 +742,6 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
     chained_call.push(call_token_b);
     chained_call.push(call_token_a);
 
-
     let post_states = vec!
         [pool_post.clone(), 
         pre_states[1].account.clone(),
@@ -746,13 +751,12 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
         pre_states[5].account.clone(),
         pre_states[6].account.clone()];
 
-    (post_states.clone(), chained_call)
-
+    (post_states, chained_call)
 }
 
 #[cfg(test)]
 mod tests {
-    use nssa_core::{account::{Account, AccountId, AccountWithMetadata}, address::Address};
+    use nssa_core::{account::{Account, AccountId, AccountWithMetadata}, program::ChainedCall};
 
     use crate::{PoolDefinition, TOKEN_HOLDING_TYPE, TokenHolding, add_liquidity, new_definition, remove_liquidity, swap};
 
@@ -1193,20 +1197,21 @@ mod tests {
         let mut user_b = Account::default();
         let mut pool_lp = Account::default();
 
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+
         user_a.data = TokenHolding::into_data(
-            TokenHolding{
-                account_type: 0u8,
-                definition_id: AccountId::new([1;32]),
-                balance: 200u128,
-            }
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
         );
+
         user_b.data = TokenHolding::into_data(
-            TokenHolding{
-                account_type: 0u8,
-                definition_id: AccountId::new([1;32]),
-                balance: 100u128,
-            }
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
         );
+
         
         vault_a.data = vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -1261,28 +1266,30 @@ mod tests {
     }
 
     #[test]
-    fn test_call_new_definition_success() {
+    fn test_call_new_definition_chain_call_success() {
         let mut pool = Account::default();
         let mut vault_a = Account::default();
         let mut vault_b = Account::default();
         let mut user_a = Account::default();
         let mut user_b = Account::default();
         let mut pool_lp = Account::default();
+        let mut user_lp = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
 
         user_a.data = TokenHolding::into_data(
-            TokenHolding{
-                account_type: 0u8,
-                definition_id: AccountId::new([1;32]),
-                balance: 200u128,
-            }
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
         );
+
         user_b.data = TokenHolding::into_data(
-            TokenHolding{
-                account_type: 0u8,
-                definition_id: AccountId::new([2;32]),
-                balance: 100u128,
-            }
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 15u128 }
         );
+
         
         vault_a.data = vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -1300,39 +1307,102 @@ mod tests {
             ];
 
 
+        let user_a = AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])};
+    
+        let user_b = AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([6; 32])};
+
+        let user_lp = AccountWithMetadata {
+            account: user_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([7; 32])
+        };
+
+        let vault_a = AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([2; 32])};
+
+        let vault_b = AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([3; 32])};
+
+        let pool_lp = AccountWithMetadata {
+            account: pool_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])};
+
         let pre_states = vec![AccountWithMetadata {
-            account: pool,
+            account: pool.clone(),
             is_authorized: true,
             account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault_a,
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: vault_b,
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: user_a,
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: user_b,
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
+            vault_a.clone(),
+            vault_b.clone(),
+            pool_lp.clone(),
+            user_a.clone(),
+            user_b.clone(),
+            user_lp.clone(),
         ];
         let balance_a = 15u128;
         let balance_b = 15u128;
         let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let (post_states, chained_calls) = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+
+        let chained_call_lp = chained_calls[0].clone();
+        let chained_call_b = chained_calls[1].clone();
+        let chained_call_a = chained_calls[2].clone();
+        
+        //Expected chain_call for Token A
+        let mut instruction: [u8;32] = [0; 32];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&balance_a.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_a = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![user_a.clone(), vault_a.clone()],
+        };
+
+        //Expected chain call for Token B
+        let mut instruction: [u8;32] = [0; 32];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&balance_b.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_b = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![user_b.clone(), vault_b.clone()],
+        };
+
+        //Expected chain call for LP
+        let mut instruction: [u8;32] = [0; 32];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&balance_a.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_lp = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![pool_lp.clone(), user_lp.clone()],
+        };
+        
+        assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
+        assert!(chained_call_a.instruction_data == expected_chained_call_a.instruction_data);
+        assert!(chained_call_a.pre_states[0].account == expected_chained_call_a.pre_states[0].account);
+        assert!(chained_call_a.pre_states[1].account == expected_chained_call_a.pre_states[1].account);
+        assert!(chained_call_b.program_id == expected_chained_call_b.program_id);
+        assert!(chained_call_b.instruction_data == expected_chained_call_b.instruction_data);
+        assert!(chained_call_b.pre_states[0].account == expected_chained_call_b.pre_states[0].account);
+        assert!(chained_call_b.pre_states[1].account == expected_chained_call_b.pre_states[1].account);
+        assert!(chained_call_lp.program_id == expected_chained_call_lp.program_id);
+        assert!(chained_call_lp.instruction_data == expected_chained_call_lp.instruction_data);
+        assert!(chained_call_lp.pre_states[0].account == expected_chained_call_lp.pre_states[0].account);
+        assert!(chained_call_lp.pre_states[1].account == expected_chained_call_lp.pre_states[1].account);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -1551,7 +1621,6 @@ mod tests {
         let mut vault2 = Account::default();
         let mut pool_lp = Account::default();
 
-
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
 
@@ -1623,6 +1692,174 @@ mod tests {
         ];
         
         let _post_states = remove_liquidity(&pre_states);
+    }
+
+    #[test]
+    fn test_call_remove_liquidity_chain_call_success() {
+        let mut pool = Account::default();
+        let mut vault_a = Account::default();
+        let mut vault_b = Account::default();
+        let mut user_a = Account::default();
+        let mut user_b = Account::default();
+        let mut pool_lp = Account::default();
+        let mut user_lp = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+        
+        vault_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
+        );
+
+        vault_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 15u128 }
+        );
+
+        pool_lp.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+
+        let vault_a_addr = AccountId::new([5;32]);
+        let vault_b_addr = AccountId::new([6;32]);
+        let liquidity_pool_id = AccountId::new([7;32]);
+        let liquidity_pool_cap: u128 = 30u128;
+        let reserve_a: u128 = 30;
+        let reserve_b: u128 = 20;
+        let user_lp_amt: u128 = 10;
+        let token_program_id: [u32;8] = [0; 8];
+
+        pool.data = PoolDefinition::into_data( PoolDefinition {
+            definition_token_a_id: definition_token_a_id.clone(),
+            definition_token_b_id: definition_token_b_id.clone(),
+            vault_a_addr: vault_a_addr.clone(),
+            vault_b_addr: vault_b_addr.clone(),
+            liquidity_pool_id,
+            liquidity_pool_cap: reserve_a,
+            reserve_a,
+            reserve_b,
+            token_program_id,
+        });
+        
+        user_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 5u128 }
+        );
+
+        user_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 5u128 }
+        );
+
+        user_lp.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id: AccountId::new([3;32]),
+                balance: user_lp_amt }
+        );
+
+        let user_a = AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])};
+    
+        let user_b = AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([6; 32])};
+
+        let user_lp = AccountWithMetadata {
+            account: user_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([7; 32])
+        };
+
+        let vault_a = AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([2; 32])};
+
+        let vault_b = AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([3; 32])};
+
+        let pool_lp = AccountWithMetadata {
+            account: pool_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])};
+
+        let pre_states = vec![AccountWithMetadata {
+            account: pool.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([0; 32])},
+            vault_a.clone(),
+            vault_b.clone(),
+            pool_lp.clone(),
+            user_a.clone(),
+            user_b.clone(),
+            user_lp.clone(),
+        ];
+        let (post_states, chained_calls) = remove_liquidity(&pre_states);
+
+        let chained_call_lp = chained_calls[0].clone();
+        let chained_call_b = chained_calls[1].clone();
+        let chained_call_a = chained_calls[2].clone();
+        
+        //Expected withdraw
+        let withdraw_amount_a = reserve_a * (user_lp_amt/reserve_a);
+        let withdraw_amount_b = reserve_b * (user_lp_amt/reserve_a);
+
+        //Expected chain_call for Token A
+        let mut instruction: [u8;32] = [0; 32];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&withdraw_amount_a.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_a = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![vault_a.clone(), user_a.clone()],
+        };
+
+        //Expected chain call for Token B
+        let mut instruction: [u8;32] = [0; 32];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&withdraw_amount_b.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_b = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![vault_b.clone(), user_b.clone()],
+        };
+
+        //Expected chain call for LP
+        let mut instruction: [u8;32] = [0; 32];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&user_lp_amt.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_lp = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![user_lp.clone(), pool_lp.clone()],
+        };
+        
+        assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
+        assert!(chained_call_a.instruction_data == expected_chained_call_a.instruction_data);
+        assert!(chained_call_a.pre_states[0].account == expected_chained_call_a.pre_states[0].account);
+        assert!(chained_call_a.pre_states[1].account == expected_chained_call_a.pre_states[1].account);
+        assert!(chained_call_b.program_id == expected_chained_call_b.program_id);
+        assert!(chained_call_b.instruction_data == expected_chained_call_b.instruction_data);
+        assert!(chained_call_b.pre_states[0].account == expected_chained_call_b.pre_states[0].account);
+        assert!(chained_call_b.pre_states[1].account == expected_chained_call_b.pre_states[1].account);
+        assert!(chained_call_lp.program_id == expected_chained_call_lp.program_id);
+        assert!(chained_call_lp.instruction_data == expected_chained_call_lp.instruction_data);
+        assert!(chained_call_lp.pre_states[0].account == expected_chained_call_lp.pre_states[0].account);
+        assert!(chained_call_lp.pre_states[1].account == expected_chained_call_lp.pre_states[1].account);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -2834,6 +3071,7 @@ mod tests {
         let main_token = definition_token_b_id.clone();
         let _post_states = add_liquidity(&pre_states, &[balance_a,balance_b], main_token);
     }
+
     #[should_panic(expected = "Reserves must be nonzero")]
     #[test]
     fn test_call_add_liquidity_reserves_zero() {
@@ -2841,7 +3079,6 @@ mod tests {
         let mut vault1 = Account::default();
         let mut vault2 = Account::default();
         let mut pool_lp = Account::default();
-
 
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
@@ -2919,6 +3156,354 @@ mod tests {
         let balance_b = 15u128;
         let main_token = definition_token_b_id.clone();
         let _post_states = add_liquidity(&pre_states, &[balance_a,balance_b], main_token);
+    }
+
+    #[test]
+    fn test_call_add_liquidity_chain_call_success_1() {
+        let mut pool = Account::default();
+        let mut vault_a = Account::default();
+        let mut vault_b = Account::default();
+        let mut user_a = Account::default();
+        let mut user_b = Account::default();
+        let mut pool_lp = Account::default();
+        let mut user_lp = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+        
+        vault_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
+        );
+
+        vault_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 15u128 }
+        );
+
+        pool_lp.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+
+        let vault_a_addr = AccountId::new([5;32]);
+        let vault_b_addr = AccountId::new([6;32]);
+        let liquidity_pool_id = AccountId::new([7;32]);
+        let liquidity_pool_cap: u128 = 30u128;
+        let reserve_a: u128 = 30;
+        let reserve_b: u128 = 20;
+        let user_lp_amt: u128 = 10;
+        let token_program_id: [u32;8] = [0; 8];
+
+        pool.data = PoolDefinition::into_data( PoolDefinition {
+            definition_token_a_id: definition_token_a_id.clone(),
+            definition_token_b_id: definition_token_b_id.clone(),
+            vault_a_addr: vault_a_addr.clone(),
+            vault_b_addr: vault_b_addr.clone(),
+            liquidity_pool_id,
+            liquidity_pool_cap: reserve_a,
+            reserve_a,
+            reserve_b,
+            token_program_id,
+        });
+        
+        user_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 50u128 }
+        );
+
+        user_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 50u128 }
+        );
+
+        user_lp.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id: AccountId::new([3;32]),
+                balance: user_lp_amt }
+        );
+
+        let user_a = AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])};
+    
+        let user_b = AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([6; 32])};
+
+        let user_lp = AccountWithMetadata {
+            account: user_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([7; 32])
+        };
+
+        let vault_a = AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([2; 32])};
+
+        let vault_b = AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([3; 32])};
+
+        let pool_lp = AccountWithMetadata {
+            account: pool_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])};
+
+        let pre_states = vec![AccountWithMetadata {
+            account: pool.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([0; 32])},
+            vault_a.clone(),
+            vault_b.clone(),
+            pool_lp.clone(),
+            user_a.clone(),
+            user_b.clone(),
+            user_lp.clone(),
+        ];
+
+        let balance_a = 10u128;
+        let balance_b = 30u128;
+        let main_token = definition_token_a_id.clone();
+        let (post_states, chained_calls) = add_liquidity(&pre_states, &[balance_a,balance_b], main_token);
+
+        let chained_call_lp = chained_calls[0].clone();
+        let chained_call_b = chained_calls[1].clone();
+        let chained_call_a = chained_calls[2].clone();
+        
+        //Expected amounts
+        let expected_actual_amount_a = balance_a;
+        //Uses: (pool_def_data.reserve_b*actual_amount_a)/pool_def_data.reserve_a
+        let expected_actual_amount_b = (reserve_b*expected_actual_amount_a)/reserve_a;
+        let expected_delta_lp = (reserve_a * expected_actual_amount_b)/reserve_b;
+
+        //Expected chain_call for Token A
+        let mut instruction: [u8;23] = [0; 23];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&expected_actual_amount_a.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_a = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![user_a.clone(), vault_a.clone()],
+        };
+
+        //Expected chain call for Token B
+        let mut instruction: [u8;23] = [0; 23];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&expected_actual_amount_b.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_b = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![user_b.clone(), vault_b.clone()],
+        };
+
+        //Expected chain call for LP
+        let mut instruction: [u8;23] = [0; 23];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&expected_delta_lp.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_lp = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![pool_lp.clone(), user_lp.clone()],
+        };
+        
+        assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
+        assert!(chained_call_a.instruction_data == expected_chained_call_a.instruction_data);
+        assert!(chained_call_a.pre_states[0].account == expected_chained_call_a.pre_states[0].account);
+        assert!(chained_call_a.pre_states[1].account == expected_chained_call_a.pre_states[1].account);
+        assert!(chained_call_b.program_id == expected_chained_call_b.program_id);
+        assert!(chained_call_b.instruction_data == expected_chained_call_b.instruction_data);
+        assert!(chained_call_b.pre_states[0].account == expected_chained_call_b.pre_states[0].account);
+        assert!(chained_call_b.pre_states[1].account == expected_chained_call_b.pre_states[1].account);
+        assert!(chained_call_lp.program_id == expected_chained_call_lp.program_id);
+        assert!(chained_call_lp.instruction_data == expected_chained_call_lp.instruction_data);
+        assert!(chained_call_lp.pre_states[0].account == expected_chained_call_lp.pre_states[0].account);
+        assert!(chained_call_lp.pre_states[1].account == expected_chained_call_lp.pre_states[1].account);
+    }
+  
+    #[test]
+    fn test_call_add_liquidity_chain_call_success_2() {
+        let mut pool = Account::default();
+        let mut vault_a = Account::default();
+        let mut vault_b = Account::default();
+        let mut user_a = Account::default();
+        let mut user_b = Account::default();
+        let mut pool_lp = Account::default();
+        let mut user_lp = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+        
+        vault_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
+        );
+
+        vault_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 15u128 }
+        );
+
+        pool_lp.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+
+        let vault_a_addr = AccountId::new([5;32]);
+        let vault_b_addr = AccountId::new([6;32]);
+        let liquidity_pool_id = AccountId::new([7;32]);
+        let liquidity_pool_cap: u128 = 30u128;
+        let reserve_a: u128 = 30;
+        let reserve_b: u128 = 20;
+        let user_lp_amt: u128 = 10;
+        let token_program_id: [u32;8] = [0; 8];
+
+        pool.data = PoolDefinition::into_data( PoolDefinition {
+            definition_token_a_id: definition_token_a_id.clone(),
+            definition_token_b_id: definition_token_b_id.clone(),
+            vault_a_addr: vault_a_addr.clone(),
+            vault_b_addr: vault_b_addr.clone(),
+            liquidity_pool_id,
+            liquidity_pool_cap: reserve_a,
+            reserve_a,
+            reserve_b,
+            token_program_id,
+        });
+        
+        user_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 50u128 }
+        );
+
+        user_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 50u128 }
+        );
+
+        user_lp.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id: AccountId::new([3;32]),
+                balance: user_lp_amt }
+        );
+
+        let user_a = AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])};
+    
+        let user_b = AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([6; 32])};
+
+        let user_lp = AccountWithMetadata {
+            account: user_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([7; 32])
+        };
+
+        let vault_a = AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([2; 32])};
+
+        let vault_b = AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([3; 32])};
+
+        let pool_lp = AccountWithMetadata {
+            account: pool_lp.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])};
+
+        let pre_states = vec![AccountWithMetadata {
+            account: pool.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([0; 32])},
+            vault_a.clone(),
+            vault_b.clone(),
+            pool_lp.clone(),
+            user_a.clone(),
+            user_b.clone(),
+            user_lp.clone(),
+        ];
+
+        let balance_a = 40u128;
+        let balance_b = 20u128;
+        let main_token = definition_token_b_id.clone();
+        let (post_states, chained_calls) = add_liquidity(&pre_states, &[balance_a,balance_b], main_token);
+
+        let chained_call_lp = chained_calls[0].clone();
+        let chained_call_b = chained_calls[1].clone();
+        let chained_call_a = chained_calls[2].clone();
+        
+        //Expected amounts
+        let expected_actual_amount_b = balance_b;
+        //Uses: (pool_def_data.reserve_b*actual_amount_a)/pool_def_data.reserve_a
+        let expected_actual_amount_a = (reserve_a*expected_actual_amount_b)/reserve_b;
+        let expected_delta_lp = (reserve_a * expected_actual_amount_b)/reserve_b;
+
+        //Expected chain_call for Token A
+        let mut instruction: [u8;23] = [0; 23];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&expected_actual_amount_a.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_a = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![user_a.clone(), vault_a.clone()],
+        };
+
+        //Expected chain call for Token B
+        let mut instruction: [u8;23] = [0; 23];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&expected_actual_amount_b.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_b = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![user_b.clone(), vault_b.clone()],
+        };
+
+        //Expected chain call for LP
+        let mut instruction: [u8;23] = [0; 23];
+        instruction[0] = 1;      
+        instruction[1..17].copy_from_slice(&expected_delta_lp.to_le_bytes());
+        let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+        let expected_chained_call_lp = ChainedCall{
+            program_id: token_program_id,
+            instruction_data,
+            pre_states: vec![pool_lp.clone(), user_lp.clone()],
+        };
+        
+        assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
+        assert!(chained_call_a.instruction_data == expected_chained_call_a.instruction_data);
+        assert!(chained_call_a.pre_states[0].account == expected_chained_call_a.pre_states[0].account);
+        assert!(chained_call_a.pre_states[1].account == expected_chained_call_a.pre_states[1].account);
+        assert!(chained_call_b.program_id == expected_chained_call_b.program_id);
+        assert!(chained_call_b.instruction_data == expected_chained_call_b.instruction_data);
+        assert!(chained_call_b.pre_states[0].account == expected_chained_call_b.pre_states[0].account);
+        assert!(chained_call_b.pre_states[1].account == expected_chained_call_b.pre_states[1].account);
+        assert!(chained_call_lp.program_id == expected_chained_call_lp.program_id);
+        assert!(chained_call_lp.instruction_data == expected_chained_call_lp.instruction_data);
+        assert!(chained_call_lp.pre_states[0].account == expected_chained_call_lp.pre_states[0].account);
+        assert!(chained_call_lp.pre_states[1].account == expected_chained_call_lp.pre_states[1].account);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -3226,5 +3811,502 @@ mod tests {
         let amount = 15u128;
         let vault_addr = AccountId::new([0;32]);
         let _post_states = swap(&pre_states, amount, vault_addr);
+    }
+
+    #[test]
+    fn test_call_swap_successful_chain_call_1() {
+        let mut pool = Account::default();
+        let mut vault_a = Account::default();
+        let mut vault_b = Account::default();
+        let mut pool_lp = Account::default();
+        let mut user_a = Account::default();
+        let mut user_b = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+
+        vault_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
+        );
+
+        vault_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 20u128 }
+        );
+
+        pool_lp.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_a.data = vec![
+                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_b.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 12, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]);
+        let vault_a_addr = AccountId::new([5;32]);
+        let vault_b_addr = AccountId::new([6;32]);
+        let liquidity_pool_id = AccountId::new([7;32]);
+        let liquidity_pool_cap: u128 = 30u128;
+        let reserve_a: u128 = 15;
+        let reserve_b: u128 = 20;
+        let token_program_id: [u32;8] = [5; 8];
+
+        pool.data = PoolDefinition::into_data(
+            PoolDefinition {
+                definition_token_a_id: definition_token_a_id.clone(),
+                definition_token_b_id: definition_token_b_id.clone(),
+                vault_a_addr: vault_a_addr.clone(),
+                vault_b_addr: vault_b_addr.clone(),
+                liquidity_pool_id,
+                liquidity_pool_cap,
+                reserve_a,
+                reserve_b,
+                token_program_id,
+            }
+         );
+
+        let pre_states = vec![AccountWithMetadata {
+            account: pool.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([0; 32])},
+            AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: vault_a_addr.clone()},
+            AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: vault_b_addr.clone()},
+            AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])},
+            AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])}
+        ];
+        let amount = 15u128;
+        let token_addr = definition_token_a_id;
+        let (post_accounts, chain_calls) = swap(&pre_states, amount, token_addr);
+
+        let pool_post = post_accounts[0].clone();
+        let pool_pre_data = PoolDefinition::parse(&pool.data).unwrap();
+        let pool_post_data = PoolDefinition::parse(&pool_post.data).unwrap();
+        assert!(pool_post_data.reserve_a == pool_pre_data.reserve_a + amount);
+
+        let expected_withdraw = (pool_pre_data.reserve_b * amount)/(pool_pre_data.reserve_a + amount);
+        assert!(pool_post_data.reserve_b  == pool_pre_data.reserve_b - expected_withdraw);
+
+        let chain_call_a = chain_calls[0].clone();
+        let chain_call_b = chain_calls[1].clone();
+
+        assert!(chain_call_b.program_id == token_program_id);
+        assert!(chain_call_a.program_id == token_program_id);
+
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&amount.to_le_bytes());
+        let expected_instruction_data_0 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&expected_withdraw.to_le_bytes());
+        let expected_instruction_data_1 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+
+        let chain_call_a_account0 = chain_call_a.pre_states[0].account.clone();
+        let chain_call_a_account1 = chain_call_a.pre_states[1].account.clone();
+
+        let chain_call_b_account0 = chain_call_b.pre_states[0].account.clone();
+        let chain_call_b_account1 = chain_call_b.pre_states[1].account.clone();
+
+        assert!(chain_call_a.instruction_data == expected_instruction_data_0);
+        assert!(chain_call_a_account0 == user_a);
+        assert!(chain_call_a_account1 == vault_a);
+        assert!(chain_call_b.instruction_data == expected_instruction_data_1);
+        assert!(chain_call_b_account0 == vault_b);
+        assert!(chain_call_b_account1 == user_b);
+
+    }
+
+    #[test]
+    fn test_call_swap_successful_chain_call_2() {
+        let mut pool = Account::default();
+        let mut vault_a = Account::default();
+        let mut vault_b = Account::default();
+        let mut pool_lp = Account::default();
+        let mut user_a = Account::default();
+        let mut user_b = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+
+        vault_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
+        );
+
+        vault_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 20u128 }
+        );
+
+        pool_lp.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_a.data = vec![
+                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_b.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 12, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]);
+        let vault_a_addr = AccountId::new([5;32]);
+        let vault_b_addr = AccountId::new([6;32]);
+        let liquidity_pool_id = AccountId::new([7;32]);
+        let liquidity_pool_cap: u128 = 30u128;
+        let reserve_a: u128 = 15;
+        let reserve_b: u128 = 20;
+        let token_program_id: [u32;8] = [5; 8];
+
+        pool.data = PoolDefinition::into_data(
+            PoolDefinition {
+                definition_token_a_id: definition_token_a_id.clone(),
+                definition_token_b_id: definition_token_b_id.clone(),
+                vault_a_addr: vault_a_addr.clone(),
+                vault_b_addr: vault_b_addr.clone(),
+                liquidity_pool_id,
+                liquidity_pool_cap,
+                reserve_a,
+                reserve_b,
+                token_program_id,
+            }
+         );
+         //swapped order of vault_a and vault_b
+        let pre_states = vec![AccountWithMetadata {
+            account: pool.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([0; 32])},
+            AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: vault_b_addr.clone()},
+            AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: vault_a_addr.clone()},
+            AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])},
+            AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])}
+        ];
+        let amount = 15u128;
+        let token_addr = definition_token_a_id;
+        let (post_accounts, chain_calls) = swap(&pre_states, amount, token_addr);
+
+        let pool_post = post_accounts[0].clone();
+        let pool_pre_data = PoolDefinition::parse(&pool.data).unwrap();
+        let pool_post_data = PoolDefinition::parse(&pool_post.data).unwrap();
+        assert!(pool_post_data.reserve_a == pool_pre_data.reserve_a + amount);
+
+        let expected_withdraw = (pool_pre_data.reserve_b * amount)/(pool_pre_data.reserve_a + amount);
+        assert!(pool_post_data.reserve_b  == pool_pre_data.reserve_b - expected_withdraw);
+
+        let chain_call_a = chain_calls[0].clone();
+        let chain_call_b = chain_calls[1].clone();
+
+        assert!(chain_call_b.program_id == token_program_id);
+        assert!(chain_call_a.program_id == token_program_id);
+
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&amount.to_le_bytes());
+        let expected_instruction_data_0 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&expected_withdraw.to_le_bytes());
+        let expected_instruction_data_1 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+
+        let chain_call_a_account0 = chain_call_a.pre_states[0].account.clone();
+        let chain_call_a_account1 = chain_call_a.pre_states[1].account.clone();
+
+        let chain_call_b_account0 = chain_call_b.pre_states[0].account.clone();
+        let chain_call_b_account1 = chain_call_b.pre_states[1].account.clone();
+
+        assert!(chain_call_a.instruction_data == expected_instruction_data_0);
+        assert!(chain_call_a_account0 == user_a);
+        assert!(chain_call_a_account1 == vault_a);
+        assert!(chain_call_b.instruction_data == expected_instruction_data_1);
+        assert!(chain_call_b_account0 == vault_b);
+        assert!(chain_call_b_account1 == user_b);
+
+    }
+
+    #[test]
+    fn test_call_swap_successful_chain_call_3() {
+        let mut pool = Account::default();
+        let mut vault_a = Account::default();
+        let mut vault_b = Account::default();
+        let mut pool_lp = Account::default();
+        let mut user_a = Account::default();
+        let mut user_b = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+
+        vault_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
+        );
+
+        vault_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 20u128 }
+        );
+
+        pool_lp.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_a.data = vec![
+                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_b.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 12, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]);
+        let vault_a_addr = AccountId::new([5;32]);
+        let vault_b_addr = AccountId::new([6;32]);
+        let liquidity_pool_id = AccountId::new([7;32]);
+        let liquidity_pool_cap: u128 = 30u128;
+        let reserve_a: u128 = 15;
+        let reserve_b: u128 = 20;
+        let token_program_id: [u32;8] = [5; 8];
+
+        pool.data = PoolDefinition::into_data(
+            PoolDefinition {
+                definition_token_a_id: definition_token_a_id.clone(),
+                definition_token_b_id: definition_token_b_id.clone(),
+                vault_a_addr: vault_a_addr.clone(),
+                vault_b_addr: vault_b_addr.clone(),
+                liquidity_pool_id,
+                liquidity_pool_cap,
+                reserve_a,
+                reserve_b,
+                token_program_id,
+            }
+         );
+
+        let pre_states = vec![AccountWithMetadata {
+            account: pool.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([0; 32])},
+            AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: vault_a_addr.clone()},
+            AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: vault_b_addr.clone()},
+            AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])},
+            AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])}
+        ];
+        let amount = 15u128;
+        let token_addr = definition_token_b_id;
+        let (post_accounts, chain_calls) = swap(&pre_states, amount, token_addr);
+
+        let pool_post = post_accounts[0].clone();
+        let pool_pre_data = PoolDefinition::parse(&pool.data).unwrap();
+        let pool_post_data = PoolDefinition::parse(&pool_post.data).unwrap();
+        assert!(pool_post_data.reserve_b == pool_pre_data.reserve_b + amount);
+
+        let expected_withdraw = (pool_pre_data.reserve_a * amount)/(pool_pre_data.reserve_b + amount);
+        assert!(pool_post_data.reserve_a  == pool_pre_data.reserve_a - expected_withdraw);
+
+        let chain_call_a = chain_calls[0].clone();
+        let chain_call_b = chain_calls[1].clone();
+
+        assert!(chain_call_b.program_id == token_program_id);
+        assert!(chain_call_a.program_id == token_program_id);
+
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&expected_withdraw.to_le_bytes());
+        let expected_instruction_data_0 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&amount.to_le_bytes());
+        let expected_instruction_data_1 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+
+        let chain_call_a_account0 = chain_call_a.pre_states[0].account.clone();
+        let chain_call_a_account1 = chain_call_a.pre_states[1].account.clone();
+
+        let chain_call_b_account0 = chain_call_b.pre_states[0].account.clone();
+        let chain_call_b_account1 = chain_call_b.pre_states[1].account.clone();
+
+        assert!(chain_call_a.instruction_data == expected_instruction_data_0);
+        assert!(chain_call_a_account0 == vault_a);
+        assert!(chain_call_a_account1 == user_a);
+        assert!(chain_call_b.instruction_data == expected_instruction_data_1);
+        assert!(chain_call_b_account0 == user_b);
+        assert!(chain_call_b_account1 == vault_b);
+
+    }
+
+    #[test]
+    fn test_call_swap_successful_chain_call_4() {
+        let mut pool = Account::default();
+        let mut vault_a = Account::default();
+        let mut vault_b = Account::default();
+        let mut pool_lp = Account::default();
+        let mut user_a = Account::default();
+        let mut user_b = Account::default();
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]); 
+
+        vault_a.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_a_id.clone(),
+                balance: 15u128 }
+        );
+
+        vault_b.data = TokenHolding::into_data(
+            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
+                definition_id:definition_token_b_id.clone(),
+                balance: 20u128 }
+        );
+
+        pool_lp.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_a.data = vec![
+                0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+        user_b.data = vec![
+                1, 1, 1, 1, 1, 1, 1, 12, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ];
+
+        let definition_token_a_id = AccountId::new([1;32]);
+        let definition_token_b_id = AccountId::new([2;32]);
+        let vault_a_addr = AccountId::new([5;32]);
+        let vault_b_addr = AccountId::new([6;32]);
+        let liquidity_pool_id = AccountId::new([7;32]);
+        let liquidity_pool_cap: u128 = 30u128;
+        let reserve_a: u128 = 15;
+        let reserve_b: u128 = 20;
+        let token_program_id: [u32;8] = [5; 8];
+
+        pool.data = PoolDefinition::into_data(
+            PoolDefinition {
+                definition_token_a_id: definition_token_a_id.clone(),
+                definition_token_b_id: definition_token_b_id.clone(),
+                vault_a_addr: vault_a_addr.clone(),
+                vault_b_addr: vault_b_addr.clone(),
+                liquidity_pool_id,
+                liquidity_pool_cap,
+                reserve_a,
+                reserve_b,
+                token_program_id,
+            }
+         );
+
+        //swapped order of vaults
+        let pre_states = vec![AccountWithMetadata {
+            account: pool.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([0; 32])},
+            AccountWithMetadata {
+            account: vault_b.clone(),
+            is_authorized: true,
+            account_id: vault_b_addr.clone()},
+            AccountWithMetadata {
+            account: vault_a.clone(),
+            is_authorized: true,
+            account_id: vault_b_addr.clone()},
+            AccountWithMetadata {
+            account: user_a.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([4; 32])},
+            AccountWithMetadata {
+            account: user_b.clone(),
+            is_authorized: true,
+            account_id: AccountId::new([5; 32])}
+        ];
+        let amount = 15u128;
+        let token_addr = definition_token_b_id;
+        let (post_accounts, chain_calls) = swap(&pre_states, amount, token_addr);
+
+        let pool_post = post_accounts[0].clone();
+        let pool_pre_data = PoolDefinition::parse(&pool.data).unwrap();
+        let pool_post_data = PoolDefinition::parse(&pool_post.data).unwrap();
+        assert!(pool_post_data.reserve_b == pool_pre_data.reserve_b + amount);
+
+        let expected_withdraw = (pool_pre_data.reserve_a * amount)/(pool_pre_data.reserve_b + amount);
+        assert!(pool_post_data.reserve_a  == pool_pre_data.reserve_a - expected_withdraw);
+
+        let chain_call_a = chain_calls[0].clone();
+        let chain_call_b = chain_calls[1].clone();
+
+        assert!(chain_call_b.program_id == token_program_id);
+        assert!(chain_call_a.program_id == token_program_id);
+
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&expected_withdraw.to_le_bytes());
+        let expected_instruction_data_0 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+        let mut instruction_data = [0; 23];
+        instruction_data[0] = 1;
+        instruction_data[1..17].copy_from_slice(&amount.to_le_bytes());
+        let expected_instruction_data_1 = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+
+        let chain_call_a_account0 = chain_call_a.pre_states[0].account.clone();
+        let chain_call_a_account1 = chain_call_a.pre_states[1].account.clone();
+
+        let chain_call_b_account0 = chain_call_b.pre_states[0].account.clone();
+        let chain_call_b_account1 = chain_call_b.pre_states[1].account.clone();
+
+        assert!(chain_call_a.instruction_data == expected_instruction_data_0);
+        assert!(chain_call_a_account0 == vault_a);
+        assert!(chain_call_a_account1 == user_a);
+        assert!(chain_call_b.instruction_data == expected_instruction_data_1);
+        assert!(chain_call_b_account0 == user_b);
+        assert!(chain_call_b_account1 == vault_b);
+
     }
 }
