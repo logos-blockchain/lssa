@@ -13,6 +13,8 @@ use crate::{
     public_transaction::PublicTransaction,
 };
 
+pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
+
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
     commitments: HashMap<Commitment, usize>,
@@ -261,6 +263,7 @@ pub mod tests {
         program::Program,
         public_transaction,
         signature::PrivateKey,
+        state::MAX_NUMBER_CHAINED_CALLS,
     };
 
     fn transfer_transaction(
@@ -2084,30 +2087,30 @@ pub mod tests {
     }
 
     #[test]
-    fn test_chained_call() {
+    fn test_chained_call_succeeds() {
         let program = Program::chain_caller();
         let key = PrivateKey::try_new([1; 32]).unwrap();
-        let account_id = AccountId::from(&PublicKey::new_from_private_key(&key));
+        let from = AccountId::from(&PublicKey::new_from_private_key(&key));
+        let to = AccountId::new([2; 32]);
         let initial_balance = 100;
-        let initial_data = [(account_id, initial_balance)];
+        let initial_data = [(from, initial_balance), (to, 0)];
         let mut state =
             V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
-        let from = account_id;
         let from_key = key;
-        let to = AccountId::new([2; 32]);
-        let amount: u128 = 37;
-        let instruction: (u128, ProgramId) =
-            (amount, Program::authenticated_transfer_program().id());
+        let amount: u128 = 0;
+        let instruction: (u128, ProgramId, u32) =
+            (amount, Program::authenticated_transfer_program().id(), 2);
 
         let expected_to_post = Account {
-            program_owner: Program::chain_caller().id(),
-            balance: amount,
+            program_owner: Program::authenticated_transfer_program().id(),
+            balance: amount * 2, // The `chain_caller` chains the program twice
             ..Account::default()
         };
 
         let message = public_transaction::Message::try_new(
             program.id(),
-            vec![to, from], // The chain_caller program permutes the account order in the call
+            vec![to, from], // The chain_caller program permutes the account order in the chain
+            // call
             vec![0],
             instruction,
         )
@@ -2119,7 +2122,44 @@ pub mod tests {
 
         let from_post = state.get_account_by_id(&from);
         let to_post = state.get_account_by_id(&to);
-        assert_eq!(from_post.balance, initial_balance - amount);
+        // The `chain_caller` program calls the program twice
+        assert_eq!(from_post.balance, initial_balance - 2 * amount);
         assert_eq!(to_post, expected_to_post);
+    }
+
+    #[test]
+    fn test_execution_fails_if_chained_calls_exceeds_depth() {
+        let program = Program::chain_caller();
+        let key = PrivateKey::try_new([1; 32]).unwrap();
+        let from = AccountId::from(&PublicKey::new_from_private_key(&key));
+        let to = AccountId::new([2; 32]);
+        let initial_balance = 100;
+        let initial_data = [(from, initial_balance), (to, 0)];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let from_key = key;
+        let amount: u128 = 0;
+        let instruction: (u128, ProgramId, u32) = (
+            amount,
+            Program::authenticated_transfer_program().id(),
+            MAX_NUMBER_CHAINED_CALLS as u32 + 1,
+        );
+
+        let message = public_transaction::Message::try_new(
+            program.id(),
+            vec![to, from], // The chain_caller program permutes the account order in the chain
+            // call
+            vec![0],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[&from_key]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+        assert!(matches!(
+            result,
+            Err(NssaError::MaxChainedCallsDepthExceeded)
+        ));
     }
 }

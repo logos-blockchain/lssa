@@ -27,11 +27,11 @@ fn main() {
     let ProgramOutput {
         pre_states,
         post_states,
-        chained_call,
+        chained_calls,
     } = program_output;
 
     // TODO: implement chained calls for privacy preserving transactions
-    if chained_call.is_some() {
+    if !chained_calls.is_empty() {
         panic!("Privacy preserving transactions do not support yet chained calls.")
     }
 

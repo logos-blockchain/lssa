@@ -1213,7 +1213,6 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     //     };
 
     //     let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
-
     //     println!("Waiting for next blocks to check if continoius run fetch account");
     //     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
     //     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
@@ -1376,6 +1375,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     pub async fn test_pinata() {
         info!("########## test_pinata ##########");
         let pinata_account_id = PINATA_BASE58;
+
         let pinata_prize = 150;
         let solution = 989106;
         let command = Command::Pinata(PinataProgramAgnosticSubcommand::Claim {

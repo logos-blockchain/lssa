@@ -54,4 +54,7 @@ pub enum NssaError {
 
     #[error("Program already exists")]
     ProgramAlreadyExists,
+
+    #[error("Chain of calls is too long")]
+    MaxChainedCallsDepthExceeded,
 }
