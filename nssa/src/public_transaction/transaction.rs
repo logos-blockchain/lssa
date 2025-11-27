@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata},
@@ -108,10 +108,10 @@ impl PublicTransaction {
             pre_states: input_pre_states,
         };
 
-        let mut chained_calls = Vec::from_iter([initial_call]);
+        let mut chained_calls = VecDeque::from_iter([initial_call]);
         let mut chain_calls_counter = 0;
 
-        while let Some(chained_call) = chained_calls.pop() {
+        while let Some(chained_call) = chained_calls.pop_front() {
             if chain_calls_counter > MAX_NUMBER_CHAINED_CALLS {
                 return Err(NssaError::MaxChainedCallsDepthExceeded);
             }
@@ -168,7 +168,7 @@ impl PublicTransaction {
                 state_diff.insert(pre.account_id, post.clone());
             }
 
-            chained_calls.extend_from_slice(&program_output.chained_calls);
+            chained_calls.extend(program_output.chained_calls);
             chain_calls_counter += 1;
         }
 
