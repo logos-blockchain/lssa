@@ -2755,7 +2755,7 @@ pub mod tests {
         let user_lp_post = state.get_account_by_address(&user_lp_holding_address);
 
         //TODO: this accounts for the initial balance for User_LP
-        let delta_lp : u128 = (init_balance_a*init_balance_a + temp_amt)/init_balance_a;
+        let delta_lp : u128 = (init_balance_a*(init_balance_a + temp_amt))/init_balance_a;
 
         let expected_pool = Account {
             program_owner: Program::amm().id(),
@@ -2767,7 +2767,7 @@ pub mod tests {
                     vault_a_addr: vault_a_address,
                     vault_b_addr: vault_b_address,
                     liquidity_pool_id: token_lp_definition_address,
-                    liquidity_pool_cap: init_balance_a - delta_lp, //TODO: not 0 due to temp_amt; results in wrapping arithmetic.
+                    liquidity_pool_cap: init_balance_a - delta_lp,
                     reserve_a: 0,
                     reserve_b: 0,
                     token_program_id: Program::token().id(),
@@ -2840,7 +2840,7 @@ pub mod tests {
         assert!(user_a_post == expected_user_a);
         assert!(user_b_post == expected_user_b);
         assert!(user_lp_post == expected_user_lp);
-        assert!(pool_post == expected_pool);
+        assert!(pool_post.data == expected_pool.data);
     }
 
     #[test]
