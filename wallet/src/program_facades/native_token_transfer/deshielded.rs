@@ -14,14 +14,14 @@ impl NativeTokenTransfer<'_> {
         let (instruction_data, program, tx_pre_check) = auth_transfer_preparation(balance_to_move);
 
         self.0
-            .send_privacy_preserving_tx(
+            .send_privacy_preserving_tx_with_pre_check(
                 vec![
                     PrivacyPreservingAccount::PrivateOwned(from),
                     PrivacyPreservingAccount::Public(to),
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
+                tx_pre_check,
             )
             .await
             .map(|(resp, secrets)| {

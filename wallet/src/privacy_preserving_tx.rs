@@ -7,7 +7,7 @@ use nssa_core::{
     encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
 };
 
-use crate::{WalletCore, transaction_utils::AccountPreparedData};
+use crate::WalletCore;
 
 pub enum PrivacyPreservingAccount {
     Public(AccountId),
@@ -33,12 +33,12 @@ enum State {
     Private(AccountPreparedData),
 }
 
-pub struct Payload {
+pub struct AccountManager {
     states: Vec<State>,
     visibility_mask: Vec<u8>,
 }
 
-impl Payload {
+impl AccountManager {
     pub async fn new(
         wallet: &WalletCore,
         accounts: Vec<PrivacyPreservingAccount>,
@@ -60,16 +60,8 @@ impl Payload {
                     (State::Public { account, sk }, 0)
                 }
                 PrivacyPreservingAccount::PrivateOwned(account_id) => {
-                    let mut pre = wallet
-                        .private_acc_preparation(account_id, true, true)
-                        .await?;
-                    let mut mask = 1;
-
-                    if pre.proof.is_none() {
-                        pre.auth_acc.is_authorized = false;
-                        pre.nsk = None;
-                        mask = 2
-                    };
+                    let pre = private_acc_preparation(wallet, account_id).await?;
+                    let mask = if pre.auth_acc.is_authorized { 1 } else { 2 };
 
                     (State::Private(pre), mask)
                 }
@@ -116,7 +108,7 @@ impl Payload {
         self.states
             .iter()
             .filter_map(|state| match state {
-                State::Public { account, .. } => Some(account.account.nonce),
+                State::Public { account, sk } => sk.as_ref().map(|_| account.account.nonce),
                 _ => None,
             })
             .collect()
@@ -170,4 +162,51 @@ impl Payload {
             })
             .collect()
     }
+}
+
+struct AccountPreparedData {
+    nsk: Option<NullifierSecretKey>,
+    npk: NullifierPublicKey,
+    ipk: IncomingViewingPublicKey,
+    auth_acc: AccountWithMetadata,
+    proof: Option<MembershipProof>,
+}
+
+async fn private_acc_preparation(
+    wallet: &WalletCore,
+    account_id: AccountId,
+) -> Result<AccountPreparedData, ExecutionFailureKind> {
+    let Some((from_keys, from_acc)) = wallet
+        .storage
+        .user_data
+        .get_private_account(&account_id)
+        .cloned()
+    else {
+        return Err(ExecutionFailureKind::KeyNotFoundError);
+    };
+
+    let mut nsk = Some(from_keys.private_key_holder.nullifier_secret_key);
+
+    let from_npk = from_keys.nullifer_public_key;
+    let from_ipk = from_keys.incoming_viewing_public_key;
+
+    // TODO: Remove this unwrap, error types must be compatible
+    let proof = wallet
+        .check_private_account_initialized(&account_id)
+        .await
+        .unwrap();
+
+    if proof.is_none() {
+        nsk = None;
+    }
+
+    let sender_pre = AccountWithMetadata::new(from_acc.clone(), proof.is_some(), &from_npk);
+
+    Ok(AccountPreparedData {
+        nsk,
+        npk: from_npk,
+        ipk: from_ipk,
+        auth_acc: sender_pre,
+        proof,
+    })
 }

@@ -1,5 +1,5 @@
 use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
-use nssa::{Account, AccountId, program::Program};
+use nssa::{AccountId, program::Program};
 use nssa_core::{
     NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey,
     program::InstructionData,
@@ -45,8 +45,7 @@ impl Token<'_> {
         name: [u8; 6],
         total_supply: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) =
-            token_program_preparation_definition(name, total_supply);
+        let (instruction_data, program) = token_program_preparation_definition(name, total_supply);
 
         self.0
             .send_privacy_preserving_tx(
@@ -55,7 +54,6 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(supply_account_id),
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
             )
             .await
@@ -114,7 +112,7 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) = token_program_preparation_transfer(amount);
+        let (instruction_data, program) = token_program_preparation_transfer(amount);
 
         self.0
             .send_privacy_preserving_tx(
@@ -123,7 +121,6 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
             )
             .await
@@ -142,7 +139,7 @@ impl Token<'_> {
         recipient_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) = token_program_preparation_transfer(amount);
+        let (instruction_data, program) = token_program_preparation_transfer(amount);
 
         self.0
             .send_privacy_preserving_tx(
@@ -154,7 +151,6 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
             )
             .await
@@ -172,7 +168,7 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) = token_program_preparation_transfer(amount);
+        let (instruction_data, program) = token_program_preparation_transfer(amount);
 
         self.0
             .send_privacy_preserving_tx(
@@ -181,7 +177,6 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(recipient_account_id),
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
             )
             .await
@@ -200,7 +195,7 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) = token_program_preparation_transfer(amount);
+        let (instruction_data, program) = token_program_preparation_transfer(amount);
 
         self.0
             .send_privacy_preserving_tx(
@@ -209,7 +204,6 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
             )
             .await
@@ -229,7 +223,7 @@ impl Token<'_> {
         recipient_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) = token_program_preparation_transfer(amount);
+        let (instruction_data, program) = token_program_preparation_transfer(amount);
 
         self.0
             .send_privacy_preserving_tx(
@@ -241,7 +235,6 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
             )
             .await
@@ -255,13 +248,7 @@ impl Token<'_> {
     }
 }
 
-fn token_program_preparation_transfer(
-    amount: u128,
-) -> (
-    InstructionData,
-    Program,
-    impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
-) {
+fn token_program_preparation_transfer(amount: u128) -> (InstructionData, Program) {
     // Instruction must be: [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
     // 0x00 || 0x00 || 0x00].
     let mut instruction = [0; 23];
@@ -269,26 +256,20 @@ fn token_program_preparation_transfer(
     instruction[1..17].copy_from_slice(&amount.to_le_bytes());
     let instruction_data = Program::serialize_instruction(instruction).unwrap();
     let program = Program::token();
-    let tx_pre_check = |_: &[&Account]| Ok(());
 
-    (instruction_data, program, tx_pre_check)
+    (instruction_data, program)
 }
 
 fn token_program_preparation_definition(
     name: [u8; 6],
     total_supply: u128,
-) -> (
-    InstructionData,
-    Program,
-    impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
-) {
+) -> (InstructionData, Program) {
     // Instruction must be: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
     let mut instruction = [0; 23];
     instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
     instruction[17..].copy_from_slice(&name);
     let instruction_data = Program::serialize_instruction(instruction).unwrap();
     let program = Program::token();
-    let tx_pre_check = |_: &[&Account]| Ok(());
 
-    (instruction_data, program, tx_pre_check)
+    (instruction_data, program)
 }

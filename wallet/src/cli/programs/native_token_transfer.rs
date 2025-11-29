@@ -75,10 +75,8 @@ impl WalletSubcommand for AuthTransferSubcommand {
                     AccountPrivacyKind::Private => {
                         let account_id = account_id.parse()?;
 
-                        let (res, [secret]) = wallet_core
-                            .register_account_under_authenticated_transfers_programs_private(
-                                account_id,
-                            )
+                        let (res, secret) = NativeTokenTransfer(wallet_core)
+                            .register_account_private(account_id)
                             .await?;
 
                         println!("Results of tx send is {res:#?}");

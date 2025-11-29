@@ -33,7 +33,6 @@ pub mod helperfunctions;
 pub mod poller;
 mod privacy_preserving_tx;
 pub mod program_facades;
-pub mod transaction_utils;
 
 pub struct WalletCore {
     pub storage: WalletChainStore,
@@ -224,12 +223,24 @@ impl WalletCore {
         &self,
         accounts: Vec<PrivacyPreservingAccount>,
         instruction_data: &InstructionData,
-        tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
         program: &Program,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
-        let payload = privacy_preserving_tx::Payload::new(self, accounts).await?;
+        self.send_privacy_preserving_tx_with_pre_check(accounts, instruction_data, program, |_| {
+            Ok(())
+        })
+        .await
+    }
 
-        let pre_states = payload.pre_states();
+    pub async fn send_privacy_preserving_tx_with_pre_check(
+        &self,
+        accounts: Vec<PrivacyPreservingAccount>,
+        instruction_data: &InstructionData,
+        program: &Program,
+        tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
+    ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
+        let acc_manager = privacy_preserving_tx::AccountManager::new(self, accounts).await?;
+
+        let pre_states = acc_manager.pre_states();
         tx_pre_check(
             &pre_states
                 .iter()
@@ -237,25 +248,25 @@ impl WalletCore {
                 .collect::<Vec<_>>(),
         )?;
 
-        let private_account_keys = payload.private_account_keys();
+        let private_account_keys = acc_manager.private_account_keys();
         let (output, proof) = nssa::privacy_preserving_transaction::circuit::execute_and_prove(
             &pre_states,
             instruction_data,
-            payload.visibility_mask(),
+            acc_manager.visibility_mask(),
             &produce_random_nonces(private_account_keys.len()),
             &private_account_keys
                 .iter()
                 .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
                 .collect::<Vec<_>>(),
-            &payload.private_account_auth(),
+            &acc_manager.private_account_auth(),
             program,
         )
         .unwrap();
 
         let message =
             nssa::privacy_preserving_transaction::message::Message::try_from_circuit_output(
-                payload.public_account_ids(),
-                Vec::from_iter(payload.public_account_nonces()),
+                acc_manager.public_account_ids(),
+                Vec::from_iter(acc_manager.public_account_nonces()),
                 private_account_keys
                     .iter()
                     .map(|keys| (keys.npk.clone(), keys.ipk.clone(), keys.epk.clone()))
@@ -268,7 +279,7 @@ impl WalletCore {
             nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
                 &message,
                 proof,
-                &payload.witness_signing_keys(),
+                &acc_manager.witness_signing_keys(),
             );
         let tx = PrivacyPreservingTransaction::new(message, witness_set);
 

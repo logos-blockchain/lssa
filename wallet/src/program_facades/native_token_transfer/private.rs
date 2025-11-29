@@ -1,13 +1,34 @@
 use std::vec;
 
 use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
-use nssa::AccountId;
+use nssa::{AccountId, program::Program};
 use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
 
 use super::{NativeTokenTransfer, auth_transfer_preparation};
 use crate::PrivacyPreservingAccount;
 
 impl NativeTokenTransfer<'_> {
+    pub async fn register_account_private(
+        &self,
+        from: AccountId,
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
+        let instruction: u128 = 0;
+
+        self.0
+            .send_privacy_preserving_tx_with_pre_check(
+                vec![PrivacyPreservingAccount::PrivateOwned(from)],
+                &Program::serialize_instruction(instruction).unwrap(),
+                &Program::authenticated_transfer_program(),
+                |_| Ok(()),
+            )
+            .await
+            .map(|(resp, secrets)| {
+                let mut secrets_iter = secrets.into_iter();
+                let first = secrets_iter.next().expect("expected sender's secret");
+                (resp, first)
+            })
+    }
+
     pub async fn send_private_transfer_to_outer_account(
         &self,
         from: AccountId,
@@ -18,7 +39,7 @@ impl NativeTokenTransfer<'_> {
         let (instruction_data, program, tx_pre_check) = auth_transfer_preparation(balance_to_move);
 
         self.0
-            .send_privacy_preserving_tx(
+            .send_privacy_preserving_tx_with_pre_check(
                 vec![
                     PrivacyPreservingAccount::PrivateOwned(from),
                     PrivacyPreservingAccount::PrivateForeign {
@@ -27,8 +48,8 @@ impl NativeTokenTransfer<'_> {
                     },
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
+                tx_pre_check,
             )
             .await
             .map(|(resp, secrets)| {
@@ -48,14 +69,14 @@ impl NativeTokenTransfer<'_> {
         let (instruction_data, program, tx_pre_check) = auth_transfer_preparation(balance_to_move);
 
         self.0
-            .send_privacy_preserving_tx(
+            .send_privacy_preserving_tx_with_pre_check(
                 vec![
                     PrivacyPreservingAccount::PrivateOwned(from),
                     PrivacyPreservingAccount::PrivateOwned(to),
                 ],
                 &instruction_data,
-                tx_pre_check,
                 &program,
+                tx_pre_check,
             )
             .await
             .map(|(resp, secrets)| {
