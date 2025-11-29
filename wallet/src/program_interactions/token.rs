@@ -1,11 +1,11 @@
 use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use nssa::{Account, AccountId, program::Program};
 use nssa_core::{
-    MembershipProof, NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey,
+    NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey,
     program::InstructionData,
 };
 
-use crate::WalletCore;
+use crate::{PrivacyPreservingAccount, WalletCore};
 
 impl WalletCore {
     pub fn token_program_preparation_transfer(
@@ -13,7 +13,7 @@ impl WalletCore {
     ) -> (
         InstructionData,
         Program,
-        impl FnOnce(&Account, &Account) -> Result<(), ExecutionFailureKind>,
+        impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) {
         // Instruction must be: [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
         // 0x00 || 0x00 || 0x00].
@@ -22,7 +22,7 @@ impl WalletCore {
         instruction[1..17].copy_from_slice(&amount.to_le_bytes());
         let instruction_data = Program::serialize_instruction(instruction).unwrap();
         let program = Program::token();
-        let tx_pre_check = |_: &Account, _: &Account| Ok(());
+        let tx_pre_check = |_: &[&Account]| Ok(());
 
         (instruction_data, program, tx_pre_check)
     }
@@ -33,7 +33,7 @@ impl WalletCore {
     ) -> (
         InstructionData,
         Program,
-        impl FnOnce(&Account, &Account) -> Result<(), ExecutionFailureKind>,
+        impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) {
         // Instruction must be: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
         let mut instruction = [0; 23];
@@ -41,7 +41,7 @@ impl WalletCore {
         instruction[17..].copy_from_slice(&name);
         let instruction_data = Program::serialize_instruction(instruction).unwrap();
         let program = Program::token();
-        let tx_pre_check = |_: &Account, _: &Account| Ok(());
+        let tx_pre_check = |_: &[&Account]| Ok(());
 
         (instruction_data, program, tx_pre_check)
     }
@@ -80,20 +80,27 @@ impl WalletCore {
         supply_account_id: AccountId,
         name: [u8; 6],
         total_supply: u128,
-    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::token_program_preparation_definition(name, total_supply);
 
-        // Kind of non-obvious naming
-        // Basically this funtion is called because authentication mask is [0, 2]
-        self.shielded_two_accs_receiver_uninit(
-            definition_account_id,
-            supply_account_id,
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::Public(definition_account_id),
+                PrivacyPreservingAccount::PrivateLocal(supply_account_id),
+            ],
             instruction_data,
             tx_pre_check,
             program,
         )
         .await
+        .map(|(resp, secrets)| {
+            let first = secrets
+                .into_iter()
+                .next()
+                .expect("expected recipient's secret");
+            (resp, first)
+        })
     }
 
     pub async fn send_transfer_token_transaction(
@@ -135,28 +142,7 @@ impl WalletCore {
         Ok(self.sequencer_client.send_tx_public(tx).await?)
     }
 
-    pub async fn send_transfer_token_transaction_private_owned_account_already_initialized(
-        &self,
-        sender_account_id: AccountId,
-        recipient_account_id: AccountId,
-        amount: u128,
-        recipient_proof: MembershipProof,
-    ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) =
-            WalletCore::token_program_preparation_transfer(amount);
-
-        self.private_tx_two_accs_all_init(
-            sender_account_id,
-            recipient_account_id,
-            instruction_data,
-            tx_pre_check,
-            program,
-            recipient_proof,
-        )
-        .await
-    }
-
-    pub async fn send_transfer_token_transaction_private_owned_account_not_initialized(
+    pub async fn send_transfer_token_transaction_private_owned_account(
         &self,
         sender_account_id: AccountId,
         recipient_account_id: AccountId,
@@ -165,14 +151,22 @@ impl WalletCore {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::token_program_preparation_transfer(amount);
 
-        self.private_tx_two_accs_receiver_uninit(
-            sender_account_id,
-            recipient_account_id,
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::PrivateLocal(sender_account_id),
+                PrivacyPreservingAccount::PrivateLocal(recipient_account_id),
+            ],
             instruction_data,
             tx_pre_check,
             program,
         )
         .await
+        .map(|(resp, secrets)| {
+            let mut iter = secrets.into_iter();
+            let first = iter.next().expect("expected sender's secret");
+            let second = iter.next().expect("expected recipient's secret");
+            (resp, [first, second])
+        })
     }
 
     pub async fn send_transfer_token_transaction_private_foreign_account(
@@ -185,15 +179,25 @@ impl WalletCore {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::token_program_preparation_transfer(amount);
 
-        self.private_tx_two_accs_receiver_outer(
-            sender_account_id,
-            recipient_npk,
-            recipient_ipk,
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::PrivateLocal(sender_account_id),
+                PrivacyPreservingAccount::PrivateForeign {
+                    npk: recipient_npk,
+                    ipk: recipient_ipk,
+                },
+            ],
             instruction_data,
             tx_pre_check,
             program,
         )
         .await
+        .map(|(resp, secrets)| {
+            let mut iter = secrets.into_iter();
+            let first = iter.next().expect("expected sender's secret");
+            let second = iter.next().expect("expected recipient's secret");
+            (resp, [first, second])
+        })
     }
 
     pub async fn send_transfer_token_transaction_deshielded(
@@ -201,58 +205,55 @@ impl WalletCore {
         sender_account_id: AccountId,
         recipient_account_id: AccountId,
         amount: u128,
-    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::token_program_preparation_transfer(amount);
 
-        self.deshielded_tx_two_accs(
-            sender_account_id,
-            recipient_account_id,
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::PrivateLocal(sender_account_id),
+                PrivacyPreservingAccount::Public(recipient_account_id),
+            ],
             instruction_data,
             tx_pre_check,
             program,
         )
         .await
+        .map(|(resp, secrets)| {
+            let first = secrets
+                .into_iter()
+                .next()
+                .expect("expected sender's secret");
+            (resp, first)
+        })
     }
 
-    pub async fn send_transfer_token_transaction_shielded_owned_account_already_initialized(
+    pub async fn send_transfer_token_transaction_shielded_owned_account(
         &self,
         sender_account_id: AccountId,
         recipient_account_id: AccountId,
         amount: u128,
-        recipient_proof: MembershipProof,
-    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::token_program_preparation_transfer(amount);
 
-        self.shielded_two_accs_all_init(
-            sender_account_id,
-            recipient_account_id,
-            instruction_data,
-            tx_pre_check,
-            program,
-            recipient_proof,
-        )
-        .await
-    }
-
-    pub async fn send_transfer_token_transaction_shielded_owned_account_not_initialized(
-        &self,
-        sender_account_id: AccountId,
-        recipient_account_id: AccountId,
-        amount: u128,
-    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) =
-            WalletCore::token_program_preparation_transfer(amount);
-
-        self.shielded_two_accs_receiver_uninit(
-            sender_account_id,
-            recipient_account_id,
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::Public(sender_account_id),
+                PrivacyPreservingAccount::PrivateLocal(recipient_account_id),
+            ],
             instruction_data,
             tx_pre_check,
             program,
         )
         .await
+        .map(|(resp, secrets)| {
+            let first = secrets
+                .into_iter()
+                .next()
+                .expect("expected recipient's secret");
+            (resp, first)
+        })
     }
 
     pub async fn send_transfer_token_transaction_shielded_foreign_account(
@@ -261,18 +262,29 @@ impl WalletCore {
         recipient_npk: NullifierPublicKey,
         recipient_ipk: IncomingViewingPublicKey,
         amount: u128,
-    ) -> Result<SendTxResponse, ExecutionFailureKind> {
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::token_program_preparation_transfer(amount);
 
-        self.shielded_two_accs_receiver_outer(
-            sender_account_id,
-            recipient_npk,
-            recipient_ipk,
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::Public(sender_account_id),
+                PrivacyPreservingAccount::PrivateForeign {
+                    npk: recipient_npk,
+                    ipk: recipient_ipk,
+                },
+            ],
             instruction_data,
             tx_pre_check,
             program,
         )
         .await
+        .map(|(resp, secrets)| {
+            let first = secrets
+                .into_iter()
+                .next()
+                .expect("expected recipient's secret");
+            (resp, first)
+        })
     }
 }

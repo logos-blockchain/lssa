@@ -1,37 +1,36 @@
 use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use nssa::AccountId;
-use nssa_core::{
-    MembershipProof, NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey,
-};
+use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
 
-use crate::WalletCore;
+use crate::{PrivacyPreservingAccount, WalletCore};
 
 impl WalletCore {
-    pub async fn send_shielded_native_token_transfer_already_initialized(
+    pub async fn send_shielded_native_token_transfer(
         &self,
         from: AccountId,
         to: AccountId,
         balance_to_move: u128,
-        to_proof: MembershipProof,
-    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::auth_transfer_preparation(balance_to_move);
 
-        self.shielded_two_accs_all_init(from, to, instruction_data, tx_pre_check, program, to_proof)
-            .await
-    }
-
-    pub async fn send_shielded_native_token_transfer_not_initialized(
-        &self,
-        from: AccountId,
-        to: AccountId,
-        balance_to_move: u128,
-    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
-        let (instruction_data, program, tx_pre_check) =
-            WalletCore::auth_transfer_preparation(balance_to_move);
-
-        self.shielded_two_accs_receiver_uninit(from, to, instruction_data, tx_pre_check, program)
-            .await
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::Public(from),
+                PrivacyPreservingAccount::PrivateLocal(to),
+            ],
+            instruction_data,
+            tx_pre_check,
+            program,
+        )
+        .await
+        .map(|(resp, secrets)| {
+            let first = secrets
+                .into_iter()
+                .next()
+                .expect("expected sender's secret");
+            (resp, first)
+        })
     }
 
     pub async fn send_shielded_native_token_transfer_outer_account(
@@ -40,18 +39,29 @@ impl WalletCore {
         to_npk: NullifierPublicKey,
         to_ipk: IncomingViewingPublicKey,
         balance_to_move: u128,
-    ) -> Result<SendTxResponse, ExecutionFailureKind> {
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::auth_transfer_preparation(balance_to_move);
 
-        self.shielded_two_accs_receiver_outer(
-            from,
-            to_npk,
-            to_ipk,
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::Public(from),
+                PrivacyPreservingAccount::PrivateForeign {
+                    npk: to_npk,
+                    ipk: to_ipk,
+                },
+            ],
             instruction_data,
             tx_pre_check,
             program,
         )
         .await
+        .map(|(resp, secrets)| {
+            let first = secrets
+                .into_iter()
+                .next()
+                .expect("expected sender's secret");
+            (resp, first)
+        })
     }
 }

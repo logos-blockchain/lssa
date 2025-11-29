@@ -389,7 +389,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 let definition_account_id: AccountId = definition_account_id.parse().unwrap();
                 let supply_account_id: AccountId = supply_account_id.parse().unwrap();
 
-                let (res, [secret_supply]) = wallet_core
+                let (res, secret_supply) = wallet_core
                     .send_new_token_definition_private_owned(
                         definition_account_id,
                         supply_account_id,
@@ -428,29 +428,13 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 let sender_account_id: AccountId = sender_account_id.parse().unwrap();
                 let recipient_account_id: AccountId = recipient_account_id.parse().unwrap();
 
-                let recipient_initialization = wallet_core
-                    .check_private_account_initialized(&recipient_account_id)
+                let (res, [secret_sender, secret_recipient]) = wallet_core
+                    .send_transfer_token_transaction_private_owned_account(
+                        sender_account_id,
+                        recipient_account_id,
+                        balance_to_move,
+                    )
                     .await?;
-
-                let (res, [secret_sender, secret_recipient]) =
-                    if let Some(recipient_proof) = recipient_initialization {
-                        wallet_core
-                        .send_transfer_token_transaction_private_owned_account_already_initialized(
-                            sender_account_id,
-                            recipient_account_id,
-                            balance_to_move,
-                            recipient_proof,
-                        )
-                        .await?
-                    } else {
-                        wallet_core
-                            .send_transfer_token_transaction_private_owned_account_not_initialized(
-                                sender_account_id,
-                                recipient_account_id,
-                                balance_to_move,
-                            )
-                            .await?
-                    };
 
                 println!("Results of tx send is {res:#?}");
 
@@ -545,7 +529,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                 let sender_account_id: AccountId = sender_account_id.parse().unwrap();
                 let recipient_account_id: AccountId = recipient_account_id.parse().unwrap();
 
-                let (res, [secret_sender]) = wallet_core
+                let (res, secret_sender) = wallet_core
                     .send_transfer_token_transaction_deshielded(
                         sender_account_id,
                         recipient_account_id,
@@ -604,7 +588,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     recipient_ipk.to_vec(),
                 );
 
-                let res = wallet_core
+                let (res, _) = wallet_core
                     .send_transfer_token_transaction_shielded_foreign_account(
                         sender_account_id,
                         recipient_npk,
@@ -638,29 +622,13 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 let sender_account_id: AccountId = sender_account_id.parse().unwrap();
                 let recipient_account_id: AccountId = recipient_account_id.parse().unwrap();
 
-                let recipient_initialization = wallet_core
-                    .check_private_account_initialized(&recipient_account_id)
+                let (res, secret_recipient) = wallet_core
+                    .send_transfer_token_transaction_shielded_owned_account(
+                        sender_account_id,
+                        recipient_account_id,
+                        balance_to_move,
+                    )
                     .await?;
-
-                let (res, [secret_recipient]) =
-                    if let Some(recipient_proof) = recipient_initialization {
-                        wallet_core
-                        .send_transfer_token_transaction_shielded_owned_account_already_initialized(
-                            sender_account_id,
-                            recipient_account_id,
-                            balance_to_move,
-                            recipient_proof,
-                        )
-                        .await?
-                    } else {
-                        wallet_core
-                            .send_transfer_token_transaction_shielded_owned_account_not_initialized(
-                                sender_account_id,
-                                recipient_account_id,
-                                balance_to_move,
-                            )
-                            .await?
-                    };
 
                 println!("Results of tx send is {res:#?}");
 

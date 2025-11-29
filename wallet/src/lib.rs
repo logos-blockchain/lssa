@@ -4,19 +4,23 @@ use anyhow::Result;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chain_storage::WalletChainStore;
 use common::{
-    sequencer_client::SequencerClient,
+    error::ExecutionFailureKind,
+    sequencer_client::{SequencerClient, json::SendTxResponse},
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::WalletConfig;
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use log::info;
-use nssa::{Account, AccountId};
-use nssa_core::{Commitment, MembershipProof};
+use nssa::{Account, AccountId, PrivacyPreservingTransaction, program::Program};
+use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
+pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
     config::PersistentStorage,
-    helperfunctions::{fetch_persistent_storage, get_home, produce_data_for_storage},
+    helperfunctions::{
+        fetch_persistent_storage, get_home, produce_data_for_storage, produce_random_nonces,
+    },
     poller::TxPoller,
 };
 
@@ -27,6 +31,7 @@ pub mod cli;
 pub mod config;
 pub mod helperfunctions;
 pub mod poller;
+mod privacy_preserving_tx;
 pub mod program_interactions;
 pub mod token_transfers;
 pub mod transaction_utils;
@@ -144,6 +149,15 @@ impl WalletCore {
         Ok(response.account)
     }
 
+    pub fn get_account_public_signing_key(
+        &self,
+        account_id: &AccountId,
+    ) -> Option<&nssa::PrivateKey> {
+        self.storage
+            .user_data
+            .get_pub_account_signing_key(account_id)
+    }
+
     pub fn get_account_private(&self, account_id: &AccountId) -> Option<Account> {
         self.storage
             .user_data
@@ -205,5 +219,68 @@ impl WalletCore {
         println!("Transaction data is {:?}", tx.message);
 
         Ok(())
+    }
+
+    pub async fn send_privacy_preserving_tx(
+        &self,
+        accounts: Vec<PrivacyPreservingAccount>,
+        instruction_data: InstructionData,
+        tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
+        program: Program,
+    ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
+        let payload = privacy_preserving_tx::Payload::new(self, accounts).await?;
+
+        let pre_states = payload.pre_states();
+        tx_pre_check(
+            &pre_states
+                .iter()
+                .map(|pre| &pre.account)
+                .collect::<Vec<_>>(),
+        )?;
+
+        let private_account_keys = payload.private_account_keys();
+        let (output, proof) = nssa::privacy_preserving_transaction::circuit::execute_and_prove(
+            &pre_states,
+            &instruction_data,
+            payload.visibility_mask(),
+            &produce_random_nonces(private_account_keys.len()),
+            &private_account_keys
+                .iter()
+                .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
+                .collect::<Vec<_>>(),
+            &payload.private_account_auth(),
+            &program,
+        )
+        .unwrap();
+
+        let message =
+            nssa::privacy_preserving_transaction::message::Message::try_from_circuit_output(
+                payload.public_account_ids(),
+                Vec::from_iter(payload.public_account_nonces()),
+                private_account_keys
+                    .iter()
+                    .map(|keys| (keys.npk.clone(), keys.ipk.clone(), keys.epk.clone()))
+                    .collect(),
+                output,
+            )
+            .unwrap();
+
+        let witness_set =
+            nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
+                &message,
+                proof,
+                &payload.witness_signing_keys(),
+            );
+        let tx = PrivacyPreservingTransaction::new(message, witness_set);
+
+        let shared_secrets = private_account_keys
+            .into_iter()
+            .map(|keys| keys.ssk)
+            .collect();
+
+        Ok((
+            self.sequencer_client.send_tx_private(tx).await?,
+            shared_secrets,
+        ))
     }
 }

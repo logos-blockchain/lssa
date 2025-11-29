@@ -15,11 +15,12 @@ impl WalletCore {
     ) -> (
         InstructionData,
         Program,
-        impl FnOnce(&Account, &Account) -> Result<(), ExecutionFailureKind>,
+        impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) {
         let instruction_data = Program::serialize_instruction(balance_to_move).unwrap();
         let program = Program::authenticated_transfer_program();
-        let tx_pre_check = move |from: &Account, _: &Account| {
+        let tx_pre_check = move |accounts: &[&Account]| {
+            let from = accounts[0];
             if from.balance >= balance_to_move {
                 Ok(())
             } else {

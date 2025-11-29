@@ -1,7 +1,7 @@
 use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use nssa::AccountId;
 
-use crate::WalletCore;
+use crate::{PrivacyPreservingAccount, WalletCore};
 
 impl WalletCore {
     pub async fn send_deshielded_native_token_transfer(
@@ -9,11 +9,26 @@ impl WalletCore {
         from: AccountId,
         to: AccountId,
         balance_to_move: u128,
-    ) -> Result<(SendTxResponse, [nssa_core::SharedSecretKey; 1]), ExecutionFailureKind> {
+    ) -> Result<(SendTxResponse, nssa_core::SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) =
             WalletCore::auth_transfer_preparation(balance_to_move);
 
-        self.deshielded_tx_two_accs(from, to, instruction_data, tx_pre_check, program)
-            .await
+        self.send_privacy_preserving_tx(
+            vec![
+                PrivacyPreservingAccount::PrivateLocal(from),
+                PrivacyPreservingAccount::Public(to),
+            ],
+            instruction_data,
+            tx_pre_check,
+            program,
+        )
+        .await
+        .map(|(resp, secrets)| {
+            let first = secrets
+                .into_iter()
+                .next()
+                .expect("expected sender's secret");
+            (resp, first)
+        })
     }
 }
