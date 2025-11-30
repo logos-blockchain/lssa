@@ -81,7 +81,7 @@ pub enum OverCommand {
 pub struct Args {
     /// Continious run flag
     #[arg(short, long)]
-    pub continious_run: bool,
+    pub continuous_run: bool,
     /// Wallet command
     #[command(subcommand)]
     pub command: Option<OverCommand>,
@@ -162,7 +162,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
     Ok(subcommand_ret)
 }
 
-pub async fn execute_continious_run() -> Result<()> {
+pub async fn execute_continuous_run() -> Result<()> {
     let config = fetch_config().await?;
     let seq_client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
     let mut wallet_core = WalletCore::start_from_config_update_chain(config.clone()).await?;

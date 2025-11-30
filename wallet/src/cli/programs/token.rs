@@ -399,7 +399,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )
                     .await?;
 
-                println!("Results of tx send is {res:#?}");
+                println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
                 let transfer_tx = wallet_core
@@ -437,7 +437,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )
                     .await?;
 
-                println!("Results of tx send is {res:#?}");
+                println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
                 let transfer_tx = wallet_core
@@ -490,7 +490,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )
                     .await?;
 
-                println!("Results of tx send is {res:#?}");
+                println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
                 let transfer_tx = wallet_core
@@ -538,7 +538,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                     )
                     .await?;
 
-                println!("Results of tx send is {res:#?}");
+                println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
                 let transfer_tx = wallet_core
@@ -598,7 +598,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )
                     .await?;
 
-                println!("Results of tx send is {res:#?}");
+                println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
                 let transfer_tx = wallet_core
@@ -631,7 +631,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )
                     .await?;
 
-                println!("Results of tx send is {res:#?}");
+                println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
                 let transfer_tx = wallet_core
