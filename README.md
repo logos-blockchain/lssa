@@ -187,6 +187,9 @@ Commands:
 
 ### Accounts
 
+> [!NOTE]
+> Accounts are the basic unit of state in NSSA. They essentially hold native tokens and arbitrary data managed by some program.
+
 The CLI provides commands to manage accounts. Run `wallet account` to see the options available:
 ```bash
 Commands:
@@ -211,7 +214,7 @@ This address is required when executing any program that interacts with the acco
 
 > [!NOTE]
 > Public accounts live on-chain and are identified by a 32-byte Account ID.
-> Running `wallet account new public` generates a fresh keypair for the fixed signature scheme used in NSSA.
+> Running `wallet account new public` generates a fresh keypair for the signature scheme used in NSSA.
 > The account ID is derived from the public key. The private key is used to sign transactions and to authorize the account in program executions.
 
 #### Account initialization
@@ -226,7 +229,10 @@ wallet account get --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 Account is Uninitialized
 ```
 
-New accounts start as uninitialized, meaning no program owns them yet. Programs can claim uninitialized accounts; once claimed, the account becomes permanently owned by that program.
+> [!NOTE]
+> New accounts begin in an uninitialized state, meaning they are not yet owned by any program. A program may claim an uninitialized account; once claimed, the account becomes owned by that program.
+> Owned accounts can only be modified through executions of the owning program. The only exception is native-token credits: any program may credit native tokens to any account.
+> However, debiting native tokens from an account must always be performed by its owning program.
 
 In this example, we will initialize the account for the Authenticated transfer program, which securely manages native token transfers by requiring authentication for debits.
 
@@ -288,7 +294,9 @@ wallet account new public
 Generated new account with addr Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
 ```
 
-The new account is uninitialized. The authenticated transfers program will claim any uninitialized account used in a transfer. So we don't need to manually initialize the recipient account.
+
+> [!NOTE]
+> The new account is uninitialized. The authenticated transfers program will claim any uninitialized account used in a transfer. So we don't need to manually initialize the recipient account.
 
 Let's send 37 tokens to the new account.
 
@@ -320,6 +328,16 @@ Account owned by authenticated transfer program
 ```
 
 #### Create a new private account
+
+> [!NOTE]
+> Private accounts are structurally identical to public accounts; they differ only in how their state is stored off-chain and represented on-chain.
+> The raw values of a private account are never stored on-chain. Instead, the chain only holds a 32-byte commitment (a hash-like binding to the actual values). Transactions include encrypted versions of the private values so that users can recover them from the blockchain. The decryption keys are known only to the user and are never shared.
+> Private accounts are not managed through the usual signature mechanism used for public accounts. Instead, each private account is associated with two keypairs:
+> - *Nullifier keys*, for using the corresponding private account in a private execution.
+> - *Viewing keys*, used for encrypting and decrypting the values included in transactions.
+>
+> Private accounts also have a 32-byte identifier, derived from the nullifier public key.
+> Just like public accounts, private accounts can only be initialized once. Any user can initialize them without knowing the owner's secret keys. However, modifying an initialized private account through an off-chain program execution requires knowledge of the owner’s secret keys.
 
 Now let’s switch to the private state and create a private account.
 
