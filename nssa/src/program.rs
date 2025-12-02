@@ -107,7 +107,8 @@ impl Program {
 
     pub fn pinata_token() -> Self {
         use crate::program_methods::PINATA_TOKEN_ELF;
-        Self::new(PINATA_TOKEN_ELF.to_vec()).expect("pinata token elf is defined in risc0 build of `program_methods`")
+        Self::new(PINATA_TOKEN_ELF.to_vec())
+            .expect("pinata token elf is defined in risc0 build of `program_methods`")
     }
 }
 

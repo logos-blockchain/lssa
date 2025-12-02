@@ -639,7 +639,7 @@ mod tests {
             AccountWithMetadata {
                 account: Account {
                     // Definition ID with
-                    data: vec![0; TOKEN_DEFINITION_DATA_SIZE - 16]
+                    data: [0; TOKEN_DEFINITION_DATA_SIZE - 16]
                         .into_iter()
                         .chain(u128::to_le_bytes(1000))
                         .collect(),
