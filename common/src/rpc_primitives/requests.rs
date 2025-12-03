@@ -20,6 +20,7 @@ pub struct RegisterAccountRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxRequest {
+    #[serde(with = "base64_deser")]
     pub transaction: Vec<u8>,
 }
 
@@ -105,12 +106,72 @@ pub struct SendTxResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetBlockDataResponse {
+    #[serde(with = "base64_deser")]
     pub block: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetBlockRangeDataResponse {
+    #[serde(with = "base64_deser::vec")]
     pub blocks: Vec<Vec<u8>>,
+}
+
+mod base64_deser {
+    use base64::{Engine as _, engine::general_purpose};
+    use serde::{self, Deserialize, Deserializer, Serializer, ser::SerializeSeq as _};
+
+    pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let base64_string = general_purpose::STANDARD.encode(bytes);
+        serializer.serialize_str(&base64_string)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let base64_string: String = Deserialize::deserialize(deserializer)?;
+        general_purpose::STANDARD
+            .decode(&base64_string)
+            .map_err(serde::de::Error::custom)
+    }
+
+    pub mod vec {
+        use super::*;
+
+        pub fn serialize<S>(bytes: &[Vec<u8>], serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let base64_strings: Vec<String> = bytes
+                .iter()
+                .map(|b| general_purpose::STANDARD.encode(b))
+                .collect();
+            let mut seq = serializer.serialize_seq(Some(base64_strings.len()))?;
+            for s in base64_strings {
+                seq.serialize_element(&s)?;
+            }
+            seq.end()
+        }
+
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Vec<u8>>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let base64_strings: Vec<String> = Deserialize::deserialize(deserializer)?;
+            let bytes_vec: Result<Vec<Vec<u8>>, D::Error> = base64_strings
+                .into_iter()
+                .map(|s| {
+                    general_purpose::STANDARD
+                        .decode(&s)
+                        .map_err(serde::de::Error::custom)
+                })
+                .collect();
+            bytes_vec
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
