@@ -1,6 +1,6 @@
 use std::vec;
 
-use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
+use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::{AccountId, program::Program};
 use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
 

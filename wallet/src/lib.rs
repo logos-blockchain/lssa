@@ -5,7 +5,8 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chain_storage::WalletChainStore;
 use common::{
     error::ExecutionFailureKind,
-    sequencer_client::{SequencerClient, json::SendTxResponse},
+    rpc_primitives::requests::SendTxResponse,
+    sequencer_client::SequencerClient,
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::WalletConfig;

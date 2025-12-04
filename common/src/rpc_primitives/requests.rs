@@ -141,16 +141,13 @@ mod base64_deser {
     pub mod vec {
         use super::*;
 
-        pub fn serialize<S>(bytes: &[Vec<u8>], serializer: S) -> Result<S::Ok, S::Error>
+        pub fn serialize<S>(bytes_vec: &[Vec<u8>], serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            let base64_strings: Vec<String> = bytes
-                .iter()
-                .map(|b| general_purpose::STANDARD.encode(b))
-                .collect();
-            let mut seq = serializer.serialize_seq(Some(base64_strings.len()))?;
-            for s in base64_strings {
+            let mut seq = serializer.serialize_seq(Some(bytes_vec.len()))?;
+            for bytes in bytes_vec {
+                let s = general_purpose::STANDARD.encode(bytes);
                 seq.serialize_element(&s)?;
             }
             seq.end()
@@ -161,15 +158,14 @@ mod base64_deser {
             D: Deserializer<'de>,
         {
             let base64_strings: Vec<String> = Deserialize::deserialize(deserializer)?;
-            let bytes_vec: Result<Vec<Vec<u8>>, D::Error> = base64_strings
+            base64_strings
                 .into_iter()
                 .map(|s| {
                     general_purpose::STANDARD
                         .decode(&s)
                         .map_err(serde::de::Error::custom)
                 })
-                .collect();
-            bytes_vec
+                .collect()
         }
     }
 }
@@ -212,4 +208,11 @@ pub struct GetProofForCommitmentResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProgramIdsResponse {
     pub program_ids: HashMap<String, ProgramId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GetInitialTestnetAccountsResponse {
+    /// Hex encoded account id
+    pub account_id: String,
+    pub balance: u64,
 }
