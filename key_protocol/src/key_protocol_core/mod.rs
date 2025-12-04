@@ -91,7 +91,10 @@ impl NSSAUserData {
         &mut self,
         parent_cci: ChainIndex,
     ) -> nssa::AccountId {
-        self.public_key_tree.generate_new_node(parent_cci).unwrap()
+        self.public_key_tree
+            .generate_new_node(&parent_cci)
+            .unwrap()
+            .0
     }
 
     /// Returns the signing key for public transaction signatures
@@ -115,7 +118,10 @@ impl NSSAUserData {
         &mut self,
         parent_cci: ChainIndex,
     ) -> nssa::AccountId {
-        self.private_key_tree.generate_new_node(parent_cci).unwrap()
+        self.private_key_tree
+            .generate_new_node(&parent_cci)
+            .unwrap()
+            .0
     }
 
     /// Returns the signing key for public transaction signatures
