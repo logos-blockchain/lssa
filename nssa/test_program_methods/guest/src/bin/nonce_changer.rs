@@ -1,4 +1,4 @@
-use nssa_core::program::{read_nssa_inputs, write_nssa_outputs, ProgramInput};
+use nssa_core::program::{read_nssa_inputs, write_nssa_outputs, AccountPostState, ProgramInput};
 
 type Instruction = ();
 
@@ -14,5 +14,5 @@ fn main() {
     let mut account_post = account_pre.clone();
     account_post.nonce += 1;
 
-    write_nssa_outputs(vec![pre], vec![account_post]);
+    write_nssa_outputs(vec![pre], vec![AccountPostState::new(account_post)]);
 }

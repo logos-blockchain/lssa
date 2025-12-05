@@ -1,11 +1,11 @@
 use nssa_core::program::{AccountPostState, ProgramInput, read_nssa_inputs, write_nssa_outputs};
 
-type Instruction = u128;
+type Instruction = ();
 
 fn main() {
     let ProgramInput {
         pre_states,
-        instruction: balance_to_burn,
+        instruction: _,
     } = read_nssa_inputs::<Instruction>();
 
     let [pre] = match pre_states.try_into() {
@@ -13,9 +13,7 @@ fn main() {
         Err(_) => return,
     };
 
-    let account_pre = &pre.account;
-    let mut account_post = account_pre.clone();
-    account_post.balance -= balance_to_burn;
+    let account_post = AccountPostState::new_claimed(pre.account.clone());
 
-    write_nssa_outputs(vec![pre], vec![AccountPostState::new(account_post)]);
+    write_nssa_outputs(vec![pre], vec![account_post]);
 }

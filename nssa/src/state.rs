@@ -477,6 +477,7 @@ pub mod tests {
             self.insert_program(Program::minter());
             self.insert_program(Program::burner());
             self.insert_program(Program::chain_caller());
+            self.insert_program(Program::claimer());
             self
         }
 
@@ -2161,5 +2162,83 @@ pub mod tests {
             result,
             Err(NssaError::MaxChainedCallsDepthExceeded)
         ));
+    }
+
+    #[test]
+    fn test_claiming_mechanism_within_chain_call() {
+        // This test calls the authenticated transfer program through the chain_caller program.
+        // The transfer is made from an initialized sender to an uninitialized recipient. And
+        // it is expected that the recipient account is claimed by the authenticated transfer
+        // program and not the chained_caller program.
+        let chain_caller = Program::chain_caller();
+        let auth_transfer = Program::authenticated_transfer_program();
+        let key = PrivateKey::try_new([1; 32]).unwrap();
+        let account_id = AccountId::from(&PublicKey::new_from_private_key(&key));
+        let initial_balance = 100;
+        let initial_data = [(account_id, initial_balance)];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let from = account_id;
+        let from_key = key;
+        let to = AccountId::new([2; 32]);
+        let amount: u128 = 37;
+
+        // Check the recipient is an uninitialized account
+        assert_eq!(state.get_account_by_id(&to), Account::default());
+
+        let expected_to_post = Account {
+            // The expected program owner is the authenticated transfer program
+            program_owner: auth_transfer.id(),
+            balance: amount,
+            ..Account::default()
+        };
+
+        // The transaction executes the chain_caller program, which internally calls the
+        // authenticated_transfer program
+        let instruction: (u128, ProgramId, u32) =
+            (amount, Program::authenticated_transfer_program().id(), 1);
+        let message = public_transaction::Message::try_new(
+            chain_caller.id(),
+            vec![to, from], // The chain_caller program permutes the account order in the chain
+            // call
+            vec![0],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[&from_key]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        state.transition_from_public_transaction(&tx).unwrap();
+
+        let from_post = state.get_account_by_id(&from);
+        let to_post = state.get_account_by_id(&to);
+        assert_eq!(from_post.balance, initial_balance - amount);
+        assert_eq!(to_post, expected_to_post);
+    }
+
+    #[test]
+    fn test_claiming_mechanism_cannot_claim_initialied_accounts() {
+        let claimer = Program::claimer();
+        let mut state = V02State::new_with_genesis_accounts(&[], &[]).with_test_programs();
+        let account_id = AccountId::new([2; 32]);
+
+        // Insert an account with non-default program owner
+        state.force_insert_account(
+            account_id,
+            Account {
+                program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
+                ..Account::default()
+            },
+        );
+
+        let message =
+            public_transaction::Message::try_new(claimer.id(), vec![account_id], vec![], ())
+                .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+
+        assert!(matches!(result, Err(NssaError::InvalidProgramBehavior)))
     }
 }
