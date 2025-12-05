@@ -113,7 +113,7 @@ impl WalletSubcommand for NewSubcommand {
     ) -> Result<SubcommandReturnValue> {
         match self {
             NewSubcommand::Public { cci } => {
-                let account_id = wallet_core.create_new_account_public(cci);
+                let account_id = wallet_core.create_new_account_public(cci).await;
 
                 println!("Generated new account with account_id Public/{account_id}");
 
