@@ -115,13 +115,13 @@ impl<N: KeyNode> KeyTree<N> {
         &mut self,
         parent_cci: &ChainIndex,
     ) -> Option<(nssa::AccountId, ChainIndex)> {
-        let father_keys = self.key_map.get(parent_cci)?;
+        let parent_keys = self.key_map.get(parent_cci)?;
         let next_child_id = self
             .find_next_last_child_of_id(parent_cci)
             .expect("Can be None only if parent is not present");
         let next_cci = parent_cci.nth_child(next_child_id);
 
-        let child_keys = father_keys.nth_child(next_child_id);
+        let child_keys = parent_keys.nth_child(next_child_id);
         let account_id = child_keys.account_id();
 
         self.key_map.insert(next_cci.clone(), child_keys);
@@ -174,11 +174,12 @@ impl<N: KeyNode> KeyTree<N> {
 }
 
 impl KeyTree<ChildKeysPrivate> {
+    #[allow(clippy::result_large_err)]
     pub fn generate_new_node(
         &mut self,
         parent_cci: &ChainIndex,
     ) -> Result<(nssa::AccountId, ChainIndex), KeyTreeGenerationError> {
-        let father_keys =
+        let parent_keys =
             self.key_map
                 .get(parent_cci)
                 .ok_or(KeyTreeGenerationError::ParentChainIdNotFound(
@@ -190,21 +191,20 @@ impl KeyTree<ChildKeysPrivate> {
         let next_cci = parent_cci.nth_child(next_child_id);
 
         if let Some(prev_cci) = next_cci.previous_in_line() {
-            let prev_keys = self.key_map.get(&prev_cci).expect(
-                format!("Constraint violated, previous child with id {prev_cci} is missing")
-                    .as_str(),
-            );
+            let prev_keys = self.key_map.get(&prev_cci).unwrap_or_else(|| {
+                panic!("Constraint violated, previous child with id {prev_cci} is missing")
+            });
 
             if prev_keys.value.1 == nssa::Account::default() {
                 return Err(KeyTreeGenerationError::PredecesorsNotInitialized(next_cci));
             }
-        } else if *parent_cci != ChainIndex::root() {
-            if father_keys.value.1 == nssa::Account::default() {
-                return Err(KeyTreeGenerationError::PredecesorsNotInitialized(next_cci));
-            }
+        } else if *parent_cci != ChainIndex::root()
+            && parent_keys.value.1 == nssa::Account::default()
+        {
+            return Err(KeyTreeGenerationError::PredecesorsNotInitialized(next_cci));
         }
 
-        let child_keys = father_keys.nth_child(next_child_id);
+        let child_keys = parent_keys.nth_child(next_child_id);
         let account_id = child_keys.account_id();
 
         self.key_map.insert(next_cci.clone(), child_keys);
@@ -221,7 +221,7 @@ impl KeyTree<ChildKeysPrivate> {
     /// If account is default, removes them.
     ///
     /// Chain must be parsed for accounts beforehand
-    pub fn cleanup_tree_for_depth(&mut self, depth: u32) {
+    pub fn cleanup_tree_remove_ininit_for_depth(&mut self, depth: u32) {
         let mut id_stack = vec![ChainIndex::root()];
 
         while let Some(curr_id) = id_stack.pop() {
@@ -244,12 +244,13 @@ impl KeyTree<ChildKeysPrivate> {
 }
 
 impl KeyTree<ChildKeysPublic> {
+    #[allow(clippy::result_large_err)]
     pub async fn generate_new_node(
         &mut self,
         parent_cci: &ChainIndex,
         client: Arc<SequencerClient>,
     ) -> Result<(nssa::AccountId, ChainIndex), KeyTreeGenerationError> {
-        let father_keys =
+        let parent_keys =
             self.key_map
                 .get(parent_cci)
                 .ok_or(KeyTreeGenerationError::ParentChainIdNotFound(
@@ -261,10 +262,9 @@ impl KeyTree<ChildKeysPublic> {
         let next_cci = parent_cci.nth_child(next_child_id);
 
         if let Some(prev_cci) = next_cci.previous_in_line() {
-            let prev_keys = self.key_map.get(&prev_cci).expect(
-                format!("Constraint violated, previous child with id {prev_cci} is missing")
-                    .as_str(),
-            );
+            let prev_keys = self.key_map.get(&prev_cci).unwrap_or_else(|| {
+                panic!("Constraint violated, previous child with id {prev_cci} is missing")
+            });
             let prev_acc = client
                 .get_account(prev_keys.account_id().to_string())
                 .await?
@@ -275,7 +275,7 @@ impl KeyTree<ChildKeysPublic> {
             }
         } else if *parent_cci != ChainIndex::root() {
             let parent_acc = client
-                .get_account(father_keys.account_id().to_string())
+                .get_account(parent_keys.account_id().to_string())
                 .await?
                 .account;
 
@@ -284,7 +284,7 @@ impl KeyTree<ChildKeysPublic> {
             }
         }
 
-        let child_keys = father_keys.nth_child(next_child_id);
+        let child_keys = parent_keys.nth_child(next_child_id);
         let account_id = child_keys.account_id();
 
         self.key_map.insert(next_cci.clone(), child_keys);
@@ -299,7 +299,7 @@ impl KeyTree<ChildKeysPublic> {
     /// depth`.
     ///
     /// If account is default, removes them.
-    pub async fn cleanup_tree_for_depth(
+    pub async fn cleanup_tree_remove_ininit_for_depth(
         &mut self,
         depth: u32,
         client: Arc<SequencerClient>,
@@ -615,7 +615,7 @@ mod tests {
             .unwrap();
         acc.value.1.balance = 6;
 
-        tree.cleanup_tree_for_depth(10);
+        tree.cleanup_tree_remove_ininit_for_depth(10);
 
         let mut key_set_res = HashSet::new();
         key_set_res.insert("/0".to_string());

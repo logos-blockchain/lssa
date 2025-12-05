@@ -102,13 +102,7 @@ impl ChainIndex {
     }
 
     pub fn depth(&self) -> u32 {
-        let mut res = 0;
-
-        for cci in &self.0 {
-            res += cci + 1;
-        }
-
-        res
+        self.0.iter().map(|cci| cci + 1).sum()
     }
 }
 
