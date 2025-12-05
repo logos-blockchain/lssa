@@ -10,7 +10,7 @@ use anyhow::Result;
 use common::{PINATA_BASE58, sequencer_client::SequencerClient};
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use log::info;
-use nssa::{AccountId, ProgramDeploymentTransaction, program::Program};
+use nssa::{AccountId, program::Program};
 use nssa_core::{NullifierPublicKey, encryption::shared_key_derivation::Secp256k1Point};
 use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
