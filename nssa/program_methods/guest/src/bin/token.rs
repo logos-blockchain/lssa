@@ -84,25 +84,25 @@ impl TokenHolding {
 
     fn parse(data: &[u8]) -> Option<Self> {
         if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
-            None
-        } else {
-            let account_type = data[0];
-            let definition_id = AccountId::new(
-                data[1..33]
-                    .try_into()
-                    .expect("Defintion ID must be 32 bytes long"),
-            );
-            let balance = u128::from_le_bytes(
-                data[33..]
-                    .try_into()
-                    .expect("balance must be 16 bytes little-endian"),
-            );
-            Some(Self {
-                definition_id,
-                balance,
-                account_type,
-            })
+            return None;
         }
+
+        let account_type = data[0];
+        let definition_id = AccountId::new(
+            data[1..33]
+                .try_into()
+                .expect("Defintion ID must be 32 bytes long"),
+        );
+        let balance = u128::from_le_bytes(
+            data[33..]
+                .try_into()
+                .expect("balance must be 16 bytes little-endian"),
+        );
+        Some(Self {
+            definition_id,
+            balance,
+            account_type,
+        })
     }
 
     fn into_data(self) -> Data {
@@ -223,7 +223,7 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostStat
         panic!("Only uninitialized accounts can be initialized");
     }
 
-    // TODO: We should check that this is an account owned by the token program.
+    // TODO: #212 We should check that this is an account owned by the token program.
     // This check can't be done here since the ID of the program is known only after compiling it
     //
     // Check definition account is valid
@@ -249,7 +249,7 @@ fn main() {
         instruction,
     } = read_nssa_inputs::<Instruction>();
 
-    let (pre_states, post_states) = match instruction[0] {
+    let post_states = match instruction[0] {
         0 => {
             // Parse instruction
             let total_supply = u128::from_le_bytes(
@@ -263,8 +263,7 @@ fn main() {
             assert_ne!(name, [0; 6]);
 
             // Execute
-            let post_states = new_definition(&pre_states, name, total_supply);
-            (pre_states, post_states)
+            new_definition(&pre_states, name, total_supply)
         }
         1 => {
             // Parse instruction
@@ -279,14 +278,14 @@ fn main() {
             assert_eq!(name, [0; 6]);
 
             // Execute
-            let post_states = transfer(&pre_states, balance_to_move);
-            (pre_states, post_states)
+            transfer(&pre_states, balance_to_move)
         }
         2 => {
             // Initialize account
-            assert_eq!(instruction[1..], [0; 22]);
-            let post_states = initialize_account(&pre_states);
-            (pre_states, post_states)
+            if instruction[1..] != [0; 22] {
+                panic!("Invalid instruction for initialize account");
+            }
+            initialize_account(&pre_states)
         }
         _ => panic!("Invalid instruction"),
     };
@@ -655,7 +654,7 @@ mod tests {
             AccountWithMetadata {
                 account: Account {
                     // Definition ID with
-                    data: vec![0; TOKEN_DEFINITION_DATA_SIZE - 16]
+                    data: [0; TOKEN_DEFINITION_DATA_SIZE - 16]
                         .into_iter()
                         .chain(u128::to_le_bytes(1000))
                         .collect(),

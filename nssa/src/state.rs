@@ -239,6 +239,20 @@ impl V02State {
             },
         );
     }
+
+    pub fn add_pinata_token_program(&mut self, account_id: AccountId) {
+        self.insert_program(Program::pinata_token());
+
+        self.public_state.insert(
+            account_id,
+            Account {
+                program_owner: Program::pinata_token().id(),
+                // Difficulty: 3
+                data: vec![3; 33],
+                ..Account::default()
+            },
+        );
+    }
 }
 
 #[cfg(test)]
@@ -250,7 +264,7 @@ pub mod tests {
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
         account::{Account, AccountId, AccountWithMetadata, Nonce},
         encryption::{EphemeralPublicKey, IncomingViewingPublicKey, Scalar},
-        program::ProgramId,
+        program::{PdaSeed, ProgramId},
     };
 
     use crate::{
@@ -2093,14 +2107,18 @@ pub mod tests {
         let key = PrivateKey::try_new([1; 32]).unwrap();
         let from = AccountId::from(&PublicKey::new_from_private_key(&key));
         let to = AccountId::new([2; 32]);
-        let initial_balance = 100;
+        let initial_balance = 1000;
         let initial_data = [(from, initial_balance), (to, 0)];
         let mut state =
             V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
         let from_key = key;
-        let amount: u128 = 0;
-        let instruction: (u128, ProgramId, u32) =
-            (amount, Program::authenticated_transfer_program().id(), 2);
+        let amount: u128 = 37;
+        let instruction: (u128, ProgramId, u32, Option<PdaSeed>) = (
+            amount,
+            Program::authenticated_transfer_program().id(),
+            2,
+            None,
+        );
 
         let expected_to_post = Account {
             program_owner: Program::authenticated_transfer_program().id(),
@@ -2140,10 +2158,11 @@ pub mod tests {
             V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
         let from_key = key;
         let amount: u128 = 0;
-        let instruction: (u128, ProgramId, u32) = (
+        let instruction: (u128, ProgramId, u32, Option<PdaSeed>) = (
             amount,
             Program::authenticated_transfer_program().id(),
             MAX_NUMBER_CHAINED_CALLS as u32 + 1,
+            None,
         );
 
         let message = public_transaction::Message::try_new(
@@ -2162,6 +2181,48 @@ pub mod tests {
             result,
             Err(NssaError::MaxChainedCallsDepthExceeded)
         ));
+    }
+
+    #[test]
+    fn test_execution_that_requires_authentication_of_a_program_derived_account_id_succeeds() {
+        let chain_caller = Program::chain_caller();
+        let pda_seed = PdaSeed::new([37; 32]);
+        let from = AccountId::from((&chain_caller.id(), &pda_seed));
+        let to = AccountId::new([2; 32]);
+        let initial_balance = 1000;
+        let initial_data = [(from, initial_balance), (to, 0)];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let amount: u128 = 58;
+        let instruction: (u128, ProgramId, u32, Option<PdaSeed>) = (
+            amount,
+            Program::authenticated_transfer_program().id(),
+            1,
+            Some(pda_seed),
+        );
+
+        let expected_to_post = Account {
+            program_owner: Program::authenticated_transfer_program().id(),
+            balance: amount, // The `chain_caller` chains the program twice
+            ..Account::default()
+        };
+        let message = public_transaction::Message::try_new(
+            chain_caller.id(),
+            vec![to, from], // The chain_caller program permutes the account order in the chain
+            // call
+            vec![],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        state.transition_from_public_transaction(&tx).unwrap();
+
+        let from_post = state.get_account_by_id(&from);
+        let to_post = state.get_account_by_id(&to);
+        assert_eq!(from_post.balance, initial_balance - amount);
+        assert_eq!(to_post, expected_to_post);
     }
 
     #[test]
@@ -2195,8 +2256,12 @@ pub mod tests {
 
         // The transaction executes the chain_caller program, which internally calls the
         // authenticated_transfer program
-        let instruction: (u128, ProgramId, u32) =
-            (amount, Program::authenticated_transfer_program().id(), 1);
+        let instruction: (u128, ProgramId, u32, Option<PdaSeed>) = (
+            amount,
+            Program::authenticated_transfer_program().id(),
+            1,
+            None,
+        );
         let message = public_transaction::Message::try_new(
             chain_caller.id(),
             vec![to, from], // The chain_caller program permutes the account order in the chain
@@ -2214,6 +2279,86 @@ pub mod tests {
         let to_post = state.get_account_by_id(&to);
         assert_eq!(from_post.balance, initial_balance - amount);
         assert_eq!(to_post, expected_to_post);
+    }
+
+    #[test]
+    fn test_pda_mechanism_with_pinata_token_program() {
+        let pinata_token = Program::pinata_token();
+        let token = Program::token();
+
+        let pinata_definition_id = AccountId::new([1; 32]);
+        let pinata_token_definition_id = AccountId::new([2; 32]);
+        // Total supply of pinata token will be in an account under a PDA.
+        let pinata_token_holding_id = AccountId::from((&pinata_token.id(), &PdaSeed::new([0; 32])));
+        let winner_token_holding_id = AccountId::new([3; 32]);
+
+        let mut expected_winner_account_data = [0; 49];
+        expected_winner_account_data[0] = 1;
+        expected_winner_account_data[1..33].copy_from_slice(pinata_token_definition_id.value());
+        expected_winner_account_data[33..].copy_from_slice(&150u128.to_le_bytes());
+        let expected_winner_token_holding_post = Account {
+            program_owner: token.id(),
+            data: expected_winner_account_data.to_vec(),
+            ..Account::default()
+        };
+
+        let mut state = V02State::new_with_genesis_accounts(&[], &[]);
+        state.add_pinata_token_program(pinata_definition_id);
+
+        // Execution of the token program to create new token for the pinata token
+        // definition and supply accounts
+        let total_supply: u128 = 10_000_000;
+        // instruction: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
+        let mut instruction: [u8; 23] = [0; 23];
+        instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
+        instruction[17..].copy_from_slice(b"PINATA");
+        let message = public_transaction::Message::try_new(
+            token.id(),
+            vec![pinata_token_definition_id, pinata_token_holding_id],
+            vec![],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+        state.transition_from_public_transaction(&tx).unwrap();
+
+        // Execution of the token program transfer just to initialize the winner token account
+        let mut instruction: [u8; 23] = [0; 23];
+        instruction[0] = 2;
+        let message = public_transaction::Message::try_new(
+            token.id(),
+            vec![pinata_token_definition_id, winner_token_holding_id],
+            vec![],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+        state.transition_from_public_transaction(&tx).unwrap();
+
+        // Submit a solution to the pinata program to claim the prize
+        let solution: u128 = 989106;
+        let message = public_transaction::Message::try_new(
+            pinata_token.id(),
+            vec![
+                pinata_definition_id,
+                pinata_token_holding_id,
+                winner_token_holding_id,
+            ],
+            vec![],
+            solution,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+        state.transition_from_public_transaction(&tx).unwrap();
+
+        let winner_token_holding_post = state.get_account_by_id(&winner_token_holding_id);
+        assert_eq!(
+            winner_token_holding_post,
+            expected_winner_token_holding_post
+        );
     }
 
     #[test]
