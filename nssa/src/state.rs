@@ -2432,14 +2432,12 @@ pub mod tests {
 
         //TODO: initialize vaults - ideally, we won't need to do this.
         // Initialize Vault A
-        let temp_amt = 1u128;
         let mut instruction: [u8; 23] = [0; 23];
-        instruction[0] = 1; //transfer
-        instruction[1..17].copy_from_slice(&temp_amt.to_le_bytes());
-
+        instruction[0] = 2; //initialize
+        
         let message = public_transaction::Message::try_new(
             Program::token().id(),
-            vec![token_a_holding_id, vault_a_id],
+            vec![token_a_definition_id, vault_a_id],
             vec![1],
             instruction,
         )
@@ -2451,12 +2449,9 @@ pub mod tests {
         state.transition_from_public_transaction(&tx).unwrap();
 
         // Initialize Vault B
-        instruction[0] = 1; //transfer
-        instruction[1..17].copy_from_slice(&temp_amt.to_le_bytes());
-
         let message = public_transaction::Message::try_new(
             Program::token().id(),
-            vec![token_b_holding_id, vault_b_id],
+            vec![token_b_definition_id, vault_b_id],
             vec![1],
             instruction,
         )
@@ -2468,12 +2463,9 @@ pub mod tests {
         state.transition_from_public_transaction(&tx).unwrap();
 
         // Initialize User LP
-        instruction[0] = 1; //transfer
-        instruction[1..17].copy_from_slice(&temp_amt.to_le_bytes());
-
         let message = public_transaction::Message::try_new(
             Program::token().id(),
-            vec![pool_lp_holding_id, user_lp_holding_id],
+            vec![pool_lp_definition_id, user_lp_holding_id],
             vec![0],
             instruction,
         )
@@ -2553,7 +2545,6 @@ pub mod tests {
         vec_private_keys.push(pool_lp_holding_key);
 
         let mut vec_amounts = Vec::new();
-        vec_amounts.push(temp_amt);
         vec_amounts.push(init_balance_a);
         vec_amounts.push(init_balance_b);
         vec_amounts.push(user_a_amount);
@@ -2566,11 +2557,10 @@ pub mod tests {
     fn test_simple_amm_initialize() {
         let (state, _vec_private_keys, vec_id, vec_amounts) = initialize_amm();
 
-        let temp_amt = vec_amounts[0];
-        let init_balance_a = vec_amounts[1];
-        let init_balance_b = vec_amounts[2];
-        let user_a_amount = vec_amounts[3];
-        let user_b_amount = vec_amounts[4];
+        let init_balance_a = vec_amounts[0];
+        let init_balance_b = vec_amounts[1];
+        let user_a_amount = vec_amounts[2];
+        let user_b_amount = vec_amounts[3];
 
         let token_a_holding_id = vec_id[0];
         let token_a_definition_id = vec_id[1];
@@ -2617,7 +2607,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_a_definition_id,
-                    balance: init_balance_a + temp_amt,
+                    balance: init_balance_a,
             }),
             nonce: 0
         };
@@ -2629,7 +2619,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_b_definition_id,
-                    balance: init_balance_b + temp_amt,
+                    balance: init_balance_b,
             }),
             nonce: 0
         };
@@ -2665,7 +2655,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_lp_definition_id,
-                    balance: init_balance_a + temp_amt,
+                    balance: init_balance_a,
             }),
             nonce: 0
         };
@@ -2683,11 +2673,10 @@ pub mod tests {
         let (state, vec_private_keys, vec_id, vec_amounts) = initialize_amm();
         let mut state: V02State = state;
 
-        let temp_amt = vec_amounts[0];
-        let init_balance_a = vec_amounts[1];
-        let init_balance_b = vec_amounts[2];
-        let user_a_amount = vec_amounts[3];
-        let user_b_amount = vec_amounts[4];
+        let init_balance_a = vec_amounts[0];
+        let init_balance_b = vec_amounts[1];
+        let user_a_amount = vec_amounts[2];
+        let user_b_amount = vec_amounts[3];
 
         let token_a_holding_key = &vec_private_keys[0];
         let token_a_definition_key = &vec_private_keys[1];
@@ -2755,7 +2744,7 @@ pub mod tests {
         let user_lp_post = state.get_account_by_id(&user_lp_holding_id);
 
         //TODO: this accounts for the initial balance for User_LP
-        let delta_lp : u128 = (init_balance_a*(init_balance_a + temp_amt))/init_balance_a;
+        let delta_lp : u128 = (init_balance_a*init_balance_a)/init_balance_a;
 
         let expected_pool = Account {
             program_owner: Program::amm().id(),
@@ -2782,7 +2771,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_a_definition_id,
-                    balance: temp_amt,
+                    balance: 0,
             }),
             nonce: 1
         };
@@ -2794,7 +2783,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_b_definition_id,
-                    balance: temp_amt,
+                    balance: 0,
             }),
             nonce: 1
         };
@@ -2848,11 +2837,10 @@ pub mod tests {
         let (state, vec_private_keys, vec_id, vec_amounts) = initialize_amm();
         let mut state: V02State = state;
 
-        let temp_amt = vec_amounts[0];
-        let init_balance_a = vec_amounts[1];
-        let init_balance_b = vec_amounts[2];
-        let user_a_amount = vec_amounts[3];
-        let user_b_amount = vec_amounts[4];
+        let init_balance_a = vec_amounts[0];
+        let init_balance_b = vec_amounts[1];
+        let user_a_amount = vec_amounts[2];
+        let user_b_amount = vec_amounts[3];
 
         let _token_a_holding_key = &vec_private_keys[0];
         let _token_a_definition_key = &vec_private_keys[1];
@@ -2956,7 +2944,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_a_definition_id,
-                    balance: init_balance_a + temp_amt + add_a,
+                    balance: init_balance_a + add_a,
             }),
             nonce: 0
         };
@@ -2968,7 +2956,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_b_definition_id,
-                    balance: init_balance_b + temp_amt + add_b,
+                    balance: init_balance_b + add_b,
             }),
             nonce: 0
         };
@@ -3004,7 +2992,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_lp_definition_id,
-                    balance: temp_amt + init_balance_a + add_a,
+                    balance: init_balance_a + add_a,
             }),
             nonce: 0
         };
@@ -3023,11 +3011,10 @@ pub mod tests {
         let (state, vec_private_keys, vec_id, vec_amounts) = initialize_amm();
         let mut state: V02State = state;
 
-        let temp_amt = vec_amounts[0];
-        let init_balance_a = vec_amounts[1];
-        let init_balance_b = vec_amounts[2];
-        let user_a_amount = vec_amounts[3];
-        let user_b_amount = vec_amounts[4];
+        let init_balance_a = vec_amounts[0];
+        let init_balance_b = vec_amounts[1];
+        let user_a_amount = vec_amounts[2];
+        let user_b_amount = vec_amounts[3];
 
         let token_a_holding_key = &vec_private_keys[0];
         let token_a_definition_key = &vec_private_keys[1];
@@ -3184,7 +3171,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_a_definition_id,
-                    balance: init_balance_a + temp_amt + swap_a,
+                    balance: init_balance_a + swap_a,
             }),
             nonce: 1
         };
@@ -3196,7 +3183,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_b_definition_id,
-                    balance: init_balance_b + temp_amt - withdraw_b,
+                    balance: init_balance_b - withdraw_b,
             }),
             nonce: 1
         };
@@ -3238,11 +3225,10 @@ pub mod tests {
         let (state, vec_private_keys, vec_id, vec_amounts) = initialize_amm();
         let mut state: V02State = state;
 
-        let temp_amt = vec_amounts[0];
-        let init_balance_a = vec_amounts[1];
-        let init_balance_b = vec_amounts[2];
-        let user_a_amount = vec_amounts[3];
-        let user_b_amount = vec_amounts[4];
+        let init_balance_a = vec_amounts[0];
+        let init_balance_b = vec_amounts[1];
+        let user_a_amount = vec_amounts[2];
+        let user_b_amount = vec_amounts[3];
 
         let token_a_holding_key = &vec_private_keys[0];
         let token_a_definition_key = &vec_private_keys[1];
@@ -3397,7 +3383,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_a_definition_id,
-                    balance: init_balance_a + temp_amt - withdraw_a,
+                    balance: init_balance_a - withdraw_a,
             }),
             nonce: 1
         };
@@ -3409,7 +3395,7 @@ pub mod tests {
                 TokenHolding{
                     account_type: TOKEN_HOLDING_TYPE,
                     definition_id: token_b_definition_id,
-                    balance: init_balance_b + temp_amt + swap_b,
+                    balance: init_balance_b + swap_b,
             }),
             nonce: 1
         };

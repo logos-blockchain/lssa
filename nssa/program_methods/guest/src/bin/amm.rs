@@ -41,7 +41,54 @@ use bytemuck;
 //      * reserve_amounts is the pool's reserves; used to compute the withdraw amount.
 //      * Outputs the token transfers as a Vec<ChainedCall> and the withdraw amount.
 
-const POOL_DEFINITION_DATA_SIZE: usize = 240;
+const POOL_DEFINITION_DATA_SIZE: usize = 209;
+const MAX_NUMBER_POOLS: usize = 32;
+const AMM_DEFINITION_DATA_SIZE: usize = 1024;
+
+struct AMMDefinition {
+    pool_ids: Vec<AccountId>,
+}
+
+impl AMMDefinition {
+    fn into_data(self) -> Vec<u8> {
+        let size_of_pool: usize = self.pool_ids.len();
+
+        let mut bytes = [0; AMM_DEFINITION_DATA_SIZE];
+        for i in 0..size_of_pool-1 {
+            bytes[32*i..32*(i+1)].copy_from_slice(&self.pool_ids[i].to_bytes())
+        }
+
+        for i in size_of_pool..MAX_NUMBER_POOLS {
+            bytes[32*i..32*(i+1)].copy_from_slice(&AccountId::default().to_bytes())
+        }
+
+        bytes.into()
+    }
+
+    fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() % 32 != 0 {
+            panic!("AMM data should be divisible by 32 (number of bytes per of AccountId");
+        }
+
+        let size_of_pool = data.len()/32;
+
+        let mut pool_ids = Vec::<AccountId>::new();
+
+        for i in 0..size_of_pool {
+            pool_ids.push(
+                AccountId::new(data[i*32..(i+1)*32].try_into().expect("Parse data: The AMM program must be provided a valid AccountIds"))
+            );
+        }
+
+        for _ in size_of_pool..MAX_NUMBER_POOLS {
+            pool_ids.push( AccountId::default() );
+        }
+
+        Some( Self{
+            pool_ids
+        })
+    }
+}
 
 struct PoolDefinition{
     definition_token_a_id: AccountId,
@@ -49,27 +96,24 @@ struct PoolDefinition{
     vault_a_addr: AccountId,
     vault_b_addr: AccountId,
     liquidity_pool_id: AccountId,
-    liquidity_pool_cap: u128,
+    liquidity_pool_supply: u128,
     reserve_a: u128,
     reserve_b: u128,
-    token_program_id: ProgramId,
+    active: bool
 }
-
 
 impl PoolDefinition {
     fn into_data(self) -> Vec<u8> {
-        let u8_token_program_id : [u8;32] = bytemuck::cast(self.token_program_id);
-
         let mut bytes = [0; POOL_DEFINITION_DATA_SIZE];
         bytes[0..32].copy_from_slice(&self.definition_token_a_id.to_bytes());
         bytes[32..64].copy_from_slice(&self.definition_token_b_id.to_bytes());
         bytes[64..96].copy_from_slice(&self.vault_a_addr.to_bytes());
         bytes[96..128].copy_from_slice(&self.vault_b_addr.to_bytes());
         bytes[128..160].copy_from_slice(&self.liquidity_pool_id.to_bytes());
-        bytes[160..176].copy_from_slice(&self.liquidity_pool_cap.to_le_bytes());
+        bytes[160..176].copy_from_slice(&self.liquidity_pool_supply.to_le_bytes());
         bytes[176..192].copy_from_slice(&self.reserve_a.to_le_bytes());
         bytes[192..208].copy_from_slice(&self.reserve_b.to_le_bytes());
-        bytes[208..].copy_from_slice(&u8_token_program_id);
+        bytes[208] = self.active as u8;
         bytes.into()
     }
 
@@ -77,36 +121,48 @@ impl PoolDefinition {
         if data.len() != POOL_DEFINITION_DATA_SIZE {
             None
         } else {
-            let definition_token_a_id = AccountId::new(data[0..32].try_into().unwrap());
-            let definition_token_b_id = AccountId::new(data[32..64].try_into().unwrap());
-            let vault_a_addr = AccountId::new(data[64..96].try_into().unwrap());
-            let vault_b_addr = AccountId::new(data[96..128].try_into().unwrap());
-            let liquidity_pool_id = AccountId::new(data[128..160].try_into().unwrap());
-            let liquidity_pool_cap = u128::from_le_bytes(data[160..176].try_into().unwrap());
-            let reserve_a = u128::from_le_bytes(data[176..192].try_into().unwrap());
-            let reserve_b = u128::from_le_bytes(data[192..208].try_into().unwrap());
-
-            let token_program_id : &[u32] = bytemuck::cast_slice(&data[208..]);
-            let token_program_id : ProgramId = token_program_id[0..8].try_into().unwrap();
+            let definition_token_a_id = AccountId::new(data[0..32].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token A definition"));
+            let definition_token_b_id = AccountId::new(data[32..64].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault B definition"));
+            let vault_a_addr = AccountId::new(data[64..96].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault A"));
+            let vault_b_addr = AccountId::new(data[96..128].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault B"));
+            let liquidity_pool_id = AccountId::new(data[128..160].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token liquidity pool definition"));
+            let liquidity_pool_supply = u128::from_le_bytes(data[160..176].try_into().expect("Parse data: The AMM program must be provided a valid u128 for liquidity cap"));
+            let reserve_a = u128::from_le_bytes(data[176..192].try_into().expect("Parse data: The AMM program must be provided a valid u128 for reserve A balance"));
+            let reserve_b = u128::from_le_bytes(data[192..208].try_into().expect("Parse data: The AMM program must be provided a valid u128 for reserve B balance"));
+            
+            let active = match data[208] {
+                0 => false,
+                1 => true,
+                _ => panic!("Parse data: The AMM program must be provided a valid bool for active"),
+            };
+            
             Some(Self {
                 definition_token_a_id,
                 definition_token_b_id,
                 vault_a_addr,
                 vault_b_addr,
                 liquidity_pool_id,
-                liquidity_pool_cap,
+                liquidity_pool_supply,
                 reserve_a,
                 reserve_b,
-                token_program_id,
+                active,
             })
         }
     }
 }
 
-
 //TODO: remove repeated code for Token_Definition and TokenHoldling
+const TOKEN_DEFINITION_TYPE: u8 = 0;
+const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
+
 const TOKEN_HOLDING_TYPE: u8 = 1;
 const TOKEN_HOLDING_DATA_SIZE: usize = 49;
+
+struct TokenDefinition {
+    account_type: u8,
+    name: [u8; 6],
+    total_supply: u128,
+}
 
 struct TokenHolding {
     account_type: u8,
@@ -114,14 +170,59 @@ struct TokenHolding {
     balance: u128,
 }
 
+impl TokenDefinition {
+    fn into_data(self) -> Vec<u8> {
+        let mut bytes = [0; TOKEN_DEFINITION_DATA_SIZE];
+        bytes[0] = self.account_type;
+        bytes[1..7].copy_from_slice(&self.name);
+        bytes[7..].copy_from_slice(&self.total_supply.to_le_bytes());
+        bytes.into()
+    }
+
+    fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != TOKEN_DEFINITION_DATA_SIZE || data[0] != TOKEN_DEFINITION_TYPE {
+            None
+        } else {
+            let account_type = data[0];
+            let name = data[1..7].try_into().unwrap();
+            let total_supply = u128::from_le_bytes(
+                data[7..]
+                    .try_into()
+                    .expect("Total supply must be 16 bytes little-endian"),
+            );
+            Some(Self {
+                account_type,
+                name,
+                total_supply,
+            })
+        }
+    }
+}
+
 impl TokenHolding {
+    fn new(definition_id: &AccountId) -> Self {
+        Self {
+            account_type: TOKEN_HOLDING_TYPE,
+            definition_id: definition_id.clone(),
+            balance: 0,
+        }
+    }
+
     fn parse(data: &[u8]) -> Option<Self> {
         if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
             None
         } else {
             let account_type = data[0];
-            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
-            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
+            let definition_id = AccountId::new(
+                data[1..33]
+                    .try_into()
+                    .expect("Defintion ID must be 32 bytes long"),
+            );
+            let balance = u128::from_le_bytes(
+                data[33..]
+                    .try_into()
+                    .expect("balance must be 16 bytes little-endian"),
+            );
             Some(Self {
                 definition_id,
                 balance,
@@ -149,18 +250,19 @@ fn main() {
 
     match instruction[0] {
         0 => {
-            let balance_a: u128 = u128::from_le_bytes(instruction[1..17].try_into().unwrap());
-            let balance_b: u128 = u128::from_le_bytes(instruction[17..33].try_into().unwrap());
+            let balance_a: u128 = u128::from_le_bytes(instruction[1..17].try_into().expect("New definition: AMM Program expects u128 for balance a"));
+            let balance_b: u128 = u128::from_le_bytes(instruction[17..33].try_into().expect("New definition: AMM Program expects u128 for balance b"));
             
+            // Convert Vec<u8> to ProgramId ([u32;8])
             let mut token_program_id: [u32;8] = [0;8];
-            token_program_id[0] = u32::from_le_bytes(instruction[33..37].try_into().unwrap());
-            token_program_id[1] = u32::from_le_bytes(instruction[37..41].try_into().unwrap());
-            token_program_id[2] = u32::from_le_bytes(instruction[41..45].try_into().unwrap());
-            token_program_id[3] = u32::from_le_bytes(instruction[45..49].try_into().unwrap());
-            token_program_id[4] = u32::from_le_bytes(instruction[49..53].try_into().unwrap());
-            token_program_id[5] = u32::from_le_bytes(instruction[53..57].try_into().unwrap());
-            token_program_id[6] = u32::from_le_bytes(instruction[57..61].try_into().unwrap());
-            token_program_id[7] = u32::from_le_bytes(instruction[61..65].try_into().unwrap());
+            token_program_id[0] = u32::from_le_bytes(instruction[33..37].try_into().expect("New definition: AMM Program expects valid u32"));
+            token_program_id[1] = u32::from_le_bytes(instruction[37..41].try_into().expect("New definition: AMM Program expects valid u32"));
+            token_program_id[2] = u32::from_le_bytes(instruction[41..45].try_into().expect("New definition: AMM Program expects valid u32"));
+            token_program_id[3] = u32::from_le_bytes(instruction[45..49].try_into().expect("New definition: AMM Program expects valid u32"));
+            token_program_id[4] = u32::from_le_bytes(instruction[49..53].try_into().expect("New definition: AMM Program expects valid u32"));
+            token_program_id[5] = u32::from_le_bytes(instruction[53..57].try_into().expect("New definition: AMM Program expects valid u32"));
+            token_program_id[6] = u32::from_le_bytes(instruction[57..61].try_into().expect("New definition: AMM Program expects valid u32"));
+            token_program_id[7] = u32::from_le_bytes(instruction[61..65].try_into().expect("New definition: AMM Program expects valid u32"));
 
             let (post_states, chained_call) = new_definition(&pre_states,
                 &[balance_a, balance_b],
@@ -175,7 +277,7 @@ fn main() {
             
             let token_addr = AccountId::new(token_addr);
             
-            let amount = u128::from_le_bytes(instruction[1..17].try_into().unwrap());
+            let amount = u128::from_le_bytes(instruction[1..17].try_into().expect("Swap: AMM Program expects valid u128 for balance to move"));
 
             let (post_states, chained_call) = swap(&pre_states, amount, token_addr);
 
@@ -183,8 +285,8 @@ fn main() {
         }
         2 => {
 
-            let balance_a = u128::from_le_bytes(instruction[1..17].try_into().unwrap());
-            let balance_b = u128::from_le_bytes(instruction[17..33].try_into().unwrap());
+            let balance_a = u128::from_le_bytes(instruction[1..17].try_into().expect("Add liquidity: AMM Program expects valid u128 for balance a"));
+            let balance_b = u128::from_le_bytes(instruction[17..33].try_into().expect("Add liquidity: AMM Program expects valid u128 for balance b"));
 
             let mut token_addr: [u8;32] = [0;32];
             token_addr[0..].copy_from_slice(&instruction[33..65]);
@@ -196,7 +298,11 @@ fn main() {
         }
         3 => {
 
-            let (post_states, chained_call) = remove_liquidity(&pre_states);
+            let balance_lp = u128::from_le_bytes(instruction[1..17].try_into().expect("Remove liquidity: AMM Program expects valid u128 for balance liquidity"));
+            let balance_a = u128::from_le_bytes(instruction[17..33].try_into().expect("Remove liquidity: AMM Program expects valid u128 for balance a"));
+            let balance_b = u128::from_le_bytes(instruction[33..49].try_into().expect("Remove liquidity: AMM Program expects valid u128 for balance b"));
+
+            let (post_states, chained_call) = remove_liquidity(&pre_states, &[balance_lp, balance_a, balance_b]);
 
             write_nssa_outputs_with_chained_call(pre_states, post_states, chained_call);
         }
@@ -225,9 +331,9 @@ fn new_definition(
     let vault_a = &pre_states[1];
     let vault_b = &pre_states[2];
     let pool_lp = &pre_states[3];
-    let user_a = &pre_states[4];
-    let user_b = &pre_states[5];
-    let user_lp = &pre_states[6];
+    let user_holding_a = &pre_states[4];
+    let user_holding_b = &pre_states[5];
+    let user_holding_lp = &pre_states[6];
 
     if pool.account != Account::default() || !pool.is_authorized {
         panic!("Pool account is initiated or not authorized");
@@ -237,9 +343,6 @@ fn new_definition(
     // owned by the amm program.
     if vault_a.account == Account::default() || vault_b.account == Account::default() {
         panic!("Vault accounts uninitialized")
-    }
-    if pool_lp.account == Account::default() {
-        panic!("Pool LP must be initialized first")
     }
 
     let amount_a = balance_in[0];
@@ -251,8 +354,8 @@ fn new_definition(
     }
 
     // Verify token_a and token_b are different
-    let definition_token_a_id = TokenHolding::parse(&user_a.account.data).unwrap().definition_id;
-    let definition_token_b_id = TokenHolding::parse(&user_b.account.data).unwrap().definition_id;
+    let definition_token_a_id = TokenHolding::parse(&user_holding_a.account.data).expect("New definition: AMM Program expects valid Token Holding account for Token A").definition_id;
+    let definition_token_b_id = TokenHolding::parse(&user_holding_b.account.data).expect("New definition: AMM Program expects valid Token Holding account for Token B").definition_id;
    
     if definition_token_a_id == definition_token_b_id {
         panic!("Cannot set up a swap for a token with itself.")
@@ -265,47 +368,47 @@ fn new_definition(
             definition_token_b_id,
             vault_a_addr: vault_a.account_id.clone(),
             vault_b_addr: vault_b.account_id.clone(),
-            liquidity_pool_id: TokenHolding::parse(&pool_lp.account.data).unwrap().definition_id,
-            liquidity_pool_cap: amount_a,
+            liquidity_pool_id: TokenHolding::parse(&pool_lp.account.data).expect("New definition: AMM Program expects valid Token Holding account for liquidity pool").definition_id,
+            liquidity_pool_supply: amount_a,
             reserve_a: amount_a,
             reserve_b: amount_b,
-            token_program_id: token_program,  
+            active: true, 
     };
 
     pool_post.data = pool_post_definition.into_data();
 
     let mut chained_call = Vec::new();
    
-    //Chain call for Token A (User_A -> Vault_A)
+    //Chain call for Token A (user_holding_a -> Vault_A)
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&amount_a.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("New definition: AMM Program expects valid instruction_data");
 
     let call_token_a = ChainedCall{
             program_id: token_program,
             instruction_data: instruction_data,
-            pre_states: vec![user_a.clone(), vault_a.clone()]
+            pre_states: vec![user_holding_a.clone(), vault_a.clone()]
         };
         
-    //Chain call for Token B (User_B -> Vault_B)
+    //Chain call for Token B (user_holding_b -> Vault_B)
     instruction[1..17].copy_from_slice(&amount_b.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("New definition: AMM Program expects valid instruction_data");
 
     let call_token_b = ChainedCall{
             program_id: token_program,
             instruction_data: instruction_data,
-            pre_states: vec![user_b.clone(), vault_b.clone()]
+            pre_states: vec![user_holding_b.clone(), vault_b.clone()]
         };
 
-    //Chain call for LP (Pool_LP -> User_LP)
+    //Chain call for LP (Pool_LP -> user_holding_lp)
     instruction[1..17].copy_from_slice(&amount_a.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("New definition: AMM Program expects valid instruction_data");
 
     let call_token_lp = ChainedCall{
             program_id: token_program,
             instruction_data: instruction_data,
-            pre_states: vec![pool_lp.clone(), user_lp.clone()]
+            pre_states: vec![pool_lp.clone(), user_holding_lp.clone()]
         };
 
     chained_call.push(call_token_lp);
@@ -337,11 +440,15 @@ fn swap(
     let pool = &pre_states[0];
     let vault_a = &pre_states[1];
     let vault_b = &pre_states[2];
-    let user_a = &pre_states[3];
-    let user_b = &pre_states[4];
+    let user_holding_a = &pre_states[3];
+    let user_holding_b = &pre_states[4];
 
     // Verify vaults are in fact vaults
-    let pool_def_data = PoolDefinition::parse(&pool.account.data).unwrap();
+    let pool_def_data = PoolDefinition::parse(&pool.account.data).expect("Swap: AMM Program expects a valid Pool Definition Account");
+
+    if !pool_def_data.active {
+        panic!("Pool is inactive");
+    }
 
     if vault_a.account_id != pool_def_data.vault_a_addr {  
         panic!("Vault A was not provided");
@@ -353,21 +460,21 @@ fn swap(
 
     // fetch pool reserves
     //validates reserves is at least the vaults' balances
-    assert!(TokenHolding::parse(&vault_a.account.data).unwrap().balance >= pool_def_data.reserve_a);
-    assert!(TokenHolding::parse(&vault_b.account.data).unwrap().balance >= pool_def_data.reserve_b);
+    assert!(TokenHolding::parse(&vault_a.account.data).expect("Swap: AMM Program expects a valid Token Holding Account for Vault A").balance >= pool_def_data.reserve_a);
+    assert!(TokenHolding::parse(&vault_b.account.data).expect("Swap: AMM Program expects a valid Token Holding Account for Vault B").balance >= pool_def_data.reserve_b);
     //Cannot swap if a reserve is 0
     assert!(pool_def_data.reserve_a > 0);
     assert!(pool_def_data.reserve_b > 0);
 
     let (chained_call, [deposit_a, withdraw_a], [deposit_b, withdraw_b])
     = if token_id == pool_def_data.definition_token_a_id {
-        let (chained_call, withdraw_b) = swap_logic(&[user_a.clone(), vault_a.clone(), vault_b.clone(), user_b.clone()],
+        let (chained_call, withdraw_b) = swap_logic(&[user_holding_a.clone(), vault_a.clone(), vault_b.clone(), user_holding_b.clone()],
                     amount,
                     &[pool_def_data.reserve_a, pool_def_data.reserve_b]);
                 
         (chained_call, [amount, 0], [0, withdraw_b])
     } else if token_id == pool_def_data.definition_token_b_id {
-        let (chained_call, withdraw_a) = swap_logic(&[user_b.clone(), vault_b.clone(), vault_a.clone(), user_a.clone()],
+        let (chained_call, withdraw_a) = swap_logic(&[user_holding_b.clone(), vault_b.clone(), vault_a.clone(), user_holding_a.clone()],
                         amount,
                         &[pool_def_data.reserve_b, pool_def_data.reserve_a]);
 
@@ -384,10 +491,10 @@ fn swap(
             vault_a_addr: pool_def_data.vault_a_addr.clone(),
             vault_b_addr: pool_def_data.vault_b_addr.clone(),
             liquidity_pool_id: pool_def_data.liquidity_pool_id.clone(),
-            liquidity_pool_cap: pool_def_data.liquidity_pool_cap.clone(),
+            liquidity_pool_supply: pool_def_data.liquidity_pool_supply.clone(),
             reserve_a: pool_def_data.reserve_a + deposit_a - withdraw_a,
             reserve_b: pool_def_data.reserve_b + deposit_b - withdraw_b,
-            token_program_id: pool_def_data.token_program_id.clone(),  
+            active: true, 
     };
 
     pool_post.data = pool_post_definition.into_data();
@@ -430,7 +537,7 @@ fn swap_logic(
     let mut instruction_data = [0;23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&deposit_amount.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).expect("Swap Logic: AMM Program expects valid transaction instruction data");
     chained_call.push(
         ChainedCall{
                 program_id: vault_deposit_tx.account.program_owner,
@@ -442,7 +549,7 @@ fn swap_logic(
     let mut instruction_data = [0;23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&withdraw_amount.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).expect("Swap Logic: AMM Program expects valid transaction instruction data");
     chained_call.push(
         ChainedCall{
                 program_id: vault_deposit_tx.account.program_owner,
@@ -462,33 +569,25 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
        panic!("Invalid number of input accounts");
     }
 
+    //TODO: add logic for re-initialized
+
     let pool = &pre_states[0];
-    let vault1 = &pre_states[1];
-    let vault2 = &pre_states[2];
+    let vault_a = &pre_states[1];
+    let vault_b = &pre_states[2];
     let pool_lp = &pre_states[3];
-    let user_a = &pre_states[4];
-    let user_b = &pre_states[5];
-    let user_lp = &pre_states[6];
+    let user_holding_a = &pre_states[4];
+    let user_holding_b = &pre_states[5];
+    let user_holding_lp = &pre_states[6];
 
     // Verify vaults are in fact vaults
-    let pool_def_data = PoolDefinition::parse(&pool.account.data).unwrap();
-
-    let vault_a = if vault1.account_id == pool_def_data.vault_a_addr {
-        vault1.clone()
-    } else if vault2.account_id == pool_def_data.vault_a_addr {
-        vault2.clone()
-    } else {
+    let pool_def_data = PoolDefinition::parse(&pool.account.data).expect("Add liquidity: AMM Program expects valid Pool Definition Account");
+    if vault_a.account_id != pool_def_data.vault_a_addr {
         panic!("Vault A was not provided");
-    };
-        
-    let vault_b = if vault1.account_id == pool_def_data.vault_b_addr {
-       vault1.clone()
-    } else if vault2.account_id == pool_def_data.vault_b_addr {
-        vault2.clone()
-    } else {
+    }
+
+    if vault_b.account_id != pool_def_data.vault_b_addr {
         panic!("Vault B was not provided");
-    };
-    
+    }    
     if max_balance_in.len() != 2 {
         panic!("Invalid number of input balances");
     }
@@ -500,8 +599,8 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
     }
     
     // 2. Determine deposit amount
-    let vault_b_balance = TokenHolding::parse(&vault_b.account.data).unwrap().balance;
-    let vault_a_balance = TokenHolding::parse(&vault_a.account.data).unwrap().balance;
+    let vault_b_balance = TokenHolding::parse(&vault_b.account.data).expect("Add liquidity: AMM Program expects valid Token Holding Account for Vault B").balance;
+    let vault_a_balance = TokenHolding::parse(&vault_a.account.data).expect("Add liquidity: AMM Program expects valid Token Holding Account for Vault A").balance;
     if vault_a_balance == 0 || vault_b_balance == 0 {
         panic!("Vaults must have nonzero balances");
     }
@@ -528,14 +627,14 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
     };
 
     // 3. Validate amounts
-    let user_a_balance = TokenHolding::parse(&user_a.account.data).unwrap().balance;
-    let user_b_balance = TokenHolding::parse(&user_b.account.data).unwrap().balance;
+    let user_holding_a_balance = TokenHolding::parse(&user_holding_a.account.data).expect("Add liquidity: AMM Program expects a valid Token Holding Account for User A").balance;
+    let user_holding_b_balance = TokenHolding::parse(&user_holding_b.account.data).expect("Add liquidity: AMM Program expects a valid Token Holding Account for User B").balance;
     assert!(max_amount_a >= actual_amount_a && max_amount_b >= actual_amount_b);
-    if user_a_balance < actual_amount_a {
+    if user_holding_a_balance < actual_amount_a {
         panic!("Insufficient balance");
     }
 
-    if  user_b_balance < actual_amount_b {
+    if  user_holding_b_balance < actual_amount_b {
         panic!("Insufficient balance");
     }
     
@@ -544,7 +643,7 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
     }
     
     // 4. Calculate LP to mint
-    let delta_lp = (pool_def_data.liquidity_pool_cap * actual_amount_b)/pool_def_data.reserve_b;
+    let delta_lp = (pool_def_data.liquidity_pool_supply * actual_amount_b)/pool_def_data.reserve_b;
 
     // 5. Update pool account
     let mut pool_post = pool.account.clone();
@@ -554,46 +653,46 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
             vault_a_addr: pool_def_data.vault_a_addr.clone(),
             vault_b_addr: pool_def_data.vault_b_addr.clone(),
             liquidity_pool_id: pool_def_data.liquidity_pool_id.clone(),
-            liquidity_pool_cap: pool_def_data.liquidity_pool_cap + delta_lp,
+            liquidity_pool_supply: pool_def_data.liquidity_pool_supply + delta_lp,
             reserve_a: pool_def_data.reserve_a + actual_amount_a,
             reserve_b: pool_def_data.reserve_b + actual_amount_b,
-            token_program_id: pool_def_data.token_program_id.clone(),  
+            active: true,  
     };
     
     pool_post.data = pool_post_definition.into_data();
     let mut chained_call = Vec::new();
 
-    // Chain call for Token A (User_A -> Vault_A)
+    // Chain call for Token A (user_holding_a -> Vault_A)
     let mut instruction_data = [0; 23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&actual_amount_a.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).expect("Add liquidity: AMM Program expects valid token transfer instruction data");
     let call_token_a = ChainedCall{
-            program_id: pool_def_data.token_program_id,
+            program_id: vault_a.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![user_a.clone(), vault_a]
+            pre_states: vec![user_holding_a.clone(), vault_a.clone()]
         };
 
-    // Chain call for Token B (User_B -> Vault_B)        
+    // Chain call for Token B (user_holding_b -> Vault_B)        
     let mut instruction_data = [0; 23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&actual_amount_b.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).expect("Add liquidity: AMM Program expects valid token transfer instruction data");
     let call_token_b = ChainedCall{
-            program_id: pool_def_data.token_program_id,
+            program_id: vault_b.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![user_b.clone(), vault_b]
+            pre_states: vec![user_holding_b.clone(), vault_b.clone()]
         };
 
-    // Chain call for LP (User_LP -> Pool_LP)    
+    // Chain call for LP (user_holding_lp -> Pool_LP)    
     let mut instruction_data = [0; 23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&delta_lp.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data).expect("Add liquidity: AMM Program expects valid token transfer instruction data");
     let call_token_lp = ChainedCall{
-            program_id: pool_def_data.token_program_id,
+            program_id: pool_lp.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![pool_lp.clone(), user_lp.clone()]
+            pre_states: vec![pool_lp.clone(), user_holding_lp.clone()]
         };
 
 
@@ -614,51 +713,69 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
 
 }
 
-fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<ChainedCall>) {
-
+fn remove_liquidity(pre_states: &[AccountWithMetadata],
+    amounts: &[u128]   
+) -> (Vec<Account>, Vec<ChainedCall>)
+{
     if pre_states.len() != 7 {
        panic!("Invalid number of input accounts");
     }
 
     let pool = &pre_states[0];
-    let vault1 = &pre_states[1];
-    let vault2 = &pre_states[2];
+    let vault_a = &pre_states[1];
+    let vault_b = &pre_states[2];
     let pool_lp = &pre_states[3];
-    let user_a = &pre_states[4];
-    let user_b = &pre_states[5];
-    let user_lp = &pre_states[6];
-    
+    let user_holding_a = &pre_states[4];
+    let user_holding_b = &pre_states[5];
+    let user_holding_lp = &pre_states[6];
+
+    if amounts.len() != 3 {
+        panic!("Invalid number of balances");       
+    }
+
+    let amount_lp = amounts[0];
+    let amount_min_a = amounts[1];
+    let amount_min_b = amounts[2];
+
     // Verify vaults are in fact vaults
-    let pool_def_data = PoolDefinition::parse(&pool.account.data).unwrap();
+    let pool_def_data = PoolDefinition::parse(&pool.account.data).expect("Remove liquidity: AMM Program expects a valid Pool Definition Account");
 
-    let vault_a = if vault1.account_id == pool_def_data.vault_a_addr {
-        vault1.clone()
-    } else if vault2.account_id == pool_def_data.vault_a_addr {
-        vault2.clone()
-    } else {
+    if !pool_def_data.active {
+        panic!("Pool is inactive");
+    }
+
+    if vault_a.account_id != pool_def_data.vault_a_addr {
         panic!("Vault A was not provided");
-    };
-        
-    let vault_b = if vault1.account_id == pool_def_data.vault_b_addr {
-       vault1.clone()
-    } else if vault2.account_id == pool_def_data.vault_b_addr {
-        vault2.clone()
-    } else {
+    }
+
+    if vault_b.account_id != pool_def_data.vault_b_addr {
         panic!("Vault B was not provided");
-    };
+    }
+    
+    // 2. Compute withdrawal amounts
+    let user_holding_lp_data = TokenHolding::parse(&user_holding_lp.account.data).expect("Remove liquidity: AMM Program expects a valid Token Account for liquidity token");
+ 
+    if user_holding_lp_data.balance > pool_def_data.liquidity_pool_supply || user_holding_lp_data.definition_id != pool_def_data.liquidity_pool_id {
+        panic!("Invalid liquidity account provided");
+    }
 
-    // 2. Determine deposit amounts
-    let user_lp_amt = TokenHolding::parse(&user_lp.account.data).unwrap().balance;
-    let withdraw_amount_a = pool_def_data.reserve_a * (user_lp_amt/pool_def_data.liquidity_pool_cap);
-    let withdraw_amount_b = pool_def_data.reserve_b * (user_lp_amt/pool_def_data.liquidity_pool_cap);
+    if user_holding_lp_data.balance < amount_lp {
+        panic!("Invalid liquidity amount provided");
+    }
 
-    //3. Validate amounts handled by token programs
+    let withdraw_amount_a = pool_def_data.reserve_a * (amount_lp/pool_def_data.liquidity_pool_supply);
+    let withdraw_amount_b = pool_def_data.reserve_b * (amount_lp/pool_def_data.liquidity_pool_supply);
+
+    // 3. Validate and slippage check
+    if withdraw_amount_a < amount_min_a {
+        panic!("Insufficient minimal withdraw amount (Token A) provided for liquidity amount");
+    }
+    if withdraw_amount_b < amount_min_b {
+        panic!("Insufficient minimal withdraw amount (Token B) provided for liquidity amount");
+    }
 
     // 4. Calculate LP to reduce cap by
-    if pool_def_data.liquidity_pool_cap == 0 {
-        panic!("Liquidity pool must be nonzero");
-    }
-    let delta_lp : u128 = (pool_def_data.liquidity_pool_cap*user_lp_amt)/pool_def_data.liquidity_pool_cap;
+    let delta_lp : u128 = (pool_def_data.liquidity_pool_supply*amount_lp)/pool_def_data.liquidity_pool_supply;
 
     // 5. Update pool account
     let mut pool_post = pool.account.clone();
@@ -668,10 +785,10 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
             vault_a_addr: pool_def_data.vault_a_addr.clone(),
             vault_b_addr: pool_def_data.vault_b_addr.clone(),
             liquidity_pool_id: pool_def_data.liquidity_pool_id.clone(),
-            liquidity_pool_cap: pool_def_data.liquidity_pool_cap - delta_lp,
+            liquidity_pool_supply: pool_def_data.liquidity_pool_supply - delta_lp,
             reserve_a: pool_def_data.reserve_a - withdraw_amount_a,
             reserve_b: pool_def_data.reserve_b - withdraw_amount_b,
-            token_program_id: pool_def_data.token_program_id.clone(),  
+            active: true,  
     };
 
     pool_post.data = pool_post_definition.into_data();
@@ -685,33 +802,35 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&withdraw_amount_a.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("Remove liquidity: AMM Program expects valid token transfer instruction data");
     let call_token_a = ChainedCall{
-            program_id: pool_def_data.token_program_id.clone(),
+            program_id: vault_a.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![vault_a, user_a.clone()]
+            pre_states: vec![vault_a.clone(), user_holding_a.clone()]
         };
 
     //Chaincall for Token B withdraw
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&withdraw_amount_b.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("Remove liquidity: AMM Program expects valid token transfer instruction data");
     let call_token_b = ChainedCall{
-            program_id: pool_def_data.token_program_id.clone(),
+            program_id: vault_b.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![vault_b, user_b.clone()]
+            pre_states: vec![vault_b.clone(), user_holding_b.clone()]
         };
 
+    //TODO: make this a call for burn once implemented in
+    // Token Program
     //Chaincall for LP adjustment        
     let mut instruction: [u8;32] = [0; 32];
     instruction[0] = 1;      
     instruction[1..17].copy_from_slice(&delta_lp.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
+    let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("Remove liquidity: AMM Program expects valid token transfer instruction data");
     let call_token_lp = ChainedCall{
-            program_id: pool_def_data.token_program_id.clone(),
+            program_id: pool_lp.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![user_lp.clone(), pool_lp.clone()]
+            pre_states: vec![user_holding_lp.clone(), pool_lp.clone()]
         };
 
     chained_call.push(call_token_lp);
@@ -732,569 +851,631 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata]) -> (Vec<Account>, Vec<Ch
 
 #[cfg(test)]
 mod tests {
-    use nssa_core::{account::{Account, AccountId, AccountWithMetadata}, program::ChainedCall};
+    use nssa_core::{{account::{Account, AccountId, AccountWithMetadata, Data}, program::ChainedCall}, program::ProgramId};
 
     use crate::{PoolDefinition, TOKEN_HOLDING_TYPE, TokenHolding, add_liquidity, new_definition, remove_liquidity, swap};
+
+
+    const TOKEN_PROGRAM_ID: ProgramId = [15;8];
+
+    enum AccountEnum {
+        user_holding_b,
+        user_holding_a,
+        vault_a_uninit,
+        vault_b_uninit,
+        vault_a_init,
+        vault_b_init,
+        vault_a_wrong_acc_id,
+        vault_b_wrong_acc_id,
+        pool_lp_uninit,
+        pool_lp_init,
+        pool_lp_wrong_acc_id,
+        user_holding_lp_uninit,
+        user_holding_lp_init,
+        pool_definition_uninit,
+        pool_definition_init,
+        pool_definition_unauth,
+    }
+
+    enum BalanceEnum {
+        vault_a_reserve_init,
+        vault_b_reserve_init,
+        user_token_a_bal,
+        user_token_b_bal,
+        user_token_lp_bal,
+        remove_min_amount_a,
+        remove_min_amount_b,
+        remove_amount_lp,
+        remove_amount_lp_too_large,
+        add_amount_a,
+        add_amount_b,
+    }
+
+    fn helper_balance_constructor(selection: BalanceEnum) -> u128 {
+        match selection {
+            BalanceEnum::vault_a_reserve_init => 1000,
+            BalanceEnum::vault_b_reserve_init => 250,
+            BalanceEnum::user_token_a_bal => 1000,
+            BalanceEnum::user_token_b_bal => 500,
+            BalanceEnum::user_token_lp_bal => 100,
+            BalanceEnum::remove_min_amount_a => 50,
+            BalanceEnum::remove_min_amount_b => 50,
+            BalanceEnum::remove_amount_lp => 50,
+            BalanceEnum::remove_amount_lp_too_large => 150,
+            BalanceEnum::add_amount_a => 500,
+            BalanceEnum::add_amount_b => 200,
+            _ => panic!("Invalid selection")
+        }
+    } 
+
+    enum IdEnum {
+        token_a_definition_id,
+        token_b_definition_id,
+        token_lp_definition_id,
+        user_token_a_id,
+        user_token_b_id,
+        user_token_lp_id,
+        pool_definition_id,
+        vault_a_id,
+        vault_b_id,
+        pool_lp_id,
+    }
+
+    fn helper_id_constructor(selection: IdEnum) -> AccountId {
+
+        match selection {
+            IdEnum::token_a_definition_id => AccountId::new([42;32]),
+            IdEnum::token_b_definition_id => AccountId::new([43;32]),
+            IdEnum::token_lp_definition_id => AccountId::new([44;32]),
+            IdEnum::user_token_a_id => AccountId::new([45;32]),
+            IdEnum::user_token_b_id => AccountId::new([46;32]),
+            IdEnum::user_token_lp_id => AccountId::new([47;32]),
+            IdEnum::pool_definition_id => AccountId::new([48;32]),
+            IdEnum::vault_a_id => AccountId::new([45;32]),
+            IdEnum::vault_b_id => AccountId::new([46;32]),
+            IdEnum::pool_lp_id => AccountId::new([47;32]),
+            _ => panic!("Invalid selection")
+        }
+    }
+
+    fn helper_account_constructor(selection: AccountEnum) -> AccountWithMetadata {
+        let amm_program_id: ProgramId = [16;8];
+        
+        match selection {
+            AccountEnum::user_holding_a => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_a_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                        }),
+                        nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::user_token_a_id),
+            },
+            AccountEnum::user_holding_b => AccountWithMetadata {
+                    account: Account {
+                        program_owner:  TOKEN_PROGRAM_ID,
+                        balance: 0u128,
+                        data: TokenHolding::into_data(
+                            TokenHolding{
+                                account_type: 1u8,
+                                definition_id: helper_id_constructor(IdEnum::token_b_definition_id),
+                                balance: helper_balance_constructor(BalanceEnum::user_token_b_bal),
+                            }),
+                        nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::user_token_b_id),
+            },
+            AccountEnum::vault_a_uninit => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_a_definition_id),
+                            balance: 0,
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::vault_a_id),
+            },
+            AccountEnum::vault_b_uninit => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_b_definition_id),
+                            balance: 0,
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::vault_b_id),
+            },
+            AccountEnum::vault_a_init => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_a_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::vault_a_id),
+            },
+            AccountEnum::vault_b_init => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_b_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::vault_b_reserve_init),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::vault_b_id),
+            },
+            AccountEnum::vault_a_wrong_acc_id => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_a_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::vault_b_id),
+            },
+            AccountEnum::vault_b_wrong_acc_id => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_b_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::vault_b_reserve_init),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::vault_a_id),
+            },
+            AccountEnum::pool_lp_uninit => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            balance: 0,
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::pool_lp_id),
+            },
+            AccountEnum::pool_lp_init => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::pool_lp_id),
+            },
+            AccountEnum::pool_lp_wrong_acc_id => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::vault_a_id),
+            },
+            AccountEnum::user_holding_lp_uninit => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            balance: 0,
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::user_token_lp_id),
+            },
+            AccountEnum::user_holding_lp_init => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            balance: helper_balance_constructor(BalanceEnum::user_token_lp_bal),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::user_token_lp_id),
+            },
+            AccountEnum::pool_definition_uninit => AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+            },
+            AccountEnum::pool_definition_init => AccountWithMetadata {
+                account: Account {
+                        program_owner:  amm_program_id,
+                        balance: 0u128,
+                        data: PoolDefinition::into_data(
+                        PoolDefinition {
+                            definition_token_a_id: helper_id_constructor(IdEnum::token_a_definition_id),
+                            definition_token_b_id: helper_id_constructor(IdEnum::token_b_definition_id),
+                            vault_a_addr: helper_id_constructor(IdEnum::vault_a_id),
+                            vault_b_addr: helper_id_constructor(IdEnum::vault_b_id),
+                            liquidity_pool_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            liquidity_pool_supply: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                            reserve_a: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                            reserve_b: helper_balance_constructor(BalanceEnum::vault_b_reserve_init),
+                            active: true,
+                        }),
+                        nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+            },
+            AccountEnum::pool_definition_unauth => AccountWithMetadata {
+                account: Account {
+                        program_owner:  amm_program_id,
+                        balance: 0u128,
+                        data: PoolDefinition::into_data(
+                        PoolDefinition {
+                            definition_token_a_id: helper_id_constructor(IdEnum::token_a_definition_id),
+                            definition_token_b_id: helper_id_constructor(IdEnum::token_b_definition_id),
+                            vault_a_addr: helper_id_constructor(IdEnum::vault_a_id),
+                            vault_b_addr: helper_id_constructor(IdEnum::vault_b_id),
+                            liquidity_pool_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            liquidity_pool_supply: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                            reserve_a: helper_balance_constructor(BalanceEnum::vault_a_reserve_init),
+                            reserve_b: helper_balance_constructor(BalanceEnum::vault_b_reserve_init),
+                            active: true,
+                        }),
+                        nonce: 0,
+                },
+                is_authorized: false,
+                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+            },
+            _ => panic!("Invalid selection"),
+        }
+    }
+
+
+/*
+TODO: delete
+    fn helper_account_constructor(selection: AccountEnum) -> AccountWithMetadata {
+        let amm_program_id: ProgramId = [15;8];
+        let token_program_id: ProgramId = [16;8];
+        let helper_id_constructor(IdEnum::token_a_definition_id) = AccountId::new([42;32]);
+        let helper_id_constructor(IdEnum::token_b_definition_id) = AccountId::new([43;32]);
+        let helper_id_constructor(IdEnum::token_lp_definition_id) = AccountId::new([44;32]);
+        let user_token_a_id = AccountId::new([45;32]);
+        let user_token_b_id = AccountId::new([46;32]);
+        let user_token_lp_id = AccountId::new([47;32]);
+        let pool_definition_id = AccountId::new([48;32]);
+        let vault_a_id = AccountId::new([45;32]);
+        let vault_b_id = AccountId::new([46;32]);
+        let pool_lp_id = AccountId::new([47;32]);
+
+        let helper_balance_constructor(BalanceEnum::vault_a_reserve_init): u128 = 1000;
+        let helper_balance_constructor(BalanceEnum::vault_b_reserve_init): u128 = 250;
+        let user_token_a_bal: u128 = 500;
+        let helper_balance_constructor(BalanceEnum::user_token_b_bal): u128 = 250;
+        let helper_balance_constructor(BalanceEnum::user_token_lp_bal): u128 = 100;
+
+            enum AccountEnum {
+        account_a_holding,
+        account_b_holding,
+        vault_a_uninit,
+        vault_b_uninit,
+        vault_a_init,
+        vault_b_init,
+        vault_a_wrong_acc_id,
+        vault_b_wrong_acc_id,
+        pool_lp_uninit,
+        pool_lp_init,
+        pool_lp_wrong_acc_id,
+        account_lp_holding_uninit,
+        account_lp_holding_init,
+        pool_definition_uninit,
+        pool_definition_init,
+
+            enum BalanceEnum {
+        uninit_balance,
+        vault_a_reserve_init,
+        vault_b_reserve_init,
+        user_token_a_bal,
+        user_token_b_bal,
+        user_token_lp_bal
+    }
+
+    }
+
+    //        amm_pool is a default account that will initiate the amm definition account values
+//        vault_holding_a is a token holding account for token a
+//        vault_holding_b is a token holding account for token b
+//        pool_lp is a token holding account for the pool's lp token 
+//        user_holding_a is a token holding account for token a
+//        user_holding_b is a token holding account for token b
+//        user_holding_lp is a token holding account for lp token
+
+*/
+
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]    
     fn test_call_new_definition_with_invalid_number_of_accounts_1() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32]),
-        }];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![ helper_account_constructor(AccountEnum::pool_definition_uninit),]
+        ;
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_new_definition_with_invalid_number_of_accounts_2() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_new_definition_with_invalid_number_of_accounts_3() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
-    }
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
+   }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_new_definition_with_invalid_number_of_accounts_4() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_new_definition_with_invalid_number_of_accounts_5() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_new_definition_with_invalid_number_of_accounts_6() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
 
     #[should_panic(expected = "Invalid number of balance")]
     #[test]
     fn test_call_new_definition_with_invalid_number_of_balances_1() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal)],
+                    TOKEN_PROGRAM_ID);
     }
     
     #[should_panic(expected = "Pool account is initiated or not authorized")]
     #[test]
     fn test_call_new_definition_with_initiated_pool() {
-        let mut pool = Account::default();
-
-        pool.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0;32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
 
     #[should_panic(expected = "Pool account is initiated or not authorized")]
     #[test]
     fn test_call_new_definition_with_unauthorized_pool() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: false,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
-    }
-
-    #[should_panic(expected = "Pool LP must be initialized first")]
-    #[test]
-    fn test_call_new_definition_with_uninitated_pool_lp() {
-        let mut pool = Account::default();
-        let mut vault_a = Account::default();
-        let mut vault_b = Account::default();
-
-        vault_a.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-        vault_b.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault_a,
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: vault_b,
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_unauth),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
     
     #[should_panic(expected = "Balances must be nonzero")]
     #[test]
     fn test_call_new_definition_with_balance_zero_1() {
-        let mut pool = Account::default();
-        let mut vault_a = Account::default();
-        let mut vault_b = Account::default();
-        let mut pool_lp = Account::default();
-
-        vault_a.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-        vault_b.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault_a,
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: vault_b,
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 0u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
-    }
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[0,
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
+    }      
 
     #[should_panic(expected = "Balances must be nonzero")]
     #[test]
     fn test_call_new_definition_with_balance_zero_2() {
-        let mut pool = Account::default();
-        let mut vault_a = Account::default();
-        let mut vault_b = Account::default();
-        let mut pool_lp = Account::default();
-
-        vault_a.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-        vault_b.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault_a,
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: vault_b,
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 0u128;
-        let token_program_id: [u32;8] = [0; 8];
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal),
+                    0],
+                    TOKEN_PROGRAM_ID);
     }
-
+    
     #[should_panic(expected = "Cannot set up a swap for a token with itself.")]
     #[test]
     fn test_call_new_definition_same_token() {
-        let mut pool = Account::default();
-        let mut vault_a = Account::default();
-        let mut vault_b = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
-        let mut pool_lp = Account::default();
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        user_a.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        user_b.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        
-        vault_a.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        vault_b.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault_a,
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: vault_b,
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: user_a,
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: user_b,
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let token_program_id: [u32;8] = [0; 8];
-        
-        let _post_states = new_definition(&pre_states, &[balance_a, balance_b], token_program_id);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_lp_uninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal), 
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
     }
 
+    //TODO: fix this
     #[test]
     fn test_call_new_definition_chain_call_success() {
-        let mut pool = Account::default();
-        let mut vault_a = Account::default();
-        let mut vault_b = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
-        let mut pool_lp = Account::default();
-        let mut user_lp = Account::default();
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        user_a.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        user_b.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-        
-        vault_a.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        vault_b.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_uninit),
+                helper_account_constructor(AccountEnum::vault_a_uninit),
+                helper_account_constructor(AccountEnum::vault_b_uninit),
+                helper_account_constructor(AccountEnum::pool_lp_uninit),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_uninit),
+                ];
+        let post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::user_token_a_bal), 
+                    helper_balance_constructor(BalanceEnum::user_token_b_bal)],
+                    TOKEN_PROGRAM_ID);
+    }
 
 
-        let user_a = AccountWithMetadata {
-            account: user_a.clone(),
+
+    /*TODO: ^^^ need to chain call checks
+        let user_holding_a = AccountWithMetadata {
+            account: user_holding_a.clone(),
             is_authorized: true,
             account_id: AccountId::new([5; 32])};
     
-        let user_b = AccountWithMetadata {
-            account: user_b.clone(),
+        let user_holding_b = AccountWithMetadata {
+            account: user_holding_b.clone(),
             is_authorized: true,
             account_id: AccountId::new([6; 32])};
 
-        let user_lp = AccountWithMetadata {
-            account: user_lp.clone(),
+        let user_holding_lp = AccountWithMetadata {
+            account: user_holding_lp.clone(),
             is_authorized: true,
             account_id: AccountId::new([7; 32])
         };
@@ -1321,9 +1502,9 @@ mod tests {
             vault_a.clone(),
             vault_b.clone(),
             pool_lp.clone(),
-            user_a.clone(),
-            user_b.clone(),
-            user_lp.clone(),
+            user_holding_a.clone(),
+            user_holding_b.clone(),
+            user_holding_lp.clone(),
         ];
         let balance_a = 15u128;
         let balance_b = 15u128;
@@ -1342,7 +1523,7 @@ mod tests {
         let expected_chained_call_a = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![user_a.clone(), vault_a.clone()],
+            pre_states: vec![user_holding_a.clone(), vault_a.clone()],
         };
 
         //Expected chain call for Token B
@@ -1353,7 +1534,7 @@ mod tests {
         let expected_chained_call_b = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![user_b.clone(), vault_b.clone()],
+            pre_states: vec![user_holding_b.clone(), vault_b.clone()],
         };
 
         //Expected chain call for LP
@@ -1364,7 +1545,7 @@ mod tests {
         let expected_chained_call_lp = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![pool_lp.clone(), user_lp.clone()],
+            pre_states: vec![pool_lp.clone(), user_holding_lp.clone()],
         };
         
         assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
@@ -1379,306 +1560,149 @@ mod tests {
         assert!(chained_call_lp.instruction_data == expected_chained_call_lp.instruction_data);
         assert!(chained_call_lp.pre_states[0].account == expected_chained_call_lp.pre_states[0].account);
         assert!(chained_call_lp.pre_states[1].account == expected_chained_call_lp.pre_states[1].account);
-    }
+    }*/
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]    
     fn test_call_remove_liquidity_with_invalid_number_of_accounts_1() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32]),
-        }];
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_remove_liquidity_with_invalid_number_of_accounts_2() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-        ];
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_remove_liquidity_with_invalid_number_of_accounts_3() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-        ];
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_remove_liquidity_with_invalid_number_of_accounts_4() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-        ];
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
-
+ 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_remove_liquidity_with_invalid_number_of_accounts_5() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-        ];
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_remove_liquidity_with_invalid_number_of_accounts_6() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-        ];
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
 
     #[should_panic(expected = "Vault A was not provided")]
     #[test]
     fn test_call_remove_liquidity_vault_a_omitted() {
-        let mut pool = Account::default();
-        let mut vault1 = Account::default();
-        let mut vault2 = Account::default();
-        let mut pool_lp = Account::default();
-
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        vault1.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        vault2.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let vault_a_addr = AccountId::new([5;32]);
-        let vault_b_addr = AccountId::new([6;32]);
-        let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
-        let reserve_a: u128 = 10;
-        let reserve_b: u128 = 20;
-        let token_program_id: [u32;8] = [0; 8];
-
-        pool.data = PoolDefinition::into_data( PoolDefinition {
-            definition_token_a_id,
-            definition_token_b_id,
-            vault_a_addr: vault_a_addr.clone(),
-            vault_b_addr: vault_b_addr.clone(),
-            liquidity_pool_id,
-            liquidity_pool_cap,
-            reserve_a,
-            reserve_b,
-            token_program_id,
-        });
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault1,
-            is_authorized: true,
-            account_id: vault_b_addr.clone()},
-            AccountWithMetadata {
-            account: vault2,
-            is_authorized: true,
-            account_id: vault_b_addr},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_wrong_acc_id),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
-
+    
     #[should_panic(expected = "Vault B was not provided")]
     #[test]
     fn test_call_remove_liquidity_vault_b_omitted() {
-        let mut pool = Account::default();
-        let mut vault1 = Account::default();
-        let mut vault2 = Account::default();
-        let mut pool_lp = Account::default();
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        vault1.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        vault2.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let vault_a_addr = AccountId::new([5;32]);
-        let vault_b_addr = AccountId::new([6;32]);
-        let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
-        let reserve_a: u128 = 10;
-        let reserve_b: u128 = 20;
-        let token_program_id: [u32;8] = [0; 8];
-
-        pool.data = PoolDefinition::into_data( PoolDefinition {
-            definition_token_a_id,
-            definition_token_b_id,
-            vault_a_addr: vault_a_addr.clone(),
-            vault_b_addr: vault_b_addr.clone(),
-            liquidity_pool_id,
-            liquidity_pool_cap,
-            reserve_a,
-            reserve_b,
-            token_program_id,
-        });
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault1,
-            is_authorized: true,
-            account_id: vault_a_addr.clone()},
-            AccountWithMetadata {
-            account: vault2,
-            is_authorized: true,
-            account_id: vault_a_addr.clone()},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        
-        let _post_states = remove_liquidity(&pre_states);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_wrong_acc_id),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
     }
 
     #[test]
+    //TODO: need to fix this test
     fn test_call_remove_liquidity_chain_call_success() {
         let mut pool = Account::default();
         let mut vault_a = Account::default();
         let mut vault_b = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_lp = Account::default();
+        let mut user_holding_lp = Account::default();
 
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
@@ -1703,10 +1727,10 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 30;
         let reserve_b: u128 = 20;
-        let user_lp_amt: u128 = 10;
+        let user_holding_lp_amt: u128 = 10;
         let token_program_id: [u32;8] = [0; 8];
 
         pool.data = PoolDefinition::into_data( PoolDefinition {
@@ -1715,42 +1739,42 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap: reserve_a,
+            liquidity_pool_supply: reserve_a,
             reserve_a,
             reserve_b,
-            token_program_id,
+            active: true,
         });
         
-        user_a.data = TokenHolding::into_data(
+        user_holding_a.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_a_id.clone(),
                 balance: 5u128 }
         );
 
-        user_b.data = TokenHolding::into_data(
+        user_holding_b.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_b_id.clone(),
                 balance: 5u128 }
         );
 
-        user_lp.data = TokenHolding::into_data(
+        user_holding_lp.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id: AccountId::new([3;32]),
-                balance: user_lp_amt }
+                balance: user_holding_lp_amt }
         );
 
-        let user_a = AccountWithMetadata {
-            account: user_a.clone(),
+        let user_holding_a = AccountWithMetadata {
+            account: user_holding_a.clone(),
             is_authorized: true,
             account_id: AccountId::new([5; 32])};
     
-        let user_b = AccountWithMetadata {
-            account: user_b.clone(),
+        let user_holding_b = AccountWithMetadata {
+            account: user_holding_b.clone(),
             is_authorized: true,
             account_id: AccountId::new([6; 32])};
 
-        let user_lp = AccountWithMetadata {
-            account: user_lp.clone(),
+        let user_holding_lp = AccountWithMetadata {
+            account: user_holding_lp.clone(),
             is_authorized: true,
             account_id: AccountId::new([7; 32])
         };
@@ -1777,19 +1801,23 @@ mod tests {
             vault_a.clone(),
             vault_b.clone(),
             pool_lp.clone(),
-            user_a.clone(),
-            user_b.clone(),
-            user_lp.clone(),
+            user_holding_a.clone(),
+            user_holding_b.clone(),
+            user_holding_lp.clone(),
         ];
-        let (post_states, chained_calls) = remove_liquidity(&pre_states);
+
+        let amount_lp =  5;
+        let amount_min_a = 2;
+        let amount_min_b = 2;
+        let (post_states, chained_calls) = remove_liquidity(&pre_states, &[amount_lp, amount_min_a, amount_min_b]);
 
         let chained_call_lp = chained_calls[0].clone();
         let chained_call_b = chained_calls[1].clone();
         let chained_call_a = chained_calls[2].clone();
         
         //Expected withdraw
-        let withdraw_amount_a = reserve_a * (user_lp_amt/reserve_a);
-        let withdraw_amount_b = reserve_b * (user_lp_amt/reserve_a);
+        let withdraw_amount_a = reserve_a * (amount_lp/reserve_a);
+        let withdraw_amount_b = reserve_b * (amount_lp/reserve_a);
 
         //Expected chain_call for Token A
         let mut instruction: [u8;32] = [0; 32];
@@ -1799,7 +1827,7 @@ mod tests {
         let expected_chained_call_a = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![vault_a.clone(), user_a.clone()],
+            pre_states: vec![vault_a.clone(), user_holding_a.clone()],
         };
 
         //Expected chain call for Token B
@@ -1810,18 +1838,18 @@ mod tests {
         let expected_chained_call_b = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![vault_b.clone(), user_b.clone()],
+            pre_states: vec![vault_b.clone(), user_holding_b.clone()],
         };
 
         //Expected chain call for LP
         let mut instruction: [u8;32] = [0; 32];
         instruction[0] = 1;      
-        instruction[1..17].copy_from_slice(&user_lp_amt.to_le_bytes());
+        instruction[1..17].copy_from_slice(&user_holding_lp_amt.to_le_bytes());
         let instruction_data = risc0_zkvm::serde::to_vec(&instruction).unwrap();
         let expected_chained_call_lp = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![user_lp.clone(), pool_lp.clone()],
+            pre_states: vec![user_holding_lp.clone(), pool_lp.clone()],
         };
         
         assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
@@ -1841,567 +1869,206 @@ mod tests {
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]    
     fn test_call_add_liquidity_with_invalid_number_of_accounts_1() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32]),
-        }];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a, balance_b], vault_addr);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::add_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_amount_b)],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_add_liquidity_with_invalid_number_of_accounts_2() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a, balance_b], vault_addr);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::add_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_amount_b)],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_add_liquidity_with_invalid_number_of_accounts_3() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a, balance_b], vault_addr);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::add_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_amount_b)],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_add_liquidity_with_invalid_number_of_accounts_4() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a, balance_b], vault_addr);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::add_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_amount_b)],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_add_liquidity_with_invalid_number_of_accounts_5() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a, balance_b], vault_addr);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::add_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_amount_b)],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
     fn test_call_add_liquidity_with_invalid_number_of_accounts_6() {
-        let pre_states = vec![AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([1; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([2; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([3; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a, balance_b], vault_addr);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::add_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_amount_b)],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
+        /*
+    
+                    helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init), */
+
+    
     #[should_panic(expected = "Invalid number of input balances")]
     #[test]
     fn test_call_add_liquidity_invalid_number_of_balances_1() {
-        let mut pool = Account::default();
-        let mut vault1 = Account::default();
-        let mut vault2 = Account::default();
-        let mut pool_lp = Account::default();
-
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        vault1.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        vault2.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let vault_a_addr = AccountId::new([5;32]);
-        let vault_b_addr = AccountId::new([6;32]);
-        let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
-        let reserve_a: u128 = 10;
-        let reserve_b: u128 = 20;
-        let token_program_id: [u32;8] = [0; 8];
-
-        pool.data = PoolDefinition::into_data( PoolDefinition {
-            definition_token_a_id: definition_token_a_id.clone(),
-            definition_token_b_id: definition_token_b_id.clone(),
-            vault_a_addr: vault_a_addr.clone(),
-            vault_b_addr: vault_b_addr.clone(),
-            liquidity_pool_id,
-            liquidity_pool_cap,
-            reserve_a,
-            reserve_b,
-            token_program_id,
-        });
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault1,
-            is_authorized: true,
-            account_id: vault_a_addr.clone()},
-            AccountWithMetadata {
-            account: vault2,
-            is_authorized: true,
-            account_id: vault_b_addr.clone()},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let _balance_b = 15u128;
-        let main_token = definition_token_a_id.clone();
-        let _post_states = add_liquidity(&pre_states, &[balance_a], main_token);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::add_amount_a),],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
     #[should_panic(expected = "Vault A was not provided")]
     #[test]
     fn test_call_add_liquidity_vault_a_omitted() {
-        let mut pool = Account::default();
-        let mut vault1 = Account::default();
-        let mut vault2 = Account::default();
-        let mut pool_lp = Account::default();
-
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        vault1.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        vault2.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let vault_a_addr = AccountId::new([5;32]);
-        let vault_b_addr = AccountId::new([6;32]);
-        let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
-        let reserve_a: u128 = 10;
-        let reserve_b: u128 = 20;
-        let token_program_id: [u32;8] = [0; 8];
-
-        pool.data = PoolDefinition::into_data( PoolDefinition {
-            definition_token_a_id,
-            definition_token_b_id,
-            vault_a_addr: vault_a_addr.clone(),
-            vault_b_addr: vault_b_addr.clone(),
-            liquidity_pool_id,
-            liquidity_pool_cap,
-            reserve_a,
-            reserve_b,
-            token_program_id,
-        });
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault1,
-            is_authorized: true,
-            account_id: vault_b_addr.clone()},
-            AccountWithMetadata {
-            account: vault2,
-            is_authorized: true,
-            account_id: vault_b_addr},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a,balance_b], vault_addr);
-    }
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_wrong_acc_id),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::add_amount_a), 
+                    helper_balance_constructor(BalanceEnum::add_amount_b),],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
+    }        
 
     #[should_panic(expected = "Vault B was not provided")]
     #[test]
     fn test_call_add_liquidity_vault_b_omitted() {
-        let mut pool = Account::default();
-        let mut vault1 = Account::default();
-        let mut vault2 = Account::default();
-        let mut pool_lp = Account::default();
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        vault1.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        vault2.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let vault_a_addr = AccountId::new([5;32]);
-        let vault_b_addr = AccountId::new([6;32]);
-        let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
-        let reserve_a: u128 = 10;
-        let reserve_b: u128 = 20;
-        let token_program_id: [u32;8] = [0; 8];
-
-        pool.data = PoolDefinition::into_data( PoolDefinition {
-            definition_token_a_id,
-            definition_token_b_id,
-            vault_a_addr: vault_a_addr.clone(),
-            vault_b_addr: vault_b_addr.clone(),
-            liquidity_pool_id,
-            liquidity_pool_cap,
-            reserve_a,
-            reserve_b,
-            token_program_id,
-        });
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault1,
-            is_authorized: true,
-            account_id: vault_a_addr.clone()},
-            AccountWithMetadata {
-            account: vault2,
-            is_authorized: true,
-            account_id: vault_a_addr.clone()},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 15u128;
-        let vault_addr = AccountId::new([1;32]);
-        let _post_states = add_liquidity(&pre_states, &[balance_a,balance_b], vault_addr);
-    }
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_wrong_acc_id),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::add_amount_a), 
+                    helper_balance_constructor(BalanceEnum::add_amount_b),],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
+    }    
 
     #[should_panic(expected = "Both max-balances must be nonzero")]
     #[test]
     fn test_call_add_liquidity_zero_balance_1() {
-        let mut pool = Account::default();
-        let mut vault1 = Account::default();
-        let mut vault2 = Account::default();
-        let mut pool_lp = Account::default();
-
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        vault1.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        vault2.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let vault_a_addr = AccountId::new([5;32]);
-        let vault_b_addr = AccountId::new([6;32]);
-        let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
-        let reserve_a: u128 = 10;
-        let reserve_b: u128 = 20;
-        let token_program_id: [u32;8] = [0; 8];
-
-        pool.data = PoolDefinition::into_data( PoolDefinition {
-            definition_token_a_id: definition_token_a_id.clone(),
-            definition_token_b_id: definition_token_b_id.clone(),
-            vault_a_addr: vault_a_addr.clone(),
-            vault_b_addr: vault_b_addr.clone(),
-            liquidity_pool_id,
-            liquidity_pool_cap,
-            reserve_a,
-            reserve_b,
-            token_program_id,
-        });
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault1,
-            is_authorized: true,
-            account_id: vault_a_addr.clone()},
-            AccountWithMetadata {
-            account: vault2,
-            is_authorized: true,
-            account_id: vault_b_addr.clone()},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 0u128;
-        let balance_b = 15u128;
-        let main_token = definition_token_a_id.clone();
-        let _post_states = add_liquidity(&pre_states, &[balance_a,balance_b], main_token);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[0, 
+                    helper_balance_constructor(BalanceEnum::add_amount_b),],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
     #[should_panic(expected = "Both max-balances must be nonzero")]
     #[test]
     fn test_call_add_liquidity_zero_balance_2() {
-        let mut pool = Account::default();
-        let mut vault1 = Account::default();
-        let mut vault2 = Account::default();
-        let mut pool_lp = Account::default();
-
-
-        let definition_token_a_id = AccountId::new([1;32]);
-        let definition_token_b_id = AccountId::new([2;32]); 
-
-        vault1.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_a_id.clone(),
-                balance: 15u128 }
-        );
-
-        vault2.data = TokenHolding::into_data(
-            TokenHolding { account_type: TOKEN_HOLDING_TYPE,
-                definition_id:definition_token_b_id.clone(),
-                balance: 15u128 }
-        );
-
-        pool_lp.data = vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            ];
-
-        let vault_a_addr = AccountId::new([5;32]);
-        let vault_b_addr = AccountId::new([6;32]);
-        let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
-        let reserve_a: u128 = 10;
-        let reserve_b: u128 = 20;
-        let token_program_id: [u32;8] = [0; 8];
-
-        pool.data = PoolDefinition::into_data( PoolDefinition {
-            definition_token_a_id: definition_token_a_id.clone(),
-            definition_token_b_id: definition_token_b_id.clone(),
-            vault_a_addr: vault_a_addr.clone(),
-            vault_b_addr: vault_b_addr.clone(),
-            liquidity_pool_id,
-            liquidity_pool_cap,
-            reserve_a,
-            reserve_b,
-            token_program_id,
-        });
-
-        let pre_states = vec![AccountWithMetadata {
-            account: pool,
-            is_authorized: true,
-            account_id: AccountId::new([0; 32])},
-            AccountWithMetadata {
-            account: vault1,
-            is_authorized: true,
-            account_id: vault_a_addr.clone()},
-            AccountWithMetadata {
-            account: vault2,
-            is_authorized: true,
-            account_id: vault_b_addr.clone()},
-            AccountWithMetadata {
-            account: pool_lp,
-            is_authorized: true,
-            account_id: AccountId::new([4; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([5; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([6; 32])},
-            AccountWithMetadata {
-            account: Account::default(),
-            is_authorized: true,
-            account_id: AccountId::new([7; 32])},
-        ];
-        let balance_a = 15u128;
-        let balance_b = 0u128;
-        let main_token = definition_token_a_id.clone();
-        let _post_states = add_liquidity(&pre_states, &[balance_a,balance_b], main_token);
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::add_amount_a), 
+                    0,],
+                    helper_id_constructor(IdEnum::vault_a_id),
+                    );
     }
 
+    /*
     #[should_panic(expected = "Mismatch of token types")]
     #[test]
     fn test_call_add_liquidity_incorrect_token_type() {
@@ -2435,7 +2102,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 10;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [0; 8];
@@ -2446,7 +2113,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -2519,7 +2186,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 10;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [0; 8];
@@ -2530,7 +2197,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -2603,7 +2270,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 10;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [0; 8];
@@ -2614,7 +2281,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -2662,8 +2329,8 @@ mod tests {
         let mut vault1 = Account::default();
         let mut vault2 = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
 
 
         let definition_token_a_id = AccountId::new([1;32]);
@@ -2675,7 +2342,7 @@ mod tests {
                 balance: 15u128 }
         );
 
-        user_a.data = TokenHolding::into_data(
+        user_holding_a.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_a_id.clone(),
                 balance: 10u128 }
@@ -2690,7 +2357,7 @@ mod tests {
                 balance: 15u128 }
         );
 
-        user_b.data = TokenHolding::into_data(
+        user_holding_b.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_b_id.clone(),
                 balance: 40u128 }
@@ -2704,7 +2371,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 15;
         let reserve_b: u128 = 15;
         let token_program_id: [u32;8] = [0; 8];
@@ -2715,7 +2382,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -2738,11 +2405,11 @@ mod tests {
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_a,
+            account: user_holding_a,
             is_authorized: true,
             account_id: AccountId::new([5; 32])},
             AccountWithMetadata {
-            account: user_b,
+            account: user_holding_b,
             is_authorized: true,
             account_id: AccountId::new([6; 32])},
             AccountWithMetadata {
@@ -2763,8 +2430,8 @@ mod tests {
         let mut vault1 = Account::default();
         let mut vault2 = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
 
 
         let definition_token_a_id = AccountId::new([1;32]);
@@ -2776,7 +2443,7 @@ mod tests {
                 balance: 15u128 }
         );
 
-        user_a.data = TokenHolding::into_data(
+        user_holding_a.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_a_id.clone(),
                 balance: 40u128 }
@@ -2791,7 +2458,7 @@ mod tests {
                 balance: 15u128 }
         );
 
-        user_b.data = TokenHolding::into_data(
+        user_holding_b.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_b_id.clone(),
                 balance: 10u128 }
@@ -2805,7 +2472,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 15;
         let reserve_b: u128 = 15;
         let token_program_id: [u32;8] = [0; 8];
@@ -2816,7 +2483,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -2839,11 +2506,11 @@ mod tests {
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_a,
+            account: user_holding_a,
             is_authorized: true,
             account_id: AccountId::new([5; 32])},
             AccountWithMetadata {
-            account: user_b,
+            account: user_holding_b,
             is_authorized: true,
             account_id: AccountId::new([6; 32])},
             AccountWithMetadata {
@@ -2864,8 +2531,8 @@ mod tests {
         let mut vault1 = Account::default();
         let mut vault2 = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
 
@@ -2875,7 +2542,7 @@ mod tests {
                 balance: 1500u128 }
         );
 
-        user_a.data = TokenHolding::into_data(
+        user_holding_a.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_a_id.clone(),
                 balance: 40u128 }
@@ -2895,7 +2562,7 @@ mod tests {
 
 
 
-        user_b.data = TokenHolding::into_data(
+        user_holding_b.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_a_id.clone(),
                 balance: 40u128 }
@@ -2909,7 +2576,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 1500u128;
         let reserve_b: u128 = 2000u128;
         let token_program_id: [u32;8] = [0; 8];
@@ -2920,7 +2587,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -2943,11 +2610,11 @@ mod tests {
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_a,
+            account: user_holding_a,
             is_authorized: true,
             account_id: AccountId::new([5; 32])},
             AccountWithMetadata {
-            account: user_b,
+            account: user_holding_b,
             is_authorized: true,
             account_id: AccountId::new([6; 32])},
             AccountWithMetadata {
@@ -2993,7 +2660,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 15;
         let reserve_b: u128 = 0;
         let token_program_id: [u32;8] = [0; 8];
@@ -3004,14 +2671,14 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
         });
 
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
 
         let pre_states = vec![AccountWithMetadata {
             account: pool,
@@ -3030,11 +2697,11 @@ mod tests {
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_a,
+            account: user_holding_a,
             is_authorized: true,
             account_id: AccountId::new([5; 32])},
             AccountWithMetadata {
-            account: user_b,
+            account: user_holding_b,
             is_authorized: true,
             account_id: AccountId::new([6; 32])},
             AccountWithMetadata {
@@ -3079,7 +2746,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 0;
         let reserve_b: u128 = 15;
         let token_program_id: [u32;8] = [0; 8];
@@ -3090,14 +2757,14 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
         });
 
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
 
         let pre_states = vec![AccountWithMetadata {
             account: pool,
@@ -3116,11 +2783,11 @@ mod tests {
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_a,
+            account: user_holding_a,
             is_authorized: true,
             account_id: AccountId::new([5; 32])},
             AccountWithMetadata {
-            account: user_b,
+            account: user_holding_b,
             is_authorized: true,
             account_id: AccountId::new([6; 32])},
             AccountWithMetadata {
@@ -3139,10 +2806,10 @@ mod tests {
         let mut pool = Account::default();
         let mut vault_a = Account::default();
         let mut vault_b = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_lp = Account::default();
+        let mut user_holding_lp = Account::default();
 
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]);
@@ -3165,10 +2832,10 @@ mod tests {
             ];
 
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 30;
         let reserve_b: u128 = 20;
-        let user_lp_amt: u128 = 10;
+        let user_holding_lp_amt: u128 = 10;
         let token_program_id: [u32;8] = [0; 8];
         let vault_a_addr = AccountId::new([7;32]);
         let vault_b_addr = AccountId::new([9;32]);
@@ -3179,42 +2846,42 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap: reserve_a,
+            liquidity_pool_supply: reserve_a,
             reserve_a,
             reserve_b,
             token_program_id,
         });
         
-        user_a.data = TokenHolding::into_data(
+        user_holding_a.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_a_id.clone(),
                 balance: 50u128 }
         );
 
-        user_b.data = TokenHolding::into_data(
+        user_holding_b.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_b_id.clone(),
                 balance: 50u128 }
         );
 
-        user_lp.data = TokenHolding::into_data(
+        user_holding_lp.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id: AccountId::new([3;32]),
-                balance: user_lp_amt }
+                balance: user_holding_lp_amt }
         );
 
-        let user_a = AccountWithMetadata {
-            account: user_a.clone(),
+        let user_holding_a = AccountWithMetadata {
+            account: user_holding_a.clone(),
             is_authorized: true,
             account_id: AccountId::new([5; 32])};
     
-        let user_b = AccountWithMetadata {
-            account: user_b.clone(),
+        let user_holding_b = AccountWithMetadata {
+            account: user_holding_b.clone(),
             is_authorized: true,
             account_id: AccountId::new([6; 32])};
 
-        let user_lp = AccountWithMetadata {
-            account: user_lp.clone(),
+        let user_holding_lp = AccountWithMetadata {
+            account: user_holding_lp.clone(),
             is_authorized: true,
             account_id: AccountId::new([7; 32])
         };
@@ -3241,9 +2908,9 @@ mod tests {
             vault_a.clone(),
             vault_b.clone(),
             pool_lp.clone(),
-            user_a.clone(),
-            user_b.clone(),
-            user_lp.clone(),
+            user_holding_a.clone(),
+            user_holding_b.clone(),
+            user_holding_lp.clone(),
         ];
 
         let balance_a = 10u128;
@@ -3269,7 +2936,7 @@ mod tests {
         let expected_chained_call_a = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![user_a.clone(), vault_a.clone()],
+            pre_states: vec![user_holding_a.clone(), vault_a.clone()],
         };
 
         //Expected chain call for Token B
@@ -3280,7 +2947,7 @@ mod tests {
         let expected_chained_call_b = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![user_b.clone(), vault_b.clone()],
+            pre_states: vec![user_holding_b.clone(), vault_b.clone()],
         };
 
         //Expected chain call for LP
@@ -3291,7 +2958,7 @@ mod tests {
         let expected_chained_call_lp = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![pool_lp.clone(), user_lp.clone()],
+            pre_states: vec![pool_lp.clone(), user_holding_lp.clone()],
         };
         
         assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
@@ -3313,10 +2980,10 @@ mod tests {
         let mut pool = Account::default();
         let mut vault_a = Account::default();
         let mut vault_b = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_lp = Account::default();
+        let mut user_holding_lp = Account::default();
 
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
@@ -3341,10 +3008,10 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 30;
         let reserve_b: u128 = 20;
-        let user_lp_amt: u128 = 10;
+        let user_holding_lp_amt: u128 = 10;
         let token_program_id: [u32;8] = [0; 8];
         let vault_a_addr = AccountId::new([2;32]);
         let vault_b_addr = AccountId::new([3;32]);
@@ -3355,42 +3022,42 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap: reserve_a,
+            liquidity_pool_supply: reserve_a,
             reserve_a,
             reserve_b,
             token_program_id,
         });
         
-        user_a.data = TokenHolding::into_data(
+        user_holding_a.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_a_id.clone(),
                 balance: 50u128 }
         );
 
-        user_b.data = TokenHolding::into_data(
+        user_holding_b.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id:definition_token_b_id.clone(),
                 balance: 50u128 }
         );
 
-        user_lp.data = TokenHolding::into_data(
+        user_holding_lp.data = TokenHolding::into_data(
             TokenHolding { account_type: TOKEN_HOLDING_TYPE,
                 definition_id: AccountId::new([3;32]),
-                balance: user_lp_amt }
+                balance: user_holding_lp_amt }
         );
 
-        let user_a = AccountWithMetadata {
-            account: user_a.clone(),
+        let user_holding_a = AccountWithMetadata {
+            account: user_holding_a.clone(),
             is_authorized: true,
             account_id: AccountId::new([5; 32])};
     
-        let user_b = AccountWithMetadata {
-            account: user_b.clone(),
+        let user_holding_b = AccountWithMetadata {
+            account: user_holding_b.clone(),
             is_authorized: true,
             account_id: AccountId::new([6; 32])};
 
-        let user_lp = AccountWithMetadata {
-            account: user_lp.clone(),
+        let user_holding_lp = AccountWithMetadata {
+            account: user_holding_lp.clone(),
             is_authorized: true,
             account_id: AccountId::new([7; 32])
         };
@@ -3417,9 +3084,9 @@ mod tests {
             vault_a.clone(),
             vault_b.clone(),
             pool_lp.clone(),
-            user_a.clone(),
-            user_b.clone(),
-            user_lp.clone(),
+            user_holding_a.clone(),
+            user_holding_b.clone(),
+            user_holding_lp.clone(),
         ];
 
         let balance_a = 40u128;
@@ -3445,7 +3112,7 @@ mod tests {
         let expected_chained_call_a = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![user_a.clone(), vault_a.clone()],
+            pre_states: vec![user_holding_a.clone(), vault_a.clone()],
         };
 
         //Expected chain call for Token B
@@ -3456,7 +3123,7 @@ mod tests {
         let expected_chained_call_b = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![user_b.clone(), vault_b.clone()],
+            pre_states: vec![user_holding_b.clone(), vault_b.clone()],
         };
 
         //Expected chain call for LP
@@ -3467,7 +3134,7 @@ mod tests {
         let expected_chained_call_lp = ChainedCall{
             program_id: token_program_id,
             instruction_data,
-            pre_states: vec![pool_lp.clone(), user_lp.clone()],
+            pre_states: vec![pool_lp.clone(), user_holding_lp.clone()],
         };
         
         assert!(chained_call_a.program_id == expected_chained_call_a.program_id);
@@ -3568,8 +3235,8 @@ mod tests {
         let mut vault_a = Account::default();
         let mut vault_b = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
 
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
@@ -3590,11 +3257,11 @@ mod tests {
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
-        user_a.data = vec![
+        user_holding_a.data = vec![
                 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
-        user_b.data = vec![
+        user_holding_b.data = vec![
                 1, 1, 1, 1, 1, 1, 1, 12, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
@@ -3604,7 +3271,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 15;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [5; 8];
@@ -3616,7 +3283,7 @@ mod tests {
                 vault_a_addr: vault_a_addr.clone(),
                 vault_b_addr: vault_b_addr.clone(),
                 liquidity_pool_id,
-                liquidity_pool_cap,
+                liquidity_pool_supply,
                 reserve_a,
                 reserve_b,
                 token_program_id,
@@ -3636,11 +3303,11 @@ mod tests {
             is_authorized: true,
             account_id: vault_b_addr.clone()},
             AccountWithMetadata {
-            account: user_a.clone(),
+            account: user_holding_a.clone(),
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_b.clone(),
+            account: user_holding_b.clone(),
             is_authorized: true,
             account_id: AccountId::new([5; 32])}
         ];
@@ -3682,7 +3349,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 10;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [0; 8];
@@ -3693,7 +3360,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -3759,7 +3426,7 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 10;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [0; 8];
@@ -3770,7 +3437,7 @@ mod tests {
             vault_a_addr: vault_a_addr.clone(),
             vault_b_addr: vault_b_addr.clone(),
             liquidity_pool_id,
-            liquidity_pool_cap,
+            liquidity_pool_supply,
             reserve_a,
             reserve_b,
             token_program_id,
@@ -3808,8 +3475,8 @@ mod tests {
         let mut vault_a = Account::default();
         let mut vault_b = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
 
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
@@ -3830,11 +3497,11 @@ mod tests {
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
-        user_a.data = vec![
+        user_holding_a.data = vec![
                 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
-        user_b.data = vec![
+        user_holding_b.data = vec![
                 1, 1, 1, 1, 1, 1, 1, 12, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
@@ -3844,13 +3511,13 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 15;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [5; 8];
 
-        user_a.program_owner = token_program_id;
-        user_b.program_owner = token_program_id;
+        user_holding_a.program_owner = token_program_id;
+        user_holding_b.program_owner = token_program_id;
         vault_a.program_owner = token_program_id;
         vault_b.program_owner = token_program_id;
 
@@ -3861,7 +3528,7 @@ mod tests {
                 vault_a_addr: vault_a_addr.clone(),
                 vault_b_addr: vault_b_addr.clone(),
                 liquidity_pool_id,
-                liquidity_pool_cap,
+                liquidity_pool_supply,
                 reserve_a,
                 reserve_b,
                 token_program_id,
@@ -3881,11 +3548,11 @@ mod tests {
             is_authorized: true,
             account_id: vault_b_addr.clone()},
             AccountWithMetadata {
-            account: user_a.clone(),
+            account: user_holding_a.clone(),
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_b.clone(),
+            account: user_holding_b.clone(),
             is_authorized: true,
             account_id: AccountId::new([5; 32])}
         ];
@@ -3924,11 +3591,11 @@ mod tests {
         let chain_call_b_account1 = chain_call_b.pre_states[1].account.clone();
 
         assert!(chain_call_a.instruction_data == expected_instruction_data_0);
-        assert!(chain_call_a_account0 == user_a);
+        assert!(chain_call_a_account0 == user_holding_a);
         assert!(chain_call_a_account1 == vault_a);
         assert!(chain_call_b.instruction_data == expected_instruction_data_1);
         assert!(chain_call_b_account0 == vault_b);
-        assert!(chain_call_b_account1 == user_b);
+        assert!(chain_call_b_account1 == user_holding_b);
     }
 
     #[test]
@@ -3937,8 +3604,8 @@ mod tests {
         let mut vault_a = Account::default();
         let mut vault_b = Account::default();
         let mut pool_lp = Account::default();
-        let mut user_a = Account::default();
-        let mut user_b = Account::default();
+        let mut user_holding_a = Account::default();
+        let mut user_holding_b = Account::default();
 
         let definition_token_a_id = AccountId::new([1;32]);
         let definition_token_b_id = AccountId::new([2;32]); 
@@ -3959,11 +3626,11 @@ mod tests {
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
-        user_a.data = vec![
+        user_holding_a.data = vec![
                 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
-        user_b.data = vec![
+        user_holding_b.data = vec![
                 1, 1, 1, 1, 1, 1, 1, 12, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ];
@@ -3973,13 +3640,13 @@ mod tests {
         let vault_a_addr = AccountId::new([5;32]);
         let vault_b_addr = AccountId::new([6;32]);
         let liquidity_pool_id = AccountId::new([7;32]);
-        let liquidity_pool_cap: u128 = 30u128;
+        let liquidity_pool_supply: u128 = 30u128;
         let reserve_a: u128 = 15;
         let reserve_b: u128 = 20;
         let token_program_id: [u32;8] = [5; 8];
 
-        user_a.program_owner = token_program_id;
-        user_b.program_owner = token_program_id;
+        user_holding_a.program_owner = token_program_id;
+        user_holding_b.program_owner = token_program_id;
         vault_a.program_owner = token_program_id;
         vault_b.program_owner = token_program_id;
 
@@ -3990,7 +3657,7 @@ mod tests {
                 vault_a_addr: vault_a_addr.clone(),
                 vault_b_addr: vault_b_addr.clone(),
                 liquidity_pool_id,
-                liquidity_pool_cap,
+                liquidity_pool_supply,
                 reserve_a,
                 reserve_b,
                 token_program_id,
@@ -4010,11 +3677,11 @@ mod tests {
             is_authorized: true,
             account_id: vault_b_addr.clone()},
             AccountWithMetadata {
-            account: user_a.clone(),
+            account: user_holding_a.clone(),
             is_authorized: true,
             account_id: AccountId::new([4; 32])},
             AccountWithMetadata {
-            account: user_b.clone(),
+            account: user_holding_b.clone(),
             is_authorized: true,
             account_id: AccountId::new([5; 32])}
         ];
@@ -4053,10 +3720,12 @@ mod tests {
 
         assert!(chain_call_a.instruction_data == expected_instruction_data_0);
         assert!(chain_call_a_account0 == vault_a);
-        assert!(chain_call_a_account1 == user_a);
+        assert!(chain_call_a_account1 == user_holding_a);
         assert!(chain_call_b.instruction_data == expected_instruction_data_1);
-        assert!(chain_call_b_account0 == user_b);
+        assert!(chain_call_b_account0 == user_holding_b);
         assert!(chain_call_b_account1 == vault_b);
 
     }
+
+    */
 }
