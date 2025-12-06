@@ -9,4 +9,3 @@ edition = "2024"
 risc0-zkvm = { version = "3.0.3", features = ['std'] }
 nssa-core = { path = "../../core" }
 serde = { version = "1.0.219", default-features = false }
-bytemuck = "1.24.0"
