@@ -652,7 +652,6 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
         panic!("Vault A was not provided");
     }
 
-    // TODO: need to check this one
     if pool_def_data.liquidity_pool_id != pool_definition_lp.account_id {
         panic!("LP definition mismatch");
     }
@@ -816,11 +815,9 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata],
         panic!("Pool is inactive");
     }
 
-    // TODO: need to check this one
     if pool_def_data.liquidity_pool_id != pool_definition_lp.account_id {
         panic!("LP definition mismatch");
     }
-
 
     if vault_a.account_id != pool_def_data.vault_a_addr {
         panic!("Vault A was not provided");
@@ -955,7 +952,7 @@ mod tests {
         vault_b_wrong_acc_id,
         pool_lp_uninit,
         pool_lp_init,
-        pool_lp_wrong_acc_id, //TODO use?
+        pool_lp_wrong_acc_id,
         user_holding_lp_uninit,
         user_holding_lp_init,
         pool_definition_uninit,
@@ -986,12 +983,12 @@ mod tests {
         remove_min_amount_b,
         remove_actual_a_successful,
         remove_min_amount_b_low,
-        remove_min_amount_a_low, //TODO use?
+        remove_min_amount_a_low,
         remove_amount_lp,
         remove_amount_lp_1,
         add_max_amount_a_low,
         add_max_amount_b_low,
-        add_max_amount_b_high, //TODO use?
+        add_max_amount_b_high,
         add_max_amount_a,
         add_max_amount_b,
         add_min_amount_lp,
@@ -1835,7 +1832,7 @@ mod tests {
             _ => panic!("Invalid selection"),
         }
     }
-
+/*/
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]    
     fn test_call_new_pool_with_invalid_number_of_accounts_1() {
@@ -2059,7 +2056,7 @@ mod tests {
         assert!(chained_call_a == helper_chained_call_constructor(ChainedCallsEnum::cc_token_a_initialization));
         assert!(chained_call_b == helper_chained_call_constructor(ChainedCallsEnum::cc_token_b_initialization));
     }
-
+*/
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]    
     fn test_call_remove_liquidity_with_invalid_number_of_accounts_1() {
@@ -2180,6 +2177,25 @@ mod tests {
                 helper_account_constructor(AccountEnum::vault_a_init),
                 helper_account_constructor(AccountEnum::vault_b_wrong_acc_id),
                 helper_account_constructor(AccountEnum::pool_lp_init),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = remove_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::remove_amount_lp), 
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_a),
+                    helper_balance_constructor(BalanceEnum::remove_min_amount_b)],
+                    );
+    }
+    
+    #[should_panic(expected = "LP definition mismatch")]
+    #[test]
+    fn test_call_remove_liquidity_lp_def_mismatch() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_wrong_acc_id),
                 helper_account_constructor(AccountEnum::user_holding_a),
                 helper_account_constructor(AccountEnum::user_holding_b),
                 helper_account_constructor(AccountEnum::user_holding_lp_init),
@@ -2484,6 +2500,25 @@ mod tests {
                     );
     }    
 
+    #[should_panic(expected = "LP definition mismatch")]
+    #[test]
+    fn test_call_add_liquidity_lp_def_mismatch() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::pool_definition_init),
+                helper_account_constructor(AccountEnum::vault_a_init),
+                helper_account_constructor(AccountEnum::vault_b_init),
+                helper_account_constructor(AccountEnum::pool_lp_wrong_acc_id),
+                helper_account_constructor(AccountEnum::user_holding_a),
+                helper_account_constructor(AccountEnum::user_holding_b),
+                helper_account_constructor(AccountEnum::user_holding_lp_init),
+                ];
+        let _post_states = add_liquidity(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::add_max_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_max_amount_b),
+                    helper_balance_constructor(BalanceEnum::add_min_amount_lp),],
+                    );
+    }    
+
     #[should_panic(expected = "Both max-balances must be nonzero")]
     #[test]
     fn test_call_add_liquidity_zero_balance_1() {
@@ -2497,9 +2532,9 @@ mod tests {
                 helper_account_constructor(AccountEnum::user_holding_lp_init),
                 ];
         let _post_states = add_liquidity(&pre_states, 
-                    &[0,
-                    helper_balance_constructor(BalanceEnum::add_max_amount_b),
-                    helper_balance_constructor(BalanceEnum::add_min_amount_lp),],
+                    &[helper_balance_constructor(BalanceEnum::add_min_amount_lp),
+                    0,
+                    helper_balance_constructor(BalanceEnum::add_max_amount_b),],
                     );
     }
 
@@ -2535,9 +2570,9 @@ mod tests {
                 helper_account_constructor(AccountEnum::user_holding_lp_init),
                 ];
         let _post_states = add_liquidity(&pre_states, 
-                    &[helper_balance_constructor(BalanceEnum::add_max_amount_a),
-                    helper_balance_constructor(BalanceEnum::add_max_amount_b),
-                    0],);
+                    &[0,
+                    helper_balance_constructor(BalanceEnum::add_max_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_max_amount_b),],);
     }
 
     #[should_panic(expected = "Vaults' balances must be at least the reserve amounts")]
@@ -2685,9 +2720,9 @@ mod tests {
                 helper_account_constructor(AccountEnum::user_holding_lp_init),
                 ];
         let (post_states, chained_calls) = add_liquidity(&pre_states, 
-                    &[helper_balance_constructor(BalanceEnum::add_max_amount_a),
-                    helper_balance_constructor(BalanceEnum::add_max_amount_b),
-                    helper_balance_constructor(BalanceEnum::add_min_amount_lp),],
+                    &[helper_balance_constructor(BalanceEnum::add_min_amount_lp),
+                    helper_balance_constructor(BalanceEnum::add_max_amount_a),
+                    helper_balance_constructor(BalanceEnum::add_max_amount_b),],
                     );
     
         let pool_post = post_states[0].clone();

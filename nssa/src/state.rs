@@ -2353,27 +2353,13 @@ impl PoolDefinition {
 }
 
     enum AccountsEnum {
-        amm, //TODO
-        pool_definition_uninit, //TODO
-        pool_definition_diff_amm, //Should point to AMM
         user_token_a_holding,
-        user_token_a_holding_auth,
         user_token_b_holding,
-        user_token_b_holding_auth,
-        //TODO all below (unless noted)
         user_token_lp_holding,
-        user_token_lp_holding_auth,
         pool_definition_init,
-        user_token_a_holding_init,
-        user_token_b_holding_init,
-        user_token_lp_holding_init,
-        pool_definition_remove,
-        user_token_a_holding_remove,
-        user_token_b_holding_remove,
-        user_token_lp_holding_remove,
-        token_a_definition_acc,// added
-        token_b_definition_acc,//added
-        token_lp_definition_acc,//added
+        token_a_definition_acc,
+        token_b_definition_acc,
+        token_lp_definition_acc,
         vault_a_init,
         vault_b_init,
         vault_a_swap_1,
@@ -2389,8 +2375,8 @@ impl PoolDefinition {
         vault_a_add,
         vault_b_add,
         user_token_a_holding_add,
-        user_token_b_holding_add,
-        user_token_lp_holding_add,
+        user_token_b_holding_add, 
+        user_token_lp_holding_add, 
         pool_definition_add,
         token_lp_definition_add,
     }
@@ -2484,8 +2470,8 @@ impl PoolDefinition {
             BalancesEnum::vault_b_balance_swap_2 => 2_084,
             BalancesEnum::user_token_a_holding_swap_2 => 9_000,
             BalancesEnum::user_token_b_holding_swap_2 => 10_416,
-            BalancesEnum::vault_a_balance_add => 0,
-            BalancesEnum::vault_b_balance_add => 0,
+            BalancesEnum::vault_a_balance_add => 7_000,
+            BalancesEnum::vault_b_balance_add => 3_500,
             BalancesEnum::user_token_a_holding_add => 8_000,
             BalancesEnum::user_token_b_holding_add => 9_000,
             BalancesEnum::user_token_lp_holding_add => 4_000,
@@ -2517,7 +2503,7 @@ impl PoolDefinition {
                         &PublicKey::new_from_private_key(&helper_private_keys_constructor(PrivateKeysEnum::amm_key))),
             IdEnum::pool_definition_id => AccountId::from(
                         &PublicKey::new_from_private_key(&helper_private_keys_constructor(PrivateKeysEnum::pool_definition_key))),
-            IdEnum::pool_definition_diff_id => AccountId::from(
+            IdEnum::pool_definition_diff_id => AccountId::from( //TODO delete?
                         &PublicKey::new_from_private_key(&helper_private_keys_constructor(PrivateKeysEnum::pool_definition_diff_key))),
             IdEnum::vault_a_id =>  AccountId::from(
                         &PublicKey::new_from_private_key(&helper_private_keys_constructor(PrivateKeysEnum::vault_a_key))),
@@ -2542,8 +2528,6 @@ impl PoolDefinition {
     fn helper_account_constructor(selection: AccountsEnum) -> Account {
         //TODO
         match selection {
-            AccountsEnum::amm => panic!("TODO"),
-            AccountsEnum::pool_definition_uninit => panic!("TODO"),
             AccountsEnum::user_token_a_holding => Account {
                     program_owner:  Program::token().id(),
                     balance: 0u128,
@@ -2845,16 +2829,28 @@ impl PoolDefinition {
                     data: TokenHolding::into_data(
                         TokenHolding{
                             account_type: 1u8,
-                            definition_id: helper_id_constructor(IdEnum::token_b_definition_id),
-                            balance: helper_balances_constructor(BalancesEnum::user_token_b_holding_add),
+                            definition_id: helper_id_constructor(IdEnum::token_lp_definition_id),
+                            balance: helper_balances_constructor(BalancesEnum::user_token_lp_holding_add),
                         }),
                     nonce: 0,
+                },
+            AccountsEnum::token_lp_definition_add => Account {
+                    program_owner: Program::token().id(),
+                    balance: 0u128,
+                    data: TokenDefinition::into_data(
+                        TokenDefinition {
+                            account_type: 0u8,
+                            name: [1u8;6],
+                            total_supply: helper_balances_constructor(BalancesEnum::token_lp_supply_add)
+                        }
+                    ),
+                    nonce: 1,
                 },
             _ => panic!("Invalid selection TODO1")
         }
     }
 
-/*
+/* TODO delete
         let expected_pool = helper_account_constructor(AccountsEnum::pool_definition_add);
         let expected_vault_a = helper_account_constructor(AccountsEnum::vault_a_add);
         let expected_vault_b = helper_account_constructor(AccountsEnum::vault_b_add);

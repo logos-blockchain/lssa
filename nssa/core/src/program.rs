@@ -12,8 +12,8 @@ pub struct ProgramInput<T> {
     pub instruction: T,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, Eq))]
 pub struct ChainedCall {
     pub program_id: ProgramId,
     pub instruction_data: InstructionData,
