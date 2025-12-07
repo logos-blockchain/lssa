@@ -1,4 +1,4 @@
-use common::{error::ExecutionFailureKind, sequencer_client::json::SendTxResponse};
+use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::AccountId;
 
 use super::{NativeTokenTransfer, auth_transfer_preparation};

@@ -5,13 +5,17 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chain_storage::WalletChainStore;
 use common::{
     error::ExecutionFailureKind,
-    sequencer_client::{SequencerClient, json::SendTxResponse},
+    rpc_primitives::requests::SendTxResponse,
+    sequencer_client::SequencerClient,
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::WalletConfig;
-use key_protocol::key_management::key_tree::chain_index::ChainIndex;
+use key_protocol::key_management::key_tree::{chain_index::ChainIndex, traits::KeyNode as _};
 use log::info;
-use nssa::{Account, AccountId, PrivacyPreservingTransaction, program::Program};
+use nssa::{
+    Account, AccountId, PrivacyPreservingTransaction,
+    privacy_preserving_transaction::message::EncryptedAccountData, program::Program,
+};
 use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
 pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
@@ -292,5 +296,94 @@ impl WalletCore {
             self.sequencer_client.send_tx_private(tx).await?,
             shared_secrets,
         ))
+    }
+
+    pub async fn sync_to_block(&mut self, block_id: u64) -> Result<()> {
+        use futures::TryStreamExt as _;
+
+        if self.last_synced_block >= block_id {
+            return Ok(());
+        }
+
+        let before_polling = std::time::Instant::now();
+
+        let poller = self.poller.clone();
+        let mut blocks =
+            std::pin::pin!(poller.poll_block_range(self.last_synced_block + 1..=block_id));
+
+        while let Some(block) = blocks.try_next().await? {
+            for tx in block.transactions {
+                let nssa_tx = NSSATransaction::try_from(&tx)?;
+                self.sync_private_accounts_with_tx(nssa_tx);
+            }
+
+            self.last_synced_block = block.block_id;
+            self.store_persistent_data().await?;
+        }
+
+        println!(
+            "Synced to block {block_id} in {:?}",
+            before_polling.elapsed()
+        );
+
+        Ok(())
+    }
+
+    fn sync_private_accounts_with_tx(&mut self, tx: NSSATransaction) {
+        let NSSATransaction::PrivacyPreserving(tx) = tx else {
+            return;
+        };
+
+        let private_account_key_chains = self
+            .storage
+            .user_data
+            .default_user_private_accounts
+            .iter()
+            .map(|(acc_account_id, (key_chain, _))| (*acc_account_id, key_chain))
+            .chain(
+                self.storage
+                    .user_data
+                    .private_key_tree
+                    .key_map
+                    .values()
+                    .map(|keys_node| (keys_node.account_id(), &keys_node.value.0)),
+            );
+
+        let affected_accounts = private_account_key_chains
+            .flat_map(|(acc_account_id, key_chain)| {
+                let view_tag = EncryptedAccountData::compute_view_tag(
+                    key_chain.nullifer_public_key.clone(),
+                    key_chain.incoming_viewing_public_key.clone(),
+                );
+
+                tx.message()
+                    .encrypted_private_post_states
+                    .iter()
+                    .enumerate()
+                    .filter(move |(_, encrypted_data)| encrypted_data.view_tag == view_tag)
+                    .filter_map(|(ciph_id, encrypted_data)| {
+                        let ciphertext = &encrypted_data.ciphertext;
+                        let commitment = &tx.message.new_commitments[ciph_id];
+                        let shared_secret =
+                            key_chain.calculate_shared_secret_receiver(encrypted_data.epk.clone());
+
+                        nssa_core::EncryptionScheme::decrypt(
+                            ciphertext,
+                            &shared_secret,
+                            commitment,
+                            ciph_id as u32,
+                        )
+                    })
+                    .map(move |res_acc| (acc_account_id, res_acc))
+            })
+            .collect::<Vec<_>>();
+
+        for (affected_account_id, new_acc) in affected_accounts {
+            println!(
+                "Received new account for account_id {affected_account_id:#?} with account object {new_acc:#?}"
+            );
+            self.storage
+                .insert_private_account_data(affected_account_id, new_acc);
+        }
     }
 }

@@ -19,8 +19,10 @@ borsh.workspace = true
 base58.workspace = true
 hex = "0.4.3"
 rand.workspace = true
-itertools = "0.14.0"
+itertools.workspace = true
 sha2.workspace = true
+futures.workspace = true
+async-stream = "0.3.6"
 
 [dependencies.key_protocol]
 path = "../key_protocol"

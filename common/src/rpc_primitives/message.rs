@@ -62,6 +62,16 @@ pub struct Request {
 }
 
 impl Request {
+    pub fn from_payload_version_2_0(method: String, payload: serde_json::Value) -> Self {
+        Self {
+            jsonrpc: Version,
+            method,
+            params: payload,
+            // ToDo: Correct checking of id
+            id: 1.into(),
+        }
+    }
+
     /// Answer the request with a (positive) reply.
     ///
     /// The ID is taken from the request.

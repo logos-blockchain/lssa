@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::RangeInclusive};
 
 use anyhow::Result;
-use json::{SendTxRequest, SendTxResponse, SequencerRpcRequest, SequencerRpcResponse};
 use nssa_core::program::ProgramId;
 use reqwest::Client;
+use serde::Deserialize;
 use serde_json::Value;
 
 use super::rpc_primitives::requests::{
@@ -12,17 +12,19 @@ use super::rpc_primitives::requests::{
 };
 use crate::{
     error::{SequencerClientError, SequencerRpcError},
-    rpc_primitives::requests::{
-        GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-        GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
-        GetProofForCommitmentRequest, GetProofForCommitmentResponse, GetTransactionByHashRequest,
-        GetTransactionByHashResponse,
+    rpc_primitives::{
+        self,
+        requests::{
+            GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest,
+            GetAccountsNoncesResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
+            GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
+            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse, SendTxRequest, SendTxResponse,
+        },
     },
-    sequencer_client::json::AccountInitialData,
     transaction::{EncodedTransaction, NSSATransaction},
 };
-
-pub mod json;
 
 #[derive(Clone)]
 pub struct SequencerClient {
@@ -46,13 +48,23 @@ impl SequencerClient {
         method: &str,
         payload: Value,
     ) -> Result<Value, SequencerClientError> {
-        let request = SequencerRpcRequest::from_payload_version_2_0(method.to_string(), payload);
+        let request =
+            rpc_primitives::message::Request::from_payload_version_2_0(method.to_string(), payload);
 
         let call_builder = self.client.post(&self.sequencer_addr);
 
         let call_res = call_builder.json(&request).send().await?;
 
         let response_vall = call_res.json::<Value>().await?;
+
+        // TODO: Actually why we need separation of `result` and `error` in rpc response?
+        #[derive(Debug, Clone, Deserialize)]
+        #[allow(dead_code)]
+        pub struct SequencerRpcResponse {
+            pub jsonrpc: String,
+            pub result: serde_json::Value,
+            pub id: u64,
+        }
 
         if let Ok(response) = serde_json::from_value::<SequencerRpcResponse>(response_vall.clone())
         {
@@ -74,6 +86,26 @@ impl SequencerClient {
         let req = serde_json::to_value(block_req)?;
 
         let resp = self.call_method_with_payload("get_block", req).await?;
+
+        let resp_deser = serde_json::from_value(resp)?;
+
+        Ok(resp_deser)
+    }
+
+    pub async fn get_block_range(
+        &self,
+        range: RangeInclusive<u64>,
+    ) -> Result<GetBlockRangeDataResponse, SequencerClientError> {
+        let block_req = GetBlockRangeDataRequest {
+            start_block_id: *range.start(),
+            end_block_id: *range.end(),
+        };
+
+        let req = serde_json::to_value(block_req)?;
+
+        let resp = self
+            .call_method_with_payload("get_block_range", req)
+            .await?;
 
         let resp_deser = serde_json::from_value(resp)?;
 
@@ -223,7 +255,7 @@ impl SequencerClient {
     /// Get initial testnet accounts from sequencer
     pub async fn get_initial_testnet_accounts(
         &self,
-    ) -> Result<Vec<AccountInitialData>, SequencerClientError> {
+    ) -> Result<Vec<GetInitialTestnetAccountsResponse>, SequencerClientError> {
         let acc_req = GetInitialTestnetAccountsRequest {};
 
         let req = serde_json::to_value(acc_req).unwrap();

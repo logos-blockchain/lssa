@@ -4,9 +4,9 @@ Nescience State Separation Architecture (NSSA) is a programmable blockchain syst
 
 ## Background
 
-Typically, public blockchains maintain a fully transparent state, where the mapping from addresses to account values is entirely visible. In NSSA, we introduce a parallel *private state*, a new layer of accounts that coexists with the public one. The public and private states can be viewed as a partition of the address space: accounts with public addresses are openly visible, while private accounts are accessible only to holders of the corresponding viewing keys. Consistency across both states is enforced through zero-knowledge proofs (ZKPs).
+Typically, public blockchains maintain a fully transparent state, where the mapping from account IDs to account values is entirely visible. In NSSA, we introduce a parallel *private state*, a new layer of accounts that coexists with the public one. The public and private states can be viewed as a partition of the account ID space: accounts with public IDs are openly visible, while private accounts are accessible only to holders of the corresponding viewing keys. Consistency across both states is enforced through zero-knowledge proofs (ZKPs).
 
-Public accounts are represented on-chain as a visible map from addresses to account states and are modified in-place when their values change. Private accounts, by contrast, are never stored in raw form on-chain. Each update creates a new commitment, which cryptographically binds the current value of the account while preserving privacy. Commitments of previous valid versions remain on-chain, but a nullifier set is maintained to mark old versions as spent, ensuring that only the most up-to-date version of each private account can be used in any execution.
+Public accounts are represented on-chain as a visible map from IDs to account states and are modified in-place when their values change. Private accounts, by contrast, are never stored in raw form on-chain. Each update creates a new commitment, which cryptographically binds the current value of the account while preserving privacy. Commitments of previous valid versions remain on-chain, but a nullifier set is maintained to mark old versions as spent, ensuring that only the most up-to-date version of each private account can be used in any execution.
 
 ### Programmability and selective privacy
 
@@ -65,10 +65,20 @@ Both public and private executions of the same program are enforced to use the s
 
 # Install dependencies
 Install build dependencies
+
 - On Linux
+Ubuntu / Debian
 ```sh
 apt install build-essential clang libssl-dev pkg-config
 ```
+
+Fedora
+```sh
+sudo dnf install clang openssl-devel pkgconf llvm
+```
+
+> **Note for Fedora 41+ users:** GCC 14+ has stricter C++ standard library headers that cause build failures with the bundled RocksDB. You must set `CXXFLAGS="-include cstdint"` when running cargo commands. See the [Run tests](#run-tests) section for examples.
+
 - On Mac
 ```sh
 xcode-select --install
@@ -99,7 +109,10 @@ The NSSA repository includes both unit and integration test suites.
 
 ```bash
 # RISC0_DEV_MODE=1 is used to skip proof generation and reduce test runtime overhead
-RISC0_DEV_MODE=1 cargo test --release 
+RISC0_DEV_MODE=1 cargo test --release
+
+# On Fedora 41+ (GCC 14+), prefix with CXXFLAGS to fix RocksDB build:
+CXXFLAGS="-include cstdint" RISC0_DEV_MODE=1 cargo test --release
 ```
 
 ### Integration tests
@@ -109,6 +122,9 @@ export NSSA_WALLET_HOME_DIR=$(pwd)/integration_tests/configs/debug/wallet/
 cd integration_tests
 # RISC0_DEV_MODE=1 skips proof generation; RUST_LOG=info enables runtime logs
 RUST_LOG=info RISC0_DEV_MODE=1 cargo run $(pwd)/configs/debug all
+
+# On Fedora 41+ (GCC 14+), prefix with CXXFLAGS to fix RocksDB build:
+CXXFLAGS="-include cstdint" RUST_LOG=info RISC0_DEV_MODE=1 cargo run $(pwd)/configs/debug all
 ```
 
 # Run the sequencer
@@ -118,6 +134,9 @@ The sequencer can be run locally:
 ```bash
 cd sequencer_runner
 RUST_LOG=info cargo run --release configs/debug
+
+# On Fedora 41+ (GCC 14+), prefix with CXXFLAGS to fix RocksDB build:
+CXXFLAGS="-include cstdint" RUST_LOG=info cargo run --release configs/debug
 ```
 
 If everything went well you should see an output similar to this:
@@ -138,18 +157,31 @@ If everything went well you should see an output similar to this:
 # Try the Wallet CLI
 
 ## Install
+
 This repository includes a CLI for interacting with the Nescience sequencer. To install it, run the following command from the root of the repository:
 
 ```bash
 cargo install --path wallet --force
-```
-Before using the CLI, set the environment variable `NSSA_WALLET_HOME_DIR` to the directory containing the wallet configuration file. A sample configuration is available at `integration_tests/configs/debug/wallet/`. To use it, run:
 
-```bash
-export NSSA_WALLET_HOME_DIR=$(pwd)/integration_tests/configs/debug/wallet/
+# On Fedora 41+ (GCC 14+), prefix with CXXFLAGS to fix RocksDB build:
+CXXFLAGS="-include cstdint" cargo install --path wallet --force
 ```
+
+Run `wallet help` to check everything went well.
 
 ## Tutorial
+
+This tutorial walks you through creating accounts and executing NSSA programs in both public and private contexts.
+
+> [!NOTE]
+> The NSSA state is split into two separate but interconnected components: the public state and the private state.
+> The public state is an on-chain, publicly visible record of accounts indexed by their Account IDs
+> The private state mirrors this, but the actual account values are stored locally by each account owner. On-chain, only a hidden commitment to each private account state is recorded. This allows the chain to enforce freshness (i.e., prevent the reuse of stale private states) while preserving privacy and unlinkability across executions and private accounts.
+> 
+> Every piece of state in NSSA is stored in an account (public or private). Accounts are either uninitialized or are owned by a program, and programs can only modify the accounts they own.
+> 
+> In NSSA, accounts can only be modified through program execution. A program is the sole mechanism that can change an account’s value.
+> Programs run publicly when all involved accounts are public, and privately when at least one private account participates.
 
 ### Health-check
 
@@ -177,7 +209,10 @@ Commands:
 
 ### Accounts
 
-Every piece of state in NSSA is stored in an account. The CLI provides commands to manage accounts. Run `wallet account` to see the options available:
+> [!NOTE]
+> Accounts are the basic unit of state in NSSA. They essentially hold native tokens and arbitrary data managed by some program.
+
+The CLI provides commands to manage accounts. Run `wallet account` to see the options available:
 ```bash
 Commands:
   get           Get account data
@@ -194,24 +229,32 @@ You can create both public and private accounts through the CLI. For example:
 wallet account new public
 
 # Output:
-Generated new account with addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+Generated new account with account_id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 ```
 
-This address is required when executing any program that interacts with the account.
+This id is required when executing any program that interacts with the account.
+
+> [!NOTE]
+> Public accounts live on-chain and are identified by a 32-byte Account ID.
+> Running `wallet account new public` generates a fresh keypair for the signature scheme used in NSSA.
+> The account ID is derived from the public key. The private key is used to sign transactions and to authorize the account in program executions.
 
 #### Account initialization
 
 To query the account’s current status, run:
 
 ```bash
-# Replace the address with yours
-wallet account get --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+# Replace the id with yours
+wallet account get --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 
 # Output:
 Account is Uninitialized
 ```
 
-New accounts start as uninitialized, meaning no program owns them yet. Programs can claim uninitialized accounts; once claimed, the account becomes permanently owned by that program.
+> [!NOTE]
+> New accounts begin in an uninitialized state, meaning they are not yet owned by any program. A program may claim an uninitialized account; once claimed, the account becomes owned by that program.
+> Owned accounts can only be modified through executions of the owning program. The only exception is native-token credits: any program may credit native tokens to any account.
+> However, debiting native tokens from an account must always be performed by its owning program.
 
 In this example, we will initialize the account for the Authenticated transfer program, which securely manages native token transfers by requiring authentication for debits.
 
@@ -221,13 +264,13 @@ Initialize the account by running:
 # This command submits a public transaction executing the `init` function of the
 # Authenticated-transfer program. The wallet polls the sequencer until the
 # transaction is included in a block, which may take several seconds.
-wallet auth-transfer init --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet auth-transfer init --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 ```
 
 After it completes, check the updated account status:
 
 ```bash
-wallet account get --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet account get --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 
 # Output:
 Account owned by authenticated transfer program
@@ -236,17 +279,17 @@ Account owned by authenticated transfer program
 
 ### Funding the account: executing the Piñata program
 
-Now that we have a public account initialized by the authenticated transfer program, we need to fund it. For that, the testnet provides the Piñata program. See the [Pinata](#piñata-program) section for instructions on how to use it.
+Now that we have a public account initialized by the authenticated transfer program, we need to fund it. For that, the testnet provides the Piñata program.
 
 ```bash
-# Complete with your address and the correct solution for your case
-wallet pinata claim --to-addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ --solution 989106
+# Complete with your id
+wallet pinata claim --to Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 ```
 
 After the claim succeeds, the account will be funded with some tokens:
 
 ```bash
-wallet account get --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet account get --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 
 # Output:
 Account owned by authenticated transfer program
@@ -270,10 +313,12 @@ Let's try it. For that we need to create another account for the recipient of th
 wallet account new public
 
 # Output:
-Generated new account with addr Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
+Generated new account with account_id Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
 ```
 
-The new account is uninitialized. The authenticated transfers program will claim any uninitialized account used in a transfer. So we don't need to manually initialize the recipient account.
+
+> [!NOTE]
+> The new account is uninitialized. The authenticated transfers program will claim any uninitialized account used in a transfer. So we don't need to manually initialize the recipient account.
 
 Let's send 37 tokens to the new account.
 
@@ -288,7 +333,7 @@ Once that succeeds we can check the states.
 
 ```bash
 # Sender account
-wallet account get --addr Public/HrA8TVjBS8UVf9akV7LRhyh6k4c7F6PS7PvqgtPmKAT8
+wallet account get --account-id Public/HrA8TVjBS8UVf9akV7LRhyh6k4c7F6PS7PvqgtPmKAT8
 
 # Output:
 Account owned by authenticated transfer program
@@ -297,7 +342,7 @@ Account owned by authenticated transfer program
 
 ```bash
 # Recipient account
-wallet account get --addr Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
+wallet account get --account-id Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
 
 # Output:
 Account owned by authenticated transfer program
@@ -306,24 +351,38 @@ Account owned by authenticated transfer program
 
 #### Create a new private account
 
+> [!NOTE]
+> Private accounts are structurally identical to public accounts; they differ only in how their state is stored off-chain and represented on-chain.
+> The raw values of a private account are never stored on-chain. Instead, the chain only holds a 32-byte commitment (a hash-like binding to the actual values). Transactions include encrypted versions of the private values so that users can recover them from the blockchain. The decryption keys are known only to the user and are never shared.
+> Private accounts are not managed through the usual signature mechanism used for public accounts. Instead, each private account is associated with two keypairs:
+> - *Nullifier keys*, for using the corresponding private account in privacy preserving executions.
+> - *Viewing keys*, used for encrypting and decrypting the values included in transactions.
+>
+> Private accounts also have a 32-byte identifier, derived from the nullifier public key.
+>
+> Just like public accounts, private accounts can only be initialized once. Any user can initialize them without knowing the owner's secret keys. However, modifying an initialized private account through an off-chain program execution requires knowledge of the owner’s secret keys.
+>
+> Transactions that modify the values of a private account include a commitment to the new values, which will be added to the on-chain commitment set. They also include a nullifier that marks the previous version as old.
+> The nullifier is constructed so that it cannot be linked to any prior commitment, ensuring that updates to the same private account cannot be correlated.
+
 Now let’s switch to the private state and create a private account.
 
 ```bash
 wallet account new private
 
 # Output:
-Generated new account with addr Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
+Generated new account with account_id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
 With npk e6366f79d026c8bd64ae6b3d601f0506832ec682ab54897f205fffe64ec0d951
 With ipk 02ddc96d0eb56e00ce14994cfdaec5ae1f76244180a919545983156e3519940a17
 ```
 
-For now, focus only on the account address. Ignore the `npk` and `ipk` values. These are stored locally in the wallet and are used internally to build privacy-preserving transactions.
-Also, the account id for private accounts is derived from the `npk` and `ipk` values. But we won't need them now.
+For now, focus only on the account id. Ignore the `npk` and `ipk` values. These are the Nullifier public key and the Viewing public key. They are stored locally in the wallet and are used internally to build privacy-preserving transactions.
+Also, the account id for private accounts is derived from the `npk` value. But we won't need them now.
 
 Just like public accounts, new private accounts start out uninitialized:
 
 ```bash
-wallet account get --addr Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
+wallet account get --account-id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
 
 # Output:
 Account is Uninitialized
@@ -337,7 +396,7 @@ This happens because program execution logic does not depend on whether the invo
 
 Let’s send 17 tokens to the new private account.
 
-The syntax is identical to the public-to-public transfer; just set the private address as the recipient.
+The syntax is identical to the public-to-public transfer; just set the private ID as the recipient.
 
 This command will run the Authenticated-Transfer program locally, generate a proof, and submit it to the sequencer. Depending on your machine, this can take from 30 seconds to 4 minutes.
 
@@ -352,7 +411,7 @@ After it succeeds, check both accounts:
 
 ```bash
 # Public sender account
-wallet account get --addr Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
+wallet account get --account-id Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
 
 # Output:
 Account owned by authenticated transfer program
@@ -361,15 +420,16 @@ Account owned by authenticated transfer program
 
 ```bash
 # Private recipient account
-wallet account get --addr Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
+wallet account get --account-id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
 
 # Output:
 Account owned by authenticated transfer program
 {"balance":17}
 ```
 
-Note: the last command does not query the network.
-It works even offline because private account data lives only in your wallet storage. Other users cannot read your private balances.
+> [!NOTE]
+> The last command does not query the network.
+> It works even offline because private account data lives only in your wallet storage. Other users cannot read your private balances.
 
 #### Digression: modifying private accounts
 
@@ -388,12 +448,12 @@ Let's create a new (uninitialized) private account like before:
 wallet account new private
 
 # Output:
-Generated new account with addr Private/AukXPRBmrYVqoqEW2HTs7N3hvTn3qdNFDcxDHVr5hMm5
+Generated new account with account_id Private/AukXPRBmrYVqoqEW2HTs7N3hvTn3qdNFDcxDHVr5hMm5
 With npk 0c95ebc4b3830f53da77bb0b80a276a776cdcf6410932acc718dcdb3f788a00e
 With ipk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72
 ```
 
-Now we'll ignore the private account address and focus on the `npk` and `ipk` values. We'll need this to send tokens to a foreign private account. Syntax is very similar.
+Now we'll ignore the private account ID and focus on the `npk` and `ipk` values. We'll need this to send tokens to a foreign private account. Syntax is very similar.
 
 ```bash
 wallet auth-transfer send \
@@ -415,6 +475,10 @@ We’ve shown how to use the authenticated-transfers program for transfers betwe
 ### The token program
 
 So far, we’ve made transfers using the authenticated-transfers program, which handles native token transfers. The Token program, on the other hand, is used for creating and managing custom tokens.
+
+> [!NOTE]
+> The token program is a single program responsible for creating and managing all tokens. There is no need to deploy new programs to introduce new tokens. All token-related operations are performed by invoking the appropriate functions of the token program.
+
 The CLI provides commands to execute the token program. To see the options available run `wallet token`:
 
 ```bash
@@ -424,9 +488,11 @@ Commands:
   help  Print this message or the help of the given subcommand(s)
 ```
 
-The Token program manages its accounts in two categories. Meaning, all accounts owned by the Token program fall into one of these types.
-- Token definition accounts: these accounts store metadata about a token, such as its name, total supply, and other identifying properties. They act as the token’s unique identifier.
-- Token holding accounts: these accounts hold actual token balances. In addition to the balance, they also record which token definition they belong to.
+
+> [!NOTE]
+> The Token program manages its accounts in two categories. Meaning, all accounts owned by the Token program fall into one of these types.
+> - Token definition accounts: these accounts store metadata about a token, such as its name, total supply, and other identifying properties. They act as the token’s unique identifier.
+> - Token holding accounts: these accounts hold actual token balances. In addition to the balance, they also record which token definition they belong to.
 
 #### Creating a new token
 
@@ -444,14 +510,14 @@ For example, let's create two new (uninitialized) public accounts and then use t
 wallet account new public
 
 # Output:
-Generated new account with addr Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
+Generated new account with account_id Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
 ```
 
 ```bash
 wallet account new public
 
 # Output:
-Generated new account with addr Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
+Generated new account with account_id Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
 ```
 
 Now we use them to create a new token. Let's call it the "Token A"
@@ -460,14 +526,14 @@ Now we use them to create a new token. Let's call it the "Token A"
 wallet token new \
     --name TOKENA \
     --total-supply 1337 \
-    --definition-addr Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7 \
-    --supply-addr Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
+    --definition-account-id Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7 \
+    --supply-account-id Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
 ```
 
 After it succeeds, we can inspect the two accounts to see how they were initialized.
 
 ```bash
-wallet account get --addr Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
+wallet account get --account-id Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
 
 # Output:
 Definition account owned by token program
@@ -475,7 +541,7 @@ Definition account owned by token program
 ```
 
 ```bash
-wallet account get --addr Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
+wallet account get --account-id Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
 
 # Output:
 Holding account owned by token program
@@ -492,7 +558,7 @@ Since we can’t reuse the accounts from the previous example, we need to create
 wallet account new public
 
 # Output:
-Generated new account with addr Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii
+Generated new account with account_id Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii
 ```
 
 ```bash
@@ -500,7 +566,7 @@ wallet account new private
 
 
 # Output:
-Generated new account with addr Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
+Generated new account with account_id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
 With npk 6a2dfe433cf28e525aa0196d719be3c16146f7ee358ca39595323f94fde38f93
 With ipk 03d59abf4bee974cc12ddb44641c19f0b5441fef39191f047c988c29a77252a577
 ```
@@ -513,15 +579,14 @@ Now we use them to create a new token. Let's call it "Token B".
 wallet token new \
     --name TOKENB \
     --total-supply 7331 \
-    --definition-addr Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii \
-    --supply-addr Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
+    --definition-account-id Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii \
+    --supply-account-id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
 ```
 
 After it succeeds, we can check their values
 
-
 ```bash
-wallet account get --addr Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii
+wallet account get --account-id Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii
 
 # Output:
 Definition account owned by token program
@@ -529,7 +594,7 @@ Definition account owned by token program
 ```
 
 ```bash
-wallet account get --addr Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
+wallet account get --account-id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
 
 # Output:
 Holding account owned by token program
@@ -550,7 +615,7 @@ Let's create a new public account for the recipient.
 wallet account new public
 
 # Output:
-Generated new account with addr Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
+Generated new account with account_id Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
 ```
 
 Let's send 10 B tokens to this new account. We'll debit this from the supply account used in the creation of the token.
@@ -565,46 +630,11 @@ wallet token send \
 Let's inspect the public account:
 
 ```bash
-wallet account get --addr Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
+wallet account get --account-id Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
 
 # Output:
 Holding account owned by token program
 {"account_type":"Token holding","definition_id":"GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii","balance":10}
-```
-
-### Piñata program
-
-The testnet comes with a program that serves as a faucet for native tokens. We call it the Piñata. Use the command `wallet pinata claim` to get native tokens from it. This requires two parameters:
-- `--to-addr` is the address of the account that will receive the tokens. **Use only initialized accounts here.**
-- `--solution` a solution to the Pinata challenge. This will change every time the Pinata is successfully claimed.
-
-To find the solution to the challenge, first query the Pinata account. This is always at the address: `Public/EfQhKQAkX2FJiwNii2WFQsGndjvF1Mzd7RuVe7QdPLw7`.
-
-```bash
-wallet account get --addr Public/EfQhKQAkX2FJiwNii2WFQsGndjvF1Mzd7RuVe7QdPLw7
-
-# Output:
-{"balance":750,"program_owner_b64":"/SQ9PX+NYQgXm7YMP7VMUBRwvU/Bq4pHTTZcCpTC5FM=","data_b64":"A939OBnG9OhvzOocqfCAJKSYvtcuV15OHDIVNg34MC8i","nonce":0}
-```
-
-Copy the `data_b64` value and run the following python script:
-
-```python
-import base64, hashlib
-
-def find_16byte_prefix(data: str, max_attempts: int) -> bytes:
-    data = base64.b64decode(data_b64)[1:]
-    for attempt in range(max_attempts):
-        suffix = attempt.to_bytes(16, 'little')
-        h = hashlib.sha256(data + suffix).digest()
-        if h[:3] == b"\x00\x00\x00":
-            solution = int.from_bytes(suffix, 'little')
-            return f"Solution: {solution}"
-    raise RuntimeError(f"No suffix found in {max_attempts} attempts")
-
-
-data_b64 = "A939OBnG9OhvzOocqfCAJKSYvtcuV15OHDIVNg34MC8i" # <- Change with the value from the Piñata account
-print(find_16byte_prefix(data_b64, 50000000))
 ```
 
 ### Chain information

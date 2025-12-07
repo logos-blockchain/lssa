@@ -135,12 +135,12 @@ pub struct WalletConfig {
     pub sequencer_addr: String,
     /// Sequencer polling duration for new blocks in milliseconds
     pub seq_poll_timeout_millis: u64,
-    /// Sequencer polling max number of blocks
-    pub seq_poll_max_blocks: usize,
+    /// Sequencer polling max number of blocks to find transaction
+    pub seq_tx_poll_max_blocks: usize,
     /// Sequencer polling max number error retries
     pub seq_poll_max_retries: u64,
-    /// Sequencer polling error retry delay in milliseconds
-    pub seq_poll_retry_delay_millis: u64,
+    /// Max amount of blocks to poll in one request
+    pub seq_block_poll_max_amount: u64,
     /// Initial accounts for wallet
     pub initial_accounts: Vec<InitialAccountData>,
 }
@@ -151,9 +151,9 @@ impl Default for WalletConfig {
             override_rust_log: None,
             sequencer_addr: "http://127.0.0.1:3040".to_string(),
             seq_poll_timeout_millis: 12000,
-            seq_poll_max_blocks: 5,
+            seq_tx_poll_max_blocks: 5,
             seq_poll_max_retries: 5,
-            seq_poll_retry_delay_millis: 500,
+            seq_block_poll_max_amount: 100,
             initial_accounts: {
                 let init_acc_json = r#"
                 [

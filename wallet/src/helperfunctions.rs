@@ -1,21 +1,16 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{path::PathBuf, str::FromStr};
 
 use anyhow::Result;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use common::{
-    block::HashableBlockData, sequencer_client::SequencerClient, transaction::NSSATransaction,
-};
-use key_protocol::{
-    key_management::key_tree::traits::KeyNode as _, key_protocol_core::NSSAUserData,
-};
-use nssa::{Account, privacy_preserving_transaction::message::EncryptedAccountData};
+use key_protocol::key_protocol_core::NSSAUserData;
+use nssa::Account;
 use nssa_core::account::Nonce;
 use rand::{RngCore, rngs::OsRng};
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
-    HOME_DIR_ENV_VAR, WalletCore,
+    HOME_DIR_ENV_VAR,
     config::{
         InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic,
         PersistentAccountDataPrivate, PersistentAccountDataPublic, PersistentStorage, WalletConfig,
@@ -228,125 +223,6 @@ impl From<Account> for HumanReadableAccount {
             nonce: account.nonce,
         }
     }
-}
-
-pub async fn parse_block_range(
-    start: u64,
-    stop: u64,
-    seq_client: Arc<SequencerClient>,
-    wallet_core: &mut WalletCore,
-) -> Result<()> {
-    for block_id in start..(stop + 1) {
-        let block =
-            borsh::from_slice::<HashableBlockData>(&seq_client.get_block(block_id).await?.block)?;
-
-        for tx in block.transactions {
-            let nssa_tx = NSSATransaction::try_from(&tx)?;
-
-            if let NSSATransaction::PrivacyPreserving(tx) = nssa_tx {
-                let mut affected_accounts = vec![];
-
-                for (acc_account_id, (key_chain, _)) in
-                    &wallet_core.storage.user_data.default_user_private_accounts
-                {
-                    let view_tag = EncryptedAccountData::compute_view_tag(
-                        key_chain.nullifer_public_key.clone(),
-                        key_chain.incoming_viewing_public_key.clone(),
-                    );
-
-                    for (ciph_id, encrypted_data) in tx
-                        .message()
-                        .encrypted_private_post_states
-                        .iter()
-                        .enumerate()
-                    {
-                        if encrypted_data.view_tag == view_tag {
-                            let ciphertext = &encrypted_data.ciphertext;
-                            let commitment = &tx.message.new_commitments[ciph_id];
-                            let shared_secret = key_chain
-                                .calculate_shared_secret_receiver(encrypted_data.epk.clone());
-
-                            let res_acc = nssa_core::EncryptionScheme::decrypt(
-                                ciphertext,
-                                &shared_secret,
-                                commitment,
-                                ciph_id as u32,
-                            );
-
-                            if let Some(res_acc) = res_acc {
-                                println!(
-                                    "Received new account for account_id {acc_account_id:#?} with account object {res_acc:#?}"
-                                );
-
-                                affected_accounts.push((*acc_account_id, res_acc));
-                            }
-                        }
-                    }
-                }
-
-                for keys_node in wallet_core
-                    .storage
-                    .user_data
-                    .private_key_tree
-                    .key_map
-                    .values()
-                {
-                    let acc_account_id = keys_node.account_id();
-                    let key_chain = &keys_node.value.0;
-
-                    let view_tag = EncryptedAccountData::compute_view_tag(
-                        key_chain.nullifer_public_key.clone(),
-                        key_chain.incoming_viewing_public_key.clone(),
-                    );
-
-                    for (ciph_id, encrypted_data) in tx
-                        .message()
-                        .encrypted_private_post_states
-                        .iter()
-                        .enumerate()
-                    {
-                        if encrypted_data.view_tag == view_tag {
-                            let ciphertext = &encrypted_data.ciphertext;
-                            let commitment = &tx.message.new_commitments[ciph_id];
-                            let shared_secret = key_chain
-                                .calculate_shared_secret_receiver(encrypted_data.epk.clone());
-
-                            let res_acc = nssa_core::EncryptionScheme::decrypt(
-                                ciphertext,
-                                &shared_secret,
-                                commitment,
-                                ciph_id as u32,
-                            );
-
-                            if let Some(res_acc) = res_acc {
-                                println!(
-                                    "Received new account for account_id {acc_account_id:#?} with account object {res_acc:#?}"
-                                );
-
-                                affected_accounts.push((acc_account_id, res_acc));
-                            }
-                        }
-                    }
-                }
-
-                for (affected_account_id, new_acc) in affected_accounts {
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(affected_account_id, new_acc);
-                }
-            }
-        }
-
-        wallet_core.last_synced_block = block_id;
-        wallet_core.store_persistent_data().await?;
-
-        println!(
-            "Block at id {block_id} with timestamp {} parsed",
-            block.timestamp
-        );
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

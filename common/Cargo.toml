@@ -15,6 +15,7 @@ log.workspace = true
 hex.workspace = true
 nssa-core = { path = "../nssa/core", features = ["host"] }
 borsh.workspace = true
+base64.workspace = true
 
 [dependencies.nssa]
 path = "../nssa"

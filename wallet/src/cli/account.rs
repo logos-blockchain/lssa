@@ -9,9 +9,7 @@ use serde::Serialize;
 use crate::{
     WalletCore,
     cli::{SubcommandReturnValue, WalletSubcommand},
-    helperfunctions::{
-        AccountPrivacyKind, HumanReadableAccount, parse_addr_with_privacy_prefix, parse_block_range,
-    },
+    helperfunctions::{AccountPrivacyKind, HumanReadableAccount, parse_addr_with_privacy_prefix},
 };
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;
@@ -278,7 +276,6 @@ impl WalletSubcommand for AccountSubcommand {
                 new_subcommand.handle_subcommand(wallet_core).await
             }
             AccountSubcommand::SyncPrivate {} => {
-                let last_synced_block = wallet_core.last_synced_block;
                 let curr_last_block = wallet_core
                     .sequencer_client
                     .get_last_block()
@@ -298,13 +295,7 @@ impl WalletSubcommand for AccountSubcommand {
 
                     println!("Stored persistent data at {path:#?}");
                 } else {
-                    parse_block_range(
-                        last_synced_block + 1,
-                        curr_last_block,
-                        wallet_core.sequencer_client.clone(),
-                        wallet_core,
-                    )
-                    .await?;
+                    wallet_core.sync_to_block(curr_last_block).await?;
                 }
 
                 Ok(SubcommandReturnValue::SyncedToBlock(curr_last_block))

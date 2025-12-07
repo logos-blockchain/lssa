@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use common::sequencer_client::SequencerClient;
 use nssa::program::Program;
 
 use crate::{
@@ -16,7 +13,7 @@ use crate::{
             token::TokenProgramAgnosticSubcommand,
         },
     },
-    helperfunctions::{fetch_config, parse_block_range},
+    helperfunctions::fetch_config,
 };
 
 pub mod account;
@@ -164,29 +161,20 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
 pub async fn execute_continuous_run() -> Result<()> {
     let config = fetch_config().await?;
-    let seq_client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
     let mut wallet_core = WalletCore::start_from_config_update_chain(config.clone()).await?;
 
-    let mut latest_block_num = seq_client.get_last_block().await?.last_block;
-    let mut curr_last_block = latest_block_num;
-
     loop {
-        parse_block_range(
-            curr_last_block,
-            latest_block_num,
-            seq_client.clone(),
-            &mut wallet_core,
-        )
-        .await?;
-
-        curr_last_block = latest_block_num + 1;
+        let latest_block_num = wallet_core
+            .sequencer_client
+            .get_last_block()
+            .await?
+            .last_block;
+        wallet_core.sync_to_block(latest_block_num).await?;
 
         tokio::time::sleep(std::time::Duration::from_millis(
             config.seq_poll_timeout_millis,
         ))
         .await;
-
-        latest_block_num = seq_client.get_last_block().await?.last_block;
     }
 }
 

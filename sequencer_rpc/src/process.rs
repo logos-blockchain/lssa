@@ -13,7 +13,8 @@ use common::{
         requests::{
             GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
             GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-            GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
+            GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
+            GetBlockRangeDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
             GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
             GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
             GetProofForCommitmentResponse, GetTransactionByHashRequest,
@@ -23,6 +24,7 @@ use common::{
     },
     transaction::{EncodedTransaction, NSSATransaction},
 };
+use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
 use sequencer_core::{TransactionMalformationError, config::AccountInitialData};
@@ -33,6 +35,7 @@ use super::{JsonHandler, respond, types::err_rpc::RpcErr};
 pub const HELLO: &str = "hello";
 pub const SEND_TX: &str = "send_tx";
 pub const GET_BLOCK: &str = "get_block";
+pub const GET_BLOCK_RANGE: &str = "get_block_range";
 pub const GET_GENESIS: &str = "get_genesis";
 pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
@@ -116,6 +119,25 @@ impl JsonHandler {
         let response = GetBlockDataResponse {
             block: borsh::to_vec(&HashableBlockData::from(block)).unwrap(),
         };
+
+        respond(response)
+    }
+
+    async fn process_get_block_range_data(&self, request: Request) -> Result<Value, RpcErr> {
+        let get_block_req = GetBlockRangeDataRequest::parse(Some(request.params))?;
+
+        let blocks = {
+            let state = self.sequencer_state.lock().await;
+            (get_block_req.start_block_id..=get_block_req.end_block_id)
+                .map(|block_id| state.block_store().get_block_at_id(block_id))
+                .map_ok(|block| {
+                    borsh::to_vec(&HashableBlockData::from(block))
+                        .expect("derived BorshSerialize should never fail")
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        };
+
+        let response = GetBlockRangeDataResponse { blocks };
 
         respond(response)
     }
@@ -297,6 +319,7 @@ impl JsonHandler {
             HELLO => self.process_temp_hello(request).await,
             SEND_TX => self.process_send_tx(request).await,
             GET_BLOCK => self.process_get_block_data(request).await,
+            GET_BLOCK_RANGE => self.process_get_block_range_data(request).await,
             GET_GENESIS => self.process_get_genesis(request).await,
             GET_LAST_BLOCK => self.process_get_last_block(request).await,
             GET_INITIAL_TESTNET_ACCOUNTS => self.get_initial_testnet_accounts(request).await,

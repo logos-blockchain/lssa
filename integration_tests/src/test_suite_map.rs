@@ -1646,23 +1646,23 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("########## test_modify_config_fields ##########");
 
         let wallet_config = fetch_config().await.unwrap();
-        let old_seq_poll_retry_delay_millis = wallet_config.seq_poll_retry_delay_millis;
+        let old_seq_poll_timeout_millis = wallet_config.seq_poll_timeout_millis;
 
         // Change config field
         let command = Command::Config(ConfigSubcommand::Set {
-            key: "seq_poll_retry_delay_millis".to_string(),
+            key: "seq_poll_timeout_millis".to_string(),
             value: "1000".to_string(),
         });
         wallet::cli::execute_subcommand(command).await.unwrap();
 
         let wallet_config = fetch_config().await.unwrap();
 
-        assert_eq!(wallet_config.seq_poll_retry_delay_millis, 1000);
+        assert_eq!(wallet_config.seq_poll_timeout_millis, 1000);
 
         // Return how it was at the beginning
         let command = Command::Config(ConfigSubcommand::Set {
-            key: "seq_poll_retry_delay_millis".to_string(),
-            value: old_seq_poll_retry_delay_millis.to_string(),
+            key: "seq_poll_timeout_millis".to_string(),
+            value: old_seq_poll_timeout_millis.to_string(),
         });
         wallet::cli::execute_subcommand(command).await.unwrap();
 
