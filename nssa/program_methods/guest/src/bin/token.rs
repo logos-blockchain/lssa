@@ -230,7 +230,7 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostStat
     let account_to_initialize = &pre_states[1];
 
     if account_to_initialize.account != Account::default() {
-        panic!("Only uninitialized accounts can be initialized");
+        panic!("Only Uninitialized accounts can be initialized");
     }
 
     // TODO: #212 We should check that this is an account owned by the token program.
@@ -251,7 +251,7 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostStat
     ]
 }
 
-fn burn(pre_states: &[AccountWithMetadata], balance_to_burn: u128) -> Vec<Account> {
+fn burn(pre_states: &[AccountWithMetadata], balance_to_burn: u128) -> Vec<AccountPostState> {
 
     if pre_states.len() != 2 {
         panic!("Invalid number of accounts");
@@ -296,10 +296,14 @@ fn burn(pre_states: &[AccountWithMetadata], balance_to_burn: u128) -> Vec<Accoun
         }
     );
 
-    vec![post_definition, post_user_holding]
+
+    vec![
+        AccountPostState::new(post_definition),
+        AccountPostState::new(post_user_holding),
+    ]
 }
 
-fn mint_additional_supply(pre_states: &[AccountWithMetadata], amount_to_mint: u128) -> Vec<Account> {
+fn mint_additional_supply(pre_states: &[AccountWithMetadata], amount_to_mint: u128) -> Vec<AccountPostState> {
     if pre_states.len() != 2 {
         panic!("Invalid number of accounts");
     }
@@ -314,8 +318,6 @@ fn mint_additional_supply(pre_states: &[AccountWithMetadata], amount_to_mint: u1
     let definition_values =
         TokenDefinition::parse(&definition.account.data).expect("Definition account must be valid");
 
-    let mut token_holding_post = token_holding.account.clone();
-
     //TODO: add overflow protection
     // TokenDefinition.supply_limit + amount_to_mint
 
@@ -327,26 +329,35 @@ fn mint_additional_supply(pre_states: &[AccountWithMetadata], amount_to_mint: u1
         panic!("Mismatch token definition and token holding");
     }
 
-    let mut post_definition = definition.account.clone();
-
-    let mut token_holding_post = token_holding.account.clone();
-
-    token_holding_post.data = TokenHolding::into_data(
-        TokenHolding {
+    let token_holding_post_data = TokenHolding {
             account_type: token_holding_values.account_type,
             definition_id: token_holding_values.definition_id,
             balance: token_holding_values.balance + amount_to_mint,
-        }
-    );
+    };
 
-    post_definition.data = TokenDefinition::into_data(
-        TokenDefinition {
+    let post_definition_data = TokenDefinition {
             account_type: definition_values.account_type,
             name: definition_values.name,
             total_supply: definition_values.total_supply + amount_to_mint,
-        }
-    );
+    };
 
+    let post_definition = {
+        let mut this = definition.account.clone();
+        this.data = post_definition_data.into_data();
+        AccountPostState::new(this)
+    };
+
+    let token_holding_post = {
+        let mut this = token_holding.account.clone();
+        this.data = token_holding_post_data.into_data();
+
+        // Claim the recipient account if it has default program owner
+        if this.program_owner == DEFAULT_PROGRAM_ID {
+            AccountPostState::new_claimed(this)
+        } else {
+            AccountPostState::new(this)
+        }
+    };
     vec![post_definition, token_holding_post]
 }
 
@@ -409,8 +420,7 @@ fn main() {
             assert_eq!(name, [0; 6]);
 
             // Execute
-            let post_states = burn(&pre_states, balance_to_burn);
-            (pre_states, post_states)
+            burn(&pre_states, balance_to_burn)
         }
         4 => {
             let balance_to_mint = u128::from_le_bytes(
@@ -424,8 +434,7 @@ fn main() {
             assert_eq!(name, [0; 6]);
 
             // Execute
-            let post_states = mint_additional_supply(&pre_states, balance_to_mint);
-            (pre_states, post_states)
+            mint_additional_supply(&pre_states, balance_to_mint)
         }
         _ => panic!("Invalid instruction"),
     };
@@ -823,40 +832,40 @@ mod tests {
     }
 
     enum BalanceEnum {
-        init_supply,
-        holding_balance,
-        init_supply_burned,
-        holding_balance_burned,
-        burn_success,
-        burn_insufficient,
-        mint_success,
-        init_supply_mint,
-        holding_balance_mint,
+        InitSupply,
+        HoldingBalance,
+        InitSupplyBurned,
+        HoldingBalanceBurned,
+        BurnSuccess,
+        BurnInsufficient,
+        MintSuccess,
+        InitSupplyMint,
+        HoldingBalanceMint,
     }
 
     enum AccountsEnum {
-        definition_account_auth,
-        definition_account_not_auth,
-        holding_diff_def,
-        holding_same_def_auth,
-        holding_same_def_not_auth,
-        definition_account_post_burn,
-        holding_account_post_burn,
-        uninit,
-        init_mint,
-        definition_account_mint,
-        holding_same_def_mint,
+        DefinitionAccountAuth,
+        DefinitionAccountNotAuth,
+        HoldingDiffDef,
+        HoldingSameDefAuth,
+        HoldingSameDefNotAuth,
+        DefinitionAccountPostBurn,
+        HoldingAccountPostBurn,
+        Uninit,
+        InitMint,
+        DefinitionAccountMint,
+        HoldingSameDefMint,
     }
 
     enum IdEnum {
-        pool_definition_id,
-        pool_definition_id_diff,
-        holding_id,
+        PoolDefinitionId,
+        PoolDefinitionIdDiff,
+        HoldingId,
     }
 
     fn helper_account_constructor(selection: AccountsEnum) -> AccountWithMetadata{
         match selection {
-            AccountsEnum::definition_account_auth => AccountWithMetadata {
+            AccountsEnum::DefinitionAccountAuth => AccountWithMetadata {
                 account: Account {
                         program_owner: [5u32;8],
                         balance: 0u128,
@@ -864,14 +873,14 @@ mod tests {
                         TokenDefinition {
                             account_type: TOKEN_DEFINITION_TYPE,
                             name: [2; 6],
-                            total_supply:  helper_balance_constructor(BalanceEnum::init_supply),
+                            total_supply:  helper_balance_constructor(BalanceEnum::InitSupply),
                         }),
                         nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
             },
-            AccountsEnum::definition_account_not_auth => AccountWithMetadata {
+            AccountsEnum::DefinitionAccountNotAuth => AccountWithMetadata {
                 account: Account {
                         program_owner: [5u32; 8],
                         balance: 0u128,
@@ -879,62 +888,62 @@ mod tests {
                         TokenDefinition {
                             account_type: TOKEN_DEFINITION_TYPE,
                             name: [2; 6],
-                            total_supply:  helper_balance_constructor(BalanceEnum::init_supply),
+                            total_supply:  helper_balance_constructor(BalanceEnum::InitSupply),
                         }),
                         nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
             },
-            AccountsEnum::holding_diff_def => AccountWithMetadata {
+            AccountsEnum::HoldingDiffDef => AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32;8],
                     balance: 0u128,
                     data: TokenHolding::into_data(
                         TokenHolding {
                             account_type: TOKEN_HOLDING_TYPE,
-                            definition_id: helper_id_constructor(IdEnum::pool_definition_id_diff),
-                            balance:  helper_balance_constructor(BalanceEnum::holding_balance),
+                            definition_id: helper_id_constructor(IdEnum::PoolDefinitionIdDiff),
+                            balance:  helper_balance_constructor(BalanceEnum::HoldingBalance),
                         }
                     ),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::holding_id),
+                account_id: helper_id_constructor(IdEnum::HoldingId),
             },
-            AccountsEnum::holding_same_def_auth => AccountWithMetadata {
+            AccountsEnum::HoldingSameDefAuth => AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32;8],
                     balance: 0u128,
                     data: TokenHolding::into_data(
                         TokenHolding {
                             account_type: TOKEN_HOLDING_TYPE,
-                            definition_id: helper_id_constructor(IdEnum::pool_definition_id),
-                            balance:  helper_balance_constructor(BalanceEnum::holding_balance),
+                            definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                            balance:  helper_balance_constructor(BalanceEnum::HoldingBalance),
                         }
                     ),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::holding_id),
+                account_id: helper_id_constructor(IdEnum::HoldingId),
             },
-            AccountsEnum::holding_same_def_not_auth => AccountWithMetadata {
+            AccountsEnum::HoldingSameDefNotAuth => AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32;8],
                     balance: 0u128,
                     data: TokenHolding::into_data(
                         TokenHolding {
                             account_type: TOKEN_HOLDING_TYPE,
-                            definition_id: helper_id_constructor(IdEnum::pool_definition_id),
-                            balance:  helper_balance_constructor(BalanceEnum::holding_balance),
+                            definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                            balance:  helper_balance_constructor(BalanceEnum::HoldingBalance),
                         }
                     ),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::holding_id),
+                account_id: helper_id_constructor(IdEnum::HoldingId),
             },
-            AccountsEnum::definition_account_post_burn => AccountWithMetadata {
+            AccountsEnum::DefinitionAccountPostBurn => AccountWithMetadata {
                 account: Account {
                         program_owner: [5u32;8],
                         balance: 0u128,
@@ -942,83 +951,67 @@ mod tests {
                         TokenDefinition {
                             account_type: TOKEN_DEFINITION_TYPE,
                             name: [2; 6],
-                            total_supply:  helper_balance_constructor(BalanceEnum::init_supply_burned),
+                            total_supply:  helper_balance_constructor(BalanceEnum::InitSupplyBurned),
                         }),
                         nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
             },
-            AccountsEnum::holding_same_def_auth => AccountWithMetadata {
+            AccountsEnum::HoldingAccountPostBurn => AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32;8],
                     balance: 0u128,
                     data: TokenHolding::into_data(
                         TokenHolding {
                             account_type: TOKEN_HOLDING_TYPE,
-                            definition_id: helper_id_constructor(IdEnum::pool_definition_id),
-                            balance:  helper_balance_constructor(BalanceEnum::holding_balance),
-                        }
-                    ),
-                    nonce: 0,
-                },
-                is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::holding_id),
-            },
-            AccountsEnum::holding_account_post_burn => AccountWithMetadata {
-                account: Account {
-                    program_owner: [5u32;8],
-                    balance: 0u128,
-                    data: TokenHolding::into_data(
-                        TokenHolding {
-                            account_type: TOKEN_HOLDING_TYPE,
-                            definition_id: helper_id_constructor(IdEnum::pool_definition_id),
-                            balance:  helper_balance_constructor(BalanceEnum::holding_balance_burned),
+                            definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                            balance:  helper_balance_constructor(BalanceEnum::HoldingBalanceBurned),
                         }
                     ),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::holding_id),
+                account_id: helper_id_constructor(IdEnum::HoldingId),
             },
-            AccountsEnum::uninit => AccountWithMetadata {
+            AccountsEnum::Uninit => AccountWithMetadata {
                 account: Account::default(),
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::holding_id),
+                account_id: helper_id_constructor(IdEnum::HoldingId),
             },
-            AccountsEnum::init_mint => AccountWithMetadata {
+            AccountsEnum::InitMint => AccountWithMetadata {
                 account: Account {
                     program_owner: [0u32;8],
                     balance: 0u128,
                     data: TokenHolding::into_data(
                         TokenHolding {
                             account_type: TOKEN_HOLDING_TYPE,
-                            definition_id: helper_id_constructor(IdEnum::pool_definition_id),
-                            balance:  helper_balance_constructor(BalanceEnum::mint_success),
+                            definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                            balance:  helper_balance_constructor(BalanceEnum::MintSuccess),
                         }
                     ),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::holding_id),
+                account_id: helper_id_constructor(IdEnum::HoldingId),
             },
-            AccountsEnum::holding_same_def_mint => AccountWithMetadata {
+            AccountsEnum::HoldingSameDefMint => AccountWithMetadata {
                 account: Account {
                         program_owner: [5u32;8],
                         balance: 0u128,
                         data: TokenHolding::into_data(
                         TokenHolding {
                             account_type: TOKEN_HOLDING_TYPE,
-                            definition_id: helper_id_constructor(IdEnum::pool_definition_id),
-                            balance:  helper_balance_constructor(BalanceEnum::holding_balance_mint),
+                            definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                            balance:  helper_balance_constructor(BalanceEnum::HoldingBalanceMint),
                         }
                     ),
                         nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
             },
-            AccountsEnum::definition_account_mint => AccountWithMetadata {
+            AccountsEnum::DefinitionAccountMint => AccountWithMetadata {
                 account: Account {
                         program_owner: [5u32;8],
                         balance: 0u128,
@@ -1026,12 +1019,12 @@ mod tests {
                         TokenDefinition {
                             account_type: TOKEN_DEFINITION_TYPE,
                             name: [2; 6],
-                            total_supply:  helper_balance_constructor(BalanceEnum::init_supply_mint),
+                            total_supply:  helper_balance_constructor(BalanceEnum::InitSupplyMint),
                         }),
                         nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::pool_definition_id),
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
             },
             _ => panic!("Invalid selection")
         }
@@ -1039,24 +1032,24 @@ mod tests {
 
     fn helper_balance_constructor(selection: BalanceEnum) -> u128 {
         match selection {
-            BalanceEnum::init_supply => 100_000,
-            BalanceEnum::holding_balance => 1_000,
-            BalanceEnum::init_supply_burned => 99_500,
-            BalanceEnum::holding_balance_burned => 500,
-            BalanceEnum::burn_success => 500,
-            BalanceEnum::burn_insufficient => 1_500,
-            BalanceEnum::mint_success => 50_000,
-            BalanceEnum::init_supply_mint => 150_000,
-            BalanceEnum::holding_balance_mint => 51_000,
+            BalanceEnum::InitSupply => 100_000,
+            BalanceEnum::HoldingBalance => 1_000,
+            BalanceEnum::InitSupplyBurned => 99_500,
+            BalanceEnum::HoldingBalanceBurned => 500,
+            BalanceEnum::BurnSuccess => 500,
+            BalanceEnum::BurnInsufficient => 1_500,
+            BalanceEnum::MintSuccess => 50_000,
+            BalanceEnum::InitSupplyMint => 150_000,
+            BalanceEnum::HoldingBalanceMint => 51_000,
             _ => panic!("Invalid selection")
         }
     }
 
     fn helper_id_constructor(selection: IdEnum) -> AccountId {
         match selection {
-            IdEnum::pool_definition_id => AccountId::new([15;32]),
-            IdEnum::pool_definition_id_diff => AccountId::new([16;32]),
-            IdEnum::holding_id => AccountId::new([17;32]),
+            IdEnum::PoolDefinitionId => AccountId::new([15;32]),
+            IdEnum::PoolDefinitionIdDiff => AccountId::new([16;32]),
+            IdEnum::HoldingId => AccountId::new([17;32]),
         }
     }
 
@@ -1064,124 +1057,124 @@ mod tests {
     #[should_panic(expected = "Invalid number of accounts")]
     fn test_burn_invalid_number_of_accounts() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
         ];
-        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::burn_success));
+        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::BurnSuccess));
     }
 
     #[test]
     #[should_panic(expected = "Mismatch token definition and token holding")]
     fn test_burn_mismatch_def() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::holding_diff_def),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::HoldingDiffDef),
         ];
-        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::burn_success));
+        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::BurnSuccess));
     }
 
     #[test]
     #[should_panic(expected = "Authorization is missing")]
     fn test_burn_missing_authorization() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::holding_same_def_not_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
         ];
-        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::burn_success));
+        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::BurnSuccess));
     }
 
     #[test]
     #[should_panic(expected = "Insufficient balance to burn")]
     fn test_burn_insufficient_balance() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::holding_same_def_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
         ];
-        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::burn_insufficient));
+        let _post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::BurnInsufficient));
     }
 
     #[test]
     fn test_burn_success() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::holding_same_def_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
         ];
-        let post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::burn_success));
+        let post_states = burn(&pre_states, helper_balance_constructor(BalanceEnum::BurnSuccess));
 
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
-        assert!(def_post == helper_account_constructor(AccountsEnum::definition_account_post_burn).account);
-        assert!(holding_post == helper_account_constructor(AccountsEnum::holding_account_post_burn).account);
+        assert!(*def_post.account() == helper_account_constructor(AccountsEnum::DefinitionAccountPostBurn).account);
+        assert!(*holding_post.account() == helper_account_constructor(AccountsEnum::HoldingAccountPostBurn).account);
     }
 
     #[test]
     #[should_panic(expected = "Invalid number of accounts")]
     fn test_mint_invalid_number_of_accounts() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
         ];
-        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::mint_success));
+        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::MintSuccess));
     }
 
     #[test]
     #[should_panic(expected = "Holding account must be valid")]
     fn test_mint_not_valid_holding_account() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::definition_account_not_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountNotAuth),
         ];
-        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::mint_success));
+        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::MintSuccess));
     }
 
     #[test]
     #[should_panic(expected = "Definition authorization is missing")]
     fn test_mint_missing_authorization() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_not_auth),
-                helper_account_constructor(AccountsEnum::holding_same_def_not_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountNotAuth),
+                helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
         ];
-        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::mint_success));
+        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::MintSuccess));
     }
 
     #[test]
     #[should_panic(expected = "Mismatch token definition and token holding")]
     fn test_mint_mismatched_token_definition() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::holding_diff_def),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::HoldingDiffDef),
         ];
-        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::mint_success));
+        let _post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::MintSuccess));
     }
 
     #[test]
     fn test_mint_success() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::holding_same_def_not_auth),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
         ];
-        let post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::mint_success));
+        let post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::MintSuccess));
 
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
-        assert!(def_post == helper_account_constructor(AccountsEnum::definition_account_mint).account);
-        assert!(holding_post == helper_account_constructor(AccountsEnum::holding_same_def_mint).account);
+        assert!(*def_post.account() == helper_account_constructor(AccountsEnum::DefinitionAccountMint).account);
+        assert!(*holding_post.account() == helper_account_constructor(AccountsEnum::HoldingSameDefMint).account);
     }
 
     #[test]
     fn test_mint_uninit_holding_success() {
         let pre_states = vec![
-                helper_account_constructor(AccountsEnum::definition_account_auth),
-                helper_account_constructor(AccountsEnum::uninit),
+                helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+                helper_account_constructor(AccountsEnum::Uninit),
         ];
-        let post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::mint_success));
+        let post_states = mint_additional_supply(&pre_states, helper_balance_constructor(BalanceEnum::MintSuccess));
 
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
-        assert!(def_post == helper_account_constructor(AccountsEnum::definition_account_mint).account);
-        assert!(holding_post == helper_account_constructor(AccountsEnum::init_mint).account);
+        assert!(*def_post.account() == helper_account_constructor(AccountsEnum::DefinitionAccountMint).account);
+        assert!(*holding_post.account() == helper_account_constructor(AccountsEnum::InitMint).account);
+        assert!(holding_post.requires_claim() == true);
     }
-
 
 }
