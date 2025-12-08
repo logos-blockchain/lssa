@@ -1,8 +1,9 @@
 use std::{fmt::Display, str::FromStr};
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize, Hash)]
 pub struct ChainIndex(Vec<u32>);
 
 #[derive(thiserror::Error, Debug)]
@@ -103,6 +104,39 @@ impl ChainIndex {
 
     pub fn depth(&self) -> u32 {
         self.0.iter().map(|cci| cci + 1).sum()
+    }
+
+    fn collapse_back(&self) -> Option<Self> {
+        let mut res = self.parent()?;
+
+        let last_mut = res.0.last_mut()?;
+        *last_mut += *(self.0.last()?) + 1;
+
+        Some(res)
+    }
+
+    fn shuffle_iter(&self) -> impl Iterator<Item = ChainIndex> {
+        self.0
+            .iter()
+            .permutations(self.0.len())
+            .unique()
+            .map(|item| ChainIndex(item.into_iter().cloned().collect()))
+    }
+
+    pub fn chain_ids_at_depth(depth: usize) -> impl Iterator<Item = ChainIndex> {
+        let mut stack = vec![ChainIndex(vec![0; depth])];
+        let mut cumulative_stack = vec![ChainIndex(vec![0; depth])];
+
+        while let Some(id) = stack.pop() {
+            if let Some(collapsed_id) = id.collapse_back() {
+                for id in collapsed_id.shuffle_iter() {
+                    stack.push(id.clone());
+                    cumulative_stack.push(id);
+                }
+            }
+        }
+
+        cumulative_stack.into_iter().unique()
     }
 }
 
@@ -210,5 +244,39 @@ mod tests {
         let parent_chain_id = chain_id.parent().unwrap();
 
         assert_eq!(parent_chain_id, ChainIndex::root())
+    }
+
+    #[test]
+    fn test_collapse_back() {
+        let chain_id = ChainIndex(vec![1, 1]);
+
+        let collapsed = chain_id.collapse_back().unwrap();
+
+        assert_eq!(collapsed, ChainIndex(vec![3]))
+    }
+
+    #[test]
+    fn test_collapse_back_one() {
+        let chain_id = ChainIndex(vec![1]);
+
+        let collapsed = chain_id.collapse_back();
+
+        assert_eq!(collapsed, None)
+    }
+
+    #[test]
+    fn test_collapse_back_root() {
+        let chain_id = ChainIndex(vec![]);
+
+        let collapsed = chain_id.collapse_back();
+
+        assert_eq!(collapsed, None)
+    }
+
+    #[test]
+    fn test_shuffle() {
+        for id in ChainIndex::chain_ids_at_depth(5) {
+            println!("{id}");
+        }
     }
 }

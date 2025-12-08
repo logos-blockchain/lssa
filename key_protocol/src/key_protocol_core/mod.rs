@@ -1,7 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use anyhow::Result;
-use common::sequencer_client::SequencerClient;
 use k256::AffinePoint;
 use serde::{Deserialize, Serialize};
 
@@ -88,14 +87,12 @@ impl NSSAUserData {
     /// Generated new private key for public transaction signatures
     ///
     /// Returns the account_id of new account
-    pub async fn generate_new_public_transaction_private_key(
+    pub fn generate_new_public_transaction_private_key(
         &mut self,
         parent_cci: ChainIndex,
-        sequencer_client: Arc<SequencerClient>,
     ) -> nssa::AccountId {
         self.public_key_tree
-            .generate_new_node(&parent_cci, sequencer_client)
-            .await
+            .generate_new_node(&parent_cci)
             .unwrap()
             .0
     }

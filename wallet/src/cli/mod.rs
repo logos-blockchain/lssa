@@ -219,7 +219,7 @@ pub async fn execute_keys_restoration(password: String, depth: u32) -> Result<()
         .storage
         .user_data
         .public_key_tree
-        .cleanup_tree_remove_ininit_for_depth(depth, wallet_core.sequencer_client.clone())
+        .cleanup_tree_remove_uninit_layered(depth, wallet_core.sequencer_client.clone())
         .await?;
 
     println!("Public tree cleaned up");
@@ -240,7 +240,7 @@ pub async fn execute_keys_restoration(password: String, depth: u32) -> Result<()
         .storage
         .user_data
         .private_key_tree
-        .cleanup_tree_remove_ininit_for_depth(depth);
+        .cleanup_tree_remove_uninit_layered(depth);
 
     println!("Private tree cleaned up");
 

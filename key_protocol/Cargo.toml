@@ -16,9 +16,11 @@ bip39.workspace = true
 hmac-sha512.workspace = true
 thiserror.workspace = true
 nssa-core = { path = "../nssa/core", features = ["host"] }
+itertools.workspace = true
 
 [dependencies.common]
 path = "../common"
 
 [dependencies.nssa]
 path = "../nssa"
+features = ["no_docker"]

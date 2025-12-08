@@ -111,7 +111,7 @@ impl<N: KeyNode> KeyTree<N> {
         }
     }
 
-    fn generate_new_node_unconstrained(
+    pub fn generate_new_node(
         &mut self,
         parent_cci: &ChainIndex,
     ) -> Option<(nssa::AccountId, ChainIndex)> {
@@ -165,7 +165,7 @@ impl<N: KeyNode> KeyTree<N> {
             let mut next_id = curr_id.nth_child(0);
 
             while (next_id.depth()) < depth {
-                self.generate_new_node_unconstrained(&curr_id);
+                self.generate_new_node(&curr_id);
                 id_stack.push(next_id.clone());
                 next_id = next_id.next_in_line();
             }
@@ -174,45 +174,6 @@ impl<N: KeyNode> KeyTree<N> {
 }
 
 impl KeyTree<ChildKeysPrivate> {
-    #[allow(clippy::result_large_err)]
-    pub fn generate_new_node(
-        &mut self,
-        parent_cci: &ChainIndex,
-    ) -> Result<(nssa::AccountId, ChainIndex), KeyTreeGenerationError> {
-        let parent_keys =
-            self.key_map
-                .get(parent_cci)
-                .ok_or(KeyTreeGenerationError::ParentChainIdNotFound(
-                    parent_cci.clone(),
-                ))?;
-        let next_child_id = self
-            .find_next_last_child_of_id(parent_cci)
-            .expect("Can be None only if parent is not present");
-        let next_cci = parent_cci.nth_child(next_child_id);
-
-        if let Some(prev_cci) = next_cci.previous_in_line() {
-            let prev_keys = self.key_map.get(&prev_cci).unwrap_or_else(|| {
-                panic!("Constraint violated, previous child with id {prev_cci} is missing")
-            });
-
-            if prev_keys.value.1 == nssa::Account::default() {
-                return Err(KeyTreeGenerationError::PredecesorsNotInitialized(next_cci));
-            }
-        } else if *parent_cci != ChainIndex::root()
-            && parent_keys.value.1 == nssa::Account::default()
-        {
-            return Err(KeyTreeGenerationError::PredecesorsNotInitialized(next_cci));
-        }
-
-        let child_keys = parent_keys.nth_child(next_child_id);
-        let account_id = child_keys.account_id();
-
-        self.key_map.insert(next_cci.clone(), child_keys);
-        self.account_id_map.insert(account_id, next_cci.clone());
-
-        Ok((account_id, next_cci))
-    }
-
     /// Cleanup of all non-initialized accounts in a private tree
     ///
     /// For given `depth` checks children to a tree such that their `ChainIndex::depth(&self) <
@@ -221,7 +182,9 @@ impl KeyTree<ChildKeysPrivate> {
     /// If account is default, removes them.
     ///
     /// Chain must be parsed for accounts beforehand
-    pub fn cleanup_tree_remove_ininit_for_depth(&mut self, depth: u32) {
+    ///
+    /// Fast, leaves gaps between accounts
+    pub fn cleanup_tree_remove_uninit_for_depth(&mut self, depth: u32) {
         let mut id_stack = vec![ChainIndex::root()];
 
         while let Some(curr_id) = id_stack.pop() {
@@ -241,64 +204,42 @@ impl KeyTree<ChildKeysPrivate> {
             }
         }
     }
+
+    /// Cleanup of non-initialized accounts in a private tree
+    ///
+    /// If account is default, removes them, stops at first non-default account.
+    ///
+    /// Walks through tree in lairs of same depth using `ChainIndex::chain_ids_at_depth()`
+    ///
+    /// Chain must be parsed for accounts beforehand
+    ///
+    /// Slow, maintains tree consistency.
+    pub fn cleanup_tree_remove_uninit_layered(&mut self, depth: u32) {
+        'outer: for i in (1..(depth as usize)).rev() {
+            println!("Cleanup of tree at depth {i}");
+            for id in ChainIndex::chain_ids_at_depth(i) {
+                if let Some(node) = self.key_map.get(&id) {
+                    if node.value.1 == nssa::Account::default() {
+                        let addr = node.account_id();
+                        self.remove(addr);
+                    } else {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl KeyTree<ChildKeysPublic> {
-    #[allow(clippy::result_large_err)]
-    pub async fn generate_new_node(
-        &mut self,
-        parent_cci: &ChainIndex,
-        client: Arc<SequencerClient>,
-    ) -> Result<(nssa::AccountId, ChainIndex), KeyTreeGenerationError> {
-        let parent_keys =
-            self.key_map
-                .get(parent_cci)
-                .ok_or(KeyTreeGenerationError::ParentChainIdNotFound(
-                    parent_cci.clone(),
-                ))?;
-        let next_child_id = self
-            .find_next_last_child_of_id(parent_cci)
-            .expect("Can be None only if parent is not present");
-        let next_cci = parent_cci.nth_child(next_child_id);
-
-        if let Some(prev_cci) = next_cci.previous_in_line() {
-            let prev_keys = self.key_map.get(&prev_cci).unwrap_or_else(|| {
-                panic!("Constraint violated, previous child with id {prev_cci} is missing")
-            });
-            let prev_acc = client
-                .get_account(prev_keys.account_id().to_string())
-                .await?
-                .account;
-
-            if prev_acc == nssa::Account::default() {
-                return Err(KeyTreeGenerationError::PredecesorsNotInitialized(next_cci));
-            }
-        } else if *parent_cci != ChainIndex::root() {
-            let parent_acc = client
-                .get_account(parent_keys.account_id().to_string())
-                .await?
-                .account;
-
-            if parent_acc == nssa::Account::default() {
-                return Err(KeyTreeGenerationError::PredecesorsNotInitialized(next_cci));
-            }
-        }
-
-        let child_keys = parent_keys.nth_child(next_child_id);
-        let account_id = child_keys.account_id();
-
-        self.key_map.insert(next_cci.clone(), child_keys);
-        self.account_id_map.insert(account_id, next_cci.clone());
-
-        Ok((account_id, next_cci))
-    }
-
     /// Cleanup of all non-initialized accounts in a public tree
     ///
     /// For given `depth` checks children to a tree such that their `ChainIndex::depth(&self) <
     /// depth`.
     ///
     /// If account is default, removes them.
+    ///
+    /// Fast, leaves gaps between accounts
     pub async fn cleanup_tree_remove_ininit_for_depth(
         &mut self,
         depth: u32,
@@ -321,6 +262,38 @@ impl KeyTree<ChildKeysPublic> {
             while (next_id.depth()) < depth {
                 id_stack.push(next_id.clone());
                 next_id = next_id.next_in_line();
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Cleanup of non-initialized accounts in a public tree
+    ///
+    /// If account is default, removes them, stops at first non-default account.
+    ///
+    /// Walks through tree in lairs of same depth using `ChainIndex::chain_ids_at_depth()`
+    ///
+    /// Slow, maintains tree consistency.
+    pub async fn cleanup_tree_remove_uninit_layered(
+        &mut self,
+        depth: u32,
+        client: Arc<SequencerClient>,
+    ) -> Result<()> {
+        'outer: for i in (1..(depth as usize)).rev() {
+            println!("Cleanup of tree at depth {i}");
+            for id in ChainIndex::chain_ids_at_depth(i) {
+                if let Some(node) = self.key_map.get(&id) {
+                    let address = node.account_id();
+                    let node_acc = client.get_account(address.to_string()).await?.account;
+
+                    if node_acc == nssa::Account::default() {
+                        let addr = node.account_id();
+                        self.remove(addr);
+                    } else {
+                        break 'outer;
+                    }
+                }
             }
         }
 
@@ -367,8 +340,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 0);
 
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -381,18 +353,12 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 1);
 
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
 
         let next_last_child_for_parent_id = tree
             .find_next_last_child_of_id(&ChainIndex::root())
@@ -413,8 +379,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 0);
 
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -427,7 +392,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 1);
 
-        let key_opt = tree.generate_new_node_unconstrained(&ChainIndex::from_str("/3").unwrap());
+        let key_opt = tree.generate_new_node(&ChainIndex::from_str("/3").unwrap());
 
         assert_eq!(key_opt, None);
     }
@@ -444,8 +409,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 0);
 
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -458,8 +422,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 1);
 
-        tree.generate_new_node_unconstrained(&ChainIndex::root())
-            .unwrap();
+        tree.generate_new_node(&ChainIndex::root()).unwrap();
 
         assert!(
             tree.key_map
@@ -472,7 +435,7 @@ mod tests {
 
         assert_eq!(next_last_child_for_parent_id, 2);
 
-        tree.generate_new_node_unconstrained(&ChainIndex::from_str("/0").unwrap())
+        tree.generate_new_node(&ChainIndex::from_str("/0").unwrap())
             .unwrap();
 
         let next_last_child_for_parent_id = tree
@@ -486,7 +449,7 @@ mod tests {
                 .contains_key(&ChainIndex::from_str("/0/0").unwrap())
         );
 
-        tree.generate_new_node_unconstrained(&ChainIndex::from_str("/0").unwrap())
+        tree.generate_new_node(&ChainIndex::from_str("/0").unwrap())
             .unwrap();
 
         let next_last_child_for_parent_id = tree
@@ -500,7 +463,7 @@ mod tests {
                 .contains_key(&ChainIndex::from_str("/0/1").unwrap())
         );
 
-        tree.generate_new_node_unconstrained(&ChainIndex::from_str("/0").unwrap())
+        tree.generate_new_node(&ChainIndex::from_str("/0").unwrap())
             .unwrap();
 
         let next_last_child_for_parent_id = tree
@@ -514,7 +477,7 @@ mod tests {
                 .contains_key(&ChainIndex::from_str("/0/2").unwrap())
         );
 
-        tree.generate_new_node_unconstrained(&ChainIndex::from_str("/0/1").unwrap())
+        tree.generate_new_node(&ChainIndex::from_str("/0/1").unwrap())
             .unwrap();
 
         assert!(
@@ -530,60 +493,11 @@ mod tests {
     }
 
     #[test]
-    fn test_key_generation_constraint() {
-        let seed_holder = seed_holder_for_tests();
-
-        let mut tree = KeyTreePrivate::new(&seed_holder);
-
-        let (_, chain_id) = tree.generate_new_node(&ChainIndex::root()).unwrap();
-
-        assert_eq!(chain_id, ChainIndex::from_str("/0").unwrap());
-
-        let res = tree.generate_new_node(&ChainIndex::from_str("/").unwrap());
-
-        assert!(matches!(
-            res,
-            Err(KeyTreeGenerationError::PredecesorsNotInitialized(_))
-        ));
-
-        let res = tree.generate_new_node(&ChainIndex::from_str("/0").unwrap());
-
-        assert!(matches!(
-            res,
-            Err(KeyTreeGenerationError::PredecesorsNotInitialized(_))
-        ));
-
-        let acc = tree
-            .key_map
-            .get_mut(&ChainIndex::from_str("/0").unwrap())
-            .unwrap();
-        acc.value.1.balance = 1;
-
-        let (_, chain_id) = tree
-            .generate_new_node(&ChainIndex::from_str("/").unwrap())
-            .unwrap();
-
-        assert_eq!(chain_id, ChainIndex::from_str("/1").unwrap());
-
-        let (_, chain_id) = tree
-            .generate_new_node(&ChainIndex::from_str("/0").unwrap())
-            .unwrap();
-
-        assert_eq!(chain_id, ChainIndex::from_str("/0/0").unwrap());
-    }
-
-    #[test]
     fn test_cleanup() {
         let seed_holder = seed_holder_for_tests();
 
         let mut tree = KeyTreePrivate::new(&seed_holder);
         tree.generate_tree_for_depth(10);
-
-        let acc = tree
-            .key_map
-            .get_mut(&ChainIndex::from_str("/0").unwrap())
-            .unwrap();
-        acc.value.1.balance = 1;
 
         let acc = tree
             .key_map
@@ -599,12 +513,6 @@ mod tests {
 
         let acc = tree
             .key_map
-            .get_mut(&ChainIndex::from_str("/0/0").unwrap())
-            .unwrap();
-        acc.value.1.balance = 4;
-
-        let acc = tree
-            .key_map
             .get_mut(&ChainIndex::from_str("/0/1").unwrap())
             .unwrap();
         acc.value.1.balance = 5;
@@ -615,7 +523,7 @@ mod tests {
             .unwrap();
         acc.value.1.balance = 6;
 
-        tree.cleanup_tree_remove_ininit_for_depth(10);
+        tree.cleanup_tree_remove_uninit_layered(10);
 
         let mut key_set_res = HashSet::new();
         key_set_res.insert("/0".to_string());
@@ -636,12 +544,6 @@ mod tests {
 
         let acc = tree
             .key_map
-            .get(&ChainIndex::from_str("/0").unwrap())
-            .unwrap();
-        assert_eq!(acc.value.1.balance, 1);
-
-        let acc = tree
-            .key_map
             .get(&ChainIndex::from_str("/1").unwrap())
             .unwrap();
         assert_eq!(acc.value.1.balance, 2);
@@ -651,12 +553,6 @@ mod tests {
             .get(&ChainIndex::from_str("/2").unwrap())
             .unwrap();
         assert_eq!(acc.value.1.balance, 3);
-
-        let acc = tree
-            .key_map
-            .get(&ChainIndex::from_str("/0/0").unwrap())
-            .unwrap();
-        assert_eq!(acc.value.1.balance, 4);
 
         let acc = tree
             .key_map
