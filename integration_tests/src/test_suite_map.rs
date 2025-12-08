@@ -603,13 +603,13 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     }
 
     /// This test creates a new private token using the token program. All accounts are owned except
-    /// suply.
+    /// supply.
     #[nssa_integration_test]
     pub async fn test_success_token_program_private_owned_definition() {
         info!("########## test_success_token_program_private_owned_definition ##########");
         let wallet_config = fetch_config().await.unwrap();
 
-        // Create new account for the token definition (public)
+        // Create new account for the token definition (private)
         let SubcommandReturnValue::RegisterAccount {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
@@ -622,7 +622,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         else {
             panic!("invalid subcommand return value");
         };
-        // Create new account for the token supply holder (private)
+        // Create new account for the token supply holder (public)
         let SubcommandReturnValue::RegisterAccount {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
@@ -693,7 +693,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         );
         let wallet_config = fetch_config().await.unwrap();
 
-        // Create new account for the token definition (public)
+        // Create new account for the token definition (private)
         let SubcommandReturnValue::RegisterAccount {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
