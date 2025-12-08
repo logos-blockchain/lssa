@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use common::{error::SequencerClientError, sequencer_client::SequencerClient};
+use common::sequencer_client::SequencerClient;
 use serde::{Deserialize, Serialize};
 
 use crate::key_management::{
@@ -28,16 +28,6 @@ pub struct KeyTree<N: KeyNode> {
 
 pub type KeyTreePublic = KeyTree<ChildKeysPublic>;
 pub type KeyTreePrivate = KeyTree<ChildKeysPrivate>;
-
-#[derive(thiserror::Error, Debug)]
-pub enum KeyTreeGenerationError {
-    #[error("Parent chain id {0} not present in tree")]
-    ParentChainIdNotFound(ChainIndex),
-    #[error("Parent or left relative of {0} is not initialized")]
-    PredecesorsNotInitialized(ChainIndex),
-    #[error("Sequencer client error {0:#?}")]
-    SequencerClientError(#[from] SequencerClientError),
-}
 
 impl<N: KeyNode> KeyTree<N> {
     pub fn new(seed: &SeedHolder) -> Self {
