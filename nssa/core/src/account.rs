@@ -23,14 +23,13 @@ pub struct Account {
     pub nonce: Nonce,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, Eq))]
 pub struct AccountWithMetadata {
     pub account: Account,
     pub is_authorized: bool,
     pub account_id: AccountId,
 }
-
 #[cfg(feature = "host")]
 impl AccountWithMetadata {
     pub fn new(account: Account, is_authorized: bool, account_id: impl Into<AccountId>) -> Self {
@@ -42,10 +41,10 @@ impl AccountWithMetadata {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, BorshSerialize, BorshDeserialize)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, BorshSerialize, BorshDeserialize, Default)]
 #[cfg_attr(
     any(feature = "host", test),
-    derive(Debug, Copy, PartialOrd, Ord, Default)
+    derive(Debug, Copy, PartialOrd, Ord)
 )]
 pub struct AccountId {
     value: [u8; 32],
@@ -175,5 +174,12 @@ mod tests {
         let base58_str = "11".repeat(33); // 66 chars = 33 bytes
         let result = base58_str.parse::<AccountId>().unwrap_err();
         assert!(matches!(result, AccountIdError::InvalidLength(_)));
+    }
+
+    #[test]
+    fn default_account_id() {
+        let default_account_id = AccountId::default();
+        let expected_account_id = AccountId::new([0;32]);
+        assert!(default_account_id == expected_account_id);
     }
 }
