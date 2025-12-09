@@ -47,8 +47,8 @@ const POOL_DEFINITION_DATA_SIZE: usize = 225;
 struct PoolDefinition{
     definition_token_a_id: AccountId,
     definition_token_b_id: AccountId,
-    vault_a_addr: AccountId,
-    vault_b_addr: AccountId,
+    vault_a_id: AccountId,
+    vault_b_id: AccountId,
     liquidity_pool_id: AccountId,
     liquidity_pool_supply: u128,
     reserve_a: u128,
@@ -62,8 +62,8 @@ impl PoolDefinition {
         let mut bytes = [0; POOL_DEFINITION_DATA_SIZE];
         bytes[0..32].copy_from_slice(&self.definition_token_a_id.to_bytes());
         bytes[32..64].copy_from_slice(&self.definition_token_b_id.to_bytes());
-        bytes[64..96].copy_from_slice(&self.vault_a_addr.to_bytes());
-        bytes[96..128].copy_from_slice(&self.vault_b_addr.to_bytes());
+        bytes[64..96].copy_from_slice(&self.vault_a_id.to_bytes());
+        bytes[96..128].copy_from_slice(&self.vault_b_id.to_bytes());
         bytes[128..160].copy_from_slice(&self.liquidity_pool_id.to_bytes());
         bytes[160..176].copy_from_slice(&self.liquidity_pool_supply.to_le_bytes());
         bytes[176..192].copy_from_slice(&self.reserve_a.to_le_bytes());
@@ -79,8 +79,8 @@ impl PoolDefinition {
         } else {
             let definition_token_a_id = AccountId::new(data[0..32].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token A definition"));
             let definition_token_b_id = AccountId::new(data[32..64].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault B definition"));
-            let vault_a_addr = AccountId::new(data[64..96].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault A"));
-            let vault_b_addr = AccountId::new(data[96..128].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault B"));
+            let vault_a_id = AccountId::new(data[64..96].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault A"));
+            let vault_b_id = AccountId::new(data[96..128].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault B"));
             let liquidity_pool_id = AccountId::new(data[128..160].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token liquidity pool definition"));
             let liquidity_pool_supply = u128::from_le_bytes(data[160..176].try_into().expect("Parse data: The AMM program must be provided a valid u128 for liquidity cap"));
             let reserve_a = u128::from_le_bytes(data[176..192].try_into().expect("Parse data: The AMM program must be provided a valid u128 for reserve A balance"));
@@ -96,8 +96,8 @@ impl PoolDefinition {
             Some(Self {
                 definition_token_a_id,
                 definition_token_b_id,
-                vault_a_addr,
-                vault_b_addr,
+                vault_a_id,
+                vault_b_id,
                 liquidity_pool_id,
                 liquidity_pool_supply,
                 reserve_a,
@@ -211,18 +211,28 @@ fn main() {
             let balance_a: u128 = u128::from_le_bytes(instruction[1..17].try_into().expect("New definition: AMM Program expects u128 for balance a"));
             let balance_b: u128 = u128::from_le_bytes(instruction[17..33].try_into().expect("New definition: AMM Program expects u128 for balance b"));
 
-            new_definition(&pre_states, &[balance_a, balance_b])
+            // Convert Vec<u8> to ProgramId ([u32;8])
+            let mut amm_program_id: [u32;8] = [0;8];
+            amm_program_id[0] = u32::from_le_bytes(instruction[33..37].try_into().expect("New definition: AMM Program expects valid u32"));
+            amm_program_id[1] = u32::from_le_bytes(instruction[37..41].try_into().expect("New definition: AMM Program expects valid u32"));
+            amm_program_id[2] = u32::from_le_bytes(instruction[41..45].try_into().expect("New definition: AMM Program expects valid u32"));
+            amm_program_id[3] = u32::from_le_bytes(instruction[45..49].try_into().expect("New definition: AMM Program expects valid u32"));
+            amm_program_id[4] = u32::from_le_bytes(instruction[49..53].try_into().expect("New definition: AMM Program expects valid u32"));
+            amm_program_id[5] = u32::from_le_bytes(instruction[53..57].try_into().expect("New definition: AMM Program expects valid u32"));
+            amm_program_id[6] = u32::from_le_bytes(instruction[57..61].try_into().expect("New definition: AMM Program expects valid u32"));
+            amm_program_id[7] = u32::from_le_bytes(instruction[61..65].try_into().expect("New definition: AMM Program expects valid u32"));
+
+            new_definition(&pre_states, &[balance_a, balance_b], amm_program_id)
         }
         1 => {
-            let mut token_in_addr: [u8;32] = [0;32];
-            token_in_addr[0..].copy_from_slice(&instruction[33..65]);
-            let token_in_addr = AccountId::new(token_in_addr);
+            let mut token_in_id: [u8;32] = [0;32];
+            token_in_id[0..].copy_from_slice(&instruction[33..65]);
+            let token_in_id = AccountId::new(token_in_id);
             
             let amount_in = u128::from_le_bytes(instruction[1..17].try_into().expect("Swap: AMM Program expects valid u128 for balance to move"));
             let min_amount_out = u128::from_le_bytes(instruction[17..33].try_into().expect("Swap: AMM Program expects valid u128 for balance to move"));
 
-
-            swap(&pre_states, &[amount_in, min_amount_out], token_in_addr)
+            swap(&pre_states, &[amount_in, min_amount_out], token_in_id)
         }
         2 => {
             let min_amount_lp = u128::from_le_bytes(instruction[1..17].try_into().expect("Add liquidity: AMM Program expects valid u128 for min amount liquidity")); 
@@ -244,31 +254,53 @@ fn main() {
     write_nssa_outputs_with_chained_call(pre_states, post_states, chained_calls);
 }
 
-/*
-// TODO: check
-fn compute_pool_pda(definition_token_a_id: AccountId, definition_token_b_id: AccountId) -> AccountId {
-    use risc0_zkvm::sha::{Impl, Sha256};
-    const PDA_POOL_DEF_PREFIX: &[u8; 32] =b"/LSSA/v0.3/AccountId/AMM/PoolDef";
 
-    //TODO order (Token_A, Token B) for uniqueness
-    let mut bytes = [0; 64];
-    bytes[0..32].copy_from_slice(&definition_token_a_id.to_bytes());
-    bytes[32..].copy_from_slice(&definition_token_b_id.to_bytes());
-    AccountId::new(
-        Impl::hash_bytes(&bytes)
-            .as_bytes()
-            .try_into()
-            .expect("Hash output must be exactly 32 bytes long"),
-    )
-
-}*/
-
-fn compute_vault_pda(pool_program: ProgramId, pool_id: AccountId, definition_token_id: AccountId) -> AccountId {
-    AccountId::from((pool_program,
-        compute_vault_pda_seed(pool_id, definition_token_id)))
+fn compute_pool_pda(amm_program_id: ProgramId, definition_token_a_id: AccountId, definition_token_b_id: AccountId) -> AccountId {
+    AccountId::from((&amm_program_id,
+        &compute_pool_pda_seed(definition_token_a_id, definition_token_b_id)))
 }
 
-fn compute_vault_pda_seed(pool_id: AccountId, definition_token_id: AccountId) -> PdaSeed {
+fn compute_pool_pda_seed(definition_token_a_id: AccountId, definition_token_b_id: AccountId) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
+
+    let mut i: usize = 0;
+    let (token_1, token_2) = loop {
+        if definition_token_a_id.value()[i] > definition_token_b_id.value()[i] {
+            let token_1 = definition_token_a_id.clone();
+            let token_2 = definition_token_b_id.clone();
+            break (token_1, token_2)
+        } else if definition_token_a_id.value()[i] < definition_token_b_id.value()[i] {
+            let token_1 = definition_token_b_id.clone();
+            let token_2 = definition_token_a_id.clone();
+            break (token_1, token_2)
+        }
+        
+        if i == 32 {
+            panic!("Definitions match");
+        } else {
+            i += 1;
+        }
+    };
+
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&token_1.to_bytes());
+    bytes[32..].copy_from_slice(&token_2.to_bytes());
+
+    PdaSeed::new(Impl::hash_bytes(&bytes).as_bytes().try_into().expect("Hash output must be exactly 32 bytes long"))
+}
+
+
+fn compute_vault_pda(amm_program_id: ProgramId, 
+                    pool_id: AccountId, 
+                    definition_token_id: AccountId
+) -> AccountId {
+    AccountId::from((&amm_program_id,
+        &compute_vault_pda_seed(pool_id, definition_token_id)))
+}
+
+fn compute_vault_pda_seed(pool_id: AccountId,
+                        definition_token_id: AccountId
+) -> PdaSeed {
     use risc0_zkvm::sha::{Impl, Sha256};
 
     let mut bytes = [0; 64];
@@ -278,9 +310,25 @@ fn compute_vault_pda_seed(pool_id: AccountId, definition_token_id: AccountId) ->
     PdaSeed::new(Impl::hash_bytes(&bytes).as_bytes().try_into().expect("Hash output must be exactly 32 bytes long"))
 }
 
+fn compute_liquidity_token_pda(amm_program_id: ProgramId, pool_id: AccountId) -> AccountId {
+    AccountId::from((&amm_program_id,
+        &compute_liquidity_token_pda_seed(pool_id)))
+}
+
+fn compute_liquidity_token_pda_seed(pool_id: AccountId) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
+
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&pool_id.to_bytes());
+    bytes[32..].copy_from_slice(&[0;32]);
+
+    PdaSeed::new(Impl::hash_bytes(&bytes).as_bytes().try_into().expect("Hash output must be exactly 32 bytes long"))
+}
+
 fn new_definition (
         pre_states: &[AccountWithMetadata],
         balance_in: &[u128],
+        amm_program_id: ProgramId,
     ) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
 
     //Pool accounts: pool itself, and its 2 vaults and LP token
@@ -311,30 +359,38 @@ fn new_definition (
     }
 
     // Verify token_a and token_b are different
-    let definition_token_a_id = TokenHolding::parse(&user_holding_a.account.data).expect("New definition: AMM Program expects valid Token Holding account for Token A").definition_id;
-    let definition_token_b_id = TokenHolding::parse(&user_holding_b.account.data).expect("New definition: AMM Program expects valid Token Holding account for Token B").definition_id;
-    //TODO: this assumes that user_holding_a and user_holding_b are both instances
-    // of the same token program
+    let definition_token_a_id = TokenHolding::parse(&user_holding_a.account.data)
+        .expect("New definition: AMM Program expects valid Token Holding account for Token A").definition_id;
+    let definition_token_b_id = TokenHolding::parse(&user_holding_b.account.data)
+        .expect("New definition: AMM Program expects valid Token Holding account for Token B").definition_id;
+ 
+    // both instances of the same token program
     let token_program = user_holding_a.account.program_owner;
 
     if definition_token_a_id == definition_token_b_id {
         panic!("Cannot set up a swap for a token with itself.")
     }
 
-    //TODO: add tests
-    // Check PDA for Pool Account and Vault Accounts
-    /*
-    if pool.account_id != compute_pool_pda(definition_token_a_id.clone(), definition_token_b_id.clone()) {
+    if pool.account_id != compute_pool_pda(amm_program_id.clone(),
+                                            definition_token_a_id.clone(),
+                                            definition_token_b_id.clone()) {
         panic!("Pool Definition Account ID does not match PDA");
     }
 
-    if vault_a.account_id != compute_vault_pda(pool.account_id.clone(), definition_token_a_id.clone()) ||
-        vault_b.account_id != compute_vault_pda(pool.account_id.clone(), definition_token_b_id.clone()) {
+    if vault_a.account_id != compute_vault_pda(amm_program_id.clone(),
+                                                pool.account_id.clone(),
+                                                definition_token_a_id.clone()) ||
+        vault_b.account_id != compute_vault_pda(amm_program_id.clone(),
+                                                pool.account_id.clone(),
+                                                definition_token_b_id.clone()) {
         panic!("Vault ID does not match PDA");        
     }
-    */
 
-    //TODO add test
+    if pool_lp.account_id != compute_liquidity_token_pda(amm_program_id.clone(),
+                                                        pool.account_id.clone()) {
+        panic!("Liquidity pool Token Definition Account ID does not match PDA");
+    }
+
     // Verify that Pool Account is not active
     let pool_account_data = if pool.account == Account::default() {
         PoolDefinition::default()
@@ -342,10 +398,10 @@ fn new_definition (
         PoolDefinition::parse(&pool.account.data).expect("AMM program expects a valid Pool account")
     };
 
-    //TODO: add test
-    if !pool_account_data.active {
+    if pool_account_data.active {
         panic!("Cannot initialize an active Pool Definition")
     }
+
 
     //3. LP Token minting calculation
     // We assume LP is based on the initial deposit amount for Token_A.
@@ -355,9 +411,9 @@ fn new_definition (
     let pool_post_definition = PoolDefinition {
             definition_token_a_id,
             definition_token_b_id,
-            vault_a_addr: vault_a.account_id.clone(),
-            vault_b_addr: vault_b.account_id.clone(),
-            liquidity_pool_id: TokenHolding::parse(&pool_lp.account.data).expect("New definition: AMM Program expects valid Token Holding account for liquidity pool").definition_id,
+            vault_a_id: vault_a.account_id.clone(),
+            vault_b_id: vault_b.account_id.clone(),
+            liquidity_pool_id: pool_lp.account_id.clone(),
             liquidity_pool_supply: amount_a,
             reserve_a: amount_a,
             reserve_b: amount_b,
@@ -368,14 +424,6 @@ fn new_definition (
     pool_post.data = pool_post_definition.into_data();
 
     let mut chained_calls = Vec::new();
-   
-
-    //TODO: token pool does not currently exist.
-    //TokenLP = definition
-    //if new Pool...then need to initialize pool with UserHoldingLP as the corresponding holding account.
-    //However, if inactive then need to mint. This can be established earlier in the program with
-    //a variable setting the instruction_data below.
-    //Double check this.
 
     //Chain call for Token A (user_holding_a -> Vault_A)
     let mut instruction: [u8;23] = [0; 23];
@@ -401,15 +449,21 @@ fn new_definition (
             pda_seeds: Vec::<PdaSeed>::new(),
         };
 
-    //Chain call for LP (Pool_LP -> user_holding_lp)
+    instruction[0] = if pool.account == Account::default() { 0 } else { 4 }; //new or mint
+    let nme = if pool.account== Account::default() { [1u8;6] } else { [0u8; 6] };
+
     instruction[1..17].copy_from_slice(&amount_a.to_le_bytes());
+    instruction[17..].copy_from_slice(&nme);
     let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("New definition: AMM Program expects valid instruction_data");
+
+    let mut pool_lp_auth = pool_lp.clone();
+    pool_lp_auth.is_authorized = true;
 
     let call_token_lp = ChainedCall{
             program_id: token_program,
             instruction_data: instruction_data,
-            pre_states: vec![pool_lp.clone(), user_holding_lp.clone()],
-            pda_seeds: Vec::<PdaSeed>::new(),
+            pre_states: vec![pool_lp_auth.clone(), user_holding_lp.clone()],
+            pda_seeds:  vec![compute_liquidity_token_pda_seed(pool.account_id.clone())],
         };
 
     chained_calls.push(call_token_lp);
@@ -417,7 +471,7 @@ fn new_definition (
     chained_calls.push(call_token_a);
 
     let post_states = vec![
-        AccountPostState::new(pool_post.clone()), 
+        AccountPostState::new_claimed(pool_post.clone()),
         AccountPostState::new(pre_states[1].account.clone()),
         AccountPostState::new(pre_states[2].account.clone()),
         AccountPostState::new(pre_states[3].account.clone()),
@@ -425,13 +479,15 @@ fn new_definition (
         AccountPostState::new(pre_states[5].account.clone()),
         AccountPostState::new(pre_states[6].account.clone())];
 
+    let chained_calls = Vec::<ChainedCall>::new();
     (post_states.clone(), chained_calls)
 }
+
 
 fn swap(
         pre_states: &[AccountWithMetadata],
         amounts: &[u128],
-        token_id: AccountId,
+        token_in_id: AccountId,
     ) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
 
     if pre_states.len() != 5 {
@@ -458,11 +514,11 @@ fn swap(
         panic!("Pool is inactive");
     }
 
-    if vault_a.account_id != pool_def_data.vault_a_addr {  
+    if vault_a.account_id != pool_def_data.vault_a_id {  
         panic!("Vault A was not provided");
     }
         
-    if vault_b.account_id != pool_def_data.vault_b_addr {
+    if vault_b.account_id != pool_def_data.vault_b_id {
         panic!("Vault B was not provided");
     }
 
@@ -476,18 +532,24 @@ fn swap(
     }
 
     let (chained_calls, [deposit_a, withdraw_a], [deposit_b, withdraw_b])
-    = if token_id == pool_def_data.definition_token_a_id {
-        let (chained_calls, withdraw_b) = swap_logic(&[user_holding_a.clone(), vault_a.clone(), vault_b.clone(), user_holding_b.clone()],
-                    amount_in,
-                    &[pool_def_data.reserve_a, pool_def_data.reserve_b],
-                    min_amount_out);
+    = if token_in_id == pool_def_data.definition_token_a_id {
+        let (chained_calls, withdraw_b) = swap_logic(&[user_holding_a.clone(),
+                                                        vault_a.clone(),
+                                                        vault_b.clone(),
+                                                        user_holding_b.clone()],
+                                                        &[amount_in, min_amount_out],
+                                                        &[pool_def_data.reserve_a, pool_def_data.reserve_b],
+                                                        pool.account_id.clone());
                 
         (chained_calls, [amount_in, 0], [0, withdraw_b])
-    } else if token_id == pool_def_data.definition_token_b_id {
-        let (chained_calls, withdraw_a) = swap_logic(&[user_holding_b.clone(), vault_b.clone(), vault_a.clone(), user_holding_a.clone()],
-                        amount_in,
-                        &[pool_def_data.reserve_b, pool_def_data.reserve_a],
-                        min_amount_out);
+    } else if token_in_id == pool_def_data.definition_token_b_id {
+        let (chained_calls, withdraw_a) = swap_logic(&[user_holding_b.clone(),
+                                                        vault_b.clone(),
+                                                        vault_a.clone(),
+                                                        user_holding_a.clone()],
+                                                        &[amount_in, min_amount_out],
+                                                        &[pool_def_data.reserve_b, pool_def_data.reserve_a],
+                                                        pool.account_id.clone());
 
         (chained_calls, [0, withdraw_a], [amount_in, 0])
     } else {
@@ -499,8 +561,8 @@ fn swap(
     let pool_post_definition = PoolDefinition {
             definition_token_a_id: pool_def_data.definition_token_a_id.clone(),
             definition_token_b_id: pool_def_data.definition_token_b_id.clone(),
-            vault_a_addr: pool_def_data.vault_a_addr.clone(),
-            vault_b_addr: pool_def_data.vault_b_addr.clone(),
+            vault_a_id: pool_def_data.vault_a_id.clone(),
+            vault_b_id: pool_def_data.vault_b_id.clone(),
             liquidity_pool_id: pool_def_data.liquidity_pool_id.clone(),
             liquidity_pool_supply: pool_def_data.liquidity_pool_supply.clone(),
             reserve_a: pool_def_data.reserve_a + deposit_a - withdraw_a,
@@ -523,9 +585,9 @@ fn swap(
 
 fn swap_logic(
     pre_states: &[AccountWithMetadata],
-    deposit_amount: u128,
+    balances: &[u128],
     reserve_amounts: &[u128],
-    min_amount_out: u128,
+    pool_id: AccountId,
 ) -> (Vec<ChainedCall>, u128)
 {
     let user_deposit_tx = pre_states[0].clone();
@@ -535,6 +597,9 @@ fn swap_logic(
 
     let reserve_deposit_vault_amount = reserve_amounts[0];
     let reserve_withdraw_vault_amount = reserve_amounts[1];
+
+    let deposit_amount = balances[0];
+    let min_amount_out = balances[1];
 
     // Compute withdraw amount
     // Compute pool's exchange constant
@@ -564,6 +629,9 @@ fn swap_logic(
             }
     );
 
+    let mut vault_withdraw_tx = vault_withdraw_tx.clone();
+    vault_withdraw_tx.is_authorized = true;
+
     let mut instruction_data = [0;23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&withdraw_amount.to_le_bytes());
@@ -573,7 +641,10 @@ fn swap_logic(
                 program_id: vault_deposit_tx.account.program_owner,
                 instruction_data: instruction_data,
                 pre_states: vec![vault_withdraw_tx.clone(), user_withdraw_tx.clone()],
-                pda_seeds: Vec::<PdaSeed>::new(),
+                pda_seeds: vec![compute_vault_pda_seed(pool_id, 
+                    TokenHolding::parse(&vault_withdraw_tx.account.data)
+                    .expect("Swap Logic: AMM Program expects valid token data")
+                    .definition_id)],
             }
     );
 
@@ -597,7 +668,7 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
 
     // Verify vaults are in fact vaults
     let pool_def_data = PoolDefinition::parse(&pool.account.data).expect("Add liquidity: AMM Program expects valid Pool Definition Account");
-    if vault_a.account_id != pool_def_data.vault_a_addr {
+    if vault_a.account_id != pool_def_data.vault_a_id {
         panic!("Vault A was not provided");
     }
 
@@ -605,7 +676,7 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
         panic!("LP definition mismatch");
     }
 
-    if vault_b.account_id != pool_def_data.vault_b_addr {
+    if vault_b.account_id != pool_def_data.vault_b_id {
         panic!("Vault B was not provided");
     }    
     if balances.len() != 3 {
@@ -669,8 +740,8 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
     let pool_post_definition = PoolDefinition {
             definition_token_a_id: pool_def_data.definition_token_a_id.clone(),
             definition_token_b_id: pool_def_data.definition_token_b_id.clone(),
-            vault_a_addr: pool_def_data.vault_a_addr.clone(),
-            vault_b_addr: pool_def_data.vault_b_addr.clone(),
+            vault_a_id: pool_def_data.vault_a_id.clone(),
+            vault_b_id: pool_def_data.vault_b_id.clone(),
             liquidity_pool_id: pool_def_data.liquidity_pool_id.clone(),
             liquidity_pool_supply: pool_def_data.liquidity_pool_supply + delta_lp,
             reserve_a: pool_def_data.reserve_a + actual_amount_a,
@@ -706,7 +777,10 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
             pda_seeds: Vec::<PdaSeed>::new(),
         };
 
-    // Chain call for LP (mint new tokens for user_holding_lp)   
+    // Chain call for LP (mint new tokens for user_holding_lp)
+    let mut pool_definition_lp_auth = pool_definition_lp.clone();
+    pool_definition_lp_auth.is_authorized = true;
+
     let mut instruction_data = [0; 23];
     instruction_data[0] = 4;
     instruction_data[1..17].copy_from_slice(&delta_lp.to_le_bytes());
@@ -714,10 +788,9 @@ fn add_liquidity(pre_states: &[AccountWithMetadata],
     let call_token_lp = ChainedCall{
             program_id: pool_definition_lp.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![pool_definition_lp.clone(), user_holding_lp.clone()],
-            pda_seeds: Vec::<PdaSeed>::new(),
+            pre_states: vec![pool_definition_lp_auth.clone(), user_holding_lp.clone()],
+            pda_seeds: vec![compute_liquidity_token_pda_seed(pool.account_id.clone())]
         };
-
 
     chained_call.push(call_token_lp);
     chained_call.push(call_token_b);
@@ -771,11 +844,11 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata],
         panic!("LP definition mismatch");
     }
 
-    if vault_a.account_id != pool_def_data.vault_a_addr {
+    if vault_a.account_id != pool_def_data.vault_a_id {
         panic!("Vault A was not provided");
     }
 
-    if vault_b.account_id != pool_def_data.vault_b_addr {
+    if vault_b.account_id != pool_def_data.vault_b_id {
         panic!("Vault B was not provided");
     }
     
@@ -818,16 +891,13 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata],
 
     let active: bool = if pool_def_data.liquidity_pool_supply - delta_lp == 0 { false } else { true };
 
-    //TODO: delete
-    //panic!("aA {}, aB {}, dLP {}", withdraw_amount_a, withdraw_amount_b, delta_lp);
-
     // 5. Update pool account
     let mut pool_post = pool.account.clone();
     let pool_post_definition = PoolDefinition {
             definition_token_a_id: pool_def_data.definition_token_a_id.clone(),
             definition_token_b_id: pool_def_data.definition_token_b_id.clone(),
-            vault_a_addr: pool_def_data.vault_a_addr.clone(),
-            vault_b_addr: pool_def_data.vault_b_addr.clone(),
+            vault_a_id: pool_def_data.vault_a_id.clone(),
+            vault_b_id: pool_def_data.vault_b_id.clone(),
             liquidity_pool_id: pool_def_data.liquidity_pool_id.clone(),
             liquidity_pool_supply: pool_def_data.liquidity_pool_supply - delta_lp,
             reserve_a: pool_def_data.reserve_a - withdraw_amount_a,
@@ -849,7 +919,7 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata],
             program_id: vault_a.account.program_owner,
             instruction_data: instruction_data,
             pre_states: vec![running_vault_a, user_holding_a.clone()],
-            pda_seeds: Vec::<PdaSeed>::new(),
+            pda_seeds: vec![compute_vault_pda_seed(pool.account_id.clone(), pool_def_data.definition_token_a_id.clone())],
         };
 
     //Chaincall for Token B withdraw
@@ -861,10 +931,13 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata],
             program_id: vault_b.account.program_owner,
             instruction_data: instruction_data,
             pre_states: vec![running_vault_b, user_holding_b.clone()],
-            pda_seeds: Vec::<PdaSeed>::new(),
+            pda_seeds: vec![compute_vault_pda_seed(pool.account_id.clone(), pool_def_data.definition_token_b_id.clone())],
         };
 
-    //Chaincall for LP adjustment        
+    //Chaincall for LP adjustment     
+    let mut pool_definition_lp_auth = pool_definition_lp.clone();
+    pool_definition_lp_auth.is_authorized = true;
+
     let mut instruction: [u8;23] = [0; 23];
     instruction[0] = 3; // token burn
     instruction[1..17].copy_from_slice(&delta_lp.to_le_bytes());
@@ -872,8 +945,8 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata],
     let call_token_lp = ChainedCall{
             program_id: pool_definition_lp.account.program_owner,
             instruction_data: instruction_data,
-            pre_states: vec![pool_definition_lp.clone(), user_holding_lp.clone()],
-            pda_seeds: Vec::<PdaSeed>::new(),
+            pre_states: vec![pool_definition_lp_auth.clone(), user_holding_lp.clone()],
+            pda_seeds: vec![compute_liquidity_token_pda_seed(pool.account_id.clone())]
         };
 
     chained_calls.push(call_token_lp);
@@ -897,9 +970,12 @@ fn remove_liquidity(pre_states: &[AccountWithMetadata],
 mod tests {
     use nssa_core::{{account::{Account, AccountId, AccountWithMetadata}, program::ChainedCall, program::PdaSeed}, program::ProgramId};
 
-    use crate::{PoolDefinition, TokenDefinition, TokenHolding, add_liquidity, new_definition, remove_liquidity, swap};
+    use crate::{PoolDefinition, TokenDefinition, TokenHolding, add_liquidity, new_definition, remove_liquidity, swap,
+        compute_liquidity_token_pda, compute_liquidity_token_pda_seed, compute_pool_pda, compute_pool_pda_seed,
+        compute_vault_pda, compute_vault_pda_seed};
 
     const TOKEN_PROGRAM_ID: ProgramId = [15;8];
+    const AMM_PROGRAM_ID: ProgramId = [42;8];
 
     enum AccountEnum {
         UserHoldingB,
@@ -933,6 +1009,12 @@ mod tests {
         PoolDefinitionAddZeroLP,
         PoolDefinitionAddSuccessful,
         PoolDefinitionRemoveSuccessful,
+        PoolDefinitionInactive,
+        PoolDefinitionWrongId,
+        VaultAWrongId,
+        VaultBWrongId,
+        PoolLPWrongId,
+        PoolDefinitionActive,
     }
 
     enum BalanceEnum {
@@ -1020,7 +1102,6 @@ mod tests {
         PoolDefinitionId,
         VaultAId,
         VaultBId,
-        PoolLPId,
     }
 
     enum ChainedCallsEnum {
@@ -1037,6 +1118,9 @@ mod tests {
         CcRemoveTokenA,
         CcRemoveTokenB,
         CcRemovePoolLP,
+        CcNewDefinitionTokenA,
+        CcNewDefinitionTokenB,
+        CcNewDefinitionLP,
     }
 
     fn helper_chained_call_constructor(selection: ChainedCallsEnum) -> ChainedCall {
@@ -1107,6 +1191,10 @@ mod tests {
             }
             ChainedCallsEnum::CcSwapTokenBTest1 => {
                 let swap_amount: u128 = 166;
+
+                let mut vault_b_auth = helper_account_constructor(AccountEnum::VaultBInit);
+                vault_b_auth.is_authorized = true;
+
                 let mut instruction: [u8;23] = [0; 23];
                 instruction[0] = 1;      
                 instruction[1..17].copy_from_slice(
@@ -1117,13 +1205,20 @@ mod tests {
                     program_id: TOKEN_PROGRAM_ID,
                     instruction_data,
                     pre_states: vec![
-                            helper_account_constructor(AccountEnum::VaultBInit),
+                            vault_b_auth,
                             helper_account_constructor(AccountEnum::UserHoldingB)],
-                    pda_seeds: Vec::<PdaSeed>::new(),
+                    pda_seeds: vec![
+                            compute_vault_pda_seed(helper_id_constructor(IdEnum::PoolDefinitionId),
+                                            helper_id_constructor(IdEnum::TokenBDefinitionId)),
+                    ],
                 }
             }
             ChainedCallsEnum::CcSwapTokenATest2 => {
                 let swap_amount: u128 = 285;
+
+                let mut vault_a_auth = helper_account_constructor(AccountEnum::VaultAInit);
+                vault_a_auth.is_authorized = true;
+
                 let mut instruction_data: [u8;23] = [0; 23];
                 instruction_data[0] = 1;      
                 instruction_data[1..17].copy_from_slice(
@@ -1134,9 +1229,13 @@ mod tests {
                     program_id: TOKEN_PROGRAM_ID,
                     instruction_data,
                     pre_states: vec![
-                            helper_account_constructor(AccountEnum::VaultAInit),
-                            helper_account_constructor(AccountEnum::UserHoldingA)],
-                    pda_seeds: Vec::<PdaSeed>::new(),
+                            vault_a_auth,
+                            helper_account_constructor(AccountEnum::UserHoldingA),
+                            ],
+                    pda_seeds: vec![
+                            compute_vault_pda_seed(helper_id_constructor(IdEnum::PoolDefinitionId),
+                                            helper_id_constructor(IdEnum::TokenADefinitionId)),
+                    ],
                 }
             }
             ChainedCallsEnum::CcSwapTokenBTest2 => {
@@ -1188,6 +1287,9 @@ mod tests {
                 }
             }
             ChainedCallsEnum::CcAddPoolLP => {
+                let mut pool_lp_auth = helper_account_constructor(AccountEnum::PoolLPInit);
+                pool_lp_auth.is_authorized = true;
+
                 let mut instruction: [u8;23] = [0; 23];
                 instruction[0] = 4;      
                 instruction[1..17].copy_from_slice(
@@ -1198,12 +1300,16 @@ mod tests {
                     program_id: TOKEN_PROGRAM_ID,
                     instruction_data,
                     pre_states: vec![
-                            helper_account_constructor(AccountEnum::PoolLPInit),
+                            pool_lp_auth,
                             helper_account_constructor(AccountEnum::UserHoldingLPInit)],
-                    pda_seeds: Vec::<PdaSeed>::new(),
+                    pda_seeds: vec![compute_liquidity_token_pda_seed(
+                                        helper_id_constructor(IdEnum::PoolDefinitionId))],
                 }
             }
             ChainedCallsEnum::CcRemoveTokenA => {
+                let mut vault_a_auth = helper_account_constructor(AccountEnum::VaultAInit);
+                vault_a_auth.is_authorized = true;
+
                 let mut instruction: [u8;23] = [0; 23];
                 instruction[0] = 1;      
                 instruction[1..17].copy_from_slice(
@@ -1214,12 +1320,18 @@ mod tests {
                     program_id: TOKEN_PROGRAM_ID,
                     instruction_data,
                     pre_states: vec![
-                            helper_account_constructor(AccountEnum::VaultAInit),
+                            vault_a_auth,
                             helper_account_constructor(AccountEnum::UserHoldingA),],
-                    pda_seeds: Vec::<PdaSeed>::new(),
+                    pda_seeds: vec![
+                            compute_vault_pda_seed(helper_id_constructor(IdEnum::PoolDefinitionId),
+                            helper_id_constructor(IdEnum::TokenADefinitionId)),
+                    ],
                 }
             }
             ChainedCallsEnum::CcRemoveTokenB => {
+                let mut vault_b_auth = helper_account_constructor(AccountEnum::VaultBInit);
+                vault_b_auth.is_authorized = true;
+
                 let mut instruction: [u8;23] = [0; 23];
                 instruction[0] = 1;      
                 instruction[1..17].copy_from_slice(
@@ -1230,12 +1342,18 @@ mod tests {
                     program_id: TOKEN_PROGRAM_ID,
                     instruction_data,
                     pre_states: vec![
-                            helper_account_constructor(AccountEnum::VaultBInit),
+                            vault_b_auth,
                             helper_account_constructor(AccountEnum::UserHoldingB),],
-                    pda_seeds: Vec::<PdaSeed>::new(),
+                    pda_seeds: vec![
+                            compute_vault_pda_seed(helper_id_constructor(IdEnum::PoolDefinitionId),
+                            helper_id_constructor(IdEnum::TokenBDefinitionId)),
+                    ],
                 }
             }
             ChainedCallsEnum::CcRemovePoolLP => {
+                let mut pool_lp_auth = helper_account_constructor(AccountEnum::PoolLPInit);
+                pool_lp_auth.is_authorized = true;
+
                 let mut instruction: [u8;23] = [0; 23];
                 instruction[0] = 3;      
                 instruction[1..17].copy_from_slice(
@@ -1248,10 +1366,63 @@ mod tests {
                     pre_states: vec![
                             helper_account_constructor(AccountEnum::UserHoldingLPInit),
                             helper_account_constructor(AccountEnum::PoolLPInit),],
+                    pda_seeds: vec![compute_liquidity_token_pda_seed(
+                                        helper_id_constructor(IdEnum::PoolDefinitionId))],
+                }
+            }
+            ChainedCallsEnum::CcNewDefinitionTokenA => {
+                let mut instruction: [u8;23] = [0; 23];
+                instruction[0] = 1;      
+                instruction[1..17].copy_from_slice(
+                    &helper_balance_constructor(BalanceEnum::AddSuccessfulAmountA)
+                    .to_le_bytes());
+                let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("AMM Program expects valid transaction instruction data");
+                ChainedCall{
+                    program_id: TOKEN_PROGRAM_ID,
+                    instruction_data,
+                    pre_states: vec![
+                            helper_account_constructor(AccountEnum::UserHoldingA),
+                            helper_account_constructor(AccountEnum::VaultAInit)],
                     pda_seeds: Vec::<PdaSeed>::new(),
                 }
             }
-           _ => panic!("Invalid selection")
+            ChainedCallsEnum::CcNewDefinitionTokenB => {
+                let mut instruction: [u8;23] = [0; 23];
+                instruction[0] = 1;      
+                instruction[1..17].copy_from_slice(
+                    &helper_balance_constructor(BalanceEnum::AddSuccessfulAmountB)
+                    .to_le_bytes());
+                let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("Swap Logic: AMM Program expects valid transaction instruction data");
+                ChainedCall{
+                    program_id: TOKEN_PROGRAM_ID,
+                    instruction_data,
+                    pre_states: vec![
+                            helper_account_constructor(AccountEnum::UserHoldingB),
+                            helper_account_constructor(AccountEnum::VaultBInit)],
+                    pda_seeds: Vec::<PdaSeed>::new(),
+                }
+            }
+            ChainedCallsEnum::CcAddPoolLP => {
+                let mut pool_lp_auth = helper_account_constructor(AccountEnum::PoolLPInit);
+                pool_lp_auth.is_authorized = true;
+
+                let mut instruction: [u8;23] = [0; 23];
+                instruction[0] = 0;      
+                instruction[1..17].copy_from_slice(
+                    &helper_balance_constructor(BalanceEnum::AddSuccessfulAmountA)
+                    .to_le_bytes());
+                let instruction_data = risc0_zkvm::serde::to_vec(&instruction).expect("Swap Logic: AMM Program expects valid transaction instruction data");
+                ChainedCall{
+                    program_id: TOKEN_PROGRAM_ID,
+                    instruction_data,
+                    pre_states: vec![
+                            pool_lp_auth,
+                            helper_account_constructor(AccountEnum::UserHoldingLPInit)],
+                    pda_seeds: vec![compute_liquidity_token_pda_seed(
+                                        helper_id_constructor(IdEnum::PoolDefinitionId))],
+                }
+            }
+            _ => panic!("Invalid selection")
         }
     }
 
@@ -1260,14 +1431,20 @@ mod tests {
         match selection {
             IdEnum::TokenADefinitionId => AccountId::new([42;32]),
             IdEnum::TokenBDefinitionId => AccountId::new([43;32]),
-            IdEnum::TokenLPDefinitionId => AccountId::new([44;32]),
+            IdEnum::TokenLPDefinitionId => compute_liquidity_token_pda(AMM_PROGRAM_ID,
+                                                helper_id_constructor(IdEnum::PoolDefinitionId),),
             IdEnum::UserTokenAId => AccountId::new([45;32]),
             IdEnum::UserTokenBId => AccountId::new([46;32]),
             IdEnum::UserTokenLPId => AccountId::new([47;32]),
-            IdEnum::PoolDefinitionId => AccountId::new([48;32]),
-            IdEnum::VaultAId => AccountId::new([45;32]),
-            IdEnum::VaultBId => AccountId::new([46;32]),
-            IdEnum::PoolLPId => AccountId::new([47;32]),
+            IdEnum::PoolDefinitionId => compute_pool_pda(AMM_PROGRAM_ID,
+                                                helper_id_constructor(IdEnum::TokenADefinitionId),
+                                                helper_id_constructor(IdEnum::TokenBDefinitionId)),
+            IdEnum::VaultAId => compute_vault_pda(AMM_PROGRAM_ID,
+                                                helper_id_constructor(IdEnum::PoolDefinitionId),
+                                                helper_id_constructor(IdEnum::TokenADefinitionId)),
+            IdEnum::VaultBId => compute_vault_pda(AMM_PROGRAM_ID,
+                                                helper_id_constructor(IdEnum::PoolDefinitionId),
+                                                helper_id_constructor(IdEnum::TokenBDefinitionId)),
             _ => panic!("Invalid selection")
         }
     }
@@ -1573,8 +1750,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
@@ -1595,8 +1772,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                             reserve_a: 0,
@@ -1617,8 +1794,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
@@ -1639,8 +1816,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveLow),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveLow),
@@ -1661,8 +1838,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveHigh),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveHigh),
@@ -1683,8 +1860,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
@@ -1705,8 +1882,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultASwapTest1),
@@ -1727,8 +1904,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultASwapTest2),
@@ -1749,8 +1926,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveLow),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
@@ -1771,8 +1948,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAAddSuccessful),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultAAddSuccessful),
@@ -1793,8 +1970,8 @@ mod tests {
                         PoolDefinition {
                             definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
                             definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
-                            vault_a_addr: helper_id_constructor(IdEnum::VaultAId),
-                            vault_b_addr: helper_id_constructor(IdEnum::VaultBId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
                             liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
                             liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultARemoveSuccessful),
                             reserve_a: helper_balance_constructor(BalanceEnum::VaultARemoveSuccessful),
@@ -1807,8 +1984,130 @@ mod tests {
                 is_authorized: true,
                 account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
             },
+            AccountEnum::PoolDefinitionInactive => AccountWithMetadata {
+                account: Account {
+                        program_owner:  ProgramId::default(),
+                        balance: 0u128,
+                        data: PoolDefinition::into_data(
+                        PoolDefinition {
+                            definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
+                            definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
+                            liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
+                            liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                            reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                            reserve_b: helper_balance_constructor(BalanceEnum::VaultBReserveInit),
+                            fees: 0u128,
+                            active: false,
+                        }),
+                        nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
+            AccountEnum::PoolDefinitionWrongId => AccountWithMetadata {
+                account: Account {
+                        program_owner:  ProgramId::default(),
+                        balance: 0u128,
+                        data: PoolDefinition::into_data(
+                        PoolDefinition {
+                            definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
+                            definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
+                            liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
+                            liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                            reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                            reserve_b: helper_balance_constructor(BalanceEnum::VaultBReserveInit),
+                            fees: 0u128,
+                            active: false,
+                        }),
+                        nonce: 0,
+                },
+                is_authorized: true,
+                account_id: AccountId::new([4;32]),
+            },
+            AccountEnum::VaultAWrongId => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::TokenADefinitionId),
+                            balance: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: AccountId::new([4;32]),
+            },
+            AccountEnum::VaultBWrongId => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenHolding::into_data(
+                        TokenHolding{
+                            account_type: 1u8,
+                            definition_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
+                            balance: helper_balance_constructor(BalanceEnum::VaultBReserveInit),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: AccountId::new([4;32]),
+            },
+            AccountEnum::PoolLPWrongId => AccountWithMetadata {
+                account: Account {
+                    program_owner:  TOKEN_PROGRAM_ID,
+                    balance: 0u128,
+                    data: TokenDefinition::into_data(
+                        TokenDefinition{
+                            account_type: 0u8,
+                            name: [1;6],
+                            total_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                        }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: AccountId::new([4;32]),
+            },
+            AccountEnum::PoolDefinitionActive => AccountWithMetadata {
+                account: Account {
+                        program_owner:  ProgramId::default(),
+                        balance: 0u128,
+                        data: PoolDefinition::into_data(
+                        PoolDefinition {
+                            definition_token_a_id: helper_id_constructor(IdEnum::TokenADefinitionId),
+                            definition_token_b_id: helper_id_constructor(IdEnum::TokenBDefinitionId),
+                            vault_a_id: helper_id_constructor(IdEnum::VaultAId),
+                            vault_b_id: helper_id_constructor(IdEnum::VaultBId),
+                            liquidity_pool_id: helper_id_constructor(IdEnum::TokenLPDefinitionId),
+                            liquidity_pool_supply: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                            reserve_a: helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                            reserve_b: helper_balance_constructor(BalanceEnum::VaultBReserveInit),
+                            fees: 0u128,
+                            active: true,
+                        }),
+                        nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
             _ => panic!("Invalid selection"),
         }
+    }
+
+    #[test]
+    fn test_pool_pda_produces_unique_id_for_token_pair() {
+        //compute_pool_pda(amm_program_id: ProgramId, definition_token_a_id: AccountId, definition_token_b_id: AccountId)
+        assert!(compute_pool_pda(AMM_PROGRAM_ID,
+                helper_id_constructor(IdEnum::TokenADefinitionId),
+                helper_id_constructor(IdEnum::TokenBDefinitionId)) ==
+                compute_pool_pda(AMM_PROGRAM_ID,
+                helper_id_constructor(IdEnum::TokenBDefinitionId),
+                helper_id_constructor(IdEnum::TokenADefinitionId)));
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -1819,7 +2118,8 @@ mod tests {
                 ];
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
-                    helper_balance_constructor(BalanceEnum::VaultBReserveInit)]
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit)],
+                    AMM_PROGRAM_ID,
                     );
     }
 
@@ -1832,7 +2132,8 @@ mod tests {
                 ];
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
-                    helper_balance_constructor(BalanceEnum::VaultBReserveInit)]
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit)],
+                    AMM_PROGRAM_ID,
                     );
     }
 
@@ -1846,7 +2147,8 @@ mod tests {
                 ];
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
-                    helper_balance_constructor(BalanceEnum::VaultBReserveInit)]
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit)],
+                    AMM_PROGRAM_ID,
                     );
     }
 
@@ -1862,6 +2164,7 @@ mod tests {
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                     helper_balance_constructor(BalanceEnum::VaultBReserveInit)],
+                    AMM_PROGRAM_ID,
                     );
     }
  
@@ -1878,6 +2181,7 @@ mod tests {
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                     helper_balance_constructor(BalanceEnum::VaultBReserveInit)],
+                    AMM_PROGRAM_ID,
                     );
     }
 
@@ -1895,6 +2199,7 @@ mod tests {
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                     helper_balance_constructor(BalanceEnum::VaultBReserveInit)],
+                    AMM_PROGRAM_ID,
                     );
     }
 
@@ -1912,6 +2217,7 @@ mod tests {
                 ];
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),],
+                    AMM_PROGRAM_ID,
                     );
     }   
 
@@ -1930,6 +2236,7 @@ mod tests {
         let _post_states = new_definition(&pre_states, 
                     &[0,
                     helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
                     );
     }   
 
@@ -1948,6 +2255,7 @@ mod tests {
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                     0],
+                    AMM_PROGRAM_ID,
                     );
     }    
 
@@ -1966,11 +2274,136 @@ mod tests {
         let _post_states = new_definition(&pre_states, 
                     &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
                     helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
+                    );
+    }
+
+    #[should_panic(expected = "Liquidity pool Token Definition Account ID does not match PDA")]
+    #[test]
+    fn test_call_new_definition_wrong_liquidity_id() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::PoolDefinitionInit),
+                helper_account_constructor(AccountEnum::VaultAInit),
+                helper_account_constructor(AccountEnum::VaultBInit),
+                helper_account_constructor(AccountEnum::PoolLPWrongId),
+                helper_account_constructor(AccountEnum::UserHoldingA),
+                helper_account_constructor(AccountEnum::UserHoldingB),
+                helper_account_constructor(AccountEnum::UserHoldingLPUninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
                     );
     }    
-  
-  //TODO rest of new definition tests go here.
 
+    #[should_panic(expected = "Pool Definition Account ID does not match PDA")]
+    #[test]
+    fn test_call_new_definition_wrong_pool_id() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::PoolDefinitionWrongId),
+                helper_account_constructor(AccountEnum::VaultAInit),
+                helper_account_constructor(AccountEnum::VaultBInit),
+                helper_account_constructor(AccountEnum::PoolLPInit),
+                helper_account_constructor(AccountEnum::UserHoldingA),
+                helper_account_constructor(AccountEnum::UserHoldingB),
+                helper_account_constructor(AccountEnum::UserHoldingLPUninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
+                    );
+    }    
+
+    #[should_panic(expected = "Vault ID does not match PDA")]
+    #[test]
+    fn test_call_new_definition_wrong_vault_id_1() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::PoolDefinitionInit),
+                helper_account_constructor(AccountEnum::VaultAWrongId),
+                helper_account_constructor(AccountEnum::VaultBInit),
+                helper_account_constructor(AccountEnum::PoolLPInit),
+                helper_account_constructor(AccountEnum::UserHoldingA),
+                helper_account_constructor(AccountEnum::UserHoldingB),
+                helper_account_constructor(AccountEnum::UserHoldingLPUninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
+                    );
+    }   
+
+    #[should_panic(expected = "Vault ID does not match PDA")]
+    #[test]
+    fn test_call_new_definition_wrong_vault_id_2() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::PoolDefinitionInit),
+                helper_account_constructor(AccountEnum::VaultAInit),
+                helper_account_constructor(AccountEnum::VaultBWrongId),
+                helper_account_constructor(AccountEnum::PoolLPInit),
+                helper_account_constructor(AccountEnum::UserHoldingA),
+                helper_account_constructor(AccountEnum::UserHoldingB),
+                helper_account_constructor(AccountEnum::UserHoldingLPUninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
+                    );
+    }   
+
+    #[should_panic(expected = "Cannot initialize an active Pool Definition")]
+    #[test]
+    fn test_call_new_definition_cannot_initialize_active_pool() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::PoolDefinitionActive),
+                helper_account_constructor(AccountEnum::VaultAInit),
+                helper_account_constructor(AccountEnum::VaultBInit),
+                helper_account_constructor(AccountEnum::PoolLPInit),
+                helper_account_constructor(AccountEnum::UserHoldingA),
+                helper_account_constructor(AccountEnum::UserHoldingB),
+                helper_account_constructor(AccountEnum::UserHoldingLPUninit),
+                ];
+        let _post_states = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
+                    );
+    }
+
+    #[should_panic(expected = "Cannot initialize an active Pool Definition")]
+    #[test]
+    fn test_call_new_definition_chain_call_successful() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::PoolDefinitionActive),
+                helper_account_constructor(AccountEnum::VaultAInit),
+                helper_account_constructor(AccountEnum::VaultBInit),
+                helper_account_constructor(AccountEnum::PoolLPInit),
+                helper_account_constructor(AccountEnum::UserHoldingA),
+                helper_account_constructor(AccountEnum::UserHoldingB),
+                helper_account_constructor(AccountEnum::UserHoldingLPUninit),
+                ];
+        let (post_states, chained_calls) = new_definition(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::VaultAReserveInit),
+                    helper_balance_constructor(BalanceEnum::VaultBReserveInit),],
+                    AMM_PROGRAM_ID,
+                    );
+    
+        let pool_post = post_states[0].clone();
+
+        assert!(helper_account_constructor(AccountEnum::PoolDefinitionAddSuccessful).account ==
+                    *pool_post.account());
+
+        let chained_call_lp = chained_calls[0].clone();
+        let chained_call_b = chained_calls[1].clone();
+        let chained_call_a = chained_calls[2].clone();
+
+        assert!(chained_call_a == helper_chained_call_constructor(ChainedCallsEnum::CcNewDefinitionTokenA));
+        assert!(chained_call_b == helper_chained_call_constructor(ChainedCallsEnum::CcNewDefinitionTokenB));
+        assert!(chained_call_lp == helper_chained_call_constructor(ChainedCallsEnum::CcNewDefinitionLP));
+    }
 
     #[should_panic(expected = "Invalid number of input accounts")]
     #[test]
@@ -2786,11 +3219,28 @@ mod tests {
 
         #[should_panic(expected = "Reserve for Token B exceeds vault balance")]
     #[test]
-    fn test_call_swap_reserves_vault_misatch_2() {
+    fn test_call_swap_reserves_vault_mismatch_2() {
         let pre_states = vec![
                 helper_account_constructor(AccountEnum::PoolDefinitionInit),
                 helper_account_constructor(AccountEnum::VaultAInit),
                 helper_account_constructor(AccountEnum::VaultBInitLow),
+                helper_account_constructor(AccountEnum::UserHoldingA),
+                helper_account_constructor(AccountEnum::UserHoldingB),
+                ];
+        let _post_states = swap(&pre_states, 
+                    &[helper_balance_constructor(BalanceEnum::AddMaxAmountA),
+                    helper_balance_constructor(BalanceEnum::MinAmountOut)],
+                    helper_id_constructor(IdEnum::TokenADefinitionId),
+                    );
+    }
+
+    #[should_panic(expected = "Pool is inactive")]
+    #[test]
+    fn test_call_swap_ianctive() {
+        let pre_states = vec![
+                helper_account_constructor(AccountEnum::PoolDefinitionInactive),
+                helper_account_constructor(AccountEnum::VaultAInit),
+                helper_account_constructor(AccountEnum::VaultBInit),
                 helper_account_constructor(AccountEnum::UserHoldingA),
                 helper_account_constructor(AccountEnum::UserHoldingB),
                 ];

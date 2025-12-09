@@ -1,7 +1,7 @@
 use risc0_zkvm::{DeserializeOwned, guest::env, serde::Deserializer};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "host")]
+//#[cfg(feature = "host")]
 use crate::account::AccountId;
 use crate::account::{Account, AccountWithMetadata};
 
@@ -29,7 +29,7 @@ impl PdaSeed {
     }
 }
 
-#[cfg(feature = "host")]
+//#[cfg(feature = "host")]
 impl From<(&ProgramId, &PdaSeed)> for AccountId {
     fn from(value: (&ProgramId, &PdaSeed)) -> Self {
         use risc0_zkvm::sha::{Impl, Sha256};
