@@ -197,6 +197,7 @@ async fn find_solution(wallet: &WalletCore, pinata_account_id: nssa::AccountId) 
     let account = wallet.get_account_public(pinata_account_id).await?;
     let data: [u8; 33] = account
         .data
+        .as_ref()
         .try_into()
         .map_err(|_| anyhow::Error::msg("invalid pinata account data"))?;
 

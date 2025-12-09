@@ -26,12 +26,14 @@ impl Account {
         bytes.extend_from_slice(&self.nonce.to_le_bytes());
         let data_length: u32 = self.data.len() as u32;
         bytes.extend_from_slice(&data_length.to_le_bytes());
-        bytes.extend_from_slice(self.data.as_slice());
+        bytes.extend_from_slice(self.data.as_ref());
         bytes
     }
 
     #[cfg(feature = "host")]
     pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
+        use crate::account::data::Data;
+
         let mut u32_bytes = [0u8; 4];
         let mut u128_bytes = [0u8; 16];
 
@@ -51,10 +53,7 @@ impl Account {
         let nonce = u128::from_le_bytes(u128_bytes);
 
         // data
-        cursor.read_exact(&mut u32_bytes)?;
-        let data_length = u32::from_le_bytes(u32_bytes);
-        let mut data = vec![0; data_length as usize];
-        cursor.read_exact(&mut data)?;
+        let data = Data::from_cursor(cursor)?;
 
         Ok(Self {
             program_owner,
@@ -149,7 +148,7 @@ mod tests {
             program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
             balance: 123456789012345678901234567890123456,
             nonce: 42,
-            data: b"hola mundo".to_vec(),
+            data: b"hola mundo".to_vec().try_into().unwrap(),
         };
 
         // program owner || balance || nonce || data_len || data
@@ -210,7 +209,7 @@ mod tests {
             program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
             balance: 123456789012345678901234567890123456,
             nonce: 42,
-            data: b"hola mundo".to_vec(),
+            data: b"hola mundo".to_vec().try_into().unwrap(),
         };
         let bytes = account.to_bytes();
         let mut cursor = Cursor::new(bytes.as_ref());

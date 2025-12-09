@@ -1,6 +1,9 @@
-use nssa_core::program::{
-    AccountPostState, ChainedCall, PdaSeed, ProgramInput, read_nssa_inputs,
-    write_nssa_outputs_with_chained_call,
+use nssa_core::{
+    account::Data,
+    program::{
+        AccountPostState, ChainedCall, PdaSeed, ProgramInput, read_nssa_inputs,
+        write_nssa_outputs_with_chained_call,
+    },
 };
 use risc0_zkvm::{
     serde::to_vec,
@@ -38,11 +41,11 @@ impl Challenge {
         digest[..difficulty].iter().all(|&b| b == 0)
     }
 
-    fn next_data(self) -> [u8; 33] {
+    fn next_data(self) -> Data {
         let mut result = [0; 33];
         result[0] = self.difficulty;
         result[1..].copy_from_slice(Impl::hash_bytes(&self.seed).as_bytes());
-        result
+        result.to_vec().try_into().expect("should fit")
     }
 }
 
@@ -74,7 +77,7 @@ fn main() {
     let mut pinata_definition_post = pinata_definition.account.clone();
     let pinata_token_holding_post = pinata_token_holding.account.clone();
     let winner_token_holding_post = winner_token_holding.account.clone();
-    pinata_definition_post.data = data.next_data().to_vec();
+    pinata_definition_post.data = data.next_data();
 
     let mut instruction_data: [u8; 23] = [0; 23];
     instruction_data[0] = 1;

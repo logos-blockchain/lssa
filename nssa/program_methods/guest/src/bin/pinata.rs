@@ -63,7 +63,11 @@ fn main() {
     let mut pinata_post = pinata.account.clone();
     let mut winner_post = winner.account.clone();
     pinata_post.balance -= PRIZE;
-    pinata_post.data = data.next_data().to_vec();
+    pinata_post.data = data
+        .next_data()
+        .to_vec()
+        .try_into()
+        .expect("33 bytes should fit into Data");
     winner_post.balance += PRIZE;
 
     write_nssa_outputs(

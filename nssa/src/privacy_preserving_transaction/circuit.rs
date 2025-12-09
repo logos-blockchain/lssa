@@ -95,7 +95,7 @@ impl Proof {
 mod tests {
     use nssa_core::{
         Commitment, DUMMY_COMMITMENT_HASH, EncryptionScheme, Nullifier,
-        account::{Account, AccountId, AccountWithMetadata},
+        account::{Account, AccountId, AccountWithMetadata, data::Data},
     };
 
     use super::*;
@@ -134,14 +134,14 @@ mod tests {
             program_owner: program.id(),
             balance: 100 - balance_to_move,
             nonce: 1,
-            data: vec![],
+            data: Data::default(),
         };
 
         let expected_recipient_post = Account {
             program_owner: program.id(),
             balance: balance_to_move,
             nonce: 0xdeadbeef,
-            data: vec![],
+            data: Data::default(),
         };
 
         let expected_sender_pre = sender.clone();
@@ -191,7 +191,7 @@ mod tests {
                 balance: 100,
                 nonce: 0xdeadbeef,
                 program_owner: program.id(),
-                data: vec![],
+                data: Data::default(),
             },
             true,
             AccountId::from(&sender_keys.npk()),
