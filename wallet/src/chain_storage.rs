@@ -263,6 +263,7 @@ mod tests {
             seq_poll_max_retries: 10,
             seq_block_poll_max_amount: 100,
             initial_accounts: create_initial_accounts(),
+            basic_auth: None,
         }
     }
 

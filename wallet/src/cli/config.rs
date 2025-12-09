@@ -73,6 +73,13 @@ impl WalletSubcommand for ConfigSubcommand {
                 "initial_accounts" => {
                     println!("{:#?}", wallet_core.storage.wallet_config.initial_accounts);
                 }
+                "basic_auth" => {
+                    if let Some(basic_auth) = &wallet_core.storage.wallet_config.basic_auth {
+                        println!("{basic_auth}");
+                    } else {
+                        println!("Not set");
+                    }
+                }
                 _ => {
                     println!("Unknown field");
                 }
@@ -98,6 +105,9 @@ impl WalletSubcommand for ConfigSubcommand {
                     "seq_block_poll_max_amount" => {
                         wallet_core.storage.wallet_config.seq_block_poll_max_amount =
                             value.parse()?;
+                    }
+                    "basic_auth" => {
+                        wallet_core.storage.wallet_config.basic_auth = Some(value.parse()?);
                     }
                     "initial_accounts" => {
                         anyhow::bail!("Setting this field from wallet is not supported");
@@ -140,6 +150,9 @@ impl WalletSubcommand for ConfigSubcommand {
                 }
                 "initial_accounts" => {
                     println!("List of initial accounts' keys(both public and private)");
+                }
+                "basic_auth" => {
+                    println!("Basic authentication credentials for sequencer HTTP requests");
                 }
                 _ => {
                     println!("Unknown field");

@@ -12,7 +12,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::{
     HOME_DIR_ENV_VAR,
     config::{
-        InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic,
+        BasicAuth, InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic,
         PersistentAccountDataPrivate, PersistentAccountDataPublic, PersistentStorage, WalletConfig,
     },
 };
@@ -86,6 +86,23 @@ pub async fn fetch_config() -> Result<WalletConfig> {
         println!("Configs setted up");
     }
 
+    Ok(config)
+}
+
+/// Parse CLI auth string and merge with config auth, prioritizing CLI
+pub fn merge_auth_config(
+    mut config: WalletConfig,
+    cli_auth: Option<String>,
+) -> Result<WalletConfig> {
+    if let Some(auth_str) = cli_auth {
+        let cli_auth_config: BasicAuth = auth_str.parse()?;
+
+        if config.basic_auth.is_some() {
+            println!("Warning: CLI auth argument takes precedence over config basic-auth");
+        }
+
+        config.basic_auth = Some(cli_auth_config);
+    }
     Ok(config)
 }
 

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use key_protocol::key_management::{
     KeyChain,
     key_tree::{
@@ -5,6 +7,49 @@ use key_protocol::key_management::{
     },
 };
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BasicAuth {
+    pub username: String,
+    pub password: Option<String>,
+}
+
+impl std::fmt::Display for BasicAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.username)?;
+        if let Some(password) = &self.password {
+            write!(f, ":{password}")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl FromStr for BasicAuth {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse = || {
+            let mut parts = s.splitn(2, ':');
+            let username = parts.next()?;
+            let password = parts.next().filter(|p| !p.is_empty());
+            if parts.next().is_some() {
+                return None;
+            }
+
+            Some((username, password))
+        };
+
+        let (username, password) = parse().ok_or_else(|| {
+            anyhow::anyhow!("Invalid auth format. Expected 'user' or 'user:password'")
+        })?;
+
+        Ok(Self {
+            username: username.to_string(),
+            password: password.map(|p| p.to_string()),
+        })
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPublic {
@@ -143,6 +188,8 @@ pub struct WalletConfig {
     pub seq_block_poll_max_amount: u64,
     /// Initial accounts for wallet
     pub initial_accounts: Vec<InitialAccountData>,
+    /// Basic authentication credentials
+    pub basic_auth: Option<BasicAuth>,
 }
 
 impl Default for WalletConfig {
@@ -154,6 +201,7 @@ impl Default for WalletConfig {
             seq_tx_poll_max_blocks: 5,
             seq_poll_max_retries: 5,
             seq_block_poll_max_amount: 100,
+            basic_auth: None,
             initial_accounts: {
                 let init_acc_json = r#"
                 [

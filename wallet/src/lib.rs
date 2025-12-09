@@ -47,7 +47,14 @@ pub struct WalletCore {
 
 impl WalletCore {
     pub async fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
-        let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
+        let basic_auth = config
+            .basic_auth
+            .as_ref()
+            .map(|auth| (auth.username.clone(), auth.password.clone()));
+        let client = Arc::new(SequencerClient::new_with_auth(
+            config.sequencer_addr.clone(),
+            basic_auth,
+        )?);
         let tx_poller = TxPoller::new(config.clone(), client.clone());
 
         let PersistentStorage {
@@ -69,7 +76,14 @@ impl WalletCore {
         config: WalletConfig,
         password: String,
     ) -> Result<Self> {
-        let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
+        let basic_auth = config
+            .basic_auth
+            .as_ref()
+            .map(|auth| (auth.username.clone(), auth.password.clone()));
+        let client = Arc::new(SequencerClient::new_with_auth(
+            config.sequencer_addr.clone(),
+            basic_auth,
+        )?);
         let tx_poller = TxPoller::new(config.clone(), client.clone());
 
         let storage = WalletChainStore::new_storage(config, password)?;

@@ -30,16 +30,25 @@ use crate::{
 pub struct SequencerClient {
     pub client: reqwest::Client,
     pub sequencer_addr: String,
+    pub basic_auth: Option<(String, Option<String>)>,
 }
 
 impl SequencerClient {
     pub fn new(sequencer_addr: String) -> Result<Self> {
+        Self::new_with_auth(sequencer_addr, None)
+    }
+
+    pub fn new_with_auth(
+        sequencer_addr: String,
+        basic_auth: Option<(String, Option<String>)>,
+    ) -> Result<Self> {
         Ok(Self {
             client: Client::builder()
                 //Add more fiedls if needed
                 .timeout(std::time::Duration::from_secs(60))
                 .build()?,
             sequencer_addr,
+            basic_auth,
         })
     }
 
@@ -51,13 +60,16 @@ impl SequencerClient {
         let request =
             rpc_primitives::message::Request::from_payload_version_2_0(method.to_string(), payload);
 
-        let call_builder = self.client.post(&self.sequencer_addr);
+        let mut call_builder = self.client.post(&self.sequencer_addr);
+
+        if let Some((username, password)) = &self.basic_auth {
+            call_builder = call_builder.basic_auth(username, password.as_deref());
+        }
 
         let call_res = call_builder.json(&request).send().await?;
 
         let response_vall = call_res.json::<Value>().await?;
 
-        // TODO: Actually why we need separation of `result` and `error` in rpc response?
         #[derive(Debug, Clone, Deserialize)]
         #[allow(dead_code)]
         pub struct SequencerRpcResponse {
