@@ -159,20 +159,17 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 .await?
         }
         Command::DeployProgram { binary_filepath } => {
-            let bytecode: Vec<u8> = std::fs::read(&binary_filepath).with_context(|| {
-                format!(
-                    "Failed to read program binary at {}",
-                    binary_filepath.display()
-                )
-            })?;
+            let bytecode: Vec<u8> = std::fs::read(&binary_filepath).context(format!(
+                "Failed to read program binary at {}",
+                binary_filepath.display()
+            ))?;
             let message = nssa::program_deployment_transaction::Message::new(bytecode);
             let transaction = ProgramDeploymentTransaction::new(message);
-            let response = wallet_core
+            let _response = wallet_core
                 .sequencer_client
                 .send_tx_program(transaction)
                 .await
-                .with_context(|| "Transaction submission error");
-            println!("Response: {:?}", response);
+                .context("Transaction submission error");
 
             SubcommandReturnValue::Empty
         }
