@@ -1,10 +1,7 @@
 use anyhow::Result;
 use clap::{CommandFactory as _, Parser as _};
 use tokio::runtime::Builder;
-use wallet::cli::{
-    Args, OverCommand, execute_continuous_run_with_auth, execute_keys_restoration_with_auth,
-    execute_setup_with_auth, execute_subcommand_with_auth,
-};
+use wallet::cli::{Args, execute_continuous_run_with_auth, execute_subcommand_with_auth};
 
 pub const NUM_THREADS: usize = 2;
 
@@ -25,19 +22,9 @@ fn main() -> Result<()> {
     env_logger::init();
 
     runtime.block_on(async move {
-        if let Some(over_command) = args.command {
-            match over_command {
-                OverCommand::Command(command) => {
-                    let _output = execute_subcommand_with_auth(command, args.auth).await?;
-                    Ok(())
-                }
-                OverCommand::RestoreKeys { password, depth } => {
-                    execute_keys_restoration_with_auth(password, depth, args.auth).await
-                }
-                OverCommand::Setup { password } => {
-                    execute_setup_with_auth(password, args.auth).await
-                }
-            }
+        if let Some(command) = args.command {
+            let _output = execute_subcommand_with_auth(command, args.auth).await?;
+            Ok(())
         } else if args.continuous_run {
             execute_continuous_run_with_auth(args.auth).await
         } else {

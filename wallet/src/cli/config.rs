@@ -9,10 +9,6 @@ use crate::{
 /// Represents generic config CLI subcommand
 #[derive(Subcommand, Debug, Clone)]
 pub enum ConfigSubcommand {
-    /// Command to explicitly setup config and storage
-    ///
-    /// Does nothing in case if both already present
-    Setup {},
     /// Getter of config fields
     Get { key: String },
     /// Setter of config fields
@@ -27,11 +23,6 @@ impl WalletSubcommand for ConfigSubcommand {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            ConfigSubcommand::Setup {} => {
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
-            }
             ConfigSubcommand::Get { key } => match key.as_str() {
                 "all" => {
                     let config_str =

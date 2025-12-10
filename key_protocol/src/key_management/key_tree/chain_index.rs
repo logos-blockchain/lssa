@@ -138,6 +138,22 @@ impl ChainIndex {
 
         cumulative_stack.into_iter().unique()
     }
+
+    pub fn chain_ids_at_depth_rev(depth: usize) -> impl Iterator<Item = ChainIndex> {
+        let mut stack = vec![ChainIndex(vec![0; depth])];
+        let mut cumulative_stack = vec![ChainIndex(vec![0; depth])];
+
+        while let Some(id) = stack.pop() {
+            if let Some(collapsed_id) = id.collapse_back() {
+                for id in collapsed_id.shuffle_iter() {
+                    stack.push(id.clone());
+                    cumulative_stack.push(id);
+                }
+            }
+        }
+
+        cumulative_stack.into_iter().rev().unique()
+    }
 }
 
 #[cfg(test)]

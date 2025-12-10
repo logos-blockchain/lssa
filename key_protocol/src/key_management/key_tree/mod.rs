@@ -20,6 +20,8 @@ pub mod keys_private;
 pub mod keys_public;
 pub mod traits;
 
+pub const DEPTH_SOFT_CAP: u32 = 20;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KeyTree<N: KeyNode> {
     pub key_map: BTreeMap<ChainIndex, N>,
@@ -118,6 +120,36 @@ impl<N: KeyNode> KeyTree<N> {
         self.account_id_map.insert(account_id, next_cci.clone());
 
         Some((account_id, next_cci))
+    }
+
+    fn find_next_slot_layered(&self) -> ChainIndex {
+        let mut depth = 1;
+
+        'outer: loop {
+            for chain_id in ChainIndex::chain_ids_at_depth_rev(depth) {
+                if !self.key_map.contains_key(&chain_id) {
+                    break 'outer chain_id;
+                }
+            }
+            depth += 1;
+        }
+    }
+
+    pub fn fill_node(&mut self, chain_index: &ChainIndex) -> Option<(nssa::AccountId, ChainIndex)> {
+        let parent_keys = self.key_map.get(&chain_index.parent()?)?;
+        let child_id = *chain_index.chain().last()?;
+
+        let child_keys = parent_keys.nth_child(child_id);
+        let account_id = child_keys.account_id();
+
+        self.key_map.insert(chain_index.clone(), child_keys);
+        self.account_id_map.insert(account_id, chain_index.clone());
+
+        Some((account_id, chain_index.clone()))
+    }
+
+    pub fn generate_new_node_layered(&mut self) -> Option<(nssa::AccountId, ChainIndex)> {
+        self.fill_node(&self.find_next_slot_layered())
     }
 
     pub fn get_node(&self, account_id: nssa::AccountId) -> Option<&N> {
@@ -480,6 +512,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(next_last_child_for_parent_id, 1);
+    }
+
+    #[test]
+    fn test_tree_balancing_automatic() {
+        let seed_holder = seed_holder_for_tests();
+
+        let mut tree = KeyTreePublic::new(&seed_holder);
+
+        for _ in 0..100 {
+            tree.generate_new_node_layered().unwrap();
+        }
+
+        let next_slot = tree.find_next_slot_layered();
+
+        assert_eq!(next_slot, ChainIndex::from_str("/0/0/2/1").unwrap());
     }
 
     #[test]

@@ -87,9 +87,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[nssa_integration_test]
     pub async fn test_success_move_to_another_account() {
         info!("########## test_success_move_to_another_account ##########");
-        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
-            cci: ChainIndex::root(),
-        }));
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None }));
 
         let wallet_config = fetch_config().await.unwrap();
 
@@ -293,9 +291,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -306,9 +302,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -319,9 +313,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: recipient_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -456,9 +448,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -469,9 +459,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Private {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Private { cci: None },
         )))
         .await
         .unwrap()
@@ -482,9 +470,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: recipient_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Private {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Private { cci: None },
         )))
         .await
         .unwrap()
@@ -618,7 +604,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
             NewSubcommand::Private {
-                cci: ChainIndex::root(),
+                cci: Some(ChainIndex::root()),
             },
         )))
         .await
@@ -631,7 +617,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
             NewSubcommand::Public {
-                cci: ChainIndex::root(),
+                cci: Some(ChainIndex::root()),
             },
         )))
         .await
@@ -680,8 +666,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // The data of a token definition account has the following layout:
         // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
         assert_eq!(
-            supply_acc.data,
-            vec![
+            supply_acc.data.as_ref(),
+            &[
                 1, 128, 101, 5, 31, 43, 36, 97, 108, 164, 92, 25, 157, 173, 5, 14, 194, 121, 239,
                 84, 19, 160, 243, 47, 193, 2, 250, 247, 232, 253, 191, 232, 173, 37, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -703,7 +689,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
             NewSubcommand::Private {
-                cci: ChainIndex::root(),
+                cci: Some(ChainIndex::root()),
             },
         )))
         .await
@@ -716,7 +702,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
             NewSubcommand::Private {
-                cci: ChainIndex::root(),
+                cci: Some(ChainIndex::root()),
             },
         )))
         .await
@@ -770,8 +756,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // The data of a token definition account has the following layout:
         // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
         assert_eq!(
-            definition_acc.data,
-            vec![
+            definition_acc.data.as_ref(),
+            &[
                 0, 65, 32, 78, 65, 77, 69, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ]
         );
@@ -780,8 +766,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // The data of a token definition account has the following layout:
         // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
         assert_eq!(
-            supply_acc.data,
-            vec![
+            supply_acc.data.as_ref(),
+            &[
                 1, 128, 101, 5, 31, 43, 36, 97, 108, 164, 92, 25, 157, 173, 5, 14, 194, 121, 239,
                 84, 19, 160, 243, 47, 193, 2, 250, 247, 232, 253, 191, 232, 173, 37, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -800,9 +786,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -813,9 +797,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Private {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Private { cci: None },
         )))
         .await
         .unwrap()
@@ -826,9 +808,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: recipient_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Private {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Private { cci: None },
         )))
         .await
         .unwrap()
@@ -942,9 +922,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -955,9 +933,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -968,9 +944,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: recipient_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Private {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Private { cci: None },
         )))
         .await
         .unwrap()
@@ -1084,9 +1058,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: definition_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -1097,9 +1069,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: supply_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Private {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Private { cci: None },
         )))
         .await
         .unwrap()
@@ -1110,9 +1080,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: recipient_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Public {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Public { cci: None },
         )))
         .await
         .unwrap()
@@ -1313,9 +1281,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         );
         let from: AccountId = ACC_SENDER_PRIVATE.parse().unwrap();
 
-        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
-            cci: ChainIndex::root(),
-        }));
+        let command =
+            Command::Account(AccountSubcommand::New(NewSubcommand::Private { cci: None }));
 
         let sub_ret = wallet::cli::execute_subcommand(command).await.unwrap();
         let SubcommandReturnValue::RegisterAccount {
@@ -1676,9 +1643,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[nssa_integration_test]
     pub async fn test_authenticated_transfer_initialize_function() {
         info!("########## test initialize account for authenticated transfer ##########");
-        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
-            cci: ChainIndex::root(),
-        }));
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None }));
         let SubcommandReturnValue::RegisterAccount { account_id } =
             wallet::cli::execute_subcommand(command).await.unwrap()
         else {
@@ -1776,9 +1741,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let SubcommandReturnValue::RegisterAccount {
             account_id: winner_account_id,
         } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
-            NewSubcommand::Private {
-                cci: ChainIndex::root(),
-            },
+            NewSubcommand::Private { cci: None },
         )))
         .await
         .unwrap()
@@ -1862,7 +1825,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let from: AccountId = ACC_SENDER_PRIVATE.parse().unwrap();
 
         let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
-            cci: ChainIndex::root(),
+            cci: Some(ChainIndex::root()),
         }));
 
         let sub_ret = wallet::cli::execute_subcommand(command).await.unwrap();
@@ -1874,7 +1837,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
-            cci: ChainIndex::from_str("/0").unwrap(),
+            cci: Some(ChainIndex::from_str("/0").unwrap()),
         }));
 
         let sub_ret = wallet::cli::execute_subcommand(command).await.unwrap();
@@ -1912,7 +1875,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let from: AccountId = ACC_SENDER.parse().unwrap();
 
         let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
-            cci: ChainIndex::root(),
+            cci: Some(ChainIndex::root()),
         }));
 
         let sub_ret = wallet::cli::execute_subcommand(command).await.unwrap();
@@ -1924,7 +1887,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
-            cci: ChainIndex::from_str("/0").unwrap(),
+            cci: Some(ChainIndex::from_str("/0").unwrap()),
         }));
 
         let sub_ret = wallet::cli::execute_subcommand(command).await.unwrap();

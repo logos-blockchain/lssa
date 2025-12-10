@@ -126,13 +126,19 @@ impl WalletCore {
         Ok(config_path)
     }
 
-    pub async fn create_new_account_public(&mut self, chain_index: ChainIndex) -> AccountId {
+    pub fn create_new_account_public(
+        &mut self,
+        chain_index: Option<ChainIndex>,
+    ) -> (AccountId, ChainIndex) {
         self.storage
             .user_data
             .generate_new_public_transaction_private_key(chain_index)
     }
 
-    pub fn create_new_account_private(&mut self, chain_index: ChainIndex) -> AccountId {
+    pub fn create_new_account_private(
+        &mut self,
+        chain_index: Option<ChainIndex>,
+    ) -> (AccountId, ChainIndex) {
         self.storage
             .user_data
             .generate_new_privacy_preserving_transaction_key_chain(chain_index)

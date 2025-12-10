@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use nssa::program::Program;
@@ -13,7 +15,7 @@ use crate::{
             token::TokenProgramAgnosticSubcommand,
         },
     },
-    helperfunctions::{fetch_config, merge_auth_config},
+    helperfunctions::{fetch_config, fetch_persistent_storage, merge_auth_config},
 };
 
 pub mod account;
@@ -51,25 +53,12 @@ pub enum Command {
     /// Command to setup config, get and set config fields
     #[command(subcommand)]
     Config(ConfigSubcommand),
-}
-
-/// Represents overarching CLI command for a wallet with setup included
-#[derive(Debug, Subcommand, Clone)]
-#[clap(about)]
-pub enum OverCommand {
-    /// Represents CLI command for a wallet
-    #[command(subcommand)]
-    Command(Command),
-    /// Setup of a storage. Initializes rots for public and private trees from `password`.
-    Setup {
-        #[arg(short, long)]
-        password: String,
-    },
+    /// Restoring keys from given password at given `depth`
+    ///
     /// !!!WARNING!!! will rewrite current storage
     RestoreKeys {
         #[arg(short, long)]
-        password: String,
-        #[arg(short, long)]
+        /// Indicates, how deep in tree accounts may be. Affects command complexity.
         depth: u32,
     },
 }
@@ -91,7 +80,7 @@ pub struct Args {
     pub auth: Option<String>,
     /// Wallet command
     #[command(subcommand)]
-    pub command: Option<OverCommand>,
+    pub command: Option<Command>,
 }
 
 #[derive(Debug, Clone)]
@@ -111,8 +100,15 @@ pub async fn execute_subcommand_with_auth(
     command: Command,
     auth: Option<String>,
 ) -> Result<SubcommandReturnValue> {
+    if fetch_persistent_storage().await.is_err() {
+        println!("Persistent storage not found, need to execute setup");
+
+        let password = read_password_from_stdin()?;
+        execute_setup_with_auth(password, auth.clone()).await?;
+    }
+
     let wallet_config = fetch_config().await?;
-    let wallet_config = merge_auth_config(wallet_config, auth)?;
+    let wallet_config = merge_auth_config(wallet_config, auth.clone())?;
     let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
     let subcommand_ret = match command {
@@ -172,6 +168,12 @@ pub async fn execute_subcommand_with_auth(
                 .handle_subcommand(&mut wallet_core)
                 .await?
         }
+        Command::RestoreKeys { depth } => {
+            let password = read_password_from_stdin()?;
+            execute_keys_restoration_with_auth(password, depth, auth).await?;
+
+            SubcommandReturnValue::Empty
+        }
     };
 
     Ok(subcommand_ret)
@@ -198,6 +200,16 @@ pub async fn execute_continuous_run_with_auth(auth: Option<String>) -> Result<()
         ))
         .await;
     }
+}
+
+pub fn read_password_from_stdin() -> Result<String> {
+    let mut password = String::new();
+
+    print!("Input password: ");
+    std::io::stdout().flush()?;
+    std::io::stdin().read_line(&mut password)?;
+
+    Ok(password.trim().to_string())
 }
 
 pub async fn execute_setup(password: String) -> Result<()> {
