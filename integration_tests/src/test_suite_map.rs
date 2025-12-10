@@ -437,11 +437,11 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     }
 
     /// This test creates a new private token using the token program. After creating the token, the
-    /// test executes a private token transfer to a new account. All accounts are owned except
-    /// definition.
+    /// test executes a private token transfer to a new account. All accounts are private owned
+    /// except definition which is public.
     #[nssa_integration_test]
-    pub async fn test_success_token_program_private_owned() {
-        info!("########## test_success_token_program_private_owned ##########");
+    pub async fn test_success_token_program_private_owned_supply() {
+        info!("########## test_success_token_program_private_owned_supply ##########");
         let wallet_config = fetch_config().await.unwrap();
 
         // Create new account for the token definition (public)
@@ -590,6 +590,189 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .get_private_account_commitment(&recipient_account_id)
             .unwrap();
         assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+    }
+
+    /// This test creates a new private token using the token program. All accounts are private
+    /// owned except supply which is public.
+    #[nssa_integration_test]
+    pub async fn test_success_token_program_private_owned_definition() {
+        info!("########## test_success_token_program_private_owned_definition ##########");
+        let wallet_config = fetch_config().await.unwrap();
+
+        // Create new account for the token definition (private)
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: definition_account_id,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private {
+                cci: ChainIndex::root(),
+            },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for the token supply holder (public)
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: supply_account_id,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {
+                cci: ChainIndex::root(),
+            },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+
+        // Create new token
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_account_id: make_private_account_input_from_str(
+                &definition_account_id.to_string(),
+            ),
+            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        let new_commitment1 = wallet_storage
+            .get_private_account_commitment(&definition_account_id)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+        // Check the status of the token definition account is the expected after the execution
+        let supply_acc = seq_client
+            .get_account(supply_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(supply_acc.program_owner, Program::token().id());
+        // The data of a token definition account has the following layout:
+        // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+        assert_eq!(
+            supply_acc.data,
+            vec![
+                1, 128, 101, 5, 31, 43, 36, 97, 108, 164, 92, 25, 157, 173, 5, 14, 194, 121, 239,
+                84, 19, 160, 243, 47, 193, 2, 250, 247, 232, 253, 191, 232, 173, 37, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+    }
+
+    /// This test creates a new private token using the token program. All accounts are private
+    /// owned.
+    #[nssa_integration_test]
+    pub async fn test_success_token_program_private_owned_definition_and_supply() {
+        info!(
+            "########## test_success_token_program_private_owned_definition_and_supply ##########"
+        );
+        let wallet_config = fetch_config().await.unwrap();
+
+        // Create new account for the token definition (private)
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: definition_account_id,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private {
+                cci: ChainIndex::root(),
+            },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for the token supply holder (private)
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: supply_account_id,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private {
+                cci: ChainIndex::root(),
+            },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+
+        // Create new token
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_account_id: make_private_account_input_from_str(
+                &definition_account_id.to_string(),
+            ),
+            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        let new_commitment1 = wallet_storage
+            .get_private_account_commitment(&definition_account_id)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
+
+        let new_commitment2 = wallet_storage
+            .get_private_account_commitment(&supply_account_id)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        let definition_acc = wallet_storage
+            .get_account_private(&definition_account_id)
+            .unwrap();
+        let supply_acc = wallet_storage
+            .get_account_private(&supply_account_id)
+            .unwrap();
+
+        assert_eq!(definition_acc.program_owner, Program::token().id());
+        // The data of a token definition account has the following layout:
+        // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+        assert_eq!(
+            definition_acc.data,
+            vec![
+                0, 65, 32, 78, 65, 77, 69, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        assert_eq!(supply_acc.program_owner, Program::token().id());
+        // The data of a token definition account has the following layout:
+        // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+        assert_eq!(
+            supply_acc.data,
+            vec![
+                1, 128, 101, 5, 31, 43, 36, 97, 108, 164, 92, 25, 157, 173, 5, 14, 194, 121, 239,
+                84, 19, 160, 243, 47, 193, 2, 250, 247, 232, 253, 191, 232, 173, 37, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
     }
 
     /// This test creates a new private token using the token program. After creating the token, the

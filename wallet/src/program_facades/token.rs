@@ -38,7 +38,7 @@ impl Token<'_> {
         Ok(self.0.sequencer_client.send_tx_public(tx).await?)
     }
 
-    pub async fn send_new_definition_private_owned(
+    pub async fn send_new_definition_private_owned_supply(
         &self,
         definition_account_id: AccountId,
         supply_account_id: AccountId,
@@ -61,8 +61,63 @@ impl Token<'_> {
                 let first = secrets
                     .into_iter()
                     .next()
-                    .expect("expected recipient's secret");
+                    .expect("expected supply's secret");
                 (resp, first)
+            })
+    }
+
+    pub async fn send_new_definition_private_owned_definiton(
+        &self,
+        definition_account_id: AccountId,
+        supply_account_id: AccountId,
+        name: [u8; 6],
+        total_supply: u128,
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
+        let (instruction_data, program) = token_program_preparation_definition(name, total_supply);
+
+        self.0
+            .send_privacy_preserving_tx(
+                vec![
+                    PrivacyPreservingAccount::PrivateOwned(definition_account_id),
+                    PrivacyPreservingAccount::Public(supply_account_id),
+                ],
+                &instruction_data,
+                &program,
+            )
+            .await
+            .map(|(resp, secrets)| {
+                let first = secrets
+                    .into_iter()
+                    .next()
+                    .expect("expected definition's secret");
+                (resp, first)
+            })
+    }
+
+    pub async fn send_new_definition_private_owned_definiton_and_supply(
+        &self,
+        definition_account_id: AccountId,
+        supply_account_id: AccountId,
+        name: [u8; 6],
+        total_supply: u128,
+    ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
+        let (instruction_data, program) = token_program_preparation_definition(name, total_supply);
+
+        self.0
+            .send_privacy_preserving_tx(
+                vec![
+                    PrivacyPreservingAccount::PrivateOwned(definition_account_id),
+                    PrivacyPreservingAccount::PrivateOwned(supply_account_id),
+                ],
+                &instruction_data,
+                &program,
+            )
+            .await
+            .map(|(resp, secrets)| {
+                let mut iter = secrets.into_iter();
+                let first = iter.next().expect("expected definition's secret");
+                let second = iter.next().expect("expected supply's secret");
+                (resp, [first, second])
             })
     }
 

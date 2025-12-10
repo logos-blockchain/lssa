@@ -14,8 +14,6 @@ use crate::{
 #[derive(Subcommand, Debug, Clone)]
 pub enum TokenProgramAgnosticSubcommand {
     /// Produce a new token
-    ///
-    /// Currently the only supported privacy options is for public definition
     New {
         /// definition_account_id - valid 32 byte base58 string with privacy prefix
         #[arg(long)]
@@ -72,8 +70,8 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
 
                 let underlying_subcommand = match (definition_addr_privacy, supply_addr_privacy) {
                     (AccountPrivacyKind::Public, AccountPrivacyKind::Public) => {
-                        TokenProgramSubcommand::Public(
-                            TokenProgramSubcommandPublic::CreateNewToken {
+                        TokenProgramSubcommand::Create(
+                            CreateNewTokenProgramSubcommand::NewPublicDefPublicSupp {
                                 definition_account_id,
                                 supply_account_id,
                                 name,
@@ -82,8 +80,8 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                         )
                     }
                     (AccountPrivacyKind::Public, AccountPrivacyKind::Private) => {
-                        TokenProgramSubcommand::Private(
-                            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+                        TokenProgramSubcommand::Create(
+                            CreateNewTokenProgramSubcommand::NewPublicDefPrivateSupp {
                                 definition_account_id,
                                 supply_account_id,
                                 name,
@@ -92,14 +90,24 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                         )
                     }
                     (AccountPrivacyKind::Private, AccountPrivacyKind::Private) => {
-                        // ToDo: maybe implement this one. It is not immediately clear why
-                        // definition should be private.
-                        anyhow::bail!("Unavailable privacy pairing")
+                        TokenProgramSubcommand::Create(
+                            CreateNewTokenProgramSubcommand::NewPrivateDefPrivateSupp {
+                                definition_account_id,
+                                supply_account_id,
+                                name,
+                                total_supply,
+                            },
+                        )
                     }
                     (AccountPrivacyKind::Private, AccountPrivacyKind::Public) => {
-                        // ToDo: Probably valid. If definition is not public, but supply is it is
-                        // very suspicious.
-                        anyhow::bail!("Unavailable privacy pairing")
+                        TokenProgramSubcommand::Create(
+                            CreateNewTokenProgramSubcommand::NewPrivateDefPublicSupp {
+                                definition_account_id,
+                                supply_account_id,
+                                name,
+                                total_supply,
+                            },
+                        )
                     }
                 };
 
@@ -202,6 +210,9 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
 /// Represents generic CLI subcommand for a wallet working with token_program
 #[derive(Subcommand, Debug, Clone)]
 pub enum TokenProgramSubcommand {
+    /// Creation of new token
+    #[command(subcommand)]
+    Create(CreateNewTokenProgramSubcommand),
     /// Public execution
     #[command(subcommand)]
     Public(TokenProgramSubcommandPublic),
@@ -219,17 +230,6 @@ pub enum TokenProgramSubcommand {
 /// Represents generic public CLI subcommand for a wallet working with token_program
 #[derive(Subcommand, Debug, Clone)]
 pub enum TokenProgramSubcommandPublic {
-    // Create a new token using the token program
-    CreateNewToken {
-        #[arg(short, long)]
-        definition_account_id: String,
-        #[arg(short, long)]
-        supply_account_id: String,
-        #[arg(short, long)]
-        name: String,
-        #[arg(short, long)]
-        total_supply: u128,
-    },
     // Transfer tokens using the token program
     TransferToken {
         #[arg(short, long)]
@@ -244,17 +244,6 @@ pub enum TokenProgramSubcommandPublic {
 /// Represents generic private CLI subcommand for a wallet working with token_program
 #[derive(Subcommand, Debug, Clone)]
 pub enum TokenProgramSubcommandPrivate {
-    // Create a new token using the token program
-    CreateNewTokenPrivateOwned {
-        #[arg(short, long)]
-        definition_account_id: String,
-        #[arg(short, long)]
-        supply_account_id: String,
-        #[arg(short, long)]
-        name: String,
-        #[arg(short, long)]
-        total_supply: u128,
-    },
     // Transfer tokens using the token program
     TransferTokenPrivateOwned {
         #[arg(short, long)]
@@ -320,35 +309,69 @@ pub enum TokenProgramSubcommandShielded {
     },
 }
 
+/// Represents generic initialization subcommand for a wallet working with token_program
+#[derive(Subcommand, Debug, Clone)]
+pub enum CreateNewTokenProgramSubcommand {
+    /// Create a new token using the token program
+    ///
+    /// Definition - public, supply - public
+    NewPublicDefPublicSupp {
+        #[arg(short, long)]
+        definition_account_id: String,
+        #[arg(short, long)]
+        supply_account_id: String,
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        total_supply: u128,
+    },
+    /// Create a new token using the token program
+    ///
+    /// Definition - public, supply - private
+    NewPublicDefPrivateSupp {
+        #[arg(short, long)]
+        definition_account_id: String,
+        #[arg(short, long)]
+        supply_account_id: String,
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        total_supply: u128,
+    },
+    /// Create a new token using the token program
+    ///
+    /// Definition - private, supply - public
+    NewPrivateDefPublicSupp {
+        #[arg(short, long)]
+        definition_account_id: String,
+        #[arg(short, long)]
+        supply_account_id: String,
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        total_supply: u128,
+    },
+    /// Create a new token using the token program
+    ///
+    /// Definition - private, supply - private
+    NewPrivateDefPrivateSupp {
+        #[arg(short, long)]
+        definition_account_id: String,
+        #[arg(short, long)]
+        supply_account_id: String,
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        total_supply: u128,
+    },
+}
+
 impl WalletSubcommand for TokenProgramSubcommandPublic {
     async fn handle_subcommand(
         self,
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            TokenProgramSubcommandPublic::CreateNewToken {
-                definition_account_id,
-                supply_account_id,
-                name,
-                total_supply,
-            } => {
-                let name = name.as_bytes();
-                if name.len() > 6 {
-                    // TODO: return error
-                    panic!();
-                }
-                let mut name_bytes = [0; 6];
-                name_bytes[..name.len()].copy_from_slice(name);
-                Token(wallet_core)
-                    .send_new_definition(
-                        definition_account_id.parse().unwrap(),
-                        supply_account_id.parse().unwrap(),
-                        name_bytes,
-                        total_supply,
-                    )
-                    .await?;
-                Ok(SubcommandReturnValue::Empty)
-            }
             TokenProgramSubcommandPublic::TransferToken {
                 sender_account_id,
                 recipient_account_id,
@@ -373,54 +396,6 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
-                definition_account_id,
-                supply_account_id,
-                name,
-                total_supply,
-            } => {
-                let name = name.as_bytes();
-                if name.len() > 6 {
-                    // TODO: return error
-                    panic!("Name length mismatch");
-                }
-                let mut name_bytes = [0; 6];
-                name_bytes[..name.len()].copy_from_slice(name);
-
-                let definition_account_id: AccountId = definition_account_id.parse().unwrap();
-                let supply_account_id: AccountId = supply_account_id.parse().unwrap();
-
-                let (res, secret_supply) = Token(wallet_core)
-                    .send_new_definition_private_owned(
-                        definition_account_id,
-                        supply_account_id,
-                        name_bytes,
-                        total_supply,
-                    )
-                    .await?;
-
-                println!("Results of tx send are {res:#?}");
-
-                let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
-
-                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let acc_decode_data = vec![(secret_supply, supply_account_id)];
-
-                    wallet_core.decode_insert_privacy_preserving_transaction_results(
-                        tx,
-                        &acc_decode_data,
-                    )?;
-                }
-
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
-
-                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
-            }
             TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
                 sender_account_id,
                 recipient_account_id,
@@ -657,12 +632,195 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
     }
 }
 
+impl WalletSubcommand for CreateNewTokenProgramSubcommand {
+    async fn handle_subcommand(
+        self,
+        wallet_core: &mut WalletCore,
+    ) -> Result<SubcommandReturnValue> {
+        match self {
+            CreateNewTokenProgramSubcommand::NewPrivateDefPrivateSupp {
+                definition_account_id,
+                supply_account_id,
+                name,
+                total_supply,
+            } => {
+                let name = name.as_bytes();
+                if name.len() > 6 {
+                    // TODO: return error
+                    panic!("Name length mismatch");
+                }
+                let mut name_bytes = [0; 6];
+                name_bytes[..name.len()].copy_from_slice(name);
+
+                let definition_account_id: AccountId = definition_account_id.parse().unwrap();
+                let supply_account_id: AccountId = supply_account_id.parse().unwrap();
+
+                let (res, [secret_definition, secret_supply]) = Token(wallet_core)
+                    .send_new_definition_private_owned_definiton_and_supply(
+                        definition_account_id,
+                        supply_account_id,
+                        name_bytes,
+                        total_supply,
+                    )
+                    .await?;
+
+                println!("Results of tx send are {res:#?}");
+
+                let tx_hash = res.tx_hash;
+                let transfer_tx = wallet_core
+                    .poll_native_token_transfer(tx_hash.clone())
+                    .await?;
+
+                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                    let acc_decode_data = vec![
+                        (secret_definition, definition_account_id),
+                        (secret_supply, supply_account_id),
+                    ];
+
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
+                }
+
+                let path = wallet_core.store_persistent_data().await?;
+
+                println!("Stored persistent accounts at {path:#?}");
+
+                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
+            }
+            CreateNewTokenProgramSubcommand::NewPrivateDefPublicSupp {
+                definition_account_id,
+                supply_account_id,
+                name,
+                total_supply,
+            } => {
+                let name = name.as_bytes();
+                if name.len() > 6 {
+                    // TODO: return error
+                    panic!("Name length mismatch");
+                }
+                let mut name_bytes = [0; 6];
+                name_bytes[..name.len()].copy_from_slice(name);
+
+                let definition_account_id: AccountId = definition_account_id.parse().unwrap();
+                let supply_account_id: AccountId = supply_account_id.parse().unwrap();
+
+                let (res, secret_definition) = Token(wallet_core)
+                    .send_new_definition_private_owned_definiton(
+                        definition_account_id,
+                        supply_account_id,
+                        name_bytes,
+                        total_supply,
+                    )
+                    .await?;
+
+                println!("Results of tx send are {res:#?}");
+
+                let tx_hash = res.tx_hash;
+                let transfer_tx = wallet_core
+                    .poll_native_token_transfer(tx_hash.clone())
+                    .await?;
+
+                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                    let acc_decode_data = vec![(secret_definition, definition_account_id)];
+
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
+                }
+
+                let path = wallet_core.store_persistent_data().await?;
+
+                println!("Stored persistent accounts at {path:#?}");
+
+                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
+            }
+            CreateNewTokenProgramSubcommand::NewPublicDefPrivateSupp {
+                definition_account_id,
+                supply_account_id,
+                name,
+                total_supply,
+            } => {
+                let name = name.as_bytes();
+                if name.len() > 6 {
+                    // TODO: return error
+                    panic!("Name length mismatch");
+                }
+                let mut name_bytes = [0; 6];
+                name_bytes[..name.len()].copy_from_slice(name);
+
+                let definition_account_id: AccountId = definition_account_id.parse().unwrap();
+                let supply_account_id: AccountId = supply_account_id.parse().unwrap();
+
+                let (res, secret_supply) = Token(wallet_core)
+                    .send_new_definition_private_owned_supply(
+                        definition_account_id,
+                        supply_account_id,
+                        name_bytes,
+                        total_supply,
+                    )
+                    .await?;
+
+                println!("Results of tx send are {res:#?}");
+
+                let tx_hash = res.tx_hash;
+                let transfer_tx = wallet_core
+                    .poll_native_token_transfer(tx_hash.clone())
+                    .await?;
+
+                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                    let acc_decode_data = vec![(secret_supply, supply_account_id)];
+
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
+                }
+
+                let path = wallet_core.store_persistent_data().await?;
+
+                println!("Stored persistent accounts at {path:#?}");
+
+                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
+            }
+            CreateNewTokenProgramSubcommand::NewPublicDefPublicSupp {
+                definition_account_id,
+                supply_account_id,
+                name,
+                total_supply,
+            } => {
+                let name = name.as_bytes();
+                if name.len() > 6 {
+                    // TODO: return error
+                    panic!();
+                }
+                let mut name_bytes = [0; 6];
+                name_bytes[..name.len()].copy_from_slice(name);
+                Token(wallet_core)
+                    .send_new_definition(
+                        definition_account_id.parse().unwrap(),
+                        supply_account_id.parse().unwrap(),
+                        name_bytes,
+                        total_supply,
+                    )
+                    .await?;
+                Ok(SubcommandReturnValue::Empty)
+            }
+        }
+    }
+}
+
 impl WalletSubcommand for TokenProgramSubcommand {
     async fn handle_subcommand(
         self,
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
+            TokenProgramSubcommand::Create(creation_subcommand) => {
+                creation_subcommand.handle_subcommand(wallet_core).await
+            }
             TokenProgramSubcommand::Private(private_subcommand) => {
                 private_subcommand.handle_subcommand(wallet_core).await
             }
