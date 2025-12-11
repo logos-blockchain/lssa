@@ -25,8 +25,8 @@ pub struct Account {
     pub nonce: Nonce,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug))]
 pub struct AccountWithMetadata {
     pub account: Account,
     pub is_authorized: bool,

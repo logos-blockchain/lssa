@@ -45,13 +45,18 @@ fn main() {
         }
 
         // TODO: Modify when multi-chain calls are supported in the circuit
-        let Some(chained_call) = &caller.chained_calls.first() else {
+        let Some(caller_chained_call) = &caller.chained_calls.first() else {
             panic!("Expected chained call");
         };
 
         // Check that instruction data in caller is the instruction data in callee
-        if chained_call.instruction_data != callee.instruction_data {
+        if caller_chained_call.instruction_data != callee.instruction_data {
             panic!("Invalid instruction data");
+        }
+
+        // Check that account pre_states in caller are the ones in calle
+        if caller_chained_call.pre_states != callee.pre_states {
+            panic!("Invalid pre states");
         }
     }
 
