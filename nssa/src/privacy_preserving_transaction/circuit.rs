@@ -195,7 +195,7 @@ mod tests {
         let expected_sender_post = Account {
             program_owner: program.id(),
             balance: 100 - balance_to_move,
-            nonce: 1,
+            nonce: 0,
             data: Data::default(),
         };
 

@@ -154,6 +154,12 @@ impl V02State {
             *current_account = post;
         }
 
+        // 5. Increment nonces for public signers
+        for account_id in tx.signer_account_ids() {
+            let current_account = self.get_account_by_id_mut(account_id);
+            current_account.nonce += 1;
+        }
+
         Ok(())
     }
 
