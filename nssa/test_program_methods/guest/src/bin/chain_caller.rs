@@ -10,10 +10,13 @@ type Instruction = (u128, ProgramId, u32, Option<PdaSeed>);
 /// It permutes the order of the input accounts on the subsequent call
 /// The `ProgramId` in the instruction must be the program_id of the authenticated transfers program
 fn main() {
-    let ProgramInput {
-        pre_states,
+    let (
+        ProgramInput {
+            pre_states,
         instruction: (balance, auth_transfer_id, num_chain_calls, pda_seed),
-    } = read_nssa_inputs::<Instruction>();
+        },
+        instruction_words
+    ) = read_nssa_inputs::<Instruction>();
 
     let [recipient_pre, sender_pre] = match pre_states.try_into() {
         Ok(array) => array,
@@ -44,6 +47,7 @@ fn main() {
     }
 
     write_nssa_outputs_with_chained_call(
+        instruction_words,
         vec![sender_pre.clone(), recipient_pre.clone()],
         vec![
             AccountPostState::new(sender_pre.account),

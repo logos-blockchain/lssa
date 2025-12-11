@@ -168,7 +168,7 @@ fn build_privacy_transaction() -> PrivacyPreservingTransaction {
             (recipient_npk.clone(), recipient_ss),
         ],
         &[(sender_nsk, proof)],
-        &program,
+        &program.into(),
     )
     .unwrap();
     let message = pptx::message::Message::try_from_circuit_output(

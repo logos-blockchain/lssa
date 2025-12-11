@@ -283,7 +283,7 @@ impl WalletCore {
                 .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
                 .collect::<Vec<_>>(),
             &acc_manager.private_account_auth(),
-            program,
+            &program.to_owned().into(),
         )
         .unwrap();
 

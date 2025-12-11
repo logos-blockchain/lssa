@@ -5,32 +5,32 @@ use nssa_core::{
 
 /// Initializes a default account under the ownership of this program.
 /// This is achieved by a noop.
-fn initialize_account(pre_state: AccountWithMetadata) {
+fn initialize_account(pre_state: AccountWithMetadata) -> AccountPostState {
     let account_to_claim = pre_state.account.clone();
     let is_authorized = pre_state.is_authorized;
 
     // Continue only if the account to claim has default values
     if account_to_claim != Account::default() {
-        return;
+        panic!("Account is already initialized");
     }
 
     // Continue only if the owner authorized this operation
     if !is_authorized {
-        return;
+        panic!("Missing required authorization");
     }
 
-    // Noop will result in account being claimed for this program
-    write_nssa_outputs(
-        vec![pre_state],
-        vec![AccountPostState::new(account_to_claim)],
-    );
+    AccountPostState::new(account_to_claim)
 }
 
 /// Transfers `balance_to_move` native balance from `sender` to `recipient`.
-fn transfer(sender: AccountWithMetadata, recipient: AccountWithMetadata, balance_to_move: u128) {
+fn transfer(
+    sender: AccountWithMetadata,
+    recipient: AccountWithMetadata,
+    balance_to_move: u128,
+) -> Vec<AccountPostState> {
     // Continue only if the sender has authorized this operation
     if !sender.is_authorized {
-        return;
+        panic!("Missing required authorization");
     }
 
     // This segment is a safe protection from authenticated transfer program
@@ -50,29 +50,33 @@ fn transfer(sender: AccountWithMetadata, recipient: AccountWithMetadata, balance
     sender_post.balance -= balance_to_move + malicious_offset;
     recipient_post.balance += balance_to_move + malicious_offset;
 
-    write_nssa_outputs(
-        vec![sender, recipient],
-        vec![
-            AccountPostState::new(sender_post),
-            AccountPostState::new(recipient_post),
-        ],
-    );
+    vec![
+        AccountPostState::new(sender_post),
+        AccountPostState::new(recipient_post),
+    ]
 }
 
 /// A transfer of balance program.
 /// To be used both in public and private contexts.
 fn main() {
     // Read input accounts.
-    let ProgramInput {
-        pre_states,
-        instruction: balance_to_move,
-    } = read_nssa_inputs();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction: balance_to_move,
+        },
+        instruction_data,
+    ) = read_nssa_inputs();
 
-    match (pre_states.as_slice(), balance_to_move) {
-        ([account_to_claim], 0) => initialize_account(account_to_claim.clone()),
+    let post_states = match (pre_states.as_slice(), balance_to_move) {
+        ([account_to_claim], 0) => {
+            let post = initialize_account(account_to_claim.clone());
+            vec![post]
+        }
         ([sender, recipient], balance_to_move) => {
             transfer(sender.clone(), recipient.clone(), balance_to_move)
         }
         _ => panic!("invalid params"),
-    }
+    };
+    write_nssa_outputs(instruction_data, pre_states, post_states);
 }

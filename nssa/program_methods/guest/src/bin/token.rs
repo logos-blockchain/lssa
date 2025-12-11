@@ -249,10 +249,13 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostStat
 type Instruction = [u8; 23];
 
 fn main() {
-    let ProgramInput {
-        pre_states,
-        instruction,
-    } = read_nssa_inputs::<Instruction>();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction,
+        },
+        instruction_words,
+    ) = read_nssa_inputs::<Instruction>();
 
     let post_states = match instruction[0] {
         0 => {
@@ -295,7 +298,7 @@ fn main() {
         _ => panic!("Invalid instruction"),
     };
 
-    write_nssa_outputs(pre_states, post_states);
+    write_nssa_outputs(instruction_words, pre_states, post_states);
 }
 
 #[cfg(test)]

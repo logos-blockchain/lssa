@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Serialize, Deserialize)]
 pub struct PrivacyPreservingCircuitInput {
-    pub program_output: ProgramOutput,
+    pub program_outputs: Vec<ProgramOutput>,
     pub visibility_mask: Vec<u8>,
     pub private_account_nonces: Vec<Nonce>,
     pub private_account_keys: Vec<(NullifierPublicKey, SharedSecretKey)>,
