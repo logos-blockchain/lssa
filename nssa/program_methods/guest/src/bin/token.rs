@@ -26,13 +26,13 @@ use nssa_core::{
 //    Arguments to this function are:
 //      * Two accounts: [definition_account, holding_account].
 //      * Authorization required: holding_account
-//      * An instruction data byte string of length 23, indicating the balance to burn with the folloiwng layout
+//      * An instruction data byte string of length 23, indicating the balance to burn with the following layout
 //       [0x03 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
 // 5. Mint additional supply of tokens tokens to a Token Holding account (thus increasing total supply)
 //    Arguments to this function are:
 //      * Two accounts: [definition_account, holding_account].
 //      * Authorization required: definition_account
-//      * An instruction data byte string of length 23, indicating the balance to mint with the folloiwng layout
+//      * An instruction data byte string of length 23, indicating the balance to mint with the following layout
 //       [0x04 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;

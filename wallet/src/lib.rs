@@ -38,6 +38,11 @@ pub mod poller;
 mod privacy_preserving_tx;
 pub mod program_facades;
 
+pub enum AccDecodeData {
+    Skip,
+    Decode(nssa_core::SharedSecretKey, AccountId),
+}
+
 pub struct WalletCore {
     pub storage: WalletChainStore,
     pub poller: TxPoller,
@@ -218,24 +223,29 @@ impl WalletCore {
     pub fn decode_insert_privacy_preserving_transaction_results(
         &mut self,
         tx: nssa::privacy_preserving_transaction::PrivacyPreservingTransaction,
-        acc_decode_data: &[(nssa_core::SharedSecretKey, AccountId)],
+        acc_decode_mask: &[AccDecodeData],
     ) -> Result<()> {
-        for (output_index, (secret, acc_account_id)) in acc_decode_data.iter().enumerate() {
-            let acc_ead = tx.message.encrypted_private_post_states[output_index].clone();
-            let acc_comm = tx.message.new_commitments[output_index].clone();
+        for (output_index, acc_decode_data) in acc_decode_mask.iter().enumerate() {
+            match acc_decode_data {
+                AccDecodeData::Decode(secret, acc_account_id) => {
+                    let acc_ead = tx.message.encrypted_private_post_states[output_index].clone();
+                    let acc_comm = tx.message.new_commitments[output_index].clone();
 
-            let res_acc = nssa_core::EncryptionScheme::decrypt(
-                &acc_ead.ciphertext,
-                secret,
-                &acc_comm,
-                output_index as u32,
-            )
-            .unwrap();
+                    let res_acc = nssa_core::EncryptionScheme::decrypt(
+                        &acc_ead.ciphertext,
+                        secret,
+                        &acc_comm,
+                        output_index as u32,
+                    )
+                    .unwrap();
 
-            println!("Received new acc {res_acc:#?}");
+                    println!("Received new acc {res_acc:#?}");
 
-            self.storage
-                .insert_private_account_data(*acc_account_id, res_acc);
+                    self.storage
+                        .insert_private_account_data(*acc_account_id, res_acc);
+                }
+                AccDecodeData::Skip => {}
+            }
         }
 
         println!("Transaction data is {:?}", tx.message);
