@@ -35,7 +35,7 @@ pub mod cli;
 pub mod config;
 pub mod helperfunctions;
 pub mod poller;
-pub mod privacy_preserving_tx;
+mod privacy_preserving_tx;
 pub mod program_facades;
 
 pub struct WalletCore {

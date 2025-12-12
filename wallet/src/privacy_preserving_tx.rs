@@ -164,15 +164,15 @@ impl AccountManager {
     }
 }
 
-pub struct AccountPreparedData {
-    pub nsk: Option<NullifierSecretKey>,
-    pub npk: NullifierPublicKey,
-    pub ipk: IncomingViewingPublicKey,
-    pub pre_state: AccountWithMetadata,
-    pub proof: Option<MembershipProof>,
+struct AccountPreparedData {
+    nsk: Option<NullifierSecretKey>,
+    npk: NullifierPublicKey,
+    ipk: IncomingViewingPublicKey,
+    pre_state: AccountWithMetadata,
+    proof: Option<MembershipProof>,
 }
 
-pub async fn private_acc_preparation(
+async fn private_acc_preparation(
     wallet: &WalletCore,
     account_id: AccountId,
 ) -> Result<AccountPreparedData, ExecutionFailureKind> {
