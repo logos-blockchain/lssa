@@ -38,7 +38,7 @@ impl Pinata<'_> {
                     PrivacyPreservingAccount::PrivateOwned(winner_account_id),
                 ],
                 &nssa::program::Program::serialize_instruction(solution).unwrap(),
-                &nssa::program::Program::pinata(),
+                &nssa::program::Program::pinata().into(),
             )
             .await
             .map(|(resp, secrets)| {

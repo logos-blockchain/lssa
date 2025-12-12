@@ -27,7 +27,7 @@ pub struct ProgramInput<T> {
 pub struct PdaSeed([u8; 32]);
 
 impl PdaSeed {
-    pub fn new(value: [u8; 32]) -> Self {
+    pub const fn new(value: [u8; 32]) -> Self {
         Self(value)
     }
 }

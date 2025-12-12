@@ -21,7 +21,7 @@ impl NativeTokenTransfer<'_> {
                     PrivacyPreservingAccount::PrivateOwned(to),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
                 tx_pre_check,
             )
             .await
@@ -53,7 +53,7 @@ impl NativeTokenTransfer<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
                 tx_pre_check,
             )
             .await
