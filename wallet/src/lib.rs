@@ -17,7 +17,6 @@ use nssa::{
     privacy_preserving_transaction::{
         circuit::ProgramWithDependencies, message::EncryptedAccountData,
     },
-    program::Program,
 };
 use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
 pub use privacy_preserving_tx::PrivacyPreservingAccount;
