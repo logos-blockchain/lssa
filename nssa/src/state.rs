@@ -862,7 +862,7 @@ pub mod tests {
             &[0xdeadbeef],
             &[(recipient_keys.npk(), shared_secret)],
             &[],
-            &[],
+            &[None],
             &Program::authenticated_transfer_program().into(),
         )
         .unwrap();
@@ -912,7 +912,7 @@ pub mod tests {
                 (recipient_keys.npk(), shared_secret_2),
             ],
             &[sender_keys.nsk],
-            &[state.get_proof_for_commitment(&sender_commitment).unwrap()],
+            &[state.get_proof_for_commitment(&sender_commitment), None],
             &program.into(),
         )
         .unwrap();
@@ -962,7 +962,7 @@ pub mod tests {
             &[new_nonce],
             &[(sender_keys.npk(), shared_secret)],
             &[sender_keys.nsk],
-            &[state.get_proof_for_commitment(&sender_commitment).unwrap()],
+            &[state.get_proof_for_commitment(&sender_commitment)],
             &program.into(),
         )
         .unwrap();
@@ -1492,7 +1492,7 @@ pub mod tests {
                 ),
             ],
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1527,7 +1527,49 @@ pub mod tests {
             &[0xdeadbeef1, 0xdeadbeef2],
             &private_account_keys,
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
+            &program.into(),
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_circuit_fails_if_insufficient_commitment_proofs_are_provided() {
+        let program = Program::simple_balance_transfer();
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let private_account_1 = AccountWithMetadata::new(
+            Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            true,
+            &sender_keys.npk(),
+        );
+        let private_account_2 =
+            AccountWithMetadata::new(Account::default(), false, &recipient_keys.npk());
+
+        // Setting no second commitment proof.
+        let private_account_membership_proofs = [Some((0, vec![]))];
+        let result = execute_and_prove(
+            &[private_account_1, private_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &[1, 2],
+            &[0xdeadbeef1, 0xdeadbeef2],
+            &[
+                (
+                    sender_keys.npk(),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                ),
+                (
+                    recipient_keys.npk(),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                ),
+            ],
+            &[sender_keys.nsk],
+            &private_account_membership_proofs,
             &program.into(),
         );
 
@@ -1610,7 +1652,7 @@ pub mod tests {
         // This should be set to the sender private account in
         // a normal circumstance. The recipient can't authorize this.
         let private_account_nsks = [recipient_keys.nsk];
-        let private_account_membership_proofs = [(0, vec![])];
+        let private_account_membership_proofs = [Some((0, vec![]))];
         let result = execute_and_prove(
             &[private_account_1, private_account_2],
             &Program::serialize_instruction(10u128).unwrap(),
@@ -1665,7 +1707,7 @@ pub mod tests {
                 ),
             ],
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1713,7 +1755,7 @@ pub mod tests {
                 ),
             ],
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1760,7 +1802,7 @@ pub mod tests {
                 ),
             ],
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1807,7 +1849,7 @@ pub mod tests {
                 ),
             ],
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1852,7 +1894,7 @@ pub mod tests {
                 ),
             ],
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1925,7 +1967,7 @@ pub mod tests {
                 ),
             ],
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1972,7 +2014,7 @@ pub mod tests {
             &[0xdeadbeef1, 0xdeadbeef2],
             &private_account_keys,
             &[sender_keys.nsk],
-            &[(0, vec![])],
+            &[Some((0, vec![]))],
             &program.into(),
         );
 
@@ -2000,7 +2042,7 @@ pub mod tests {
         // private account (visibility mask equal to 1 means that auth keys are expected).
         let visibility_mask = [1, 2];
         let private_account_nsks = [sender_keys.nsk, recipient_keys.nsk];
-        let private_account_membership_proofs = [(0, vec![]), (1, vec![])];
+        let private_account_membership_proofs = [Some((0, vec![])), Some((1, vec![]))];
         let result = execute_and_prove(
             &[private_account_1, private_account_2],
             &Program::serialize_instruction(10u128).unwrap(),
@@ -2095,7 +2137,7 @@ pub mod tests {
 
         let visibility_mask = [1, 1];
         let private_account_nsks = [sender_keys.nsk, sender_keys.nsk];
-        let private_account_membership_proofs = [(1, vec![]), (1, vec![])];
+        let private_account_membership_proofs = [Some((1, vec![])), Some((1, vec![]))];
         let shared_secret = SharedSecretKey::new(&[55; 32], &sender_keys.ivk());
         let result = execute_and_prove(
             &[private_account_1.clone(), private_account_1],
@@ -2410,8 +2452,8 @@ pub mod tests {
             &[(from_keys.npk(), to_ss), (to_keys.npk(), from_ss)],
             &[from_keys.nsk, to_keys.nsk],
             &[
-                state.get_proof_for_commitment(&from_commitment).unwrap(),
-                state.get_proof_for_commitment(&to_commitment).unwrap(),
+                state.get_proof_for_commitment(&from_commitment),
+                state.get_proof_for_commitment(&to_commitment),
             ],
             &program_with_deps,
         )
@@ -2617,5 +2659,57 @@ pub mod tests {
 
         assert!(expected_sender_post == sender_post);
         assert!(expected_recipient_post == recipient_post);
+    }
+
+    #[test]
+    fn test_private_authorized_uninitialized_account() {
+        let mut state = V02State::new_with_genesis_accounts(&[], &[]);
+
+        // Set up keys for the authorized private account
+        let private_keys = test_private_account_keys_1();
+
+        // Create an authorized private account with default values (new account being initialized)
+        let authorized_account =
+            AccountWithMetadata::new(Account::default(), true, &private_keys.npk());
+
+        let program = Program::authenticated_transfer_program();
+
+        // Set up parameters for the new account
+        let esk = [3; 32];
+        let shared_secret = SharedSecretKey::new(&esk, &private_keys.ivk());
+        let epk = EphemeralPublicKey::from_scalar(esk);
+
+        // Balance to initialize the account with (0 for a new account)
+        let balance: u128 = 0;
+
+        let nonce = 0xdeadbeef1;
+
+        // Execute and prove the circuit with the authorized account but no commitment proof
+        let (output, proof) = execute_and_prove(
+            std::slice::from_ref(&authorized_account),
+            &Program::serialize_instruction(balance).unwrap(),
+            &[1],
+            &[nonce],
+            &[(private_keys.npk(), shared_secret)],
+            &[private_keys.nsk],
+            &[None],
+            &program.into(),
+        )
+        .unwrap();
+
+        // Create message from circuit output
+        let message = Message::try_from_circuit_output(
+            vec![],
+            vec![],
+            vec![(private_keys.npk(), private_keys.ivk(), epk)],
+            output,
+        )
+        .unwrap();
+
+        let witness_set = WitnessSet::for_message(&message, proof, &[]);
+
+        let tx = PrivacyPreservingTransaction::new(message, witness_set);
+        let result = state.transition_from_privacy_preserving_transaction(&tx);
+        assert!(result.is_ok());
     }
 }

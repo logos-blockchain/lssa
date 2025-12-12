@@ -168,7 +168,7 @@ fn build_privacy_transaction() -> PrivacyPreservingTransaction {
             (recipient_npk.clone(), recipient_ss),
         ],
         &[sender_nsk],
-        &[proof],
+        &[Some(proof)],
         &program.into(),
     )
     .unwrap();

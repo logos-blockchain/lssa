@@ -165,29 +165,40 @@ fn main() {
                     // Private account with authentication
                     let nsk = private_nsks_iter.next().expect("Missing nsk");
 
-                    let membership_proof = private_membership_proofs_iter
-                        .next()
-                        .expect("Missing membership proof");
-
                     // Verify the nullifier public key
                     let expected_npk = NullifierPublicKey::from(nsk);
                     if &expected_npk != npk {
                         panic!("Nullifier public key mismatch");
                     }
 
-                    // Compute commitment set digest associated with provided auth path
-                    let commitment_pre = Commitment::new(npk, &pre_states[i].account);
-                    let set_digest = compute_digest_for_path(&commitment_pre, membership_proof);
-
                     // Check pre_state authorization
                     if !pre_states[i].is_authorized {
                         panic!("Pre-state not authorized");
                     }
 
-                    // Compute update nullifier
-                    let nullifier = Nullifier::for_account_update(&commitment_pre, nsk);
+                    let membership_proof_opt = private_membership_proofs_iter
+                        .next()
+                        .expect("Missing membership proof");
+                    let (nullifier, set_digest) = membership_proof_opt
+                        .as_ref()
+                        .map(|membership_proof| {
+                            // Compute commitment set digest associated with provided auth path
+                            let commitment_pre = Commitment::new(npk, &pre_states[i].account);
+                            let set_digest =
+                                compute_digest_for_path(&commitment_pre, membership_proof);
+
+                            // Compute update nullifier
+                            let nullifier = Nullifier::for_account_update(&commitment_pre, nsk);
+                            (nullifier, set_digest)
+                        })
+                        .unwrap_or_else(|| {
+                            // Compute initialization nullifier
+                            let nullifier = Nullifier::for_account_initialization(npk);
+                            (nullifier, DUMMY_COMMITMENT_HASH)
+                        });
                     new_nullifiers.push((nullifier, set_digest));
                 } else {
+                    // Private account without authentication
                     if pre_states[i].account != Account::default() {
                         panic!("Found new private account with non default values.");
                     }
@@ -196,7 +207,13 @@ fn main() {
                         panic!("Found new private account marked as authorized.");
                     }
 
-                    // Compute initialization nullifier
+                    let membership_proof_opt = private_membership_proofs_iter
+                        .next()
+                        .expect("Missing membership proof");
+                    assert!(
+                        membership_proof_opt.is_none(),
+                        "Membership proof must be None for unauthorized accounts"
+                    );
                     let nullifier = Nullifier::for_account_initialization(npk);
                     new_nullifiers.push((nullifier, DUMMY_COMMITMENT_HASH));
                 }

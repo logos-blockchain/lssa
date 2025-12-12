@@ -10,12 +10,23 @@ use crate::{
 
 #[derive(Serialize, Deserialize)]
 pub struct PrivacyPreservingCircuitInput {
+    /// Outputs of the program execution.
     pub program_outputs: Vec<ProgramOutput>,
+    /// Visibility mask for accounts.
+    ///
+    /// - `0` - public account
+    /// - `1` - private account with authentication
+    /// - `2` - private account without authentication
     pub visibility_mask: Vec<u8>,
+    /// Nonces of private accounts.
     pub private_account_nonces: Vec<Nonce>,
+    /// Public keys of private accounts.
     pub private_account_keys: Vec<(NullifierPublicKey, SharedSecretKey)>,
+    /// Nullifier secret keys for authorized private accounts.
     pub private_account_nsks: Vec<NullifierSecretKey>,
-    pub private_account_membership_proofs: Vec<MembershipProof>,
+    /// Membership proofs for private accounts. Can be [`None`] for uninitialized accounts.
+    pub private_account_membership_proofs: Vec<Option<MembershipProof>>,
+    /// Program ID.
     pub program_id: ProgramId,
 }
 

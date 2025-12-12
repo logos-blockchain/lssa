@@ -52,7 +52,7 @@ pub fn execute_and_prove(
     private_account_nonces: &[u128],
     private_account_keys: &[(NullifierPublicKey, SharedSecretKey)],
     private_account_nsks: &[NullifierSecretKey],
-    private_account_membership_proofs: &[MembershipProof],
+    private_account_membership_proofs: &[Option<MembershipProof>],
     program_with_dependencies: &ProgramWithDependencies,
 ) -> Result<(PrivacyPreservingCircuitOutput, Proof), NssaError> {
     let mut program = &program_with_dependencies.program;
@@ -221,7 +221,7 @@ mod tests {
             &[0xdeadbeef],
             &[(recipient_keys.npk(), shared_secret.clone())],
             &[],
-            &[],
+            &[None],
             &Program::authenticated_transfer_program().into(),
         )
         .unwrap();
@@ -320,7 +320,7 @@ mod tests {
                 (recipient_keys.npk(), shared_secret_2.clone()),
             ],
             &[sender_keys.nsk],
-            &[commitment_set.get_proof_for(&commitment_sender).unwrap()],
+            &[commitment_set.get_proof_for(&commitment_sender), None],
             &program.into(),
         )
         .unwrap();
