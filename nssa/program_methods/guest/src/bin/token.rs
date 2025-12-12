@@ -38,48 +38,175 @@ use nssa_core::{
 //      * An instruction data byte string of length 23, indicating the balance to mint with the folloiwng layout
 //       [0x04 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
 
-enum TokenStandard {
-    FungibleTokenHolding,
-    FungibleAssetHolding,
-    NonFungibleHolding,
+type TokenStandard = u8;
+
+enum TokenStandardEnum {
+    FungibleToken,
+    FungibleAsset,
+    NonFungible,
+}
+enum MetadataStandardEnum {
+    SimpleMetadata,
+    ExpandedMetadata,
 }
 
-fn helper_token_standard_constructor(selection: TokenStandard) -> u8 {
+// Remove enums...unnecessary structure
+fn helper_token_standard_constructor(selection: TokenStandardEnum) -> u8 {
     match selection {
-        TokenStandard::FungibleTokenHolding => 0, //TODO: make sure this matches with current definition
-        TokenStandard::FungibleAssetHolding => 1,
-        TokenStandard::NonFungibleHolding => 2,
+        TokenStandardEnum::FungibleToken => 0,
+        TokenStandardEnum::FungibleAsset => 1,
+        TokenStandardEnum::NonFungible => 2,
         _ => panic!("Invalid selection"),
     }
 }
 
-const TOKEN_DEFINITION_TYPE: u8 = 0;
+
+
+fn helper_metadata_standard_constructor(selection: MetadataStandardEnum) -> u8 {
+    match selection {
+        MetadataStandardEnum::SimpleMetadata => 0,
+        MetadataStandardEnum::ExpandedMetadata => 1,
+    }
+}
+
 const TOKEN_DEFINITION_DATA_SIZE: usize = 55;
 
 const TOKEN_HOLDING_TYPE: u8 = 1;
+const TOKEN_HOLDING_MASTER_EDITION: u8 = 2;
+const TOKEN_HOLDING_PRINTED: u8 = 3;
+
+
+
 const TOKEN_HOLDING_DATA_SIZE: usize = 49;
 const CURRENT_VERSION: u8 = 1;
+const NUMBER_OF_METADATA_TYPES: u8 = 2;
 
 const TOKEN_METADATA_DATA_SIZE: usize = 463;
 
-//TODO: pub probably not necessary
-pub type StringU8 = Vec<u8>;
-
 struct TokenDefinition {
-    account_type: u8, //specifies Token Standard?
+    account_type: u8, // Token Standard
     name: [u8; 6],
     total_supply: u128,
     metadata_id: AccountId,
 }
 
+impl TokenDefinition {
+    fn into_data(self) -> Data {
+        let mut bytes = Vec::<u8>::new();
+        bytes.extend_from_slice(&[self.account_type]);
+        bytes.extend_from_slice(&self.name);
+        bytes.extend_from_slice(&self.total_supply.to_le_bytes());
+        bytes.extend_from_slice(&self.metadata_id.to_bytes());
+
+        if bytes.len() != TOKEN_DEFINITION_DATA_SIZE {
+            panic!("Invalid Token Definition data");
+        }
+
+        Data::try_from(bytes).expect("Invalid data")
+    }
+
+    fn parse(data: &Data) -> Option<Self> {
+        let data = Vec::<u8>::from(data.clone());
+
+        if data.len() != TOKEN_DEFINITION_DATA_SIZE {
+            None
+        } else {
+            let account_type = data[0];
+            let name = data[1..7].try_into().expect("Name must be a 6 bytes");
+            let total_supply = u128::from_le_bytes(
+                data[7..23]
+                    .try_into()
+                    .expect("Total supply must be 16 bytes little-endian"),
+            );
+            let metadata_id = AccountId::new(
+                data[23..TOKEN_DEFINITION_DATA_SIZE]
+                    .try_into()
+                    .expect("Token Program expects valid Account Id for Metadata"),
+            );
+
+            let this = Some(Self {
+                account_type,
+                name,
+                total_supply,
+                metadata_id: metadata_id.clone(),
+            });
+
+            //TODO tests
+            if account_type == //NFTs must have supply 1
+                helper_token_standard_constructor(TokenStandardEnum::NonFungible)
+                && total_supply != 1
+            {
+                None
+            } else if account_type == //Fungible Tokens do not have metadata.
+                helper_token_standard_constructor(TokenStandardEnum::FungibleToken)
+                && metadata_id != AccountId::new([0; 32])
+            {
+                None
+            } else {
+                this
+            }
+        }
+    }
+}
+
+//TODO(edition/master edition/printable)
+// => use balance for total prints allowed
+// fix logic for NFTs to allow for printables
 struct TokenHolding {
-    account_type: u8, //(potentially for edition/master edition/printable)
+    account_type: u8,
     definition_id: AccountId,
     balance: u128,
 }
 
-//BAH fixed data size is kind of needed...
-//TODO need implement
+impl TokenHolding {
+    fn new(definition_id: &AccountId) -> Self {
+        Self {
+            account_type: TOKEN_HOLDING_TYPE,
+            definition_id: definition_id.clone(),
+            balance: 0,
+        }
+    }
+
+    fn parse(data: &Data) -> Option<Self> {
+        let data = Vec::<u8>::from(data.clone());
+
+        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
+            return None;
+        }
+
+        let account_type = data[0];
+        let definition_id = AccountId::new(
+            data[1..33]
+                .try_into()
+                .expect("Defintion ID must be 32 bytes long"),
+        );
+        let balance = u128::from_le_bytes(
+            data[33..]
+                .try_into()
+                .expect("balance must be 16 bytes little-endian"),
+        );
+
+        Some(Self {
+            definition_id,
+            balance,
+            account_type,
+        })
+    }
+
+    fn into_data(self) -> Data {
+        let mut bytes = Vec::<u8>::new();
+        bytes.extend_from_slice(&[self.account_type]);
+        bytes.extend_from_slice(&self.definition_id.to_bytes());
+        bytes.extend_from_slice(&self.balance.to_le_bytes());
+
+        if bytes.len() != TOKEN_HOLDING_DATA_SIZE {
+            panic!("Invalid Token Holding data");
+        }
+
+        Data::try_from(bytes).expect("Invalid data")
+    }
+}
+
 struct TokenMetadata {
     account_type: u8, //Not sure if necessary
     version: u8,
@@ -90,9 +217,16 @@ struct TokenMetadata {
 }
 
 //TODO remove any unwraps
-
 impl TokenMetadata {
     fn into_data(self) -> Data {
+        if self.account_type
+            != helper_metadata_standard_constructor(MetadataStandardEnum::SimpleMetadata)
+            || self.account_type
+                != helper_metadata_standard_constructor(MetadataStandardEnum::ExpandedMetadata)
+        {
+            panic!("Invalid Metadata type");
+        }
+
         let mut bytes = Vec::<u8>::new();
         bytes.extend_from_slice(&[self.account_type]);
         bytes.extend_from_slice(&[self.version]);
@@ -102,7 +236,7 @@ impl TokenMetadata {
         bytes.extend_from_slice(&self.primary_sale_date.to_le_bytes());
 
         if bytes.len() != TOKEN_METADATA_DATA_SIZE {
-            panic!("Invalid Token Definition data");
+            panic!("Invalid Token Definition data length");
         }
 
         Data::try_from(bytes).expect("Invalid data")
@@ -111,7 +245,7 @@ impl TokenMetadata {
     fn parse(data: &Data) -> Option<Self> {
         let data = Vec::<u8>::from(data.clone());
 
-        if data.len() != TOKEN_METADATA_DATA_SIZE {
+        if data.len() != TOKEN_METADATA_DATA_SIZE || data[0] >= NUMBER_OF_METADATA_TYPES {
             None
         } else {
             let account_type = data[0];
@@ -144,113 +278,6 @@ impl TokenMetadata {
     }
 }
 
-impl TokenDefinition {
-    fn into_data(self) -> Data {
-        let mut bytes = Vec::<u8>::new();
-        bytes.extend_from_slice(&[self.account_type]);
-        bytes.extend_from_slice(&self.name);
-        bytes.extend_from_slice(&self.total_supply.to_le_bytes());
-        bytes.extend_from_slice(&self.metadata_id.to_bytes());
-
-        if bytes.len() != TOKEN_DEFINITION_DATA_SIZE {
-            panic!("Invalid Token Definition data");
-        }
-
-        Data::try_from(bytes).expect("Invalid data")
-    }
-
-    //STATUS: TODO
-    fn parse(data: &Data) -> Option<Self> {
-        let data = Vec::<u8>::from(data.clone());
-
-        //TODO: TOKEN_DEFINITION_TYPE might be silly
-        //Should make sure it's a valid option
-        //Removed the check for data[0] check
-        //Can be included
-        if data.len() != TOKEN_DEFINITION_DATA_SIZE {
-            None
-        } else {
-            let account_type = data[0];
-            let name = data[1..7].try_into().unwrap();
-            let total_supply = u128::from_le_bytes(
-                data[7..23]
-                    .try_into()
-                    .expect("Total supply must be 16 bytes little-endian"),
-            );
-            let metadata_id = AccountId::new(
-                data[23..TOKEN_DEFINITION_DATA_SIZE]
-                    .try_into()
-                    .expect("Token Program expects valid Account Id for Metadata"),
-            );
-            Some(Self {
-                account_type,
-                name,
-                total_supply,
-                metadata_id,
-            })
-        }
-    }
-}
-
-impl TokenHolding {
-    //STATUS: TODO
-    //account type matters
-    fn new(definition_id: &AccountId) -> Self {
-        Self {
-            account_type: TOKEN_HOLDING_TYPE,
-            definition_id: definition_id.clone(),
-            balance: 0,
-        }
-    }
-
-    //STATUS: TODO
-    fn parse(data: &Data) -> Option<Self> {
-        let data = Vec::<u8>::from(data.clone());
-
-        //TODO: holding type matters
-        //e.g., royalties payments for NFTs?
-        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
-            return None;
-        }
-
-        let account_type = data[0];
-        let definition_id = AccountId::new(
-            data[1..33]
-                .try_into()
-                .expect("Defintion ID must be 32 bytes long"),
-        );
-        let balance = u128::from_le_bytes(
-            data[33..]
-                .try_into()
-                .expect("balance must be 16 bytes little-endian"),
-        );
-
-        Some(Self {
-            definition_id,
-            balance,
-            account_type,
-        })
-    }
-
-    //STATUS: fixed
-    fn into_data(self) -> Data {
-        let mut bytes = Vec::<u8>::new();
-        bytes.extend_from_slice(&[self.account_type]);
-        bytes.extend_from_slice(&self.definition_id.to_bytes());
-        bytes.extend_from_slice(&self.balance.to_le_bytes());
-
-        if bytes.len() != TOKEN_HOLDING_DATA_SIZE {
-            panic!("Invalid Token Holding data");
-        }
-
-        Data::try_from(bytes).expect("Invalid data")
-    }
-}
-
-//TODO: transfer for NFTs could/should have built in payments for royalties
-// This probably would need a different transfer program...
-// or branching logic
-// Minus royalties issue-> this function is fine
 fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<AccountPostState> {
     if pre_states.len() != 2 {
         panic!("Invalid number of input accounts");
@@ -309,8 +336,6 @@ fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<Ac
     vec![sender_post, recipient_post]
 }
 
-//TODO: use new_definition to only mint FungibleTokens
-// e.g. no Metadata
 fn new_definition(
     pre_states: &[AccountWithMetadata],
     name: [u8; 6],
@@ -332,7 +357,7 @@ fn new_definition(
     }
 
     let token_definition = TokenDefinition {
-        account_type: helper_token_standard_constructor(TokenStandard::FungibleTokenHolding),
+        account_type: helper_token_standard_constructor(TokenStandardEnum::FungibleToken),
         name,
         total_supply,
         metadata_id: AccountId::new([0; 32]),
@@ -361,9 +386,8 @@ fn new_definition_with_metadata(
     name: [u8; 6],
     total_supply: u128,
     token_standard: u8,
-    uri: &[u8; 200],
-    creators: &[u8; 250],
-    blockid: u64,
+    metadata_standard: u8,
+    metadata_values: &Data,
 ) -> Vec<AccountPostState> {
     if pre_states.len() != 3 {
         panic!("Invalid number of input accounts");
@@ -373,28 +397,24 @@ fn new_definition_with_metadata(
     let metadata_target_account = &pre_states[1];
     let holding_target_account = &pre_states[2];
 
-    //TODO test
     if definition_target_account.account != Account::default() {
         panic!("Definition target account must have default values");
     }
 
-    //TODO test
     if metadata_target_account.account != Account::default() {
         panic!("Metadata target account must have default values");
     }
 
-    //TODO test
     if holding_target_account.account != Account::default() {
         panic!("Holding target account must have default values");
     }
 
-    //TODO test
     if !valid_total_supply_for_token_standard(total_supply, token_standard) {
         panic!("Invalid total supply for the specified token supply");
     }
 
     let token_definition = TokenDefinition {
-        account_type: helper_token_standard_constructor(TokenStandard::FungibleTokenHolding),
+        account_type: token_standard,
         name,
         total_supply,
         metadata_id: metadata_target_account.account_id.clone(),
@@ -406,14 +426,24 @@ fn new_definition_with_metadata(
         balance: total_supply,
     };
 
-    //TODO: enforce with pda seed address
+    if metadata_values.len() != 450 {
+        panic!("Metadata values data should be 450 bytes");
+    }
+
+    let uri: [u8; 200] = metadata_values[0..200]
+        .try_into()
+        .expect("Token program expects valid uri for Metadata");
+    let creators: [u8; 250] = metadata_values[200..450]
+        .try_into()
+        .expect("Token program expects valid creators for Metadata");
+
     let token_metadata = TokenMetadata {
-        account_type: 0u8, //todo temp
-        version: 1u8,
+        account_type: metadata_standard,
+        version: CURRENT_VERSION,
         definition_id: definition_target_account.account_id.clone(),
-        uri: uri.clone(),
-        creators: creators.clone(),
-        primary_sale_date: blockid,
+        uri,
+        creators,
+        primary_sale_date: 0u64, //TODO: future works to implement this
     };
 
     let mut definition_target_account_post = definition_target_account.account.clone();
@@ -428,17 +458,18 @@ fn new_definition_with_metadata(
     vec![
         AccountPostState::new_claimed(definition_target_account_post),
         AccountPostState::new_claimed(holding_target_account_post),
+        AccountPostState::new_claimed(metadata_target_account_post),
     ]
 }
 
 fn valid_total_supply_for_token_standard(total_supply: u128, token_standard: u8) -> bool {
-    if token_standard == helper_token_standard_constructor(TokenStandard::NonFungibleHolding)
+    if token_standard == helper_token_standard_constructor(TokenStandardEnum::NonFungible)
         && total_supply != 1
     {
-        return false;
+        false
+    } else {
+        true
     }
-
-    true
 }
 
 fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostState> {
@@ -524,16 +555,14 @@ fn burn(pre_states: &[AccountWithMetadata], balance_to_burn: u128) -> Vec<Accoun
     ]
 }
 
-//TODO: temp
 fn is_mintable(account_type: u8) -> bool {
-    if account_type == helper_token_standard_constructor(TokenStandard::NonFungibleHolding) {
+    if account_type == helper_token_standard_constructor(TokenStandardEnum::NonFungible) {
         false
     } else {
         true
     }
 }
 
-// Status of function: fixed
 fn mint_additional_supply(
     pre_states: &[AccountWithMetadata],
     amount_to_mint: u128,
@@ -555,7 +584,6 @@ fn mint_additional_supply(
     let token_holding_values: TokenHolding = if token_holding.account == Account::default() {
         TokenHolding::new(&definition.account_id)
     } else {
-        //remove clone
         TokenHolding::parse(&token_holding.account.data).expect("Holding account must be valid")
     };
 
@@ -608,8 +636,8 @@ fn mint_additional_supply(
     vec![post_definition, token_holding_post]
 }
 
-type Instruction = [u8; 23];
-
+//TODO: add vars for 23 and 474
+type Instruction = Vec<u8>;
 fn main() {
     let ProgramInput {
         pre_states,
@@ -618,6 +646,10 @@ fn main() {
 
     let post_states = match instruction[0] {
         0 => {
+            if instruction.len() != 23 {
+                panic!("Invalid instruction length");
+            }
+
             // Parse instruction
             let total_supply = u128::from_le_bytes(
                 instruction[1..17]
@@ -633,6 +665,10 @@ fn main() {
             new_definition(&pre_states, name, total_supply)
         }
         1 => {
+            if instruction.len() != 23 {
+                panic!("Invalid instruction length");
+            }
+
             // Parse instruction
             let balance_to_move = u128::from_le_bytes(
                 instruction[1..17]
@@ -648,6 +684,10 @@ fn main() {
             transfer(&pre_states, balance_to_move)
         }
         2 => {
+            if instruction.len() != 23 {
+                panic!("Invalid instruction length");
+            }
+
             // Initialize account
             if instruction[1..] != [0; 22] {
                 panic!("Invalid instruction for initialize account");
@@ -655,6 +695,10 @@ fn main() {
             initialize_account(&pre_states)
         }
         3 => {
+            if instruction.len() != 23 {
+                panic!("Invalid instruction length");
+            }
+
             let balance_to_burn = u128::from_le_bytes(
                 instruction[1..17]
                     .try_into()
@@ -669,6 +713,10 @@ fn main() {
             burn(&pre_states, balance_to_burn)
         }
         4 => {
+            if instruction.len() != 23 {
+                panic!("Invalid instruction length");
+            }
+
             let balance_to_mint = u128::from_le_bytes(
                 instruction[1..17]
                     .try_into()
@@ -682,6 +730,20 @@ fn main() {
             // Execute
             mint_additional_supply(&pre_states, balance_to_mint)
         }
+        5 => {
+            if instruction.len() != 474 {
+                panic!("Invalid instruction length")
+            }
+
+            let total_supply = u128::from_le_bytes(instruction[1..17].try_into().expect("Total supply must be 16 bytes little-endian"),);
+            let name = instruction[17..23].try_into().expect("Name must be 6 bytes long");
+            assert_ne!(name, [0;6]);
+            let token_standard = instruction[23];
+            let metadata_standard = instruction[24];
+            let metadata_values: Data = Data::try_from(instruction[25..474].to_vec()).expect("Invalid metadata");
+
+            new_definition_with_metadata(&pre_states, name, total_supply, token_standard, metadata_standard, &metadata_values)
+        }
         _ => panic!("Invalid instruction"),
     };
 
@@ -693,10 +755,10 @@ mod tests {
     use nssa_core::account::{Account, AccountId, AccountWithMetadata, Data};
 
     use crate::{
-        TOKEN_DEFINITION_DATA_SIZE, TOKEN_DEFINITION_TYPE, TOKEN_HOLDING_DATA_SIZE,
-        TOKEN_HOLDING_TYPE, TokenDefinition, TokenHolding, TokenStandard, burn,
-        helper_token_standard_constructor, initialize_account, mint_additional_supply,
-        new_definition, transfer,
+        TOKEN_DEFINITION_DATA_SIZE, TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_TYPE, TokenDefinition,
+        TokenHolding, TokenStandardEnum, burn, helper_token_standard_constructor,
+        initialize_account, mint_additional_supply, new_definition, new_definition_with_metadata,
+        transfer,
     };
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -1126,10 +1188,10 @@ mod tests {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
-                        account_type: TOKEN_DEFINITION_TYPE,
+                        account_type: helper_token_standard_constructor(TokenStandardEnum::FungibleToken),
                         name: [2; 6],
                         total_supply: helper_balance_constructor(BalanceEnum::InitSupply),
-                        metadata_id: helper_id_constructor(IdEnum::MetadataId),
+                        metadata_id: AccountId::new([0;32]),
                     }),
                     nonce: 0,
                 },
@@ -1141,10 +1203,10 @@ mod tests {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
-                        account_type: TOKEN_DEFINITION_TYPE,
+                        account_type: helper_token_standard_constructor(TokenStandardEnum::FungibleToken),
                         name: [2; 6],
                         total_supply: helper_balance_constructor(BalanceEnum::InitSupply),
-                        metadata_id: helper_id_constructor(IdEnum::MetadataId),
+                        metadata_id: AccountId::new([0;32]),
                     }),
                     nonce: 0,
                 },
@@ -1212,10 +1274,10 @@ mod tests {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
-                        account_type: TOKEN_DEFINITION_TYPE,
+                        account_type: helper_token_standard_constructor(TokenStandardEnum::FungibleToken),
                         name: [2; 6],
                         total_supply: helper_balance_constructor(BalanceEnum::InitSupplyBurned),
-                        metadata_id: helper_id_constructor(IdEnum::MetadataId),
+                        metadata_id: AccountId::new([0;32]),
                     }),
                     nonce: 0,
                 },
@@ -1274,10 +1336,10 @@ mod tests {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
-                        account_type: TOKEN_DEFINITION_TYPE,
+                        account_type: helper_token_standard_constructor(TokenStandardEnum::FungibleToken),
                         name: [2; 6],
                         total_supply: helper_balance_constructor(BalanceEnum::InitSupplyMint),
-                        metadata_id: helper_id_constructor(IdEnum::MetadataId),
+                        metadata_id: AccountId::new([0;32]),
                     }),
                     nonce: 0,
                 },
@@ -1304,11 +1366,11 @@ mod tests {
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
                         account_type: helper_token_standard_constructor(
-                            TokenStandard::NonFungibleHolding,
+                            TokenStandardEnum::NonFungible,
                         ),
                         name: [2; 6],
                         total_supply: helper_balance_constructor(BalanceEnum::InitSupplyMint),
-                        metadata_id: helper_id_constructor(IdEnum::MetadataId),
+                        metadata_id: AccountId::new([0;32]),
                     }),
                     nonce: 0,
                 },
@@ -1571,4 +1633,223 @@ mod tests {
             helper_balance_constructor(BalanceEnum::MintSuccess),
         );
     }
+
+    #[should_panic(expected = "Invalid number of input accounts")]
+    #[test]
+    fn test_call_new_definition_metadata_with_invalid_number_of_accounts_1() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;450].to_vec()).unwrap();
+
+        let pre_states = vec![AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: true,
+            account_id: AccountId::new([1; 32]),
+        }];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
+    #[should_panic(expected = "Invalid number of input accounts")]
+    #[test]
+    fn test_call_new_definition_metadata_with_invalid_number_of_accounts_2() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;450].to_vec()).unwrap();
+
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
+    #[should_panic(expected = "Invalid number of input accounts")]
+    #[test]
+    fn test_call_new_definition_metadata_with_invalid_number_of_accounts_3() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;450].to_vec()).unwrap();
+
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([3; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([4; 32]),
+            },
+        ];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
+    #[should_panic(expected = "Definition target account must have default values")]
+    #[test]
+    fn test_call_new_definition_metadata_with_init_definition() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;450].to_vec()).unwrap();
+
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([3; 32]),
+            },
+        ];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
+    #[should_panic(expected ="Metadata target account must have default values")]
+    #[test]
+    fn test_call_new_definition_metadata_with_init_metadata() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;450].to_vec()).unwrap();
+
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            helper_account_constructor(AccountsEnum::HoldingSameDefMint), //TODO: change to a metadata account
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([3; 32]),
+            },
+        ];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
+    #[should_panic(expected ="Holding target account must have default values")]
+    #[test]
+    fn test_call_new_definition_metadata_with_init_holding() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;450].to_vec()).unwrap();
+
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+            helper_account_constructor(AccountsEnum::HoldingSameDefMint),
+        ];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
+    #[should_panic(expected ="Metadata values data should be 450 bytes")]
+    #[test]
+    fn test_call_new_definition_metadata_with_too_short_metadata_length() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;449].to_vec()).unwrap();
+
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([3; 32]),
+            },
+        ];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
+    #[should_panic(expected ="Metadata values data should be 450 bytes")]
+    #[test]
+    fn test_call_new_definition_metadata_with_too_long_metadata_length() {
+        let name = [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe];
+        let total_supply = 15u128;
+        let token_standard = 0u8;
+        let metadata_standard = 0u8;
+        let metadata_values: Data = Data::try_from([1u8;451].to_vec()).unwrap();
+
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([3; 32]),
+            },
+        ];
+        let _post_states = new_definition_with_metadata(&pre_states,  name, total_supply, token_standard, metadata_standard, &metadata_values);
+    }
+
 }
+
+/*
+    pre_states: &[AccountWithMetadata],
+    name: [u8; 6],
+    total_supply: u128,
+    token_standard: TokenStandardEnum,
+    metadata_standard: MetadataStandardEnum,
+    metadata_values: &Data,
+
+*/
