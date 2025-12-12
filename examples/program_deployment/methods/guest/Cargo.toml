@@ -1,0 +1,13 @@
+[package]
+name = "programs"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+risc0-zkvm = { version = "3.0.3", features = ['std'] }
+nssa-core = { path = "../../../../nssa/core" }
+serde = { version = "1.0.219", default-features = false }
+hex = "0.4.3"
+bytemuck = "1.24.0"
