@@ -48,7 +48,7 @@ borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
 
-rocksdb = { version = "0.21.0", default-features = false, features = [
+rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",
 ] }
 
