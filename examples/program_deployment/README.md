@@ -50,6 +50,9 @@ For convenience, export this path:
 export EXAMPLE_PROGRAMS_BUILD_DIR=$(pwd)/examples/program_deployment/methods/guest/target/riscv32im-risc0-zkvm-elf/docker
 ```
 
+> [!IMPORTANT]
+> **All remaining commands must be run from the `examples/program_deployment` directory.**
+
 # 3. Hello world example 
 
 The Hello world program reads an arbitrary sequence of bytes from its instruction and appends them to the data field of the input account.
