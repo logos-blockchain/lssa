@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 tokio = { workspace = true, features = ["macros"] }
 wallet = { path = "../../wallet" }
-nssa-core = {path = "../../nssa/core"}
+nssa-core = { path = "../../nssa/core" }
 nssa = { path = "../../nssa" }
 key_protocol = { path = "../../key_protocol/" }
 clap = "4.5.53"
