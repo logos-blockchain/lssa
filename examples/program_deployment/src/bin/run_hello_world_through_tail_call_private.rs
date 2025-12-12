@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
 use nssa::{
-    AccountId, ProgramId, PublicTransaction,
-    privacy_preserving_transaction::circuit::ProgramWithDependencies,
+    AccountId, ProgramId, privacy_preserving_transaction::circuit::ProgramWithDependencies,
     program::Program,
-    public_transaction::{Message, WitnessSet},
 };
 use wallet::{PrivacyPreservingAccount, WalletCore, helperfunctions::fetch_config};
 
