@@ -154,6 +154,12 @@ impl V02State {
             *current_account = post;
         }
 
+        // 5. Increment nonces for public signers
+        for account_id in tx.signer_account_ids() {
+            let current_account = self.get_account_by_id_mut(account_id);
+            current_account.nonce += 1;
+        }
+
         Ok(())
     }
 
@@ -272,7 +278,10 @@ pub mod tests {
         error::NssaError,
         execute_and_prove,
         privacy_preserving_transaction::{
-            PrivacyPreservingTransaction, circuit, message::Message, witness_set::WitnessSet,
+            PrivacyPreservingTransaction,
+            circuit::{self, ProgramWithDependencies},
+            message::Message,
+            witness_set::WitnessSet,
         },
         program::Program,
         public_transaction,
@@ -859,7 +868,7 @@ pub mod tests {
             &[0xdeadbeef],
             &[(recipient_keys.npk(), shared_secret)],
             &[],
-            &Program::authenticated_transfer_program(),
+            &Program::authenticated_transfer_program().into(),
         )
         .unwrap();
 
@@ -911,7 +920,7 @@ pub mod tests {
                 sender_keys.nsk,
                 state.get_proof_for_commitment(&sender_commitment).unwrap(),
             )],
-            &program,
+            &program.into(),
         )
         .unwrap();
 
@@ -963,7 +972,7 @@ pub mod tests {
                 sender_keys.nsk,
                 state.get_proof_for_commitment(&sender_commitment).unwrap(),
             )],
-            &program,
+            &program.into(),
         )
         .unwrap();
 
@@ -1176,7 +1185,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1202,7 +1211,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1228,7 +1237,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1254,7 +1263,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1282,7 +1291,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.to_owned().into(),
         );
 
         assert!(matches!(result, Err(NssaError::ProgramProveFailed(_))));
@@ -1308,7 +1317,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1343,7 +1352,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1369,7 +1378,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1404,7 +1413,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1441,7 +1450,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1482,7 +1491,7 @@ pub mod tests {
                 ),
             ],
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1516,7 +1525,7 @@ pub mod tests {
             &[0xdeadbeef1, 0xdeadbeef2],
             &private_account_keys,
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1557,7 +1566,7 @@ pub mod tests {
                 ),
             ],
             &private_account_auth,
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1605,7 +1614,7 @@ pub mod tests {
             &[0xdeadbeef1, 0xdeadbeef2],
             &private_account_keys,
             &private_account_auth,
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1651,7 +1660,7 @@ pub mod tests {
                 ),
             ],
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1698,7 +1707,7 @@ pub mod tests {
                 ),
             ],
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1744,7 +1753,7 @@ pub mod tests {
                 ),
             ],
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1790,7 +1799,7 @@ pub mod tests {
                 ),
             ],
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1834,7 +1843,7 @@ pub mod tests {
                 ),
             ],
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1863,7 +1872,7 @@ pub mod tests {
             &[],
             &[],
             &[],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1905,7 +1914,7 @@ pub mod tests {
                 ),
             ],
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1951,7 +1960,7 @@ pub mod tests {
             &[0xdeadbeef1, 0xdeadbeef2],
             &private_account_keys,
             &[(sender_keys.nsk, (0, vec![]))],
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -1997,7 +2006,7 @@ pub mod tests {
                 ),
             ],
             &private_account_auth,
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -2088,7 +2097,7 @@ pub mod tests {
                 (sender_keys.npk(), shared_secret),
             ],
             &private_account_auth,
-            &program,
+            &program.into(),
         );
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
@@ -2131,7 +2140,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_chained_call_succeeds() {
+    fn test_public_chained_call() {
         let program = Program::chain_caller();
         let key = PrivateKey::try_new([1; 32]).unwrap();
         let from = AccountId::from(&PublicKey::new_from_private_key(&key));
@@ -2308,6 +2317,128 @@ pub mod tests {
         let to_post = state.get_account_by_id(&to);
         assert_eq!(from_post.balance, initial_balance - amount);
         assert_eq!(to_post, expected_to_post);
+    }
+
+    #[test]
+    fn test_private_chained_call() {
+        // Arrange
+        let chain_caller = Program::chain_caller();
+        let auth_transfers = Program::authenticated_transfer_program();
+        let from_keys = test_private_account_keys_1();
+        let to_keys = test_private_account_keys_2();
+        let initial_balance = 100;
+        let from_account = AccountWithMetadata::new(
+            Account {
+                program_owner: auth_transfers.id(),
+                balance: initial_balance,
+                ..Account::default()
+            },
+            true,
+            &from_keys.npk(),
+        );
+        let to_account = AccountWithMetadata::new(
+            Account {
+                program_owner: auth_transfers.id(),
+                ..Account::default()
+            },
+            true,
+            &to_keys.npk(),
+        );
+
+        let from_commitment = Commitment::new(&from_keys.npk(), &from_account.account);
+        let to_commitment = Commitment::new(&to_keys.npk(), &to_account.account);
+        let mut state = V02State::new_with_genesis_accounts(
+            &[],
+            &[from_commitment.clone(), to_commitment.clone()],
+        )
+        .with_test_programs();
+        let amount: u128 = 37;
+        let instruction: (u128, ProgramId, u32, Option<PdaSeed>) = (
+            amount,
+            Program::authenticated_transfer_program().id(),
+            1,
+            None,
+        );
+
+        let from_esk = [3; 32];
+        let from_ss = SharedSecretKey::new(&from_esk, &from_keys.ivk());
+        let from_epk = EphemeralPublicKey::from_scalar(from_esk);
+
+        let to_esk = [3; 32];
+        let to_ss = SharedSecretKey::new(&to_esk, &to_keys.ivk());
+        let to_epk = EphemeralPublicKey::from_scalar(to_esk);
+
+        let mut dependencies = HashMap::new();
+
+        dependencies.insert(auth_transfers.id(), auth_transfers);
+        let program_with_deps = ProgramWithDependencies::new(chain_caller, dependencies);
+
+        let from_new_nonce = 0xdeadbeef1;
+        let to_new_nonce = 0xdeadbeef2;
+
+        let from_expected_post = Account {
+            balance: initial_balance - amount,
+            nonce: from_new_nonce,
+            ..from_account.account.clone()
+        };
+        let from_expected_commitment = Commitment::new(&from_keys.npk(), &from_expected_post);
+
+        let to_expected_post = Account {
+            balance: amount,
+            nonce: to_new_nonce,
+            ..to_account.account.clone()
+        };
+        let to_expected_commitment = Commitment::new(&to_keys.npk(), &to_expected_post);
+
+        // Act
+        let (output, proof) = execute_and_prove(
+            &[to_account, from_account],
+            &Program::serialize_instruction(instruction).unwrap(),
+            &[1, 1],
+            &[from_new_nonce, to_new_nonce],
+            &[(from_keys.npk(), to_ss), (to_keys.npk(), from_ss)],
+            &[
+                (
+                    from_keys.nsk,
+                    state.get_proof_for_commitment(&from_commitment).unwrap(),
+                ),
+                (
+                    to_keys.nsk,
+                    state.get_proof_for_commitment(&to_commitment).unwrap(),
+                ),
+            ],
+            &program_with_deps,
+        )
+        .unwrap();
+
+        let message = Message::try_from_circuit_output(
+            vec![],
+            vec![],
+            vec![
+                (to_keys.npk(), to_keys.ivk(), to_epk),
+                (from_keys.npk(), from_keys.ivk(), from_epk),
+            ],
+            output,
+        )
+        .unwrap();
+        let witness_set = WitnessSet::for_message(&message, proof, &[]);
+        let transaction = PrivacyPreservingTransaction::new(message, witness_set);
+
+        state
+            .transition_from_privacy_preserving_transaction(&transaction)
+            .unwrap();
+
+        // Assert
+        assert!(
+            state
+                .get_proof_for_commitment(&from_expected_commitment)
+                .is_some()
+        );
+        assert!(
+            state
+                .get_proof_for_commitment(&to_expected_commitment)
+                .is_some()
+        );
     }
 
     #[test]

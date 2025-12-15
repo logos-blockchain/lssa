@@ -54,10 +54,13 @@ fn main() {
     // Read input accounts.
     // It is expected to receive three accounts: [pinata_definition, pinata_token_holding,
     // winner_token_holding]
-    let ProgramInput {
-        pre_states,
-        instruction: solution,
-    } = read_nssa_inputs::<Instruction>();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction: solution,
+        },
+        instruction_words,
+    ) = read_nssa_inputs::<Instruction>();
 
     let [
         pinata_definition,
@@ -98,6 +101,7 @@ fn main() {
     }];
 
     write_nssa_outputs_with_chained_call(
+        instruction_words,
         vec![
             pinata_definition,
             pinata_token_holding,

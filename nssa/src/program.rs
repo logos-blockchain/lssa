@@ -14,7 +14,7 @@ use crate::{
 /// TODO: Make this variable when fees are implemented
 const MAX_NUM_CYCLES_PUBLIC_EXECUTION: u64 = 1024 * 1024 * 32; // 32M cycles
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Program {
     id: ProgramId,
     elf: Vec<u8>,

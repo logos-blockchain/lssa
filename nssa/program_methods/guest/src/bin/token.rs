@@ -1,24 +1,27 @@
 use nssa_core::{
-    account::{Account, AccountId, AccountWithMetadata, Data, data::DATA_MAX_LENGTH_IN_BYTES},
+    account::{Account, AccountId, AccountWithMetadata, Data},
     program::{
         AccountPostState, DEFAULT_PROGRAM_ID, ProgramInput, read_nssa_inputs, write_nssa_outputs,
     },
 };
 
 // The token program has three functions:
-// 1. New token definition. Arguments to this function are:
-//      * Two **default** accounts: [definition_account, holding_account]. The first default account
-//        will be initialized with the token definition account values. The second account will be
-//        initialized to a token holding account for the new token, holding the entire total supply.
-//      * An instruction data of 23-bytes, indicating the total supply and the token name, with the
-//        following layout: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)] The
-//        name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-// 2. Token transfer Arguments to this function are:
+// 1. New token definition.
+//    Arguments to this function are:
+//      * Two **default** accounts: [definition_account, holding_account].
+//        The first default account will be initialized with the token definition account values. The second account will
+//        be initialized to a token holding account for the new token, holding the entire total supply.
+//      * An instruction data of 23-bytes, indicating the total supply and the token name, with
+//        the following layout:
+//        [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
+//        The name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+// 2. Token transfer
+//    Arguments to this function are:
 //      * Two accounts: [sender_account, recipient_account].
-//      * An instruction data byte string of length 23, indicating the total supply with the
-//        following layout [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00
-//        || 0x00 || 0x00].
-// 3. Initialize account with zero balance Arguments to this function are:
+//      * An instruction data byte string of length 23, indicating the total supply with the following layout
+//        [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
+// 3. Initialize account with zero balance
+//    Arguments to this function are:
 //      * Two accounts: [definition_account, account_to_initialize].
 //      * An dummy byte string of length 23, with the following layout
 //        [0x02 || 0x00 || 0x00 || 0x00 || ... || 0x00 || 0x00].
@@ -37,11 +40,9 @@ use nssa_core::{
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;
 const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
-const _: () = assert!(TOKEN_DEFINITION_DATA_SIZE <= DATA_MAX_LENGTH_IN_BYTES);
 
 const TOKEN_HOLDING_TYPE: u8 = 1;
 const TOKEN_HOLDING_DATA_SIZE: usize = 49;
-const _: () = assert!(TOKEN_HOLDING_DATA_SIZE <= DATA_MAX_LENGTH_IN_BYTES);
 
 struct TokenDefinition {
     account_type: u8,
@@ -381,10 +382,13 @@ fn mint_additional_supply(
 type Instruction = [u8; 23];
 
 fn main() {
-    let ProgramInput {
-        pre_states,
-        instruction,
-    } = read_nssa_inputs::<Instruction>();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction,
+        },
+        instruction_words,
+    ) = read_nssa_inputs::<Instruction>();
 
     let post_states = match instruction[0] {
         0 => {
@@ -455,7 +459,7 @@ fn main() {
         _ => panic!("Invalid instruction"),
     };
 
-    write_nssa_outputs(pre_states, post_states);
+    write_nssa_outputs(instruction_words, pre_states, post_states);
 }
 
 #[cfg(test)]

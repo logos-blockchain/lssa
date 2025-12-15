@@ -61,7 +61,7 @@ impl AccountManager {
                 }
                 PrivacyPreservingAccount::PrivateOwned(account_id) => {
                     let pre = private_acc_preparation(wallet, account_id).await?;
-                    let mask = if pre.auth_acc.is_authorized { 1 } else { 2 };
+                    let mask = if pre.pre_state.is_authorized { 1 } else { 2 };
 
                     (State::Private(pre), mask)
                 }
@@ -72,7 +72,7 @@ impl AccountManager {
                         nsk: None,
                         npk,
                         ipk,
-                        auth_acc,
+                        pre_state: auth_acc,
                         proof: None,
                     };
 
@@ -95,7 +95,7 @@ impl AccountManager {
             .iter()
             .map(|state| match state {
                 State::Public { account, .. } => account.clone(),
-                State::Private(pre) => pre.auth_acc.clone(),
+                State::Private(pre) => pre.pre_state.clone(),
             })
             .collect()
     }
@@ -168,7 +168,7 @@ struct AccountPreparedData {
     nsk: Option<NullifierSecretKey>,
     npk: NullifierPublicKey,
     ipk: IncomingViewingPublicKey,
-    auth_acc: AccountWithMetadata,
+    pre_state: AccountWithMetadata,
     proof: Option<MembershipProof>,
 }
 
@@ -206,7 +206,7 @@ async fn private_acc_preparation(
         nsk,
         npk: from_npk,
         ipk: from_ipk,
-        auth_acc: sender_pre,
+        pre_state: sender_pre,
         proof,
     })
 }

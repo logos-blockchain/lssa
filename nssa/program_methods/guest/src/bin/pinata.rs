@@ -44,10 +44,13 @@ impl Challenge {
 fn main() {
     // Read input accounts.
     // It is expected to receive only two accounts: [pinata_account, winner_account]
-    let ProgramInput {
-        pre_states,
-        instruction: solution,
-    } = read_nssa_inputs::<Instruction>();
+    let (
+        ProgramInput {
+            pre_states,
+            instruction: solution,
+        },
+        instruction_words,
+    ) = read_nssa_inputs::<Instruction>();
 
     let [pinata, winner] = match pre_states.try_into() {
         Ok(array) => array,
@@ -71,6 +74,7 @@ fn main() {
     winner_post.balance += PRIZE;
 
     write_nssa_outputs(
+        instruction_words,
         vec![pinata, winner],
         vec![
             AccountPostState::new(pinata_post),

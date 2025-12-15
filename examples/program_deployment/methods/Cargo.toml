@@ -1,0 +1,10 @@
+[package]
+name = "test-program-methods"
+version = "0.1.0"
+edition = "2024"
+
+[build-dependencies]
+risc0-build = { version = "3.0.3" }
+
+[package.metadata.risc0]
+methods = ["guest"]
