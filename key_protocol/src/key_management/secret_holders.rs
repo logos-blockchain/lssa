@@ -115,11 +115,77 @@ impl SecretSpendingKey {
             outgoing_viewing_secret_key: self.generate_outgoing_viewing_secret_key(),
         }
     }
+
+    pub fn generate_child_nullifier_secret_key(&self, cci: u32) -> NullifierSecretKey {
+        let mut key = vec![];
+        key.extend_from_slice(b"NSSAchain");
+
+        let mut input = vec![];
+
+        input.extend_from_slice(&self.0);
+        input.extend_from_slice(&[1u8]);
+        input.extend_from_slice(&cci.to_le_bytes());
+        input.extend_from_slice(&[0u8;22]);
+
+        let hash_value = hmac_sha512::HMAC::mac(input, key);
+
+    
+        *hash_value
+            .first_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get first 32")    
+    }
+
+    pub fn generate_child_incoming_viewing_secret_key(&self, cci: u32) -> IncomingViewingSecretKey {
+        let mut key = vec![];
+        key.extend_from_slice(b"NSSAchain");
+
+        let mut input = vec![];
+
+        input.extend_from_slice(&self.0);
+        input.extend_from_slice(&[2u8]);
+        input.extend_from_slice(&cci.to_le_bytes());
+        input.extend_from_slice(&[0u8;22]);
+
+        let hash_value = hmac_sha512::HMAC::mac(input, key);
+
+    
+        *hash_value
+            .first_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get first 32")    
+    }
+
+    pub fn generate_child_outgoing_viewing_secret_key(&self, cci: u32) -> OutgoingViewingSecretKey {
+        let mut key = vec![];
+        key.extend_from_slice(b"NSSAchain");
+
+        let mut input = vec![];
+
+        input.extend_from_slice(&self.0);
+        input.extend_from_slice(&[3u8]);
+        input.extend_from_slice(&cci.to_le_bytes());
+        input.extend_from_slice(&[0u8;22]);
+
+        let hash_value = hmac_sha512::HMAC::mac(input, key);
+
+    
+        *hash_value
+            .first_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get first 32")    
+    }
 }
 
 impl PrivateKeyHolder {
     pub fn generate_nullifier_public_key(&self) -> NullifierPublicKey {
-        (&self.nullifier_secret_key).into()
+        let mut hasher = sha2::Sha256::new();
+
+        hasher.update("NSSA_keys");
+        hasher.update(self.nullifier_secret_key);
+        hasher.update([7u8]);
+        hasher.update([0u8; 22]);
+
+        NullifierPublicKey {
+            0: <HashType>::from(hasher.finalize_fixed())
+        }
     }
 
     pub fn generate_incoming_viewing_public_key(&self) -> IncomingViewingPublicKey {

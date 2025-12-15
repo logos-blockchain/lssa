@@ -1,6 +1,8 @@
 use k256::{Scalar, elliptic_curve::PrimeField};
-use nssa_core::encryption::IncomingViewingPublicKey;
+use nssa_core::{NullifierPublicKey, encryption::IncomingViewingPublicKey};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, digest::FixedOutput};
+use common::HashType;
 
 use crate::key_management::{
     KeyChain,
@@ -33,7 +35,20 @@ impl KeyNode for ChildKeysPrivate {
         let isk = ssk.generate_incoming_viewing_secret_key();
         let ovk = ssk.generate_outgoing_viewing_secret_key();
 
-        let npk = (&nsk).into();
+
+        let npk: NullifierPublicKey = { 
+            let mut hasher = sha2::Sha256::new();
+
+            hasher.update("NSSA_keys");
+            hasher.update(nsk);
+            hasher.update([7u8]);
+            hasher.update([0u8; 22]);
+
+            NullifierPublicKey {
+            0: <HashType>::from(hasher.finalize_fixed())
+            }
+        };
+
         let ipk = IncomingViewingPublicKey::from_scalar(isk);
 
         Self {
@@ -56,6 +71,7 @@ impl KeyNode for ChildKeysPrivate {
     }
 
     fn nth_child(&self, cci: u32) -> Self {
+        // parent_pt = ovk_par + scalar(nsk_par)*isk_par
         let parent_pt = Scalar::from_repr(
             self.value
                 .0
@@ -91,11 +107,24 @@ impl KeyNode for ChildKeysPrivate {
             .last_chunk::<32>()
             .expect("hash_value is 64 bytes, must be safe to get last 32");
 
-        let nsk = ssk.generate_nullifier_secret_key();
-        let isk = ssk.generate_incoming_viewing_secret_key();
-        let ovk = ssk.generate_outgoing_viewing_secret_key();
+        let nsk = ssk.generate_child_nullifier_secret_key(cci);
+        let isk = ssk.generate_child_incoming_viewing_secret_key(cci);
+        let ovk = ssk.generate_child_outgoing_viewing_secret_key(cci);
 
-        let npk = (&nsk).into();
+        //TODO: separate out into its own function
+        let npk: NullifierPublicKey = {
+            let mut hasher = sha2::Sha256::new();
+
+            hasher.update("NSSAchain");
+            hasher.update(nsk);
+            hasher.update([7u8]);
+            hasher.update([0u8; 22]);
+
+            NullifierPublicKey {
+                0: <HashType>::from(hasher.finalize_fixed())
+            }
+        };
+
         let ipk = IncomingViewingPublicKey::from_scalar(isk);
 
         Self {
