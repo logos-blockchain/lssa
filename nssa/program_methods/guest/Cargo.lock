@@ -1575,6 +1575,7 @@ name = "nssa-core"
 version = "0.1.0"
 dependencies = [
  "borsh",
+ "bytemuck",
  "chacha20",
  "risc0-zkvm",
  "serde",
