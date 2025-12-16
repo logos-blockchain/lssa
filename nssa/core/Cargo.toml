@@ -7,7 +7,7 @@ edition = "2024"
 risc0-zkvm = { version = "3.0.3", features = ['std'] }
 serde = { version = "1.0", default-features = false }
 thiserror = { version = "2.0.12" }
-bytemuck = { version = "1.13" }
+bytemuck = "1.24.0"
 chacha20 = { version = "0.9", default-features = false }
 k256 = { version = "0.13.3", optional = true }
 base58 = { version = "0.2.0", optional = true }

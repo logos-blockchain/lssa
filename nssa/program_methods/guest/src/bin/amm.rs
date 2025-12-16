@@ -73,7 +73,7 @@ struct PoolDefinition{
 }
 
 impl PoolDefinition {
-    fn into_data(self) -> Vec<u8> {
+    fn into_data(self) -> Data {
         let mut bytes = [0; POOL_DEFINITION_DATA_SIZE];
         bytes[0..32].copy_from_slice(&self.definition_token_a_id.to_bytes());
         bytes[32..64].copy_from_slice(&self.definition_token_b_id.to_bytes());
@@ -85,7 +85,11 @@ impl PoolDefinition {
         bytes[192..208].copy_from_slice(&self.reserve_b.to_le_bytes());
         bytes[208..224].copy_from_slice(&self.fees.to_le_bytes());
         bytes[224] = self.active as u8;
-        bytes.into()
+
+        bytes
+            .to_vec()
+            .try_into()
+            .expect("225 bytes should fit into Data")
     }
 
     fn parse(data: &[u8]) -> Option<Self> {
@@ -144,13 +148,17 @@ struct TokenHolding {
 }
 
 impl TokenDefinition {
-    fn into_data(self) -> Vec<u8> {
+    fn into_data(self) -> Data {
         let mut bytes = [0; TOKEN_DEFINITION_DATA_SIZE];
         bytes[0] = self.account_type;
         bytes[1..7].copy_from_slice(&self.name);
         bytes[7..].copy_from_slice(&self.total_supply.to_le_bytes());
-        bytes.into()
+        bytes
+            .to_vec()
+            .try_into()
+            .expect("23 bytes should fit into Data")
     }
+
 
     fn parse(data: &[u8]) -> Option<Self> {
         if data.len() != TOKEN_DEFINITION_DATA_SIZE || data[0] != TOKEN_DEFINITION_TYPE {
@@ -209,17 +217,21 @@ impl TokenHolding {
         bytes[0] = self.account_type;
         bytes[1..33].copy_from_slice(&self.definition_id.to_bytes());
         bytes[33..].copy_from_slice(&self.balance.to_le_bytes());
-        bytes.to_vec().try_into().expect("Data too big")
+        
+        bytes
+            .to_vec()
+            .try_into()
+            .expect("49 bytes should fit into Data")
     }
 }
 
 
 type Instruction = Vec<u8>;
 fn main() {
-    let ( ProgramInput {
+    let (ProgramInput {
         pre_states,
         instruction,
-    }, instruction_data) = read_nssa_inputs::<Instruction>();
+    }, instruction_words) = read_nssa_inputs::<Instruction>();
 
     let (post_states, chained_calls) = match instruction[0] {
         0 => {
@@ -266,7 +278,7 @@ fn main() {
         _ => panic!("Invalid instruction"),
     };
 
-    write_nssa_outputs_with_chained_call(instruction_data, pre_states, post_states, chained_calls);
+    write_nssa_outputs_with_chained_call(instruction_words, pre_states, post_states, chained_calls);
 }
 
 

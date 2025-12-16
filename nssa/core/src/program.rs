@@ -20,8 +20,8 @@ pub struct ProgramInput<T> {
 /// Each program can derive up to `2^256` unique account IDs by choosing different
 /// seeds. PDAs allow programs to control namespaced account identifiers without
 /// collisions between programs.
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, Eq))]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug))]
 pub struct PdaSeed([u8; 32]);
 
 impl PdaSeed {
@@ -51,8 +51,8 @@ impl From<(&ProgramId, &PdaSeed)> for AccountId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, Eq))]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug,))]
 pub struct ChainedCall {
     /// The program ID of the program to execute
     pub program_id: ProgramId,
