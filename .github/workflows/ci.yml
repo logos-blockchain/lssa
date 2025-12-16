@@ -17,7 +17,7 @@ jobs:
   fmt-rs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
       - name: Install nightly toolchain for rustfmt
         run: rustup install nightly --profile minimal --component rustfmt
@@ -28,7 +28,7 @@ jobs:
   fmt-toml:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
       - name: Install taplo-cli
         run: cargo install --locked taplo-cli
@@ -39,7 +39,7 @@ jobs:
   machete:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
       - name: Install active toolchain
         run: rustup install
@@ -56,7 +56,7 @@ jobs:
 
     name: lint
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
       - uses: ./.github/actions/install-system-deps
 
@@ -81,7 +81,7 @@ jobs:
 
     name: test
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
       - uses: ./.github/actions/install-system-deps
 
