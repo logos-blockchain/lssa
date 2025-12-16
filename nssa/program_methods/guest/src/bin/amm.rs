@@ -55,6 +55,7 @@ use nssa_core::{
 //      * compute_pool_pda_seed: token definitions for the pool pair
 //      * compute_vault_pda_seed: pool definition id, definition token id,
 //      * compute_liquidity_token_pda_seed: pool definition id
+//
 
 const POOL_DEFINITION_DATA_SIZE: usize = 225;
 

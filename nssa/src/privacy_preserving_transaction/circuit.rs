@@ -216,7 +216,7 @@ mod tests {
             &Program::serialize_instruction(balance_to_move).unwrap(),
             &[0, 2],
             &[0xdeadbeef],
-            &[(recipient_keys.npk(), shared_secret.clone())],
+            &[(recipient_keys.npk(), shared_secret)],
             &[],
             &Program::authenticated_transfer_program().into(),
         )
@@ -312,8 +312,8 @@ mod tests {
             &[1, 2],
             &[0xdeadbeef1, 0xdeadbeef2],
             &[
-                (sender_keys.npk(), shared_secret_1.clone()),
-                (recipient_keys.npk(), shared_secret_2.clone()),
+                (sender_keys.npk(), shared_secret_1),
+                (recipient_keys.npk(), shared_secret_2),
             ],
             &[(
                 sender_keys.nsk,

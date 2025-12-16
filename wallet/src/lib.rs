@@ -280,7 +280,7 @@ impl WalletCore {
             &produce_random_nonces(private_account_keys.len()),
             &private_account_keys
                 .iter()
-                .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
+                .map(|keys| (keys.npk.clone(), keys.ssk))
                 .collect::<Vec<_>>(),
             &acc_manager.private_account_auth(),
             &program.to_owned().into(),

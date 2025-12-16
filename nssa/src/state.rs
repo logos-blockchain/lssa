@@ -2094,7 +2094,7 @@ pub mod tests {
             &visibility_mask,
             &[0xdeadbeef1, 0xdeadbeef2],
             &[
-                (sender_keys.npk(), shared_secret.clone()),
+                (sender_keys.npk(), shared_secret),
                 (sender_keys.npk(), shared_secret),
             ],
             &private_account_auth,
@@ -2288,12 +2288,12 @@ pub mod tests {
         let mut i: usize = 0;
         let (token_1, token_2) = loop {
             if definition_token_a_id.value()[i] > definition_token_b_id.value()[i] {
-                let token_1 = definition_token_a_id.clone();
-                let token_2 = definition_token_b_id.clone();
+                let token_1 = definition_token_a_id;
+                let token_2 = definition_token_b_id;
                 break (token_1, token_2);
             } else if definition_token_a_id.value()[i] < definition_token_b_id.value()[i] {
-                let token_1 = definition_token_b_id.clone();
-                let token_2 = definition_token_a_id.clone();
+                let token_1 = definition_token_b_id;
+                let token_2 = definition_token_a_id;
                 break (token_1, token_2);
             }
 
@@ -2396,6 +2396,7 @@ pub mod tests {
                 .expect("225 bytes should fit into Data")
         }
 
+        #[allow(unused)]
         fn parse(data: &[u8]) -> Option<Self> {
             if data.len() != POOL_DEFINITION_DATA_SIZE {
                 None
@@ -2531,6 +2532,7 @@ pub mod tests {
         UserTokenBHoldingNewDef,
     }
 
+    #[allow(clippy::enum_variant_names)]
     enum IdEnum {
         PoolDefinitionId,
         TokenLPDefinitionId,
@@ -2543,6 +2545,7 @@ pub mod tests {
         VaultBId,
     }
 
+    #[allow(clippy::enum_variant_names)]
     enum PrivateKeysEnum {
         UserTokenAKey,
         UserTokenBKey,
@@ -2680,9 +2683,7 @@ pub mod tests {
                     reserve_b: helper_balances_constructor(BalancesEnum::VaultBBalanceInit),
                     fees: 0u128,
                     active: true,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::TokenADefinitionAcc => Account {
@@ -2692,9 +2693,7 @@ pub mod tests {
                     account_type: 0u8,
                     name: [1u8; 6],
                     total_supply: helper_balances_constructor(BalancesEnum::TokenASupply),
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::TokenBDefinitionAcc => Account {
@@ -2704,9 +2703,7 @@ pub mod tests {
                     account_type: 0u8,
                     name: [1u8; 6],
                     total_supply: helper_balances_constructor(BalancesEnum::TokenBSupply),
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::TokenLPDefinitionAcc => Account {
@@ -2716,9 +2713,7 @@ pub mod tests {
                     account_type: 0u8,
                     name: [1u8; 6],
                     total_supply: helper_balances_constructor(BalancesEnum::TokenLPSupply),
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::VaultAInit => Account {
@@ -2787,9 +2782,7 @@ pub mod tests {
                     reserve_b: helper_balances_constructor(BalancesEnum::VaultBBalanceSwap1),
                     fees: 0u128,
                     active: true,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::UserTokenAHoldingSwap1 => Account {
@@ -2848,9 +2841,7 @@ pub mod tests {
                     reserve_b: helper_balances_constructor(BalancesEnum::VaultBBalanceSwap2),
                     fees: 0u128,
                     active: true,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::UserTokenAHoldingSwap2 => Account {
@@ -2909,9 +2900,7 @@ pub mod tests {
                     reserve_b: helper_balances_constructor(BalancesEnum::VaultBBalanceAdd),
                     fees: 0u128,
                     active: true,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::UserTokenAHoldingAdd => Account {
@@ -2951,9 +2940,7 @@ pub mod tests {
                     account_type: 0u8,
                     name: [1u8; 6],
                     total_supply: helper_balances_constructor(BalancesEnum::TokenLPSupplyAdd),
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::VaultARemove => Account {
@@ -2992,9 +2979,7 @@ pub mod tests {
                     reserve_b: helper_balances_constructor(BalancesEnum::VaultBBalanceRemove),
                     fees: 0u128,
                     active: true,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::UserTokenAHoldingRemove => Account {
@@ -3034,9 +3019,7 @@ pub mod tests {
                     account_type: 0u8,
                     name: [1u8; 6],
                     total_supply: helper_balances_constructor(BalancesEnum::TokenLPSupplyRemove),
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::TokenLPDefinitionInitInactive => Account {
@@ -3046,9 +3029,7 @@ pub mod tests {
                     account_type: 0u8,
                     name: [1u8; 6],
                     total_supply: 0,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::VaultAInitInactive => Account {
@@ -3085,9 +3066,7 @@ pub mod tests {
                     reserve_b: 0,
                     fees: 0u128,
                     active: false,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::UserTokenAHoldingNewInit => Account {
@@ -3127,9 +3106,7 @@ pub mod tests {
                     account_type: 0u8,
                     name: [1u8; 6],
                     total_supply: helper_balances_constructor(BalancesEnum::VaultABalanceInit),
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::PoolDefinitionNewInit => Account {
@@ -3148,9 +3125,7 @@ pub mod tests {
                     reserve_b: helper_balances_constructor(BalancesEnum::VaultBBalanceInit),
                     fees: 0u128,
                     active: true,
-                })
-                .try_into()
-                .expect("Data too big"),
+                }),
                 nonce: 0,
             },
             AccountsEnum::UserTokenLPHoldingInitZero => Account {

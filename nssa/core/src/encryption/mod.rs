@@ -16,7 +16,7 @@ use crate::{Commitment, account::Account};
 
 pub type Scalar = [u8; 32];
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct SharedSecretKey(pub [u8; 32]);
 
 pub struct EncryptionScheme;
