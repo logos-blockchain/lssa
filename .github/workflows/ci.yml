@@ -36,6 +36,20 @@ jobs:
       - name: Check TOML files are formatted
         run: taplo fmt --check .
 
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install active toolchain
+        run: rustup install
+
+      - name: Install cargo-machete
+        run: cargo install cargo-machete
+
+      - name: Check for unused dependencies
+        run: cargo machete
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 60

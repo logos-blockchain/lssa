@@ -7,4 +7,3 @@ edition = "2024"
 nssa_core.workspace = true
 
 risc0-zkvm.workspace = true
-serde = { workspace = true, default-features = false }

@@ -4,11 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-nssa_core.workspace = true
 nssa.workspace = true
 wallet.workspace = true
-key_protocol.workspace = true
 
 tokio = { workspace = true, features = ["macros"] }
 clap.workspace = true
-serde.workspace = true
