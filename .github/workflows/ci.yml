@@ -14,25 +14,83 @@ on:
 name: General
 
 jobs:
-  ubuntu-latest-pipeline:
+  fmt-rs:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-
-    name: ubuntu-latest-pipeline
     steps:
       - uses: actions/checkout@v3
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential clang libclang-dev libssl-dev pkg-config
-
-      - name: Install active toolchain
-        run: rustup install
 
       - name: Install nightly toolchain for rustfmt
         run: rustup install nightly --profile minimal --component rustfmt
 
-      - name: lint - ubuntu-latest
-        run: chmod 777 ./ci_scripts/lint-ubuntu.sh && ./ci_scripts/lint-ubuntu.sh
-      - name: test ubuntu-latest
-        if: success() || failure()
-        run: chmod 777 ./ci_scripts/test-ubuntu.sh && ./ci_scripts/test-ubuntu.sh
+      - name: Check Rust files are formatted
+        run: cargo +nightly fmt --check
+
+  fmt-toml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install taplo-cli
+        run: cargo install --locked taplo-cli
+
+      - name: Check TOML files are formatted
+        run: taplo fmt --check .
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    name: lint
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/install-system-deps
+
+      - uses: ./.github/actions/install-risc0
+
+      - name: Install active toolchain
+        run: rustup install
+
+      - name: Lint workspace
+        env:
+          RISC0_SKIP_BUILD: "1"
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Lint programs
+        env:
+          RISC0_SKIP_BUILD: "1"
+        run: cargo clippy -p "*programs" -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    name: test
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/install-system-deps
+
+      - uses: ./.github/actions/install-risc0
+
+      - name: Install active toolchain
+        run: rustup install
+
+      - name: Unit tests
+        env:
+          RISC0_DEV_MODE: "1"
+        run: cargo test --workspace --features no_docker
+
+      - name: Test valid proof
+        env:
+          NSSA_WALLET_HOME_DIR: ./integration-tests/configs/debug/wallet
+          RUST_LOG: "info"
+        run: cargo run --bin integration-tests -- ./integration-tests/configs/debug/ test_success_private_transfer_to_another_owned_account
+
+      - name: Integration tests
+        env:
+          NSSA_WALLET_HOME_DIR: ./integration-tests/configs/debug/wallet
+          RUST_LOG: "info"
+          RISC0_DEV_MODE: "1"
+        run: cargo run --bin integration-tests -- ./integration-tests/configs/debug/ all
+
