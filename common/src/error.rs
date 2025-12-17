@@ -1,3 +1,4 @@
+use nssa::AccountId;
 use serde::Deserialize;
 
 use crate::rpc_primitives::errors::RpcError;
@@ -49,4 +50,6 @@ pub enum ExecutionFailureKind {
     SequencerClientError(#[from] SequencerClientError),
     #[error("Can not pay for operation")]
     InsufficientFundsError,
+    #[error("Account {0} data is invalid")]
+    AccountDataError(AccountId),
 }

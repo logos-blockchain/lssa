@@ -1,30 +1,43 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::{AccountId, program::Program};
 use nssa_core::{SharedSecretKey, program::InstructionData};
-use serde::Serialize;
 
-use crate::{PrivacyPreservingAccount, WalletCore};
+use crate::{PrivacyPreservingAccount, WalletCore, cli::account::TokenHolding};
 
-struct OrphanHack65BytesInput([u8; 65]);
+struct OrphanHack65BytesInput([u32; 65]);
 
-impl Serialize for OrphanHack65BytesInput {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_bytes(&self.0)
+impl OrphanHack65BytesInput {
+    fn expand(orig: [u8; 65]) -> Self {
+        let mut res = [0u32; 65];
+
+        for (idx, val) in orig.into_iter().enumerate() {
+            res[idx] = val as u32;
+        }
+
+        Self(res)
     }
+
+    fn words(&self) -> Vec<u32> {
+        self.0.to_vec()
+    } 
 }
 
-struct OrphanHack49BytesInput([u8; 49]);
+struct OrphanHack49BytesInput([u32; 49]);
 
-impl Serialize for OrphanHack49BytesInput {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_bytes(&self.0)
+impl OrphanHack49BytesInput {
+    fn expand(orig: [u8; 49]) -> Self {
+        let mut res = [0u32; 49];
+
+        for (idx, val) in orig.into_iter().enumerate() {
+            res[idx] = val as u32;
+        }
+
+        Self(res)
     }
+
+    fn words(&self) -> Vec<u32> {
+        self.0.to_vec()
+    } 
 }
 
 pub struct AMM<'w>(pub &'w WalletCore);
@@ -33,17 +46,91 @@ impl AMM<'_> {
     #[allow(clippy::too_many_arguments)]
     pub async fn send_new_amm_definition(
         &self,
-        _amm_pool: PrivacyPreservingAccount,
-        _vault_holding_a: PrivacyPreservingAccount,
-        _vault_holding_b: PrivacyPreservingAccount,
-        _pool_lp: PrivacyPreservingAccount,
-        _user_holding_a: PrivacyPreservingAccount,
-        _user_holding_b: PrivacyPreservingAccount,
-        _user_holding_lp: PrivacyPreservingAccount,
-        _balance_a: u128,
-        _balance_b: u128,
+        amm_pool: PrivacyPreservingAccount,
+        vault_holding_a: PrivacyPreservingAccount,
+        vault_holding_b: PrivacyPreservingAccount,
+        pool_lp: PrivacyPreservingAccount,
+        user_holding_a: PrivacyPreservingAccount,
+        user_holding_b: PrivacyPreservingAccount,
+        user_holding_lp: PrivacyPreservingAccount,
+        balance_a: u128,
+        balance_b: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
-        todo!()
+        let (instruction, program) = amm_program_preparation_definition(balance_a, balance_b);
+
+        match (
+            amm_pool,
+            vault_holding_a,
+            vault_holding_b,
+            pool_lp,
+            user_holding_a,
+            user_holding_b,
+            user_holding_lp,
+        ) {
+            (
+                PrivacyPreservingAccount::Public(amm_pool),
+                PrivacyPreservingAccount::Public(vault_holding_a),
+                PrivacyPreservingAccount::Public(vault_holding_b),
+                PrivacyPreservingAccount::Public(pool_lp),
+                PrivacyPreservingAccount::Public(user_holding_a),
+                PrivacyPreservingAccount::Public(user_holding_b),
+                PrivacyPreservingAccount::Public(user_holding_lp),
+            ) => {
+                let account_ids = vec![
+                    amm_pool,
+                    vault_holding_a,
+                    vault_holding_b,
+                    pool_lp,
+                    user_holding_a,
+                    user_holding_b,
+                    user_holding_lp,
+                ];
+
+                let Ok(nonces) = self
+                    .0
+                    .get_accounts_nonces(vec![user_holding_a, user_holding_b])
+                    .await
+                else {
+                    return Err(ExecutionFailureKind::SequencerError);
+                };
+
+                let Some(signing_key_a) = self
+                    .0
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&user_holding_a)
+                else {
+                    return Err(ExecutionFailureKind::KeyNotFoundError);
+                };
+
+                let Some(signing_key_b) = self
+                    .0
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&user_holding_b)
+                else {
+                    return Err(ExecutionFailureKind::KeyNotFoundError);
+                };
+
+                let message = nssa::public_transaction::Message::try_new(
+                    program.id(),
+                    account_ids,
+                    nonces,
+                    instruction,
+                )
+                .unwrap();
+
+                let witness_set = nssa::public_transaction::WitnessSet::for_message(
+                    &message,
+                    &[signing_key_a, signing_key_b],
+                );
+
+                let tx = nssa::PublicTransaction::new(message, witness_set);
+
+                Ok(self.0.sequencer_client.send_tx_public(tx).await?)
+            }
+            _ => unreachable!(),
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -99,18 +186,55 @@ impl AMM<'_> {
                     user_holding_b,
                 ];
 
-                // ToDo: Correct authorization
-                // ToDo: Also correct instruction serialization
+                let account_id_auth;
 
-                let message = nssa::public_transaction::Message::try_new(
+                // Checking, which account are associated with TokenDefinition
+                let token_holder_acc_a = self
+                    .0
+                    .get_account_public(user_holding_a)
+                    .await
+                    .map_err(|_| ExecutionFailureKind::SequencerError)?;
+                let token_holder_acc_b = self
+                    .0
+                    .get_account_public(user_holding_b)
+                    .await
+                    .map_err(|_| ExecutionFailureKind::SequencerError)?;
+
+                let token_holder_a = TokenHolding::parse(&token_holder_acc_a.data)
+                    .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?;
+                let token_holder_b = TokenHolding::parse(&token_holder_acc_b.data)
+                    .ok_or(ExecutionFailureKind::AccountDataError(user_holding_b))?;
+
+                if token_holder_a.definition_id == token_definition_id {
+                    account_id_auth = user_holding_a;
+                } else if token_holder_b.definition_id == token_definition_id {
+                    account_id_auth = user_holding_b;
+                } else {
+                    return Err(ExecutionFailureKind::AccountDataError(token_definition_id));
+                }
+
+                let Ok(nonces) = self.0.get_accounts_nonces(vec![account_id_auth]).await else {
+                    return Err(ExecutionFailureKind::SequencerError);
+                };
+
+                let Some(signing_key) = self
+                    .0
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&account_id_auth)
+                else {
+                    return Err(ExecutionFailureKind::KeyNotFoundError);
+                };
+
+                let message = nssa::public_transaction::Message::new_preserialized(
                     program.id(),
                     account_ids,
-                    vec![],
+                    nonces,
                     instruction,
-                )
-                .unwrap();
+                );
 
-                let witness_set = nssa::public_transaction::WitnessSet::for_message(&message, &[]);
+                let witness_set =
+                    nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
 
                 let tx = nssa::PublicTransaction::new(message, witness_set);
 
@@ -218,18 +342,44 @@ impl AMM<'_> {
                     user_holding_lp,
                 ];
 
-                // ToDo: Correct authorization
-                // ToDo: Also correct instruction serialization
+                let Ok(nonces) = self
+                    .0
+                    .get_accounts_nonces(vec![user_holding_a, user_holding_b])
+                    .await
+                else {
+                    return Err(ExecutionFailureKind::SequencerError);
+                };
+
+                let Some(signing_key_a) = self
+                    .0
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&user_holding_a)
+                else {
+                    return Err(ExecutionFailureKind::KeyNotFoundError);
+                };
+
+                let Some(signing_key_b) = self
+                    .0
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&user_holding_b)
+                else {
+                    return Err(ExecutionFailureKind::KeyNotFoundError);
+                };
 
                 let message = nssa::public_transaction::Message::try_new(
                     program.id(),
                     account_ids,
-                    vec![],
+                    nonces,
                     instruction,
                 )
                 .unwrap();
 
-                let witness_set = nssa::public_transaction::WitnessSet::for_message(&message, &[]);
+                let witness_set = nssa::public_transaction::WitnessSet::for_message(
+                    &message,
+                    &[signing_key_a, signing_key_b],
+                );
 
                 let tx = nssa::PublicTransaction::new(message, witness_set);
 
@@ -343,18 +493,44 @@ impl AMM<'_> {
                     user_holding_lp,
                 ];
 
-                // ToDo: Correct authorization
-                // ToDo: Also correct instruction serialization
+                let Ok(nonces) = self
+                    .0
+                    .get_accounts_nonces(vec![user_holding_a, user_holding_b])
+                    .await
+                else {
+                    return Err(ExecutionFailureKind::SequencerError);
+                };
+
+                let Some(signing_key_a) = self
+                    .0
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&user_holding_a)
+                else {
+                    return Err(ExecutionFailureKind::KeyNotFoundError);
+                };
+
+                let Some(signing_key_b) = self
+                    .0
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&user_holding_b)
+                else {
+                    return Err(ExecutionFailureKind::KeyNotFoundError);
+                };
 
                 let message = nssa::public_transaction::Message::try_new(
                     program.id(),
                     account_ids,
-                    vec![],
+                    nonces,
                     instruction,
                 )
                 .unwrap();
 
-                let witness_set = nssa::public_transaction::WitnessSet::for_message(&message, &[]);
+                let witness_set = nssa::public_transaction::WitnessSet::for_message(
+                    &message,
+                    &[signing_key_a, signing_key_b],
+                );
 
                 let tx = nssa::PublicTransaction::new(message, witness_set);
 
@@ -431,7 +607,7 @@ fn amm_program_preparation_definition(
 ) -> (InstructionData, Program) {
     // An instruction data of 65-bytes, indicating the initial amm reserves' balances and
     // token_program_id with the following layout:
-    // [0x00 || array of balances (little-endian 16 bytes) || AMM_PROGRAM_ID)]
+    // [0x00 || array of balances (little-endian 16 bytes) || TOKEN_PROGRAM_ID)]
     let amm_program_id = Program::token().id();
 
     let mut instruction = [0; 65];
@@ -448,9 +624,8 @@ fn amm_program_preparation_definition(
     instruction[57..61].copy_from_slice(&amm_program_id[6].to_le_bytes());
     instruction[61..].copy_from_slice(&amm_program_id[7].to_le_bytes());
 
-    let instruction_data =
-        Program::serialize_instruction(OrphanHack65BytesInput(instruction)).unwrap();
-    let program = Program::token();
+    let instruction_data = OrphanHack65BytesInput::expand(instruction).words();
+    let program = Program::amm();
 
     (instruction_data, program)
 }
@@ -471,8 +646,8 @@ fn amm_program_preparation_swap(
     instruction[33..].copy_from_slice(&token_definition_id.to_bytes());
 
     let instruction_data =
-        Program::serialize_instruction(OrphanHack65BytesInput(instruction)).unwrap();
-    let program = Program::token();
+        OrphanHack65BytesInput::expand(instruction).words();
+    let program = Program::amm();
 
     (instruction_data, program)
 }
@@ -492,9 +667,8 @@ fn amm_program_preparation_add_liq(
     instruction[17..33].copy_from_slice(&max_amount_a.to_le_bytes());
     instruction[33..49].copy_from_slice(&max_amount_b.to_le_bytes());
 
-    let instruction_data =
-        Program::serialize_instruction(OrphanHack49BytesInput(instruction)).unwrap();
-    let program = Program::token();
+    let instruction_data = OrphanHack49BytesInput::expand(instruction).words();
+    let program = Program::amm();
 
     (instruction_data, program)
 }
@@ -514,9 +688,30 @@ fn amm_program_preparation_remove_liq(
     instruction[17..33].copy_from_slice(&max_amount_a.to_le_bytes());
     instruction[33..49].copy_from_slice(&max_amount_b.to_le_bytes());
 
-    let instruction_data =
-        Program::serialize_instruction(OrphanHack49BytesInput(instruction)).unwrap();
-    let program = Program::token();
+    let instruction_data = OrphanHack49BytesInput::expand(instruction).words();
+    let program = Program::amm();
 
     (instruction_data, program)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::program_facades::amm::OrphanHack65BytesInput;
+
+
+    #[test]
+    fn test_correct_ser() {
+        let mut arr = [0u8; 65];
+
+        for i in 0..64 {
+            arr[i] = i as u8;
+        }
+
+        let hack = OrphanHack65BytesInput::expand(arr);
+        let instruction_data = hack.words();
+
+        println!("{instruction_data:?}");
+
+        //assert_eq!(serialization_res_1, serialization_res_2);
+    }
 }

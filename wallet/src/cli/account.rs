@@ -25,10 +25,10 @@ struct TokenDefinition {
     total_supply: u128,
 }
 
-struct TokenHolding {
+pub struct TokenHolding {
     #[allow(unused)]
     account_type: u8,
-    definition_id: AccountId,
+    pub definition_id: AccountId,
     balance: u128,
 }
 
@@ -51,7 +51,7 @@ impl TokenDefinition {
 }
 
 impl TokenHolding {
-    fn parse(data: &[u8]) -> Option<Self> {
+    pub fn parse(data: &[u8]) -> Option<Self> {
         if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
             None
         } else {

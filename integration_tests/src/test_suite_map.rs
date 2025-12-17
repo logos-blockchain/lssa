@@ -23,8 +23,8 @@ use wallet::{
         account::{AccountSubcommand, NewSubcommand},
         config::ConfigSubcommand,
         programs::{
-            native_token_transfer::AuthTransferSubcommand, pinata::PinataProgramAgnosticSubcommand,
-            token::TokenProgramAgnosticSubcommand,
+            amm::AmmProgramAgnosticSubcommand, native_token_transfer::AuthTransferSubcommand,
+            pinata::PinataProgramAgnosticSubcommand, token::TokenProgramAgnosticSubcommand,
         },
     },
     config::PersistentStorage,
@@ -2031,6 +2031,198 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         assert_eq!(acc3.balance, 91);
         assert_eq!(acc4.balance, 114);
+
+        info!("Success!");
+    }
+
+    #[nssa_integration_test]
+    pub async fn test_amm_public() {
+        info!("########## test_amm_public ##########");
+        let wallet_config = fetch_config().await.unwrap();
+
+        // Create new account for the token definition
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: definition_account_id,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for the token supply holder
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: supply_account_id,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for receiving a token transaction
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: recipient_account_id_1,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for receiving a token transaction
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: recipient_account_id_2,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+
+        // Create new token
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_account_id: make_public_account_input_from_str(
+                &definition_account_id.to_string(),
+            ),
+            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
+
+        // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id_1`
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            to: Some(make_public_account_input_from_str(
+                &recipient_account_id_1.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id_2`
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            to: Some(make_public_account_input_from_str(
+                &recipient_account_id_2.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        info!("=================== SETUP FINISHED ===============");
+
+        // Create new AMM
+
+        // Setup accounts
+        // Create new account for the amm pool
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: amm_pool,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for the vault a
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: vault_holding_a,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for the vault b
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: vault_holding_b,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for the pool lp
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: pool_lp,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+        // Create new account for the user holding lp
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: user_holding_lp,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+
+        // Send creation tx
+        let subcommand = AmmProgramAgnosticSubcommand::New {
+            amm_pool: make_public_account_input_from_str(&amm_pool.to_string()),
+            vault_holding_a: make_public_account_input_from_str(&vault_holding_a.to_string()),
+            vault_holding_b: make_public_account_input_from_str(&vault_holding_b.to_string()),
+            pool_lp: make_public_account_input_from_str(&pool_lp.to_string()),
+            user_holding_a: make_public_account_input_from_str(&recipient_account_id_1.to_string()),
+            user_holding_b: make_public_account_input_from_str(&recipient_account_id_2.to_string()),
+            user_holding_lp: make_public_account_input_from_str(&user_holding_lp.to_string()),
+            balance_a: 3,
+            balance_b: 3,
+        };
+
+        wallet::cli::execute_subcommand(Command::AMM(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let amm_pool_acc = seq_client
+            .get_account(amm_pool.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        info!("AMM pool is {amm_pool_acc:#?}");
 
         info!("Success!");
     }

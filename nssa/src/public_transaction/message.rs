@@ -30,4 +30,18 @@ impl Message {
             instruction_data,
         })
     }
+
+    pub fn new_preserialized(
+        program_id: ProgramId,
+        account_ids: Vec<AccountId>,
+        nonces: Vec<Nonce>,
+        instruction_data: Vec<u32>,
+    ) -> Self {
+        Self {
+            program_id,
+            account_ids,
+            nonces,
+            instruction_data,
+        }
+    }
 }

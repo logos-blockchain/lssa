@@ -124,6 +124,7 @@ pub struct ProgramOutput {
 pub fn read_nssa_inputs<T: DeserializeOwned>() -> (ProgramInput<T>, InstructionData) {
     let pre_states: Vec<AccountWithMetadata> = env::read();
     let instruction_words: InstructionData = env::read();
+    println!("INSTRUCTION WORKDS IS {instruction_words:?}");
     let instruction = T::deserialize(&mut Deserializer::new(instruction_words.as_ref())).unwrap();
     (
         ProgramInput {
