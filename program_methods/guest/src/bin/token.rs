@@ -1091,7 +1091,7 @@ mod tests {
             BalanceEnum::MintSuccess => 50_000,
             BalanceEnum::InitSupplyMint => 150_000,
             BalanceEnum::HoldingBalanceMint => 51_000,
-            BalanceEnum::MintOverflow => 2u128.pow(128) - 40_000,
+            BalanceEnum::MintOverflow => u128::MAX - 40_000,
         }
     }
 
