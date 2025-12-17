@@ -341,6 +341,7 @@ pub mod tests {
                 authenticated_transfers_program,
             );
             this.insert(Program::token().id(), Program::token());
+            this.insert(Program::amm().id(), Program::amm());
             this
         };
 
