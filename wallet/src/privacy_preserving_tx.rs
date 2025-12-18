@@ -133,11 +133,21 @@ impl AccountManager {
             .collect()
     }
 
-    pub fn private_account_auth(&self) -> Vec<(NullifierSecretKey, MembershipProof)> {
+    pub fn private_account_auth(&self) -> Vec<NullifierSecretKey> {
         self.states
             .iter()
             .filter_map(|state| match state {
-                State::Private(pre) => Some((pre.nsk?, pre.proof.clone()?)),
+                State::Private(pre) => pre.nsk,
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn private_account_membership_proofs(&self) -> Vec<Option<MembershipProof>> {
+        self.states
+            .iter()
+            .filter_map(|state| match state {
+                State::Private(pre) => Some(pre.proof.clone()),
                 _ => None,
             })
             .collect()
@@ -153,7 +163,7 @@ impl AccountManager {
             .collect()
     }
 
-    pub fn witness_signing_keys(&self) -> Vec<&PrivateKey> {
+    pub fn public_account_auth(&self) -> Vec<&PrivateKey> {
         self.states
             .iter()
             .filter_map(|state| match state {
@@ -185,7 +195,7 @@ async fn private_acc_preparation(
         return Err(ExecutionFailureKind::KeyNotFoundError);
     };
 
-    let mut nsk = Some(from_keys.private_key_holder.nullifier_secret_key);
+    let nsk = from_keys.private_key_holder.nullifier_secret_key;
 
     let from_npk = from_keys.nullifer_public_key;
     let from_ipk = from_keys.incoming_viewing_public_key;
@@ -196,14 +206,12 @@ async fn private_acc_preparation(
         .await
         .unwrap();
 
-    if proof.is_none() {
-        nsk = None;
-    }
-
-    let sender_pre = AccountWithMetadata::new(from_acc.clone(), proof.is_some(), &from_npk);
+    // TODO: Technically we could allow unauthorized owned accounts, but currently we don't have
+    // support from that in the wallet.
+    let sender_pre = AccountWithMetadata::new(from_acc.clone(), true, &from_npk);
 
     Ok(AccountPreparedData {
-        nsk,
+        nsk: Some(nsk),
         npk: from_npk,
         ipk: from_ipk,
         pre_state: sender_pre,

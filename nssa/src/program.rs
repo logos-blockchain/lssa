@@ -222,6 +222,15 @@ mod tests {
             }
         }
 
+        pub fn noop() -> Self {
+            use test_program_methods::{NOOP_ELF, NOOP_ID};
+
+            Program {
+                id: NOOP_ID,
+                elf: NOOP_ELF.to_vec(),
+            }
+        }
+
         pub fn modified_transfer_program() -> Self {
             use test_program_methods::MODIFIED_TRANSFER_ELF;
             // This unwrap won't panic since the `MODIFIED_TRANSFER_ELF` comes from risc0 build of
