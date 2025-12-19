@@ -12,7 +12,7 @@ use crate::{
 /// Represents generic CLI subcommand for a wallet working with amm program
 #[derive(Subcommand, Debug, Clone)]
 pub enum AmmProgramAgnosticSubcommand {
-    /// Produce a new token
+    /// Produce a new pool
     ///
     /// user_holding_a and user_holding_b must be owned.
     ///
