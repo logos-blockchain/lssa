@@ -618,13 +618,13 @@ wallet account new public
 Generated new account with account_id Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
 ```
 
-Let's send 10 B tokens to this new account. We'll debit this from the supply account used in the creation of the token.
+Let's send 1000 B tokens to this new account. We'll debit this from the supply account used in the creation of the token.
 
 ```bash
 wallet token send \
     --from Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF \
     --to Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6 \
-    --amount 10
+    --amount 1000
 ```
 
 Let's inspect the public account:
@@ -634,7 +634,7 @@ wallet account get --account-id Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6
 
 # Output:
 Holding account owned by token program
-{"account_type":"Token holding","definition_id":"GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii","balance":10}
+{"account_type":"Token holding","definition_id":"GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii","balance":1000}
 ```
 
 ### Chain information
@@ -657,4 +657,105 @@ wallet chain-info current-block-id
 Last block id is 65537
 ```
 
+
+### Automated Market Maker (AMM)
+
+NSSA includes an AMM program that manages liquidity pools and enables swaps between custom tokens. To test this functionality, we first need to create a liquidity pool.
+
+#### Creating a liquidity pool for a token pair
+
+We start by creating a new pool for the tokens previously created. In return for providing liquidity, we will receive liquidity provider (LP) tokens, which represent our share of the pool and are required to withdraw liquidity later.
+
+To hold these LP tokens, we first create a new account:
+
+```bash
+wallet account new public
+
+# Output:
+Generated new account with account_id Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf
+```
+
+Next, we initialize the liquidity pool by depositing tokens A and B and specifying the account that will receive the LP tokens:
+
+```bash
+wallet amm new \
+    --user-holding-a Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw \
+    --user-holding-b Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6 \
+    --user-holding-lp Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf \
+    --balance-a 100 \
+    --balance-b 200
+```
+
+The newly created account is owned by the token program, meaning that LP tokens are managed by the same token infrastructure as regular tokens.
+
+```bash
+wallet account get --account-id Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf
+
+# Output:
+Holding account owned by token program
+{"account_type":"Token holding","definition_id":"7BeDS3e28MA5Err7gBswmR1fUKdHXqmUpTefNPu3pJ9i","balance":100}
+```
+
+If you inspect the `user-holding-a` and `user-holding-b` accounts passed to the `wallet amm new` command, you will see that 100 and 200 tokens were deducted, respectively. These tokens now reside in the liquidity pool and are available for swaps by any user.
+
+
+#### Swaping
+
+Token swaps can be performed using the wallet amm swap command:
+
+```bash
+wallet amm swap \
+    --user-holding-a Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw \
+    --user-holding-b Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6 \
+    # The amount of tokens to swap
+    --amount-in 5 \
+    # The minimum number of tokens expected in return
+    --min-amount-out 8 \
+    # The definition ID of the token being provided to the swap
+    # In this case, we are swapping from TOKENA to TOKENB, and so this is the definition ID of TOKENA
+    --token-definition 4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
+```
+
+Once executed, 5 tokens are deducted from the Token A holding account and the corresponding amount (determined by the pool’s pricing function) is credited to the Token B holding account.
+
+
+#### Withdrawing liquidity from the pool
+
+Liquidity providers can withdraw assets from the pool by redeeming (burning) LP tokens. The amount of tokens received is proportional to the share of LP tokens being redeemed relative to the total LP supply.
+
+This operation is performed using the `wallet amm remove-liquidity` command:
+
+```bash
+wallet amm remove-liquidity \
+    --user-holding-a Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw \
+    --user-holding-b Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6 \
+    --user-holding-lp Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf \
+    --balance-lp 20 \
+    --min-amount-a 1 \
+    --min-amount-b 1
+```
+
+This instruction burns `balance-lp` LP tokens from the user’s LP holding account. In exchange, the AMM transfers tokens A and B from the pool’s vault accounts to the user’s holding accounts, according to the current pool reserves.
+
+The `min-amount-a` and `min-amount-b` parameters specify the minimum acceptable amounts of tokens A and B to be received. If the computed outputs fall below either threshold, the instruction fails, protecting the user against unfavorable pool state changes.
+
+#### Adding liquidity to the pool
+
+Additional liquidity can be added to an existing pool by depositing tokens A and B in the ratio implied by the current pool reserves. In return, new LP tokens are minted to represent the user’s proportional share of the pool.
+
+This is done using the `wallet amm add-liquidity` command:
+
+```bash
+wallet amm add-liquidity \
+    --user-holding-a Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw \
+    --user-holding-b Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6 \
+    --user-holding-lp Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf \
+    --min-amount-lp 1 \
+    --max-amount-a 10 \
+    --max-amount-b 10
+```
+
+In this instruction, `max-amount-a` and `max-amount-b` define upper bounds on the number of tokens A and B that may be withdrawn from the user’s accounts. The AMM computes the actual required amounts based on the pool’s reserve ratio.
+
+The `min-amount-lp` parameter specifies the minimum number of LP tokens that must be minted for the transaction to succeed. If the resulting LP token amount is below this threshold, the instruction fails.
 
