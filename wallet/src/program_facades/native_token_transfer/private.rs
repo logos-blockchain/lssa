@@ -18,7 +18,7 @@ impl NativeTokenTransfer<'_> {
             .send_privacy_preserving_tx_with_pre_check(
                 vec![PrivacyPreservingAccount::PrivateOwned(from)],
                 &Program::serialize_instruction(instruction).unwrap(),
-                &Program::authenticated_transfer_program(),
+                &Program::authenticated_transfer_program().into(),
                 |_| Ok(()),
             )
             .await
@@ -48,7 +48,7 @@ impl NativeTokenTransfer<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
                 tx_pre_check,
             )
             .await
@@ -75,7 +75,7 @@ impl NativeTokenTransfer<'_> {
                     PrivacyPreservingAccount::PrivateOwned(to),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
                 tx_pre_check,
             )
             .await
