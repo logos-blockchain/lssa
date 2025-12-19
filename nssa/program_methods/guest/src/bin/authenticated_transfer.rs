@@ -17,7 +17,7 @@ fn initialize_account(pre_state: AccountWithMetadata) -> AccountPostState {
 
     // Continue only if the owner authorized this operation
     if !is_authorized {
-        panic!("Invalid input");
+        panic!("Account must be authorized");
     }
 
     account_to_claim
@@ -31,12 +31,12 @@ fn transfer(
 ) -> Vec<AccountPostState> {
     // Continue only if the sender has authorized this operation
     if !sender.is_authorized {
-        panic!("Invalid input");
+        panic!("Sender must be authorized");
     }
 
     // Continue only if the sender has enough balance
     if sender.account.balance < balance_to_move {
-        panic!("Invalid input");
+        panic!("Sender has insufficient balance");
     }
 
     // Create accounts post states, with updated balances

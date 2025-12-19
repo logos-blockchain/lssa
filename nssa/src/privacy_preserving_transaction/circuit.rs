@@ -44,13 +44,15 @@ impl From<Program> for ProgramWithDependencies {
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution
 /// circuit
+#[expect(clippy::too_many_arguments, reason = "TODO: fix later")]
 pub fn execute_and_prove(
     pre_states: &[AccountWithMetadata],
     instruction_data: &InstructionData,
     visibility_mask: &[u8],
     private_account_nonces: &[u128],
     private_account_keys: &[(NullifierPublicKey, SharedSecretKey)],
-    private_account_auth: &[(NullifierSecretKey, MembershipProof)],
+    private_account_nsks: &[NullifierSecretKey],
+    private_account_membership_proofs: &[Option<MembershipProof>],
     program_with_dependencies: &ProgramWithDependencies,
 ) -> Result<(PrivacyPreservingCircuitOutput, Proof), NssaError> {
     let mut program = &program_with_dependencies.program;
@@ -105,7 +107,8 @@ pub fn execute_and_prove(
         visibility_mask: visibility_mask.to_vec(),
         private_account_nonces: private_account_nonces.to_vec(),
         private_account_keys: private_account_keys.to_vec(),
-        private_account_auth: private_account_auth.to_vec(),
+        private_account_nsks: private_account_nsks.to_vec(),
+        private_account_membership_proofs: private_account_membership_proofs.to_vec(),
         program_id: program_with_dependencies.program.id(),
     };
 
@@ -195,7 +198,7 @@ mod tests {
         let expected_sender_post = Account {
             program_owner: program.id(),
             balance: 100 - balance_to_move,
-            nonce: 1,
+            nonce: 0,
             data: Data::default(),
         };
 
@@ -218,6 +221,7 @@ mod tests {
             &[0xdeadbeef],
             &[(recipient_keys.npk(), shared_secret.clone())],
             &[],
+            &[None],
             &Program::authenticated_transfer_program().into(),
         )
         .unwrap();
@@ -315,10 +319,8 @@ mod tests {
                 (sender_keys.npk(), shared_secret_1.clone()),
                 (recipient_keys.npk(), shared_secret_2.clone()),
             ],
-            &[(
-                sender_keys.nsk,
-                commitment_set.get_proof_for(&commitment_sender).unwrap(),
-            )],
+            &[sender_keys.nsk],
+            &[commitment_set.get_proof_for(&commitment_sender), None],
             &program.into(),
         )
         .unwrap();

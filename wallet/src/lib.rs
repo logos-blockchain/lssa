@@ -285,7 +285,8 @@ impl WalletCore {
                 .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
                 .collect::<Vec<_>>(),
             &acc_manager.private_account_auth(),
-            program,
+            &acc_manager.private_account_membership_proofs(),
+            &program.to_owned(),
         )
         .unwrap();
 
@@ -305,7 +306,7 @@ impl WalletCore {
             nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
                 &message,
                 proof,
-                &acc_manager.witness_signing_keys(),
+                &acc_manager.public_account_auth(),
             );
         let tx = PrivacyPreservingTransaction::new(message, witness_set);
 

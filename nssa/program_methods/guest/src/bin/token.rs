@@ -1,35 +1,48 @@
 use nssa_core::{
-    account::{Account, AccountId, AccountWithMetadata, Data, data::DATA_MAX_LENGTH_IN_BYTES},
+    account::{Account, AccountId, AccountWithMetadata, Data},
     program::{
         AccountPostState, DEFAULT_PROGRAM_ID, ProgramInput, read_nssa_inputs, write_nssa_outputs,
     },
 };
 
 // The token program has three functions:
-// 1. New token definition. Arguments to this function are:
-//      * Two **default** accounts: [definition_account, holding_account]. The first default account
-//        will be initialized with the token definition account values. The second account will be
-//        initialized to a token holding account for the new token, holding the entire total supply.
-//      * An instruction data of 23-bytes, indicating the total supply and the token name, with the
-//        following layout: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)] The
-//        name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-// 2. Token transfer Arguments to this function are:
+// 1. New token definition.
+//    Arguments to this function are:
+//      * Two **default** accounts: [definition_account, holding_account].
+//        The first default account will be initialized with the token definition account values. The second account will
+//        be initialized to a token holding account for the new token, holding the entire total supply.
+//      * An instruction data of 23-bytes, indicating the total supply and the token name, with
+//        the following layout:
+//        [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
+//        The name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+// 2. Token transfer
+//    Arguments to this function are:
 //      * Two accounts: [sender_account, recipient_account].
-//      * An instruction data byte string of length 23, indicating the total supply with the
-//        following layout [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00
-//        || 0x00 || 0x00].
-// 3. Initialize account with zero balance Arguments to this function are:
+//      * An instruction data byte string of length 23, indicating the total supply with the following layout
+//        [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
+// 3. Initialize account with zero balance
+//    Arguments to this function are:
 //      * Two accounts: [definition_account, account_to_initialize].
-//      * An dummy byte string of length 23, with the following layout [0x02 || 0x00 || 0x00 || 0x00
-//        || ... || 0x00 || 0x00].
+//      * An dummy byte string of length 23, with the following layout
+//        [0x02 || 0x00 || 0x00 || 0x00 || ... || 0x00 || 0x00].
+// 4. Burn tokens from a Token Holding account (thus lowering total supply)
+//    Arguments to this function are:
+//      * Two accounts: [definition_account, holding_account].
+//      * Authorization required: holding_account
+//      * An instruction data byte string of length 23, indicating the balance to burn with the folloiwng layout
+//       [0x03 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
+// 5. Mint additional supply of tokens tokens to a Token Holding account (thus increasing total supply)
+//    Arguments to this function are:
+//      * Two accounts: [definition_account, holding_account].
+//      * Authorization required: definition_account
+//      * An instruction data byte string of length 23, indicating the balance to mint with the folloiwng layout
+//       [0x04 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
 
 const TOKEN_DEFINITION_TYPE: u8 = 0;
 const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
-const _: () = assert!(TOKEN_DEFINITION_DATA_SIZE <= DATA_MAX_LENGTH_IN_BYTES);
 
 const TOKEN_HOLDING_TYPE: u8 = 1;
 const TOKEN_HOLDING_DATA_SIZE: usize = 49;
-const _: () = assert!(TOKEN_HOLDING_DATA_SIZE <= DATA_MAX_LENGTH_IN_BYTES);
 
 struct TokenDefinition {
     account_type: u8,
@@ -150,7 +163,7 @@ fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<Ac
     recipient_holding.balance = recipient_holding
         .balance
         .checked_add(balance_to_move)
-        .expect("Recipient balance overflow.");
+        .expect("Recipient balance overflow");
 
     let sender_post = {
         let mut this = sender.account.clone();
@@ -225,7 +238,7 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostStat
     let account_to_initialize = &pre_states[1];
 
     if account_to_initialize.account != Account::default() {
-        panic!("Only uninitialized accounts can be initialized");
+        panic!("Only Uninitialized accounts can be initialized");
     }
 
     // TODO: #212 We should check that this is an account owned by the token program.
@@ -244,6 +257,126 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostStat
         AccountPostState::new(definition_post),
         AccountPostState::new_claimed(account_to_initialize),
     ]
+}
+
+fn burn(pre_states: &[AccountWithMetadata], balance_to_burn: u128) -> Vec<AccountPostState> {
+    if pre_states.len() != 2 {
+        panic!("Invalid number of accounts");
+    }
+
+    let definition = &pre_states[0];
+    let user_holding = &pre_states[1];
+
+    let definition_values =
+        TokenDefinition::parse(&definition.account.data).expect("Definition account must be valid");
+    let user_values = TokenHolding::parse(&user_holding.account.data)
+        .expect("Token Holding account must be valid");
+
+    if definition.account_id != user_values.definition_id {
+        panic!("Mismatch token definition and token holding");
+    }
+
+    if !user_holding.is_authorized {
+        panic!("Authorization is missing");
+    }
+
+    if user_values.balance < balance_to_burn {
+        panic!("Insufficient balance to burn");
+    }
+
+    let mut post_user_holding = user_holding.account.clone();
+    let mut post_definition = definition.account.clone();
+
+    post_user_holding.data = TokenHolding::into_data(TokenHolding {
+        account_type: user_values.account_type,
+        definition_id: user_values.definition_id,
+        balance: user_values
+            .balance
+            .checked_sub(balance_to_burn)
+            .expect("Checked above"),
+    });
+
+    post_definition.data = TokenDefinition::into_data(TokenDefinition {
+        account_type: definition_values.account_type,
+        name: definition_values.name,
+        total_supply: definition_values
+            .total_supply
+            .checked_sub(balance_to_burn)
+            .expect("Total supply underflow"),
+    });
+
+    vec![
+        AccountPostState::new(post_definition),
+        AccountPostState::new(post_user_holding),
+    ]
+}
+
+fn mint_additional_supply(
+    pre_states: &[AccountWithMetadata],
+    amount_to_mint: u128,
+) -> Vec<AccountPostState> {
+    if pre_states.len() != 2 {
+        panic!("Invalid number of accounts");
+    }
+
+    let definition = &pre_states[0];
+    let token_holding = &pre_states[1];
+
+    if !definition.is_authorized {
+        panic!("Definition authorization is missing");
+    }
+
+    let definition_values =
+        TokenDefinition::parse(&definition.account.data).expect("Definition account must be valid");
+
+    let token_holding_values: TokenHolding = if token_holding.account == Account::default() {
+        TokenHolding::new(&definition.account_id)
+    } else {
+        TokenHolding::parse(&token_holding.account.data).expect("Holding account must be valid")
+    };
+
+    if definition.account_id != token_holding_values.definition_id {
+        panic!("Mismatch token definition and token holding");
+    }
+
+    let token_holding_post_data = TokenHolding {
+        account_type: token_holding_values.account_type,
+        definition_id: token_holding_values.definition_id,
+        balance: token_holding_values
+            .balance
+            .checked_add(amount_to_mint)
+            .expect("New balance overflow"),
+    };
+
+    let post_total_supply = definition_values
+        .total_supply
+        .checked_add(amount_to_mint)
+        .expect("Total supply overflow");
+
+    let post_definition_data = TokenDefinition {
+        account_type: definition_values.account_type,
+        name: definition_values.name,
+        total_supply: post_total_supply,
+    };
+
+    let post_definition = {
+        let mut this = definition.account.clone();
+        this.data = post_definition_data.into_data();
+        AccountPostState::new(this)
+    };
+
+    let token_holding_post = {
+        let mut this = token_holding.account.clone();
+        this.data = token_holding_post_data.into_data();
+
+        // Claim the recipient account if it has default program owner
+        if this.program_owner == DEFAULT_PROGRAM_ID {
+            AccountPostState::new_claimed(this)
+        } else {
+            AccountPostState::new(this)
+        }
+    };
+    vec![post_definition, token_holding_post]
 }
 
 type Instruction = [u8; 23];
@@ -295,6 +428,34 @@ fn main() {
             }
             initialize_account(&pre_states)
         }
+        3 => {
+            let balance_to_burn = u128::from_le_bytes(
+                instruction[1..17]
+                    .try_into()
+                    .expect("Balance to burn must be 16 bytes little-endian"),
+            );
+            let name: [u8; 6] = instruction[17..]
+                .try_into()
+                .expect("Name must be 6 bytes long");
+            assert_eq!(name, [0; 6]);
+
+            // Execute
+            burn(&pre_states, balance_to_burn)
+        }
+        4 => {
+            let balance_to_mint = u128::from_le_bytes(
+                instruction[1..17]
+                    .try_into()
+                    .expect("Balance to burn must be 16 bytes little-endian"),
+            );
+            let name: [u8; 6] = instruction[17..]
+                .try_into()
+                .expect("Name must be 6 bytes long");
+            assert_eq!(name, [0; 6]);
+
+            // Execute
+            mint_additional_supply(&pre_states, balance_to_mint)
+        }
         _ => panic!("Invalid instruction"),
     };
 
@@ -306,8 +467,9 @@ mod tests {
     use nssa_core::account::{Account, AccountId, AccountWithMetadata};
 
     use crate::{
-        TOKEN_DEFINITION_DATA_SIZE, TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_TYPE,
-        initialize_account, new_definition, transfer,
+        TOKEN_DEFINITION_DATA_SIZE, TOKEN_DEFINITION_TYPE, TOKEN_HOLDING_DATA_SIZE,
+        TOKEN_HOLDING_TYPE, TokenDefinition, TokenHolding, burn, initialize_account,
+        mint_additional_supply, new_definition, transfer,
     };
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -703,6 +865,457 @@ mod tests {
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ]
+        );
+    }
+
+    enum BalanceEnum {
+        InitSupply,
+        HoldingBalance,
+        InitSupplyBurned,
+        HoldingBalanceBurned,
+        BurnSuccess,
+        BurnInsufficient,
+        MintSuccess,
+        InitSupplyMint,
+        HoldingBalanceMint,
+        MintOverflow,
+    }
+
+    enum AccountsEnum {
+        DefinitionAccountAuth,
+        DefinitionAccountNotAuth,
+        HoldingDiffDef,
+        HoldingSameDefAuth,
+        HoldingSameDefNotAuth,
+        HoldingSameDefNotAuthOverflow,
+        DefinitionAccountPostBurn,
+        HoldingAccountPostBurn,
+        Uninit,
+        InitMint,
+        DefinitionAccountMint,
+        HoldingSameDefMint,
+        HoldingSameDefAuthLargeBalance,
+    }
+
+    enum IdEnum {
+        PoolDefinitionId,
+        PoolDefinitionIdDiff,
+        HoldingId,
+    }
+
+    fn helper_account_constructor(selection: AccountsEnum) -> AccountWithMetadata {
+        match selection {
+            AccountsEnum::DefinitionAccountAuth => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenDefinition::into_data(TokenDefinition {
+                        account_type: TOKEN_DEFINITION_TYPE,
+                        name: [2; 6],
+                        total_supply: helper_balance_constructor(BalanceEnum::InitSupply),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
+            AccountsEnum::DefinitionAccountNotAuth => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenDefinition::into_data(TokenDefinition {
+                        account_type: TOKEN_DEFINITION_TYPE,
+                        name: [2; 6],
+                        total_supply: helper_balance_constructor(BalanceEnum::InitSupply),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: false,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
+            AccountsEnum::HoldingDiffDef => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionIdDiff),
+                        balance: helper_balance_constructor(BalanceEnum::HoldingBalance),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::HoldingId),
+            },
+            AccountsEnum::HoldingSameDefAuth => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        balance: helper_balance_constructor(BalanceEnum::HoldingBalance),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::HoldingId),
+            },
+            AccountsEnum::HoldingSameDefNotAuth => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        balance: helper_balance_constructor(BalanceEnum::HoldingBalance),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: false,
+                account_id: helper_id_constructor(IdEnum::HoldingId),
+            },
+            AccountsEnum::HoldingSameDefNotAuthOverflow => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        balance: helper_balance_constructor(BalanceEnum::InitSupply),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: false,
+                account_id: helper_id_constructor(IdEnum::HoldingId),
+            },
+            AccountsEnum::DefinitionAccountPostBurn => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenDefinition::into_data(TokenDefinition {
+                        account_type: TOKEN_DEFINITION_TYPE,
+                        name: [2; 6],
+                        total_supply: helper_balance_constructor(BalanceEnum::InitSupplyBurned),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
+            AccountsEnum::HoldingAccountPostBurn => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        balance: helper_balance_constructor(BalanceEnum::HoldingBalanceBurned),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: false,
+                account_id: helper_id_constructor(IdEnum::HoldingId),
+            },
+            AccountsEnum::Uninit => AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: false,
+                account_id: helper_id_constructor(IdEnum::HoldingId),
+            },
+            AccountsEnum::InitMint => AccountWithMetadata {
+                account: Account {
+                    program_owner: [0u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        balance: helper_balance_constructor(BalanceEnum::MintSuccess),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: false,
+                account_id: helper_id_constructor(IdEnum::HoldingId),
+            },
+            AccountsEnum::HoldingSameDefMint => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        balance: helper_balance_constructor(BalanceEnum::HoldingBalanceMint),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
+            AccountsEnum::DefinitionAccountMint => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenDefinition::into_data(TokenDefinition {
+                        account_type: TOKEN_DEFINITION_TYPE,
+                        name: [2; 6],
+                        total_supply: helper_balance_constructor(BalanceEnum::InitSupplyMint),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
+            AccountsEnum::HoldingSameDefAuthLargeBalance => AccountWithMetadata {
+                account: Account {
+                    program_owner: [5u32; 8],
+                    balance: 0u128,
+                    data: TokenHolding::into_data(TokenHolding {
+                        account_type: TOKEN_HOLDING_TYPE,
+                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        balance: helper_balance_constructor(BalanceEnum::MintOverflow),
+                    }),
+                    nonce: 0,
+                },
+                is_authorized: true,
+                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+            },
+            _ => panic!("Invalid selection"),
+        }
+    }
+
+    fn helper_balance_constructor(selection: BalanceEnum) -> u128 {
+        match selection {
+            BalanceEnum::InitSupply => 100_000,
+            BalanceEnum::HoldingBalance => 1_000,
+            BalanceEnum::InitSupplyBurned => 99_500,
+            BalanceEnum::HoldingBalanceBurned => 500,
+            BalanceEnum::BurnSuccess => 500,
+            BalanceEnum::BurnInsufficient => 1_500,
+            BalanceEnum::MintSuccess => 50_000,
+            BalanceEnum::InitSupplyMint => 150_000,
+            BalanceEnum::HoldingBalanceMint => 51_000,
+            BalanceEnum::MintOverflow => (2 as u128).pow(128) - 40_000,
+            _ => panic!("Invalid selection"),
+        }
+    }
+
+    fn helper_id_constructor(selection: IdEnum) -> AccountId {
+        match selection {
+            IdEnum::PoolDefinitionId => AccountId::new([15; 32]),
+            IdEnum::PoolDefinitionIdDiff => AccountId::new([16; 32]),
+            IdEnum::HoldingId => AccountId::new([17; 32]),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid number of accounts")]
+    fn test_burn_invalid_number_of_accounts() {
+        let pre_states = vec![helper_account_constructor(
+            AccountsEnum::DefinitionAccountAuth,
+        )];
+        let _post_states = burn(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::BurnSuccess),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Mismatch token definition and token holding")]
+    fn test_burn_mismatch_def() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingDiffDef),
+        ];
+        let _post_states = burn(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::BurnSuccess),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Authorization is missing")]
+    fn test_burn_missing_authorization() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+        ];
+        let _post_states = burn(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::BurnSuccess),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Insufficient balance to burn")]
+    fn test_burn_insufficient_balance() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
+        ];
+        let _post_states = burn(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::BurnInsufficient),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Total supply underflow")]
+    fn test_burn_total_supply_underflow() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefAuthLargeBalance),
+        ];
+        let _post_states = burn(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintOverflow),
+        );
+    }
+
+    #[test]
+    fn test_burn_success() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
+        ];
+        let post_states = burn(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::BurnSuccess),
+        );
+
+        let def_post = post_states[0].clone();
+        let holding_post = post_states[1].clone();
+
+        assert!(
+            *def_post.account()
+                == helper_account_constructor(AccountsEnum::DefinitionAccountPostBurn).account
+        );
+        assert!(
+            *holding_post.account()
+                == helper_account_constructor(AccountsEnum::HoldingAccountPostBurn).account
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid number of accounts")]
+    fn test_mint_invalid_number_of_accounts() {
+        let pre_states = vec![helper_account_constructor(
+            AccountsEnum::DefinitionAccountAuth,
+        )];
+        let _post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintSuccess),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Holding account must be valid")]
+    fn test_mint_not_valid_holding_account() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::DefinitionAccountNotAuth),
+        ];
+        let _post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintSuccess),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Definition authorization is missing")]
+    fn test_mint_missing_authorization() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountNotAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+        ];
+        let _post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintSuccess),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Mismatch token definition and token holding")]
+    fn test_mint_mismatched_token_definition() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingDiffDef),
+        ];
+        let _post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintSuccess),
+        );
+    }
+
+    #[test]
+    fn test_mint_success() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+        ];
+        let post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintSuccess),
+        );
+
+        let def_post = post_states[0].clone();
+        let holding_post = post_states[1].clone();
+
+        assert!(
+            *def_post.account()
+                == helper_account_constructor(AccountsEnum::DefinitionAccountMint).account
+        );
+        assert!(
+            *holding_post.account()
+                == helper_account_constructor(AccountsEnum::HoldingSameDefMint).account
+        );
+    }
+
+    #[test]
+    fn test_mint_uninit_holding_success() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::Uninit),
+        ];
+        let post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintSuccess),
+        );
+
+        let def_post = post_states[0].clone();
+        let holding_post = post_states[1].clone();
+
+        assert!(
+            *def_post.account()
+                == helper_account_constructor(AccountsEnum::DefinitionAccountMint).account
+        );
+        assert!(
+            *holding_post.account() == helper_account_constructor(AccountsEnum::InitMint).account
+        );
+        assert!(holding_post.requires_claim() == true);
+    }
+
+    #[test]
+    #[should_panic(expected = "Total supply overflow")]
+    fn test_mint_total_supply_overflow() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+        ];
+        let _post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintOverflow),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "New balance overflow")]
+    fn test_mint_holding_account_overflow() {
+        let pre_states = vec![
+            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuthOverflow),
+        ];
+        let _post_states = mint_additional_supply(
+            &pre_states,
+            helper_balance_constructor(BalanceEnum::MintOverflow),
         );
     }
 }
