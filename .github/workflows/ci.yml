@@ -22,6 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential clang libclang-dev libssl-dev pkg-config
+
       - name: Install active toolchain
         run: rustup install
 
