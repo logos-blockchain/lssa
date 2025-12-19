@@ -5,7 +5,7 @@ use nssa::{AccountId, program::Program};
 use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
 
 use super::{NativeTokenTransfer, auth_transfer_preparation};
-use crate::PrivacyPreservingAccount;
+use crate::{AccDecodeData, PrivacyPreservingAccount};
 
 impl NativeTokenTransfer<'_> {
     pub async fn register_account_private(
@@ -27,6 +27,42 @@ impl NativeTokenTransfer<'_> {
                 let first = secrets_iter.next().expect("expected sender's secret");
                 (resp, first)
             })
+    }
+
+    pub async fn send_private_transfer_to_owned_account_gen(
+        &self,
+        from: AccountId,
+        to: AccountId,
+        balance_to_move: u128,
+    ) -> Result<(SendTxResponse, Vec<AccDecodeData>), ExecutionFailureKind> {
+        self.send_privacy_preserving_transfer_unified(
+            vec![
+                PrivacyPreservingAccount::PrivateOwned(from),
+                PrivacyPreservingAccount::PrivateOwned(to),
+            ],
+            balance_to_move,
+        )
+        .await
+    }
+
+    pub async fn send_private_transfer_to_outer_account_gen(
+        &self,
+        from: AccountId,
+        to_npk: NullifierPublicKey,
+        to_ipk: IncomingViewingPublicKey,
+        balance_to_move: u128,
+    ) -> Result<(SendTxResponse, Vec<AccDecodeData>), ExecutionFailureKind> {
+        self.send_privacy_preserving_transfer_unified(
+            vec![
+                PrivacyPreservingAccount::PrivateOwned(from),
+                PrivacyPreservingAccount::PrivateForeign {
+                    npk: to_npk,
+                    ipk: to_ipk,
+                },
+            ],
+            balance_to_move,
+        )
+        .await
     }
 
     pub async fn send_private_transfer_to_outer_account(

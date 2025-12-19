@@ -317,8 +317,8 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                 let from: AccountId = from.parse().unwrap();
                 let to: AccountId = to.parse().unwrap();
 
-                let (res, [secret_from, secret_to]) = NativeTokenTransfer(wallet_core)
-                    .send_private_transfer_to_owned_account(from, to, amount)
+                let (res, acc_decode_data) = NativeTokenTransfer(wallet_core)
+                    .send_private_transfer_to_owned_account_gen(from, to, amount)
                     .await?;
 
                 println!("Results of tx send are {res:#?}");
@@ -329,8 +329,6 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let acc_decode_data = vec![Decode(secret_from, from), Decode(secret_to, to)];
-
                     wallet_core.decode_insert_privacy_preserving_transaction_results(
                         tx,
                         &acc_decode_data,
@@ -361,8 +359,8 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                 let to_ipk =
                     nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
 
-                let (res, [secret_from, _]) = NativeTokenTransfer(wallet_core)
-                    .send_private_transfer_to_outer_account(from, to_npk, to_ipk, amount)
+                let (res, acc_decode_data) = NativeTokenTransfer(wallet_core)
+                    .send_private_transfer_to_outer_account_gen(from, to_npk, to_ipk, amount)
                     .await?;
 
                 println!("Results of tx send are {res:#?}");
@@ -373,8 +371,6 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let acc_decode_data = vec![Decode(secret_from, from)];
-
                     wallet_core.decode_insert_privacy_preserving_transaction_results(
                         tx,
                         &acc_decode_data,

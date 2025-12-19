@@ -9,6 +9,7 @@ use nssa_core::{
 
 use crate::WalletCore;
 
+#[derive(Clone)]
 pub enum PrivacyPreservingAccount {
     Public(AccountId),
     PrivateOwned(AccountId),
@@ -16,6 +17,22 @@ pub enum PrivacyPreservingAccount {
         npk: NullifierPublicKey,
         ipk: IncomingViewingPublicKey,
     },
+}
+
+impl PrivacyPreservingAccount {
+    pub fn account_id_decode_data(&self) -> Option<AccountId> {
+        match self {
+            &Self::PrivateOwned(acc_id) => Some(acc_id),
+            _ => None,
+        }
+    }
+
+    pub fn is_private(&self) -> bool {
+        matches!(
+            &self,
+            &Self::PrivateOwned(_) | &Self::PrivateForeign { npk: _, ipk: _ }
+        )
+    }
 }
 
 pub struct PrivateAccountKeys {
