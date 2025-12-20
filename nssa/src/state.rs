@@ -2442,6 +2442,7 @@ pub mod tests {
                 .expect("Hash output must be exactly 32 bytes long"),
         )
     }
+
     const POOL_DEFINITION_DATA_SIZE: usize = 225;
 
     #[derive(Default)]
@@ -3647,7 +3648,7 @@ pub mod tests {
         let expected_pool = AccountForTests::pool_definition_init();
         let expected_vault_a = AccountForTests::vault_a_init();
         let expected_vault_b = AccountForTests::vault_b_init();
-        let expected_token_lp = AccountForTests::token_lp_definition_new_init(); //TODO?
+        let expected_token_lp = AccountForTests::token_lp_definition_new_init();
         let expected_user_token_a = AccountForTests::user_token_a_holding_new_init();
         let expected_user_token_b = AccountForTests::user_token_b_holding_new_init();
         let expected_user_token_lp = AccountForTests::user_token_lp_holding_new_init();
