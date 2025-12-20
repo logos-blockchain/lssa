@@ -109,8 +109,6 @@ fn is_token_holding_type_valid(standard: u8) -> bool {
     }
 }
 
-
-
 struct TokenDefinition {
     account_type: u8,
     name: [u8; 6],
@@ -305,7 +303,6 @@ impl TokenMetadata {
         }
     }
 }
-
 
 fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<AccountPostState> {
     if pre_states.len() != 2 {
@@ -903,243 +900,227 @@ mod tests {
         new_definition_with_metadata, print_nft, transfer,
     };
 
-    enum BalanceEnum {
-        InitSupply,
-        HoldingBalance,
-        InitSupplyBurned,
-        HoldingBalanceBurned,
-        BurnSuccess,
-        BurnInsufficient,
-        MintSuccess,
-        InitSupplyMint,
-        HoldingBalanceMint,
-        MintOverflow,
-        RecipientPostTransfer,
-        RecipientUninitPostTransfer,
-        SenderPostTransfer,
-        TransferAmount,
-        PrintableCopies,
-    }
+    struct BalanceForTests;
+    struct IdForTests;
 
-    enum AccountsEnum {
-        DefinitionAccountAuth,
-        DefinitionAccountNotAuth,
-        HoldingDiffDef,
-        HoldingSameDefAuth,
-        HoldingSameDefNotAuth,
-        HoldingSameDefNotAuthOverflow,
-        DefinitionAccountPostBurn,
-        HoldingAccountPostBurn,
-        InitMint,
-        DefinitionAccountMint,
-        HoldingSameDefMint,
-        HoldingSameDefAuthLargeBalance,
-        DefinitionAccountAuthNonFungible,
-        DefinitionAccountUninit,
-        HoldingAccountUninit,
-        HoldingAccountInit,
-        DefinitionAccountUnclaimed,
-        HoldingAccountUnclaimed,
-        HoldingAccount2Init,
-        HoldingAccount2InitPostTransfer,
-        HoldingAccount2UninitPostTransfer,
-        HoldingAccountInitPostTransfer,
-        HoldingAccountMasterNFT,
-        HoldingAccountMasterNFTInsufficientBalance,
-        HoldingAccountMasterNFTAfterPrint,
-        HoldingAccountPrintedNFT,
-        HoldingAccountMasterNFTTransferredTo,
-        HoldingAccountMasterNFTPostTransfer,
-    }
+    struct AccountForTests;
 
-    enum IdEnum {
-        PoolDefinitionId,
-        PoolDefinitionIdDiff,
-        HoldingId,
-        Holding2Id,
-        MetadataId,
-    }
-
-    fn helper_account_constructor(selection: AccountsEnum) -> AccountWithMetadata {
-        match selection {
-            AccountsEnum::DefinitionAccountAuth => AccountWithMetadata {
+    impl AccountForTests {
+        fn definition_account_auth() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
                         account_type: TOKEN_STANDARD_FUNGIBLE_TOKEN,
                         name: [2; 6],
-                        total_supply: helper_balance_constructor(BalanceEnum::InitSupply),
+                        total_supply: BalanceForTests::init_supply(),
                         metadata_id: AccountId::new([0; 32]),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::DefinitionAccountNotAuth => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+
+        fn definition_account_without_auth() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
                         account_type: TOKEN_STANDARD_FUNGIBLE_TOKEN,
                         name: [2; 6],
-                        total_supply: helper_balance_constructor(BalanceEnum::InitSupply),
+                        total_supply: BalanceForTests::init_supply(),
                         metadata_id: AccountId::new([0; 32]),
                     }),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::HoldingDiffDef => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+
+        fn holding_different_definition() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionIdDiff),
-                        balance: helper_balance_constructor(BalanceEnum::HoldingBalance),
+                        definition_id: IdForTests::pool_definition_id_diff(),
+                        balance: BalanceForTests::holding_balance(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingSameDefAuth => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_same_definition_with_authorization() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::HoldingBalance),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::holding_balance(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingSameDefNotAuth => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_same_definition_without_authorization() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::HoldingBalance),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::holding_balance(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingSameDefNotAuthOverflow => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_same_definition_without_authorization_overflow() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::InitSupply),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::init_supply(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::DefinitionAccountPostBurn => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn definition_account_post_burn() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
                         account_type: TOKEN_STANDARD_FUNGIBLE_TOKEN,
                         name: [2; 6],
-                        total_supply: helper_balance_constructor(BalanceEnum::InitSupplyBurned),
+                        total_supply: BalanceForTests::init_supply_burned(),
                         metadata_id: AccountId::new([0; 32]),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::HoldingAccountPostBurn => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+
+        fn holding_account_post_burn() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::HoldingBalanceBurned),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::holding_balance_burned(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingAccountUninit => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account_uninit() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account::default(),
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::Holding2Id),
-            },
-            AccountsEnum::InitMint => AccountWithMetadata {
+                account_id: IdForTests::holding_id_2(),
+            }
+        }
+
+        fn init_mint() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [0u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::MintSuccess),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::mint_success(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingSameDefMint => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account_same_definition_mint() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::HoldingBalanceMint),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::holding_balance_mint(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::DefinitionAccountMint => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+        fn definition_account_mint() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
                         account_type: TOKEN_STANDARD_FUNGIBLE_TOKEN,
                         name: [2; 6],
-                        total_supply: helper_balance_constructor(BalanceEnum::InitSupplyMint),
+                        total_supply: BalanceForTests::init_supply_mint(),
                         metadata_id: AccountId::new([0; 32]),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::HoldingSameDefAuthLargeBalance => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+        fn holding_same_definition_with_authorization_and_large_balance() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::MintOverflow),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::mint_overflow(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::DefinitionAccountAuthNonFungible => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+        fn definition_account_with_authorization_nonfungible() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
@@ -1152,230 +1133,319 @@ mod tests {
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::DefinitionAccountUninit => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+        fn definition_account_uninit() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account::default(),
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::HoldingAccountInit => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+
+        fn holding_account_init() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::InitSupply),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::init_supply(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::DefinitionAccountUnclaimed => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+        fn definition_account_unclaimed() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [0u32; 8],
                     balance: 0u128,
                     data: TokenDefinition::into_data(TokenDefinition {
                         account_type: TOKEN_STANDARD_FUNGIBLE_TOKEN,
                         name: [2; 6],
-                        total_supply: helper_balance_constructor(BalanceEnum::InitSupply),
+                        total_supply: BalanceForTests::init_supply(),
                         metadata_id: AccountId::new([0; 32]),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-            },
-            AccountsEnum::HoldingAccountUnclaimed => AccountWithMetadata {
+                account_id: IdForTests::pool_definition_id(),
+            }
+        }
+        fn holding_account_unclaimed() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [0u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::InitSupply),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::init_supply(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingAccount2Init => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account2_init() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::InitSupply),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::init_supply(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::Holding2Id),
-            },
-            AccountsEnum::HoldingAccount2InitPostTransfer => AccountWithMetadata {
+                account_id: IdForTests::holding_id_2(),
+            }
+        }
+
+        fn holding_account2_init_post_transfer() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::RecipientPostTransfer),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::recipient_post_transfer(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::Holding2Id),
-            },
-            AccountsEnum::HoldingAccountInitPostTransfer => AccountWithMetadata {
+                account_id: IdForTests::holding_id_2(),
+            }
+        }
+
+        fn holding_account_init_post_transfer() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::SenderPostTransfer),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::sender_post_transfer(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingAccount2UninitPostTransfer => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account2_uninit_post_transfer() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [0u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(
-                            BalanceEnum::RecipientUninitPostTransfer,
-                        ),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::recipient_uninit_post_transfer(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::Holding2Id),
-            },
-            AccountsEnum::HoldingAccountMasterNFT => AccountWithMetadata {
+                account_id: IdForTests::holding_id_2(),
+            }
+        }
+
+        fn holding_account_master_nft() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_NFT_MASTER,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::PrintableCopies),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::printable_copies(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingAccountMasterNFTInsufficientBalance => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account_master_nft_insufficient_balance() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_NFT_MASTER,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        definition_id: IdForTests::pool_definition_id(),
                         balance: 1,
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingAccountMasterNFTAfterPrint => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account_master_nft_after_print() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_NFT_MASTER,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::PrintableCopies) - 1,
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::printable_copies() - 1,
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingAccountPrintedNFT => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account_printed_nft() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [0u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_NFT_PRINTED_COPY,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        definition_id: IdForTests::pool_definition_id(),
                         balance: 1,
                     }),
                     nonce: 0,
                 },
                 is_authorized: false,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            AccountsEnum::HoldingAccountMasterNFTTransferredTo => AccountWithMetadata {
+                account_id: IdForTests::holding_id(),
+            }
+        }
+
+        fn holding_account_with_master_nft_transferred_to() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [0u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_NFT_MASTER,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
-                        balance: helper_balance_constructor(BalanceEnum::PrintableCopies),
+                        definition_id: IdForTests::pool_definition_id(),
+                        balance: BalanceForTests::printable_copies(),
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::Holding2Id),
-            },
-            AccountsEnum::HoldingAccountMasterNFTPostTransfer => AccountWithMetadata {
+                account_id: IdForTests::holding_id_2(),
+            }
+        }
+
+        fn holding_account_master_nft_post_transfer() -> AccountWithMetadata {
+            AccountWithMetadata {
                 account: Account {
                     program_owner: [5u32; 8],
                     balance: 0u128,
                     data: TokenHolding::into_data(TokenHolding {
                         account_type: TOKEN_HOLDING_NFT_MASTER,
-                        definition_id: helper_id_constructor(IdEnum::PoolDefinitionId),
+                        definition_id: IdForTests::pool_definition_id(),
                         balance: 0,
                     }),
                     nonce: 0,
                 },
                 is_authorized: true,
-                account_id: helper_id_constructor(IdEnum::HoldingId),
-            },
-            _ => panic!("Invalid selection"),
+                account_id: IdForTests::holding_id(),
+            }
         }
     }
 
-    fn helper_balance_constructor(selection: BalanceEnum) -> u128 {
-        match selection {
-            BalanceEnum::InitSupply => 100_000,
-            BalanceEnum::HoldingBalance => 1_000,
-            BalanceEnum::InitSupplyBurned => 99_500,
-            BalanceEnum::HoldingBalanceBurned => 500,
-            BalanceEnum::BurnSuccess => 500,
-            BalanceEnum::BurnInsufficient => 1_500,
-            BalanceEnum::MintSuccess => 50_000,
-            BalanceEnum::InitSupplyMint => 150_000,
-            BalanceEnum::HoldingBalanceMint => 51_000,
-            BalanceEnum::MintOverflow => (2 as u128).pow(128) - 40_000,
-            BalanceEnum::SenderPostTransfer => 95_000,
-            BalanceEnum::RecipientPostTransfer => 105_000,
-            BalanceEnum::RecipientUninitPostTransfer => 5_000,
-            BalanceEnum::TransferAmount => 5_000,
-            BalanceEnum::PrintableCopies => 10,
-            _ => panic!("Invalid selection"),
+    impl BalanceForTests {
+        fn init_supply() -> u128 {
+            100_000
+        }
+
+        fn holding_balance() -> u128 {
+            1_000
+        }
+
+        fn init_supply_burned() -> u128 {
+            99_500
+        }
+
+        fn holding_balance_burned() -> u128 {
+            500
+        }
+
+        fn burn_success() -> u128 {
+            500
+        }
+
+        fn burn_insufficient() -> u128 {
+            1_500
+        }
+
+        fn mint_success() -> u128 {
+            50_000
+        }
+
+        fn holding_balance_mint() -> u128 {
+            51_000
+        }
+
+        fn mint_overflow() -> u128 {
+            (2 as u128).pow(128) - 40_000
+        }
+
+        fn init_supply_mint() -> u128 {
+            150_000
+        }
+
+        fn sender_post_transfer() -> u128 {
+            95_000
+        }
+
+        fn recipient_post_transfer() -> u128 {
+            105_000
+        }
+
+        fn recipient_uninit_post_transfer() -> u128 {
+            5_000
+        }
+
+        fn transfer_amount() -> u128 {
+            5_000
+        }
+
+        fn printable_copies() -> u128 {
+            10
         }
     }
 
-    fn helper_id_constructor(selection: IdEnum) -> AccountId {
-        match selection {
-            IdEnum::PoolDefinitionId => AccountId::new([15; 32]),
-            IdEnum::PoolDefinitionIdDiff => AccountId::new([16; 32]),
-            IdEnum::HoldingId => AccountId::new([17; 32]),
-            IdEnum::MetadataId => AccountId::new([42; 32]),
-            IdEnum::Holding2Id => AccountId::new([31; 32]),
+    impl IdForTests {
+        fn pool_definition_id() -> AccountId {
+            AccountId::new([15; 32])
+        }
+
+        fn pool_definition_id_diff() -> AccountId {
+            AccountId::new([16; 32])
+        }
+
+        fn holding_id() -> AccountId {
+            AccountId::new([17; 32])
+        }
+
+        fn holding_id_2() -> AccountId {
+            AccountId::new([42; 32])
+        }
+
+        fn metadata_id() -> AccountId {
+            AccountId::new([31; 32])
         }
     }
 
@@ -1458,25 +1528,21 @@ mod tests {
     #[test]
     fn test_new_definition_with_valid_inputs_succeeds() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountUninit),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::definition_account_uninit(),
+            AccountForTests::holding_account_uninit(),
         ];
 
-        let post_states = new_definition(
-            &pre_states,
-            [2u8; 6],
-            helper_balance_constructor(BalanceEnum::InitSupply),
-        );
+        let post_states = new_definition(&pre_states, [2u8; 6], BalanceForTests::init_supply());
 
         let [definition_account, holding_account] = post_states.try_into().ok().unwrap();
         assert!(
             *definition_account.account()
-                == helper_account_constructor(AccountsEnum::DefinitionAccountUnclaimed).account
+                == AccountForTests::definition_account_unclaimed().account
         );
 
         assert!(
             *holding_account.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccountUnclaimed).account
+                == AccountForTests::holding_account_unclaimed().account
         );
     }
 
@@ -1586,8 +1652,8 @@ mod tests {
     #[test]
     fn test_transfer_with_different_definition_ids_should_fail() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
-            helper_account_constructor(AccountsEnum::HoldingDiffDef),
+            AccountForTests::holding_same_definition_with_authorization(),
+            AccountForTests::holding_different_definition(),
         ];
         let _post_states = transfer(&pre_states, 10);
     }
@@ -1596,14 +1662,11 @@ mod tests {
     #[test]
     fn test_transfer_with_insufficient_balance_should_fail() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefMint),
+            AccountForTests::holding_same_definition_with_authorization(),
+            AccountForTests::holding_account_same_definition_mint(),
         ];
         // Attempt to transfer 38 tokens
-        let _post_states = transfer(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::BurnInsufficient),
-        );
+        let _post_states = transfer(&pre_states, BalanceForTests::burn_insufficient());
     }
 
     #[should_panic(expected = "Sender authorization is missing")]
@@ -1638,22 +1701,19 @@ mod tests {
     #[test]
     fn test_transfer_with_valid_inputs_succeeds() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountInit),
-            helper_account_constructor(AccountsEnum::HoldingAccount2Init),
+            AccountForTests::holding_account_init(),
+            AccountForTests::holding_account2_init(),
         ];
-        let post_states = transfer(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::TransferAmount),
-        );
+        let post_states = transfer(&pre_states, BalanceForTests::transfer_amount());
         let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
 
         assert!(
             *sender_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccountInitPostTransfer).account
+                == AccountForTests::holding_account_init_post_transfer().account
         );
         assert!(
             *recipient_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccount2InitPostTransfer)
+                == AccountForTests::holding_account2_init_post_transfer()
                     .account
         );
     }
@@ -1662,59 +1722,39 @@ mod tests {
     #[test]
     fn test_transfer_with_master_nft_invalid_balance() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFT),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_master_nft(),
+            AccountForTests::holding_account_uninit(),
         ];
-        let post_states = transfer(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::TransferAmount),
-        );
-        let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
-
-        assert!(
-            *sender_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccountInitPostTransfer).account
-        );
-        assert!(
-            *recipient_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccount2InitPostTransfer)
-                    .account
-        );
+        let post_states = transfer(&pre_states, BalanceForTests::transfer_amount());
     }
 
     #[should_panic(expected = "Invalid balance in recipient account for NFT transfer")]
     #[test]
     fn test_transfer_with_master_nft_invalid_recipient_balance() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFT),
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFTTransferredTo),
+            AccountForTests::holding_account_master_nft(),
+            AccountForTests::holding_account_with_master_nft_transferred_to(),
         ];
-        let _post_states = transfer(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::PrintableCopies),
-        );
+        let _post_states = transfer(&pre_states, BalanceForTests::printable_copies());
     }
 
     #[test]
     fn test_transfer_with_master_nft_success() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFT),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_master_nft(),
+            AccountForTests::holding_account_uninit(),
         ];
-        let post_states = transfer(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::PrintableCopies),
-        );
+        let post_states = transfer(&pre_states, BalanceForTests::printable_copies());
         let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
 
         assert!(
             *sender_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccountMasterNFTPostTransfer)
+                == AccountForTests::holding_account_master_nft_post_transfer()
                     .account
         );
         assert!(
             *recipient_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccountMasterNFTTransferredTo)
+                == AccountForTests::holding_account_with_master_nft_transferred_to()
                     .account
         );
     }
@@ -1722,22 +1762,20 @@ mod tests {
     #[test]
     fn test_token_initialize_account_succeeds() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountInit),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_init(),
+            AccountForTests::holding_account2_init(),
         ];
-        let post_states = transfer(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::TransferAmount),
-        );
+        let post_states = transfer(&pre_states, BalanceForTests::transfer_amount());
         let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
 
         assert!(
             *sender_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccountInitPostTransfer).account
+                == AccountForTests::holding_account_init_post_transfer()
+                .account
         );
         assert!(
             *recipient_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccount2UninitPostTransfer)
+                == AccountForTests::holding_account2_init_post_transfer()
                     .account
         );
     }
@@ -1745,213 +1783,169 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid number of accounts")]
     fn test_burn_invalid_number_of_accounts() {
-        let pre_states = vec![helper_account_constructor(
-            AccountsEnum::DefinitionAccountAuth,
-        )];
-        let _post_states = burn(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::BurnSuccess),
-        );
+        let pre_states = vec![
+            AccountForTests::definition_account_auth(),
+        ];
+        let _post_states = burn(&pre_states, BalanceForTests::burn_success());
     }
 
     #[test]
     #[should_panic(expected = "Mismatch Token Definition and Token Holding")]
     fn test_burn_mismatch_def() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingDiffDef),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_different_definition(),
         ];
-        let _post_states = burn(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::BurnSuccess),
-        );
+        let _post_states = burn(&pre_states, BalanceForTests::burn_success());
     }
 
     #[test]
     #[should_panic(expected = "Authorization is missing")]
     fn test_burn_missing_authorization() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_same_definition_without_authorization(),
         ];
-        let _post_states = burn(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::BurnSuccess),
-        );
+        let _post_states = burn(&pre_states, BalanceForTests::burn_success());
     }
 
     #[test]
     #[should_panic(expected = "Insufficient balance to burn")]
     fn test_burn_insufficient_balance() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_same_definition_with_authorization(),
         ];
-        let _post_states = burn(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::BurnInsufficient),
-        );
+        let _post_states = burn(&pre_states, BalanceForTests::burn_insufficient());
     }
 
     #[test]
     #[should_panic(expected = "Total supply underflow")]
     fn test_burn_total_supply_underflow() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefAuthLargeBalance),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_same_definition_with_authorization_and_large_balance(),
         ];
-        let _post_states = burn(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintOverflow),
-        );
+        let _post_states = burn(&pre_states, BalanceForTests::mint_overflow());
     }
 
     #[test]
     fn test_burn_success() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_same_definition_with_authorization(),
         ];
-        let post_states = burn(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::BurnSuccess),
-        );
+        let post_states = burn(&pre_states, BalanceForTests::burn_success());
 
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
         assert!(
             *def_post.account()
-                == helper_account_constructor(AccountsEnum::DefinitionAccountPostBurn).account
+                == AccountForTests::definition_account_post_burn().account
         );
         assert!(
             *holding_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingAccountPostBurn).account
+                == AccountForTests::holding_account_post_burn().account
         );
     }
 
     #[test]
     #[should_panic(expected = "Invalid number of accounts")]
     fn test_mint_invalid_number_of_accounts_1() {
-        let pre_states = vec![helper_account_constructor(
-            AccountsEnum::DefinitionAccountAuth,
-        )];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let pre_states = vec![AccountForTests::definition_account_auth()];
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
     }
 
     #[test]
     #[should_panic(expected = "Invalid number of accounts")]
     fn test_mint_invalid_number_of_accounts_2() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefMint),
-            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_account_same_definition_mint(),
+            AccountForTests::holding_same_definition_with_authorization(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
     }
 
     #[test]
     #[should_panic(expected = "Holding account must be valid")]
     fn test_mint_not_valid_holding_account() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::DefinitionAccountNotAuth),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::definition_account_without_auth(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
     }
 
     #[test]
     #[should_panic(expected = "Definition account must be valid")]
     fn test_mint_not_valid_definition_account() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingSameDefAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+            AccountForTests::holding_same_definition_with_authorization(),
+            AccountForTests::holding_same_definition_without_authorization(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
     }
 
     #[test]
     #[should_panic(expected = "Definition authorization is missing")]
     fn test_mint_missing_authorization() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountNotAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+            AccountForTests::definition_account_without_auth(),
+            AccountForTests::holding_same_definition_without_authorization(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
     }
 
     #[test]
     #[should_panic(expected = "Mismatch Token Definition and Token Holding")]
     fn test_mint_mismatched_token_definition() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingDiffDef),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_different_definition(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
     }
 
     #[test]
     fn test_mint_success() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_same_definition_without_authorization(),
         ];
-        let post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
 
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
         assert!(
             *def_post.account()
-                == helper_account_constructor(AccountsEnum::DefinitionAccountMint).account
+                == AccountForTests::definition_account_mint().account
         );
         assert!(
             *holding_post.account()
-                == helper_account_constructor(AccountsEnum::HoldingSameDefMint).account
+                == AccountForTests::holding_account_same_definition_mint().account
         );
     }
 
     #[test]
     fn test_mint_uninit_holding_success() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_account_uninit(),
         ];
-        let post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
 
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
         assert!(
             *def_post.account()
-                == helper_account_constructor(AccountsEnum::DefinitionAccountMint).account
+                == AccountForTests::definition_account_mint().account
         );
         assert!(
-            *holding_post.account() == helper_account_constructor(AccountsEnum::InitMint).account
+            *holding_post.account() == AccountForTests::init_mint().account
         );
         assert!(holding_post.requires_claim() == true);
     }
@@ -1960,26 +1954,20 @@ mod tests {
     #[should_panic(expected = "Total supply overflow")]
     fn test_mint_total_supply_overflow() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_same_definition_without_authorization(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintOverflow),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_overflow());
     }
 
     #[test]
     #[should_panic(expected = "New balance overflow")]
     fn test_mint_holding_account_overflow() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuthOverflow),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_same_definition_without_authorization_overflow(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintOverflow),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_overflow());
     }
 
     #[test]
@@ -1988,13 +1976,10 @@ mod tests {
     )]
     fn test_mint_cannot_mint_unmintable_tokens() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuthNonFungible),
-            helper_account_constructor(AccountsEnum::HoldingSameDefNotAuth),
+            AccountForTests::definition_account_with_authorization_nonfungible(),
+            AccountForTests::holding_same_definition_without_authorization(),
         ];
-        let _post_states = mint_additional_supply(
-            &pre_states,
-            helper_balance_constructor(BalanceEnum::MintSuccess),
-        );
+        let _post_states = mint_additional_supply(&pre_states, BalanceForTests::mint_success());
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -2103,7 +2088,7 @@ mod tests {
         let metadata_values: Data = Data::try_from([1u8; 450].to_vec()).unwrap();
 
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
+            AccountForTests::definition_account_auth(),
             AccountWithMetadata {
                 account: Account::default(),
                 is_authorized: true,
@@ -2140,7 +2125,7 @@ mod tests {
                 is_authorized: true,
                 account_id: AccountId::new([1; 32]),
             },
-            helper_account_constructor(AccountsEnum::HoldingSameDefMint),
+            AccountForTests::holding_account_same_definition_mint(),
             AccountWithMetadata {
                 account: Account::default(),
                 is_authorized: true,
@@ -2177,7 +2162,7 @@ mod tests {
                 is_authorized: true,
                 account_id: AccountId::new([2; 32]),
             },
-            helper_account_constructor(AccountsEnum::HoldingSameDefMint),
+            AccountForTests::holding_account_same_definition_mint(),
         ];
         let _post_states = new_definition_with_metadata(
             &pre_states,
@@ -2372,9 +2357,9 @@ mod tests {
     #[should_panic(expected = "Invalid number of accounts")]
     #[test]
     fn test_print_nft_invalid_number_of_accounts_1() {
-        let pre_states = vec![helper_account_constructor(
-            AccountsEnum::HoldingAccountMasterNFT,
-        )];
+        let pre_states = vec![
+            AccountForTests::holding_account_master_nft()
+            ];
         let _post_states = print_nft(&pre_states);
     }
 
@@ -2382,9 +2367,9 @@ mod tests {
     #[test]
     fn test_print_nft_invalid_number_of_accounts_2() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFT),
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_master_nft(),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_account_uninit(),
         ];
         let _post_states = print_nft(&pre_states);
     }
@@ -2393,8 +2378,8 @@ mod tests {
     #[test]
     fn test_print_nft_master_account_must_be_authorized() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_uninit(),
+            AccountForTests::holding_account_uninit(),
         ];
         let _post_states = print_nft(&pre_states);
     }
@@ -2403,8 +2388,8 @@ mod tests {
     #[test]
     fn test_print_nft_print_account_initialized() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFT),
-            helper_account_constructor(AccountsEnum::HoldingAccountInit),
+            AccountForTests::holding_account_master_nft(),
+            AccountForTests::holding_account_init(),
         ];
         let _post_states = print_nft(&pre_states);
     }
@@ -2413,8 +2398,8 @@ mod tests {
     #[test]
     fn test_print_nft_master_nft_invalid_token_holding() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::DefinitionAccountAuth),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::definition_account_auth(),
+            AccountForTests::holding_account_uninit(),
         ];
         let _post_states = print_nft(&pre_states);
     }
@@ -2423,8 +2408,8 @@ mod tests {
     #[test]
     fn test_print_nft_master_nft_not_nft_master_account() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountInit),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_init(),
+            AccountForTests::holding_account_uninit(),
         ];
         let _post_states = print_nft(&pre_states);
     }
@@ -2433,8 +2418,8 @@ mod tests {
     #[test]
     fn test_print_nft_master_nft_insufficient_balance() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFTInsufficientBalance),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_master_nft_insufficient_balance(),
+            AccountForTests::holding_account_uninit(),
         ];
         let _post_states = print_nft(&pre_states);
     }
@@ -2442,8 +2427,8 @@ mod tests {
     #[test]
     fn test_print_nft_success() {
         let pre_states = vec![
-            helper_account_constructor(AccountsEnum::HoldingAccountMasterNFT),
-            helper_account_constructor(AccountsEnum::HoldingAccountUninit),
+            AccountForTests::holding_account_master_nft(),
+            AccountForTests::holding_account_uninit(),
         ];
         let post_states = print_nft(&pre_states);
 
@@ -2452,12 +2437,11 @@ mod tests {
 
         assert!(
             *post_master_nft
-                == helper_account_constructor(AccountsEnum::HoldingAccountMasterNFTAfterPrint)
-                    .account
+                == AccountForTests::holding_account_master_nft_after_print().account
         );
         assert!(
             *post_printed
-                == helper_account_constructor(AccountsEnum::HoldingAccountPrintedNFT).account
+                == AccountForTests::holding_account_printed_nft().account
         );
     }
 }
