@@ -20,7 +20,7 @@ impl NativeTokenTransfer<'_> {
                     PrivacyPreservingAccount::Public(to),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
                 tx_pre_check,
             )
             .await

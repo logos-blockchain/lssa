@@ -4,32 +4,26 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+nssa_core.workspace = true
+nssa.workspace = true
+common.workspace = true
+key_protocol.workspace = true
+
 anyhow.workspace = true
 serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
 tokio.workspace = true
-tempfile.workspace = true
 clap.workspace = true
-nssa-core = { path = "../nssa/core" }
 base64.workspace = true
-bytemuck = "1.23.2"
+bytemuck.workspace = true
 borsh.workspace = true
 base58.workspace = true
-hex = "0.4.3"
+hex.workspace = true
 rand.workspace = true
 itertools.workspace = true
 sha2.workspace = true
 futures.workspace = true
 async-stream = "0.3.6"
 indicatif = { version = "0.18.3", features = ["improved_unicode"] }
-
-[dependencies.key_protocol]
-path = "../key_protocol"
-
-[dependencies.nssa]
-path = "../nssa"
-
-[dependencies.common]
-path = "../common"

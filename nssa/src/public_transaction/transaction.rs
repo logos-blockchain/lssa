@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use borsh::{BorshDeserialize, BorshSerialize};
+use log::debug;
 use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata},
     program::{ChainedCall, DEFAULT_PROGRAM_ID, PdaSeed, ProgramId, validate_execution},
@@ -123,8 +124,16 @@ impl PublicTransaction {
                 return Err(NssaError::InvalidInput("Unknown program".into()));
             };
 
+            debug!(
+                "Program {:?} pre_states: {:?}, instruction_data: {:?}",
+                chained_call.program_id, chained_call.pre_states, chained_call.instruction_data
+            );
             let mut program_output =
                 program.execute(&chained_call.pre_states, &chained_call.instruction_data)?;
+            debug!(
+                "Program {:?} output: {:?}",
+                chained_call.program_id, program_output
+            );
 
             let authorized_pdas =
                 self.compute_authorized_pdas(&caller_program_id, &chained_call.pda_seeds);

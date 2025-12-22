@@ -56,8 +56,6 @@ pub enum TokenProgramAgnosticSubcommand {
     ///
     /// Also if `definition` is private then it is owned, because
     /// we can not modify foreign accounts.
-    ///
-    /// ToDo: Return and add foreign variant when we could modify foreign accounts
     Burn {
         /// definition - valid 32 byte base58 string with privacy prefix
         #[arg(long)]

@@ -54,7 +54,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(supply_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -82,7 +82,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(supply_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -110,7 +110,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(supply_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -176,7 +176,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -206,7 +206,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -232,7 +232,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(recipient_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -259,7 +259,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -290,7 +290,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -312,7 +312,9 @@ impl Token<'_> {
         let (instruction, program) = token_program_preparation_burn(amount);
 
         // ToDo: Fix this by updating `nssa::public_transaction::Message::try_new` to get raw bytes
-        let instruction: [u32; 23] = instruction.try_into().unwrap();
+        let instruction: [u32; 23] = instruction
+            .try_into()
+            .expect("Instruction vector should have len 32");
 
         let Ok(nonces) = self.0.get_accounts_nonces(vec![holder_account_id]).await else {
             return Err(ExecutionFailureKind::SequencerError);
@@ -323,16 +325,14 @@ impl Token<'_> {
             nonces,
             instruction,
         )
-        .unwrap();
+        .expect("Instruction should serialize");
 
-        let Some(signing_key) = self
+        let signing_key = self
             .0
             .storage
             .user_data
             .get_pub_account_signing_key(&holder_account_id)
-        else {
-            return Err(ExecutionFailureKind::KeyNotFoundError);
-        };
+            .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
         let witness_set =
             nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
 
@@ -356,7 +356,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -382,7 +382,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -409,7 +409,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -479,7 +479,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -509,7 +509,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -535,7 +535,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -562,7 +562,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -593,7 +593,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
