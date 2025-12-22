@@ -74,17 +74,13 @@ const CURRENT_VERSION: u8 = 1;
 const TOKEN_METADATA_DATA_SIZE: usize = 463;
 
 fn is_token_standard_valid(standard: u8) -> bool {
-    if standard == TOKEN_STANDARD_FUNGIBLE_TOKEN {
-        true
-    } else if standard == TOKEN_STANDARD_FUNGIBLE_ASSET {
-        true
-    } else if standard == TOKEN_STANDARD_NONFUNGIBLE {
-        true
-    } else if standard == TOKEN_STANDARD_NONFUNGIBLE_PRINTABLE {
-        true
-    } else {
-        false
-    }
+    matches!(
+        standard,
+        TOKEN_STANDARD_FUNGIBLE_TOKEN
+        | TOKEN_STANDARD_FUNGIBLE_ASSET
+        | TOKEN_STANDARD_NONFUNGIBLE
+        | TOKEN_STANDARD_NONFUNGIBLE_PRINTABLE
+    )
 }
 
 fn is_metadata_type_valid(standard: u8) -> bool {
