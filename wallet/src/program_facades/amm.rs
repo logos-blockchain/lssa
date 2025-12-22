@@ -2,10 +2,7 @@ use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxRespon
 use nssa::{AccountId, ProgramId, program::Program};
 use nssa_core::program::PdaSeed;
 
-use crate::{
-    TokenHolding, WalletCore,
-    program_facades::{OrphanHack49BytesInput, OrphanHack65BytesInput},
-};
+use crate::{TokenHolding, WalletCore};
 
 fn compute_pool_pda(
     amm_program_id: ProgramId,
@@ -451,10 +448,7 @@ impl Amm<'_> {
     }
 }
 
-fn amm_program_preparation_definition(
-    balance_a: u128,
-    balance_b: u128,
-) -> (OrphanHack65BytesInput, Program) {
+fn amm_program_preparation_definition(balance_a: u128, balance_b: u128) -> (Vec<u8>, Program) {
     // An instruction data of 65-bytes, indicating the initial amm reserves' balances and
     // token_program_id with the following layout:
     // [0x00 || array of balances (little-endian 16 bytes) || AMM_PROGRAM_ID)]
@@ -474,7 +468,7 @@ fn amm_program_preparation_definition(
     instruction[57..61].copy_from_slice(&amm_program_id[6].to_le_bytes());
     instruction[61..].copy_from_slice(&amm_program_id[7].to_le_bytes());
 
-    let instruction_data = OrphanHack65BytesInput::expand(instruction);
+    let instruction_data = instruction.to_vec();
     let program = Program::amm();
 
     (instruction_data, program)
@@ -484,7 +478,7 @@ fn amm_program_preparation_swap(
     amount_in: u128,
     min_amount_out: u128,
     token_definition_id: AccountId,
-) -> (OrphanHack65BytesInput, Program) {
+) -> (Vec<u8>, Program) {
     // An instruction data byte string of length 65, indicating which token type to swap, quantity
     // of tokens put into the swap (of type TOKEN_DEFINITION_ID) and min_amount_out.
     // [0x01 || amount (little-endian 16 bytes) || TOKEN_DEFINITION_ID].
@@ -496,7 +490,7 @@ fn amm_program_preparation_swap(
     // This can be done less verbose, but it is better to use same way, as in amm program
     instruction[33..].copy_from_slice(&token_definition_id.to_bytes());
 
-    let instruction_data = OrphanHack65BytesInput::expand(instruction);
+    let instruction_data = instruction.to_vec();
     let program = Program::amm();
 
     (instruction_data, program)
@@ -506,7 +500,7 @@ fn amm_program_preparation_add_liq(
     min_amount_lp: u128,
     max_amount_a: u128,
     max_amount_b: u128,
-) -> (OrphanHack49BytesInput, Program) {
+) -> (Vec<u8>, Program) {
     // An instruction data byte string of length 49, amounts for minimum amount of liquidity from
     // add (min_amount_lp), max amount added for each token (max_amount_a and max_amount_b);
     // indicate [0x02 || array of of balances (little-endian 16 bytes)].
@@ -517,7 +511,7 @@ fn amm_program_preparation_add_liq(
     instruction[17..33].copy_from_slice(&max_amount_a.to_le_bytes());
     instruction[33..49].copy_from_slice(&max_amount_b.to_le_bytes());
 
-    let instruction_data = OrphanHack49BytesInput::expand(instruction);
+    let instruction_data = instruction.to_vec();
     let program = Program::amm();
 
     (instruction_data, program)
@@ -527,7 +521,7 @@ fn amm_program_preparation_remove_liq(
     balance_lp: u128,
     min_amount_a: u128,
     min_amount_b: u128,
-) -> (OrphanHack49BytesInput, Program) {
+) -> (Vec<u8>, Program) {
     // An instruction data byte string of length 49, amounts for minimum amount of liquidity to
     // redeem (balance_lp), minimum balance of each token to remove (min_amount_a and
     // min_amount_b); indicate [0x03 || array of balances (little-endian 16 bytes)].
@@ -538,7 +532,7 @@ fn amm_program_preparation_remove_liq(
     instruction[17..33].copy_from_slice(&min_amount_a.to_le_bytes());
     instruction[33..49].copy_from_slice(&min_amount_b.to_le_bytes());
 
-    let instruction_data = OrphanHack49BytesInput::expand(instruction);
+    let instruction_data = instruction.to_vec();
     let program = Program::amm();
 
     (instruction_data, program)
