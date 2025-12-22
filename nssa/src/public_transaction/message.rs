@@ -36,7 +36,7 @@ impl Message {
         program_id: ProgramId,
         account_ids: Vec<AccountId>,
         nonces: Vec<Nonce>,
-        instruction_data: Vec<u32>,
+        instruction_data: InstructionData,
     ) -> Self {
         Self {
             program_id,

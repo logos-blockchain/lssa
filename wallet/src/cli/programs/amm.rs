@@ -6,7 +6,7 @@ use crate::{
     WalletCore,
     cli::{SubcommandReturnValue, WalletSubcommand},
     helperfunctions::{AccountPrivacyKind, parse_addr_with_privacy_prefix},
-    program_facades::amm::AMM,
+    program_facades::amm::Amm,
 };
 
 /// Represents generic CLI subcommand for a wallet working with amm program
@@ -32,7 +32,7 @@ pub enum AmmProgramAgnosticSubcommand {
         #[arg(long)]
         balance_b: u128,
     },
-    /// Swap with variable privacy
+    /// Swap
     ///
     /// The account associated with swapping token must be owned
     ///
@@ -52,7 +52,7 @@ pub enum AmmProgramAgnosticSubcommand {
         #[arg(long)]
         token_definition: String,
     },
-    /// Add liquidity with variable privacy
+    /// Add liquidity
     ///
     /// user_holding_a and user_holding_b must be owned.
     ///
@@ -74,7 +74,7 @@ pub enum AmmProgramAgnosticSubcommand {
         #[arg(long)]
         max_amount_b: u128,
     },
-    /// Remove liquidity with variable privacy
+    /// Remove liquidity
     ///
     /// user_holding_lp must be owned.
     ///
@@ -132,8 +132,8 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
                         AccountPrivacyKind::Public,
                         AccountPrivacyKind::Public,
                     ) => {
-                        AMM(wallet_core)
-                            .send_new_amm_definition(
+                        Amm(wallet_core)
+                            .send_new_definition(
                                 user_holding_a,
                                 user_holding_b,
                                 user_holding_lp,
@@ -146,7 +146,7 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
                     }
                     _ => {
                         // ToDo: Implement after private multi-chain calls is available
-                        anyhow::bail!("Only public execution allowed for AMM calls");
+                        anyhow::bail!("Only public execution allowed for Amm calls");
                     }
                 }
             }
@@ -167,7 +167,7 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
 
                 match (user_holding_a_privacy, user_holding_b_privacy) {
                     (AccountPrivacyKind::Public, AccountPrivacyKind::Public) => {
-                        AMM(wallet_core)
+                        Amm(wallet_core)
                             .send_swap(
                                 user_holding_a,
                                 user_holding_b,
@@ -181,7 +181,7 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
                     }
                     _ => {
                         // ToDo: Implement after private multi-chain calls is available
-                        anyhow::bail!("Only public execution allowed for AMM calls");
+                        anyhow::bail!("Only public execution allowed for Amm calls");
                     }
                 }
             }
@@ -214,8 +214,8 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
                         AccountPrivacyKind::Public,
                         AccountPrivacyKind::Public,
                     ) => {
-                        AMM(wallet_core)
-                            .send_add_liq(
+                        Amm(wallet_core)
+                            .send_add_liquidity(
                                 user_holding_a,
                                 user_holding_b,
                                 user_holding_lp,
@@ -229,7 +229,7 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
                     }
                     _ => {
                         // ToDo: Implement after private multi-chain calls is available
-                        anyhow::bail!("Only public execution allowed for AMM calls");
+                        anyhow::bail!("Only public execution allowed for Amm calls");
                     }
                 }
             }
@@ -262,8 +262,8 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
                         AccountPrivacyKind::Public,
                         AccountPrivacyKind::Public,
                     ) => {
-                        AMM(wallet_core)
-                            .send_remove_liq(
+                        Amm(wallet_core)
+                            .send_remove_liquidity(
                                 user_holding_a,
                                 user_holding_b,
                                 user_holding_lp,
@@ -277,7 +277,7 @@ impl WalletSubcommand for AmmProgramAgnosticSubcommand {
                     }
                     _ => {
                         // ToDo: Implement after private multi-chain calls is available
-                        anyhow::bail!("Only public execution allowed for AMM calls");
+                        anyhow::bail!("Only public execution allowed for Amm calls");
                     }
                 }
             }

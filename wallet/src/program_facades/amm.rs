@@ -1,19 +1,109 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
-use nssa::{AccountId, program::Program};
+use nssa::{AccountId, ProgramId, program::Program};
+use nssa_core::program::PdaSeed;
 
 use crate::{
-    WalletCore,
-    cli::account::TokenHolding,
-    program_facades::{
-        OrphanHack49BytesInput, OrphanHack65BytesInput, compute_liquidity_token_pda,
-        compute_pool_pda, compute_vault_pda,
-    },
+    TokenHolding, WalletCore,
+    program_facades::{OrphanHack49BytesInput, OrphanHack65BytesInput},
 };
 
-pub struct AMM<'w>(pub &'w WalletCore);
+fn compute_pool_pda(
+    amm_program_id: ProgramId,
+    definition_token_a_id: AccountId,
+    definition_token_b_id: AccountId,
+) -> AccountId {
+    AccountId::from((
+        &amm_program_id,
+        &compute_pool_pda_seed(definition_token_a_id, definition_token_b_id),
+    ))
+}
 
-impl AMM<'_> {
-    pub async fn send_new_amm_definition(
+fn compute_pool_pda_seed(
+    definition_token_a_id: AccountId,
+    definition_token_b_id: AccountId,
+) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
+
+    let mut i: usize = 0;
+    let (token_1, token_2) = loop {
+        if definition_token_a_id.value()[i] > definition_token_b_id.value()[i] {
+            let token_1 = definition_token_a_id;
+            let token_2 = definition_token_b_id;
+            break (token_1, token_2);
+        } else if definition_token_a_id.value()[i] < definition_token_b_id.value()[i] {
+            let token_1 = definition_token_b_id;
+            let token_2 = definition_token_a_id;
+            break (token_1, token_2);
+        }
+
+        if i == 32 {
+            panic!("Definitions match");
+        } else {
+            i += 1;
+        }
+    };
+
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&token_1.to_bytes());
+    bytes[32..].copy_from_slice(&token_2.to_bytes());
+
+    PdaSeed::new(
+        Impl::hash_bytes(&bytes)
+            .as_bytes()
+            .try_into()
+            .expect("Hash output must be exactly 32 bytes long"),
+    )
+}
+
+fn compute_vault_pda(
+    amm_program_id: ProgramId,
+    pool_id: AccountId,
+    definition_token_id: AccountId,
+) -> AccountId {
+    AccountId::from((
+        &amm_program_id,
+        &compute_vault_pda_seed(pool_id, definition_token_id),
+    ))
+}
+
+fn compute_vault_pda_seed(pool_id: AccountId, definition_token_id: AccountId) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
+
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&pool_id.to_bytes());
+    bytes[32..].copy_from_slice(&definition_token_id.to_bytes());
+
+    PdaSeed::new(
+        Impl::hash_bytes(&bytes)
+            .as_bytes()
+            .try_into()
+            .expect("Hash output must be exactly 32 bytes long"),
+    )
+}
+
+fn compute_liquidity_token_pda(amm_program_id: ProgramId, pool_id: AccountId) -> AccountId {
+    AccountId::from((&amm_program_id, &compute_liquidity_token_pda_seed(pool_id)))
+}
+
+fn compute_liquidity_token_pda_seed(pool_id: AccountId) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
+
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&pool_id.to_bytes());
+    bytes[32..].copy_from_slice(&[0; 32]);
+
+    PdaSeed::new(
+        Impl::hash_bytes(&bytes)
+            .as_bytes()
+            .try_into()
+            .expect("Hash output must be exactly 32 bytes long"),
+    )
+}
+
+pub struct Amm<'w>(pub &'w WalletCore);
+
+impl Amm<'_> {
+    pub async fn send_new_definition(
         &self,
         user_holding_a: AccountId,
         user_holding_b: AccountId,
@@ -25,12 +115,16 @@ impl AMM<'_> {
 
         let amm_program_id = Program::amm().id();
 
-        let Ok(user_a_acc) = self.0.get_account_public(user_holding_a).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
-        let Ok(user_b_acc) = self.0.get_account_public(user_holding_b).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+        let user_a_acc = self
+            .0
+            .get_account_public(user_holding_a)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
+        let user_b_acc = self
+            .0
+            .get_account_public(user_holding_b)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
         let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
             .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
@@ -55,31 +149,25 @@ impl AMM<'_> {
             user_holding_lp,
         ];
 
-        let Ok(nonces) = self
+        let nonces = self
             .0
             .get_accounts_nonces(vec![user_holding_a, user_holding_b])
             .await
-        else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let Some(signing_key_a) = self
+        let signing_key_a = self
             .0
             .storage
             .user_data
             .get_pub_account_signing_key(&user_holding_a)
-        else {
-            return Err(ExecutionFailureKind::KeyNotFoundError);
-        };
+            .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
-        let Some(signing_key_b) = self
+        let signing_key_b = self
             .0
             .storage
             .user_data
             .get_pub_account_signing_key(&user_holding_b)
-        else {
-            return Err(ExecutionFailureKind::KeyNotFoundError);
-        };
+            .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(
             program.id(),
@@ -112,12 +200,16 @@ impl AMM<'_> {
 
         let amm_program_id = Program::amm().id();
 
-        let Ok(user_a_acc) = self.0.get_account_public(user_holding_a).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
-        let Ok(user_b_acc) = self.0.get_account_public(user_holding_b).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+        let user_a_acc = self
+            .0
+            .get_account_public(user_holding_a)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
+        let user_b_acc = self
+            .0
+            .get_account_public(user_holding_b)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
         let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
             .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
@@ -166,18 +258,18 @@ impl AMM<'_> {
             return Err(ExecutionFailureKind::AccountDataError(token_definition_id));
         }
 
-        let Ok(nonces) = self.0.get_accounts_nonces(vec![account_id_auth]).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+        let nonces = self
+            .0
+            .get_accounts_nonces(vec![account_id_auth])
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let Some(signing_key) = self
+        let signing_key = self
             .0
             .storage
             .user_data
             .get_pub_account_signing_key(&account_id_auth)
-        else {
-            return Err(ExecutionFailureKind::KeyNotFoundError);
-        };
+            .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(
             program.id(),
@@ -195,7 +287,7 @@ impl AMM<'_> {
         Ok(self.0.sequencer_client.send_tx_public(tx).await?)
     }
 
-    pub async fn send_add_liq(
+    pub async fn send_add_liquidity(
         &self,
         user_holding_a: AccountId,
         user_holding_b: AccountId,
@@ -209,12 +301,16 @@ impl AMM<'_> {
 
         let amm_program_id = Program::amm().id();
 
-        let Ok(user_a_acc) = self.0.get_account_public(user_holding_a).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
-        let Ok(user_b_acc) = self.0.get_account_public(user_holding_b).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+        let user_a_acc = self
+            .0
+            .get_account_public(user_holding_a)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
+        let user_b_acc = self
+            .0
+            .get_account_public(user_holding_b)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
         let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
             .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
@@ -239,31 +335,25 @@ impl AMM<'_> {
             user_holding_lp,
         ];
 
-        let Ok(nonces) = self
+        let nonces = self
             .0
             .get_accounts_nonces(vec![user_holding_a, user_holding_b])
             .await
-        else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let Some(signing_key_a) = self
+        let signing_key_a = self
             .0
             .storage
             .user_data
             .get_pub_account_signing_key(&user_holding_a)
-        else {
-            return Err(ExecutionFailureKind::KeyNotFoundError);
-        };
+            .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
-        let Some(signing_key_b) = self
+        let signing_key_b = self
             .0
             .storage
             .user_data
             .get_pub_account_signing_key(&user_holding_b)
-        else {
-            return Err(ExecutionFailureKind::KeyNotFoundError);
-        };
+            .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(
             program.id(),
@@ -283,7 +373,7 @@ impl AMM<'_> {
         Ok(self.0.sequencer_client.send_tx_public(tx).await?)
     }
 
-    pub async fn send_remove_liq(
+    pub async fn send_remove_liquidity(
         &self,
         user_holding_a: AccountId,
         user_holding_b: AccountId,
@@ -297,12 +387,16 @@ impl AMM<'_> {
 
         let amm_program_id = Program::amm().id();
 
-        let Ok(user_a_acc) = self.0.get_account_public(user_holding_a).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
-        let Ok(user_b_acc) = self.0.get_account_public(user_holding_b).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+        let user_a_acc = self
+            .0
+            .get_account_public(user_holding_a)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
+        let user_b_acc = self
+            .0
+            .get_account_public(user_holding_b)
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
         let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
             .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
@@ -327,18 +421,18 @@ impl AMM<'_> {
             user_holding_lp,
         ];
 
-        let Ok(nonces) = self.0.get_accounts_nonces(vec![user_holding_lp]).await else {
-            return Err(ExecutionFailureKind::SequencerError);
-        };
+        let nonces = self
+            .0
+            .get_accounts_nonces(vec![user_holding_lp])
+            .await
+            .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let Some(signing_key_lp) = self
+        let signing_key_lp = self
             .0
             .storage
             .user_data
             .get_pub_account_signing_key(&user_holding_lp)
-        else {
-            return Err(ExecutionFailureKind::KeyNotFoundError);
-        };
+            .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(
             program.id(),

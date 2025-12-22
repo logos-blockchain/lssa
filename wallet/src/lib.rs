@@ -43,6 +43,60 @@ pub enum AccDecodeData {
     Decode(nssa_core::SharedSecretKey, AccountId),
 }
 
+const TOKEN_DEFINITION_TYPE: u8 = 0;
+const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
+
+const TOKEN_HOLDING_TYPE: u8 = 1;
+const TOKEN_HOLDING_DATA_SIZE: usize = 49;
+
+struct TokenDefinition {
+    #[allow(unused)]
+    account_type: u8,
+    name: [u8; 6],
+    total_supply: u128,
+}
+
+pub struct TokenHolding {
+    pub account_type: u8,
+    pub definition_id: AccountId,
+    pub balance: u128,
+}
+
+impl TokenDefinition {
+    fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != TOKEN_DEFINITION_DATA_SIZE || data[0] != TOKEN_DEFINITION_TYPE {
+            None
+        } else {
+            let account_type = data[0];
+            let name = data[1..7].try_into().unwrap();
+            let total_supply = u128::from_le_bytes(data[7..].try_into().unwrap());
+
+            Some(Self {
+                account_type,
+                name,
+                total_supply,
+            })
+        }
+    }
+}
+
+impl TokenHolding {
+    pub fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
+            None
+        } else {
+            let account_type = data[0];
+            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
+            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
+            Some(Self {
+                definition_id,
+                balance,
+                account_type,
+            })
+        }
+    }
+}
+
 pub struct WalletCore {
     pub storage: WalletChainStore,
     pub poller: TxPoller,
