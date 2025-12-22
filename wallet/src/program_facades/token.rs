@@ -356,7 +356,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -382,7 +382,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -409,7 +409,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -479,7 +479,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -509,7 +509,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -535,7 +535,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -562,7 +562,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -593,7 +593,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program,
+                &program.into(),
             )
             .await
             .map(|(resp, secrets)| {
