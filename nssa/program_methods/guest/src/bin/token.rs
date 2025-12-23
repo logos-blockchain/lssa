@@ -77,32 +77,19 @@ fn is_token_standard_valid(standard: u8) -> bool {
     matches!(
         standard,
         TOKEN_STANDARD_FUNGIBLE_TOKEN
-        | TOKEN_STANDARD_FUNGIBLE_ASSET
-        | TOKEN_STANDARD_NONFUNGIBLE
-        | TOKEN_STANDARD_NONFUNGIBLE_PRINTABLE
+            | TOKEN_STANDARD_FUNGIBLE_ASSET
+            | TOKEN_STANDARD_NONFUNGIBLE
+            | TOKEN_STANDARD_NONFUNGIBLE_PRINTABLE
     )
 }
 
 fn is_metadata_type_valid(standard: u8) -> bool {
-    if standard == METADATA_TYPE_SIMPLE {
-        true
-    } else if standard == METADATA_TYPE_EXPANDED {
-        true
-    } else {
-        false
-    }
+    matches!(standard, METADATA_TYPE_SIMPLE | METADATA_TYPE_EXPANDED)
 }
 
 fn is_token_holding_type_valid(standard: u8) -> bool {
-    if standard == TOKEN_HOLDING_STANDARD {
-        true
-    } else if standard == TOKEN_HOLDING_NFT_MASTER {
-        true
-    } else if standard == TOKEN_HOLDING_NFT_PRINTED_COPY {
-        true
-    } else {
-        false
-    }
+    matches!(standard, |TOKEN_HOLDING_STANDARD| TOKEN_HOLDING_NFT_MASTER
+        | TOKEN_HOLDING_NFT_PRINTED_COPY)
 }
 
 struct TokenDefinition {
@@ -154,9 +141,9 @@ impl TokenDefinition {
             });
 
             match account_type {
-                TOKEN_STANDARD_NONFUNGIBLE if total_supply != 1
-                | TOKEN_STANDARD_FUNGIBLE_TOKEN if metadata_id != AccountId::new([0; 32]) =>  None
-                _ => this
+                TOKEN_STANDARD_NONFUNGIBLE if total_supply != 1 => None,
+                TOKEN_STANDARD_FUNGIBLE_TOKEN if metadata_id != AccountId::new([0; 32]) => None,
+                _ => this,
             }
         }
     }
@@ -528,11 +515,7 @@ fn new_definition_with_metadata(
 }
 
 fn valid_total_supply_for_token_standard(total_supply: u128, token_standard: u8) -> bool {
-    if token_standard == TOKEN_STANDARD_NONFUNGIBLE && total_supply != 1 {
-        false
-    } else {
-        true
-    }
+    token_standard != TOKEN_STANDARD_NONFUNGIBLE || total_supply == 1
 }
 
 fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostState> {
@@ -619,11 +602,7 @@ fn burn(pre_states: &[AccountWithMetadata], balance_to_burn: u128) -> Vec<Accoun
 }
 
 fn is_mintable(account_type: u8) -> bool {
-    if account_type == TOKEN_STANDARD_NONFUNGIBLE {
-        false
-    } else {
-        true
-    }
+    account_type != TOKEN_STANDARD_NONFUNGIBLE
 }
 
 fn mint_additional_supply(
@@ -1529,10 +1508,7 @@ mod tests {
                 == AccountForTests::definition_account_unclaimed().account
         );
 
-        assert!(
-            *holding_account.account()
-                == AccountForTests::holding_account_unclaimed().account
-        );
+        assert!(*holding_account.account() == AccountForTests::holding_account_unclaimed().account);
     }
 
     #[should_panic(expected = "Invalid number of input accounts")]
@@ -1697,13 +1673,11 @@ mod tests {
         let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
 
         assert!(
-            *sender_post.account()
-                == AccountForTests::holding_account_init_post_transfer().account
+            *sender_post.account() == AccountForTests::holding_account_init_post_transfer().account
         );
         assert!(
             *recipient_post.account()
-                == AccountForTests::holding_account2_init_post_transfer()
-                    .account
+                == AccountForTests::holding_account2_init_post_transfer().account
         );
     }
 
@@ -1738,13 +1712,11 @@ mod tests {
 
         assert!(
             *sender_post.account()
-                == AccountForTests::holding_account_master_nft_post_transfer()
-                    .account
+                == AccountForTests::holding_account_master_nft_post_transfer().account
         );
         assert!(
             *recipient_post.account()
-                == AccountForTests::holding_account_with_master_nft_transferred_to()
-                    .account
+                == AccountForTests::holding_account_with_master_nft_transferred_to().account
         );
     }
 
@@ -1758,23 +1730,18 @@ mod tests {
         let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
 
         assert!(
-            *sender_post.account()
-                == AccountForTests::holding_account_init_post_transfer()
-                .account
+            *sender_post.account() == AccountForTests::holding_account_init_post_transfer().account
         );
         assert!(
             *recipient_post.account()
-                == AccountForTests::holding_account2_init_post_transfer()
-                    .account
+                == AccountForTests::holding_account2_init_post_transfer().account
         );
     }
 
     #[test]
     #[should_panic(expected = "Invalid number of accounts")]
     fn test_burn_invalid_number_of_accounts() {
-        let pre_states = vec![
-            AccountForTests::definition_account_auth(),
-        ];
+        let pre_states = vec![AccountForTests::definition_account_auth()];
         let _post_states = burn(&pre_states, BalanceForTests::burn_success());
     }
 
@@ -1829,14 +1796,8 @@ mod tests {
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
-        assert!(
-            *def_post.account()
-                == AccountForTests::definition_account_post_burn().account
-        );
-        assert!(
-            *holding_post.account()
-                == AccountForTests::holding_account_post_burn().account
-        );
+        assert!(*def_post.account() == AccountForTests::definition_account_post_burn().account);
+        assert!(*holding_post.account() == AccountForTests::holding_account_post_burn().account);
     }
 
     #[test]
@@ -1908,10 +1869,7 @@ mod tests {
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
-        assert!(
-            *def_post.account()
-                == AccountForTests::definition_account_mint().account
-        );
+        assert!(*def_post.account() == AccountForTests::definition_account_mint().account);
         assert!(
             *holding_post.account()
                 == AccountForTests::holding_account_same_definition_mint().account
@@ -1929,13 +1887,8 @@ mod tests {
         let def_post = post_states[0].clone();
         let holding_post = post_states[1].clone();
 
-        assert!(
-            *def_post.account()
-                == AccountForTests::definition_account_mint().account
-        );
-        assert!(
-            *holding_post.account() == AccountForTests::init_mint().account
-        );
+        assert!(*def_post.account() == AccountForTests::definition_account_mint().account);
+        assert!(*holding_post.account() == AccountForTests::init_mint().account);
         assert!(holding_post.requires_claim() == true);
     }
 
@@ -2346,9 +2299,7 @@ mod tests {
     #[should_panic(expected = "Invalid number of accounts")]
     #[test]
     fn test_print_nft_invalid_number_of_accounts_1() {
-        let pre_states = vec![
-            AccountForTests::holding_account_master_nft()
-            ];
+        let pre_states = vec![AccountForTests::holding_account_master_nft()];
         let _post_states = print_nft(&pre_states);
     }
 
@@ -2425,12 +2376,8 @@ mod tests {
         let post_printed = post_states[1].account();
 
         assert!(
-            *post_master_nft
-                == AccountForTests::holding_account_master_nft_after_print().account
+            *post_master_nft == AccountForTests::holding_account_master_nft_after_print().account
         );
-        assert!(
-            *post_printed
-                == AccountForTests::holding_account_printed_nft().account
-        );
+        assert!(*post_printed == AccountForTests::holding_account_printed_nft().account);
     }
 }
