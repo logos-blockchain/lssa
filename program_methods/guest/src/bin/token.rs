@@ -137,7 +137,7 @@ impl TokenDefinition {
                 account_type,
                 name,
                 total_supply,
-                metadata_id: metadata_id.clone(),
+                metadata_id,
             });
 
             match account_type {
@@ -159,7 +159,7 @@ impl TokenHolding {
     fn new(definition_id: &AccountId) -> Self {
         Self {
             account_type: TOKEN_HOLDING_STANDARD,
-            definition_id: definition_id.clone(),
+            definition_id: *definition_id,
             balance: 0,
         }
     }
@@ -409,7 +409,7 @@ fn new_definition(
 
     let token_holding = TokenHolding {
         account_type: TOKEN_HOLDING_STANDARD,
-        definition_id: definition_target_account.account_id.clone(),
+        definition_id: definition_target_account.account_id,
         balance: total_supply,
     };
 
@@ -469,12 +469,12 @@ fn new_definition_with_metadata(
         account_type: token_standard,
         name,
         total_supply,
-        metadata_id: metadata_target_account.account_id.clone(),
+        metadata_id: metadata_target_account.account_id,
     };
 
     let token_holding = TokenHolding {
         account_type: TOKEN_HOLDING_STANDARD,
-        definition_id: definition_target_account.account_id.clone(),
+        definition_id: definition_target_account.account_id,
         balance: total_supply,
     };
 
@@ -492,7 +492,7 @@ fn new_definition_with_metadata(
     let token_metadata = TokenMetadata {
         account_type: metadata_standard,
         version: CURRENT_VERSION,
-        definition_id: definition_target_account.account_id.clone(),
+        definition_id: definition_target_account.account_id,
         uri,
         creators,
         primary_sale_date: 0u64, //TODO: future works to implement this
@@ -705,7 +705,7 @@ fn print_nft(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostState> {
         panic!("Insufficient balance to print another NFT copy");
     }
 
-    let definition_id = master_account_data.definition_id.clone();
+    let definition_id = master_account_data.definition_id;
 
     let post_master_account = {
         let mut this = master_account.account.clone();
@@ -862,9 +862,9 @@ mod tests {
 
     use crate::{
         TOKEN_DEFINITION_DATA_SIZE, TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_NFT_MASTER,
-        TOKEN_HOLDING_NFT_PRINTED_COPY, TOKEN_HOLDING_STANDARD, TOKEN_STANDARD_FUNGIBLE_ASSET,
+        TOKEN_HOLDING_NFT_PRINTED_COPY, TOKEN_HOLDING_STANDARD,
         TOKEN_STANDARD_FUNGIBLE_TOKEN, TOKEN_STANDARD_NONFUNGIBLE, TokenDefinition, TokenHolding,
-        burn, initialize_account, mint_additional_supply, new_definition,
+        burn, mint_additional_supply, new_definition,
         new_definition_with_metadata, print_nft, transfer,
     };
 
@@ -1367,7 +1367,7 @@ mod tests {
         }
 
         fn mint_overflow() -> u128 {
-            (2 as u128).pow(128) - 40_000
+            2_u128.pow(128) - 40_000
         }
 
         fn init_supply_mint() -> u128 {
@@ -1889,7 +1889,7 @@ mod tests {
 
         assert!(*def_post.account() == AccountForTests::definition_account_mint().account);
         assert!(*holding_post.account() == AccountForTests::init_mint().account);
-        assert!(holding_post.requires_claim() == true);
+        assert!(holding_post.requires_claim());
     }
 
     #[test]
