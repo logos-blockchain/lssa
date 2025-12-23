@@ -67,13 +67,17 @@ impl KeyNode for ChildKeysPublic {
                 .expect("hash_value is 64 bytes, must be safe to get first 32"),
         )
         .unwrap();
-        //TODO: remove unwrap
+
         let csk = nssa::PrivateKey::try_new(
             csk.add_tweak(&Scalar::from_le_bytes(*self.csk.value()).unwrap())
-                .expect("TODO")
-                .secret_bytes(), //.secret_bytes().expect("TODO");
+                .expect("Expect a valid Scalar")
+                .secret_bytes(),
         )
         .unwrap();
+
+        if secp256k1::constants::CURVE_ORDER < *csk.value() {
+            panic!("Secret key cannot exceed curve order");
+        } 
 
         let ccc = *hash_value
             .last_chunk::<32>()
