@@ -113,9 +113,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                 let to = receiver.parse()?;
 
                 if from.is_private() || to.is_private() {
-                    let mut acc_vector = vec![];
-                    acc_vector.push(from);
-                    acc_vector.push(to);
+                    let acc_vector = vec![from, to];
 
                     let (res, acc_decode_data) = send_privacy_preserving_transaction_unified(
                         wallet_core,

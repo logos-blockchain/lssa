@@ -96,9 +96,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                 let supply = supply.parse()?;
 
                 if definition.is_private() || supply.is_private() {
-                    let mut acc_vector = vec![];
-                    acc_vector.push(definition);
-                    acc_vector.push(supply);
+                    let acc_vector = vec![definition, supply];
 
                     let name = name.as_bytes();
                     if name.len() > 6 {
@@ -165,9 +163,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                 let to = to.parse()?;
 
                 if from.is_private() || to.is_private() {
-                    let mut acc_vector = vec![];
-                    acc_vector.push(from);
-                    acc_vector.push(to);
+                    let acc_vector = vec![from, to];
 
                     let (res, acc_decode_data) = send_privacy_preserving_transaction_unified(
                         wallet_core,
@@ -216,9 +212,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                 let holder = holder.parse()?;
 
                 if definition.is_private() || holder.is_private() {
-                    let mut acc_vector = vec![];
-                    acc_vector.push(definition);
-                    acc_vector.push(holder);
+                    let acc_vector = vec![definition, holder];
 
                     let (res, acc_decode_data) = send_privacy_preserving_transaction_unified(
                         wallet_core,
@@ -270,9 +264,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                 let holder = holder.parse()?;
 
                 if definition.is_private() || holder.is_private() {
-                    let mut acc_vector = vec![];
-                    acc_vector.push(definition);
-                    acc_vector.push(holder);
+                    let acc_vector = vec![definition, holder];
 
                     let (res, acc_decode_data) = send_privacy_preserving_transaction_unified(
                         wallet_core,
