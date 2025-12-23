@@ -17,6 +17,7 @@ hmac-sha512.workspace = true
 thiserror.workspace = true
 nssa-core = { path = "../nssa/core", features = ["host"] }
 itertools.workspace = true
+secp256k1 = "0.31.1"
 
 [dependencies.common]
 path = "../common"
