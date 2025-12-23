@@ -10,29 +10,12 @@ use crate::key_management::{
     secret_holders::{PrivateKeyHolder, SecretSpendingKey},
 };
 
-const TWO_POWER_31: u32 = (2u32).pow(31);
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChildKeysPrivate {
     pub value: (KeyChain, nssa::Account),
     pub ccc: [u8; 32],
     /// Can be [`None`] if root
     pub cci: Option<u32>,
-}
-
-impl ChildKeysPrivate {
-    fn nth_child_nonharden_hash(&self, cci: u32) -> [u8; 64] {
-        /// TODO: logic required
-        panic!("Nonharden keys not yet designed for private state")
-    }
-
-    fn nth_child_harden_hash(&self, cci: u32) -> [u8; 64] {
-        let mut hash_input = vec![];
-        //   hash_input.extend_from_slice(self.csk.value());
-        //hash_input.extend_from_slice(&(cci - TWO_POWER_31).to_le_bytes());
-
-        hmac_sha512::HMAC::mac(hash_input, self.ccc)
-    }
 }
 
 impl KeyNode for ChildKeysPrivate {
@@ -127,7 +110,6 @@ impl KeyNode for ChildKeysPrivate {
         let isk = ssk.generate_child_incoming_viewing_secret_key(cci);
         let ovk = ssk.generate_child_outgoing_viewing_secret_key(cci);
 
-        //TODO: separate out into its own function
         let npk: NullifierPublicKey = {
             let mut hasher = sha2::Sha256::new();
 
