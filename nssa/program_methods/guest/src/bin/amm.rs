@@ -388,12 +388,14 @@ fn compute_pool_pda_seed(
 ) -> PdaSeed {
     use risc0_zkvm::sha::{Impl, Sha256};
 
-    //let mut i: usize = 0;
-    //TODO
-
-    let (token_1, token_2) = match definition_token_a_id.value().cmp(definition_token_b_id.value()) {
+    let (token_1, token_2) = match definition_token_a_id
+        .value()
+        .cmp(definition_token_b_id.value())
+    {
         std::cmp::Ordering::Less => (definition_token_b_id.clone(), definition_token_a_id.clone()),
-        std::cmp::Ordering::Greater => (definition_token_a_id.clone(), definition_token_b_id.clone()),
+        std::cmp::Ordering::Greater => {
+            (definition_token_a_id.clone(), definition_token_b_id.clone())
+        }
         std::cmp::Ordering::Equal => panic!("Definitions match"),
     };
 
@@ -723,7 +725,8 @@ fn swap(
                 vault_a.clone(),
                 vault_b.clone(),
                 user_holding_b.clone(),
-                &amounts,
+                amounts[0],
+                amounts[1],
                 &[pool_def_data.reserve_a, pool_def_data.reserve_b],
                 pool.account_id.clone(),
             );
@@ -735,7 +738,8 @@ fn swap(
                 vault_b.clone(),
                 vault_a.clone(),
                 user_holding_a.clone(),
-                &amounts,
+                amounts[0],
+                amounts[1],
                 &[pool_def_data.reserve_b, pool_def_data.reserve_a],
                 pool.account_id.clone(),
             );
@@ -778,9 +782,6 @@ fn swap_logic(
 ) -> (Vec<ChainedCall>, u128, u128) {
     let reserve_deposit_vault_amount = reserve_amounts[0];
     let reserve_withdraw_vault_amount = reserve_amounts[1];
-
-    let deposit_amount = balances[0];
-    let min_amount_out = balances[1];
 
     // Compute withdraw amount
     // Maintains pool constant product
@@ -841,7 +842,7 @@ fn add_liquidity(
     let user_holding_b = &pre_states[5];
     let user_holding_lp = &pre_states[6];
 
-    // Verify vaults are in fact vaults
+    // 1. Fetch Pool state
     let pool_def_data = PoolDefinition::parse(&pool.account.data)
         .expect("Add liquidity: AMM Program expects valid Pool Definition Account");
     if vault_a.account_id != pool_def_data.vault_a_id {
@@ -1005,7 +1006,7 @@ fn remove_liquidity(
     let amount_min_a = amounts[1];
     let amount_min_b = amounts[2];
 
-    // Verify vaults are in fact vaults
+    // 1. Fetch Pool state
     let pool_def_data = PoolDefinition::parse(&pool.account.data)
         .expect("Remove liquidity: AMM Program expects a valid Pool Definition Account");
 
@@ -1080,6 +1081,7 @@ fn remove_liquidity(
         liquidity_pool_supply: pool_def_data.liquidity_pool_supply - delta_lp,
         reserve_a: pool_def_data.reserve_a - withdraw_amount_a,
         reserve_b: pool_def_data.reserve_b - withdraw_amount_b,
+        active,
         ..pool_def_data.clone()
     };
 
