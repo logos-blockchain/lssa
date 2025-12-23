@@ -7,8 +7,9 @@ use nssa_core::{
     encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
 };
 
-use crate::WalletCore;
+use crate::{WalletCore, helperfunctions::AccountPrivacyKind};
 
+#[derive(Clone)]
 pub enum PrivacyPreservingAccount {
     Public(AccountId),
     PrivateOwned(AccountId),
@@ -16,6 +17,36 @@ pub enum PrivacyPreservingAccount {
         npk: NullifierPublicKey,
         ipk: IncomingViewingPublicKey,
     },
+}
+
+impl PrivacyPreservingAccount {
+    pub fn account_id_decode_data(&self) -> Option<AccountId> {
+        match self {
+            &Self::PrivateOwned(acc_id) => Some(acc_id),
+            _ => None,
+        }
+    }
+
+    pub fn is_private(&self) -> bool {
+        matches!(
+            &self,
+            &Self::PrivateOwned(_) | &Self::PrivateForeign { npk: _, ipk: _ }
+        )
+    }
+
+    pub fn prepare_authorized_account(account_id: AccountId, privacy: AccountPrivacyKind) -> Self {
+        match privacy {
+            AccountPrivacyKind::Private => Self::PrivateOwned(account_id),
+            AccountPrivacyKind::Public => Self::Public(account_id),
+        }
+    }
+
+    pub fn account_id(&self) -> Option<AccountId> {
+        match &self {
+            Self::Public(account_id) | Self::PrivateOwned(account_id) => Some(*account_id),
+            _ => None,
+        }
+    }
 }
 
 pub struct PrivateAccountKeys {

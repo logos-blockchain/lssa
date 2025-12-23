@@ -23,8 +23,9 @@ use wallet::{
         account::{AccountSubcommand, NewSubcommand},
         config::ConfigSubcommand,
         programs::{
-            native_token_transfer::AuthTransferSubcommand, pinata::PinataProgramAgnosticSubcommand,
-            token::TokenProgramAgnosticSubcommand,
+            ArgsDefinitionOwned, ArgsHolderMaybeUnowned, ArgsHolderOwned, ArgsReceiverMaybeUnowned,
+            ArgsSenderOwned, ArgsSupplyOwned, native_token_transfer::AuthTransferSubcommand,
+            pinata::PinataProgramAgnosticSubcommand, token::TokenProgramAgnosticSubcommand,
         },
     },
     config::PersistentStorage,
@@ -49,10 +50,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     pub async fn test_success() {
         info!("########## test_success ##########");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -115,12 +120,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         }
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(
-                &new_persistent_account_id,
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &new_persistent_account_id,
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -152,10 +161,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     pub async fn test_failure() {
         info!("########## test_failure ##########");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 1000000,
         });
 
@@ -193,10 +206,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     pub async fn test_success_two_transactions() {
         info!("########## test_success_two_transactions ##########");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -228,10 +245,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("First TX Success!");
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -323,10 +344,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -383,12 +410,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -433,6 +464,104 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert_eq!(
             u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
             7
+        );
+
+        // Burn 3 tokens from `recipient_acc`
+        let subcommand = TokenProgramAgnosticSubcommand::Burn {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                ),
+            },
+            amount: 3,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = seq_client
+            .get_account(definition_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        // Check the status of the account at `recipient_account_id` is the expected after the
+        // execution
+        let recipient_acc = seq_client
+            .get_account(recipient_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
+            4
+        );
+
+        // Mint 10 tokens at `recipient_acc`
+        let subcommand = TokenProgramAgnosticSubcommand::Mint {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
+            amount: 10,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = seq_client
+            .get_account(definition_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        // Check the status of the account at `recipient_account_id` is the expected after the
+        // execution
+        let recipient_acc = seq_client
+            .get_account(recipient_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
+            14
         );
     }
 
@@ -480,10 +609,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -526,12 +661,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -560,12 +699,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Transfer additional 7 tokens from `supply_acc` to the account at account_id
         // `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -590,6 +733,208 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .get_private_account_commitment(&recipient_account_id)
             .unwrap();
         assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        // Burn 3 tokens from `recipient_acc`
+        let subcommand = TokenProgramAgnosticSubcommand::Burn {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                ),
+            },
+            amount: 3,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = seq_client
+            .get_account(definition_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        let new_commitment2 = wallet_storage
+            .get_private_account_commitment(&recipient_account_id)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        // Check the status of the account at `recipient_account_id` is the expected after the
+        // execution
+        let recipient_acc = wallet_storage
+            .get_account_private(&recipient_account_id)
+            .unwrap();
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
+            11
+        );
+
+        // Mint 10 tokens at `recipient_acc`
+        let subcommand = TokenProgramAgnosticSubcommand::Mint {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
+            amount: 10,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = seq_client
+            .get_account(definition_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        let new_commitment2 = wallet_storage
+            .get_private_account_commitment(&recipient_account_id)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        // Check the status of the account at `recipient_account_id` is the expected after the
+        // execution
+        let recipient_acc = wallet_storage
+            .get_account_private(&recipient_account_id)
+            .unwrap();
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
+            21
+        );
+
+        // Now the same mint, but in foreign way
+
+        // Create new account for receiving a mint transaction
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: recipient_account_id2,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        let (holder_keys, _) = wallet_storage
+            .storage
+            .user_data
+            .get_private_account(&recipient_account_id2)
+            .unwrap();
+
+        // Mint 9 tokens at `recipient_acc2`
+        let subcommand = TokenProgramAgnosticSubcommand::Mint {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: None,
+                holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
+                holder_ipk: Some(hex::encode(
+                    holder_keys.incoming_viewing_public_key.0.clone(),
+                )),
+            },
+            amount: 9,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        // Sync to claim holder
+        let command = Command::Account(AccountSubcommand::SyncPrivate {});
+
+        wallet::cli::execute_subcommand(command).await.unwrap();
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = seq_client
+            .get_account(definition_account_id.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 53, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        let new_commitment2 = wallet_storage
+            .get_private_account_commitment(&recipient_account_id2)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        // Check the status of the account at `recipient_account_id2` is the expected after the
+        // execution
+        let recipient_acc = wallet_storage
+            .get_account_private(&recipient_account_id2)
+            .unwrap();
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
+            9
+        );
     }
 
     /// This test creates a new private token using the token program. All accounts are private
@@ -628,10 +973,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_private_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -673,6 +1024,311 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ]
         );
+
+        // Create new account for receiving a mint transaction
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: recipient_account_id_pr,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+
+        // Create new account for receiving a mint transaction
+        let SubcommandReturnValue::RegisterAccount {
+            account_id: recipient_account_id_pub,
+        } = wallet::cli::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public { cci: None },
+        )))
+        .await
+        .unwrap()
+        else {
+            panic!("invalid subcommand return value");
+        };
+
+        // Mint 10 tokens at `recipient_acc_pub`
+        let subcommand = TokenProgramAgnosticSubcommand::Mint {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_public_account_input_from_str(
+                    &recipient_account_id_pub.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
+            amount: 10,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = wallet_storage
+            .get_account_private(&definition_account_id)
+            .unwrap();
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        // Check the status of the account at `recipient_account_id_pub` is the expected after the
+        // execution
+        let recipient_acc_pub = seq_client
+            .get_account(recipient_account_id_pub.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc_pub.data[33..].try_into().unwrap()),
+            10
+        );
+
+        let (holder_keys, _) = wallet_storage
+            .storage
+            .user_data
+            .get_private_account(&recipient_account_id_pr)
+            .unwrap();
+
+        // Mint 5 tokens at `recipient_acc_pr`
+        let subcommand = TokenProgramAgnosticSubcommand::Mint {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: None,
+                holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
+                holder_ipk: Some(hex::encode(
+                    holder_keys.incoming_viewing_public_key.0.clone(),
+                )),
+            },
+            amount: 5,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        // Sync to claim holder
+        let command = Command::Account(AccountSubcommand::SyncPrivate {});
+
+        wallet::cli::execute_subcommand(command).await.unwrap();
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = wallet_storage
+            .get_account_private(&definition_account_id)
+            .unwrap();
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        let new_commitment2 = wallet_storage
+            .get_private_account_commitment(&recipient_account_id_pr)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        // Check the status of the account at `recipient_account_id_pr` is the expected after the
+        // execution
+        let recipient_acc_pr = wallet_storage
+            .get_account_private(&recipient_account_id_pr)
+            .unwrap();
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc_pr.data[33..].try_into().unwrap()),
+            5
+        );
+
+        // Mint 5 tokens at `recipient_acc_pr`
+        let subcommand = TokenProgramAgnosticSubcommand::Mint {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_private_account_input_from_str(
+                    &recipient_account_id_pr.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
+            amount: 5,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = wallet_storage
+            .get_account_private(&definition_account_id)
+            .unwrap();
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        let new_commitment2 = wallet_storage
+            .get_private_account_commitment(&recipient_account_id_pr)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        // Check the status of the account at `recipient_account_id_pr` is the expected after the
+        // execution
+        let recipient_acc = wallet_storage
+            .get_account_private(&recipient_account_id_pr)
+            .unwrap();
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
+            10
+        );
+
+        // Burn 5 tokens at `recipient_acc_pub`
+        let subcommand = TokenProgramAgnosticSubcommand::Burn {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_public_account_input_from_str(
+                    &recipient_account_id_pub.to_string(),
+                ),
+            },
+            amount: 5,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = wallet_storage
+            .get_account_private(&definition_account_id)
+            .unwrap();
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        // Check the status of the account at `recipient_account_id_pub` is the expected after the
+        // execution
+        let recipient_acc_pub = seq_client
+            .get_account(recipient_account_id_pub.to_string())
+            .await
+            .unwrap()
+            .account;
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc_pub.data[33..].try_into().unwrap()),
+            5
+        );
+
+        // Burn 5 tokens at `recipient_acc_pr`
+        let subcommand = TokenProgramAgnosticSubcommand::Burn {
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_private_account_input_from_str(
+                    &recipient_account_id_pr.to_string(),
+                ),
+            },
+            amount: 5,
+        };
+
+        wallet::cli::execute_subcommand(Command::Token(subcommand))
+            .await
+            .unwrap();
+        info!("Waiting for next block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        let wallet_config = fetch_config().await.unwrap();
+        let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
+            .await
+            .unwrap();
+
+        // Check the status of the token definition account is the expected after the execution
+        let definition_acc = wallet_storage
+            .get_account_private(&definition_account_id)
+            .unwrap();
+
+        assert_eq!(
+            definition_acc.data.as_ref(),
+            &[
+                0, 65, 32, 78, 65, 77, 69, 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        let new_commitment2 = wallet_storage
+            .get_private_account_commitment(&recipient_account_id_pr)
+            .unwrap();
+        assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        // Check the status of the account at `recipient_account_id_pr` is the expected after the
+        // execution
+        let recipient_acc = wallet_storage
+            .get_account_private(&recipient_account_id_pr)
+            .unwrap();
+
+        assert_eq!(
+            u128::from_le_bytes(recipient_acc.data[33..].try_into().unwrap()),
+            5
+        );
     }
 
     /// This test creates a new private token using the token program. All accounts are private
@@ -713,10 +1369,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_private_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -818,10 +1480,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -870,12 +1538,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: None,
-            to_npk: Some(hex::encode(recipient_keys.nullifer_public_key.0)),
-            to_ipk: Some(hex::encode(
-                recipient_keys.incoming_viewing_public_key.0.clone(),
-            )),
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(hex::encode(recipient_keys.nullifer_public_key.0)),
+                to_ipk: Some(hex::encode(
+                    recipient_keys.incoming_viewing_public_key.0.clone(),
+                )),
+            },
             amount: 7,
         };
 
@@ -954,10 +1626,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -990,12 +1668,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1019,12 +1701,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Transfer additional 7 tokens from `supply_acc` to the account at account_id
         // `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1090,10 +1776,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -1136,12 +1828,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1165,12 +1861,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Transfer additional 7 tokens from `supply_acc` to the account at account_id
         // `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1199,10 +1899,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to: AccountId = ACC_RECEIVER_PRIVATE.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(&to.to_string())),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(&to.to_string())),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -1237,10 +1941,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: None,
-            to_npk: Some(to_npk_string),
-            to_ipk: Some(hex::encode(to_ipk.0)),
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(to_npk_string),
+                to_ipk: Some(hex::encode(to_ipk.0)),
+            },
             amount: 100,
         });
 
@@ -1306,10 +2014,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: None,
-            to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
-            to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
+                to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+            },
             amount: 100,
         });
 
@@ -1419,10 +2131,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to: AccountId = ACC_RECEIVER.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_public_account_input_from_str(&to.to_string())),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(&to.to_string())),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -1468,10 +2184,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to: AccountId = ACC_RECEIVER_PRIVATE.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(&to.to_string())),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(&to.to_string())),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -1512,10 +2232,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let from: AccountId = ACC_SENDER.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: None,
-            to_npk: Some(to_npk_string),
-            to_ipk: Some(hex::encode(to_ipk.0)),
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(to_npk_string),
+                to_ipk: Some(hex::encode(to_ipk.0)),
+            },
             amount: 100,
         });
 
@@ -1900,24 +2624,32 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &to_account_id1.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &to_account_id1.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
         wallet::cli::execute_subcommand(command).await.unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &to_account_id2.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &to_account_id2.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 101,
         });
 
@@ -1950,24 +2682,32 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &to_account_id3.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &to_account_id3.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 102,
         });
 
         wallet::cli::execute_subcommand(command).await.unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &to_account_id4.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &to_account_id4.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 103,
         });
 
@@ -2027,24 +2767,32 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("########## TREE CHECKS END ##########");
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&to_account_id1.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &to_account_id2.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&to_account_id1.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &to_account_id2.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 10,
         });
 
         wallet::cli::execute_subcommand(command).await.unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&to_account_id3.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &to_account_id4.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&to_account_id3.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &to_account_id4.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 11,
         });
 
