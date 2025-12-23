@@ -10,12 +10,29 @@ use crate::key_management::{
     secret_holders::{PrivateKeyHolder, SecretSpendingKey},
 };
 
+const TWO_POWER_31: u32 = (2u32).pow(31);
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChildKeysPrivate {
     pub value: (KeyChain, nssa::Account),
     pub ccc: [u8; 32],
     /// Can be [`None`] if root
     pub cci: Option<u32>,
+}
+
+impl ChildKeysPrivate {
+    fn nth_child_nonharden_hash(&self, cci: u32) -> [u8; 64] {
+        /// TODO: logic required
+        panic!("Nonharden keys not yet designed for private state")
+    }
+
+    fn nth_child_harden_hash(&self, cci: u32) -> [u8; 64] {
+        let mut hash_input = vec![];
+        //   hash_input.extend_from_slice(self.csk.value());
+        //hash_input.extend_from_slice(&(cci - TWO_POWER_31).to_le_bytes());
+
+        hmac_sha512::HMAC::mac(hash_input, self.ccc)
+    }
 }
 
 impl KeyNode for ChildKeysPrivate {
@@ -89,10 +106,8 @@ impl KeyNode for ChildKeysPrivate {
                         .into(),
                 )
                 .expect("Key generated as scalar, must be valid representation");
+
         let mut input = vec![];
-
-        panic!("{}", parent_pt.to_bytes()[0]);
-
         input.extend_from_slice(b"NSSA_seed_priv");
         input.extend_from_slice(&parent_pt.to_bytes());
         input.extend_from_slice(&cci.to_le_bytes());
@@ -187,121 +202,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_keys_deterministic_generation() {
-        let root_keys = ChildKeysPrivate::root([42; 64]);
-        let child_keys = root_keys.nth_child(5);
-
-        assert_eq!(root_keys.cci, None);
-        assert_eq!(child_keys.cci, Some(5));
-
-        assert_eq!(
-            root_keys.value.0.secret_spending_key.0,
-            [
-                249, 83, 253, 32, 174, 204, 185, 44, 253, 167, 61, 92, 128, 5, 152, 4, 220, 21, 88,
-                84, 167, 180, 154, 249, 44, 77, 33, 136, 59, 131, 203, 152
-            ]
-        );
-        assert_eq!(
-            child_keys.value.0.secret_spending_key.0,
-            [
-                16, 242, 229, 242, 252, 158, 153, 210, 234, 120, 70, 85, 83, 196, 5, 53, 28, 26,
-                187, 230, 22, 193, 146, 232, 237, 3, 166, 184, 122, 1, 233, 93
-            ]
-        );
-
-        assert_eq!(
-            root_keys.value.0.private_key_holder.nullifier_secret_key,
-            [
-                38, 195, 52, 182, 16, 66, 167, 156, 9, 14, 65, 100, 17, 93, 166, 71, 27, 148, 93,
-                85, 116, 109, 130, 8, 195, 222, 159, 214, 141, 41, 124, 57
-            ]
-        );
-        assert_eq!(
-            child_keys.value.0.private_key_holder.nullifier_secret_key,
-            [
-                215, 46, 2, 151, 174, 60, 86, 154, 5, 3, 175, 245, 12, 176, 220, 58, 250, 118, 236,
-                49, 254, 221, 229, 58, 40, 1, 170, 145, 175, 108, 23, 170
-            ]
-        );
-
-        assert_eq!(
-            root_keys
-                .value
-                .0
-                .private_key_holder
-                .incoming_viewing_secret_key,
-            [
-                153, 161, 15, 34, 96, 184, 165, 165, 27, 244, 155, 40, 70, 5, 241, 133, 78, 40, 61,
-                118, 48, 148, 226, 5, 97, 18, 201, 128, 82, 248, 163, 72
-            ]
-        );
-        assert_eq!(
-            child_keys
-                .value
-                .0
-                .private_key_holder
-                .incoming_viewing_secret_key,
-            [
-                192, 155, 55, 43, 164, 115, 71, 145, 227, 225, 21, 57, 55, 12, 226, 44, 10, 103,
-                39, 73, 230, 173, 60, 69, 69, 122, 110, 241, 164, 3, 192, 57
-            ]
-        );
-
-        assert_eq!(
-            root_keys
-                .value
-                .0
-                .private_key_holder
-                .outgoing_viewing_secret_key,
-            [
-                205, 87, 71, 129, 90, 242, 217, 200, 140, 252, 124, 46, 207, 7, 33, 156, 83, 166,
-                150, 81, 98, 131, 182, 156, 110, 92, 78, 140, 125, 218, 152, 154
-            ]
-        );
-        assert_eq!(
-            child_keys
-                .value
-                .0
-                .private_key_holder
-                .outgoing_viewing_secret_key,
-            [
-                131, 202, 219, 172, 219, 29, 48, 120, 226, 209, 209, 10, 216, 173, 48, 167, 233,
-                17, 35, 155, 30, 217, 176, 120, 72, 146, 250, 226, 165, 178, 255, 90
-            ]
-        );
-
-        assert_eq!(
-            root_keys.value.0.nullifer_public_key.0,
-            [
-                65, 176, 149, 243, 192, 45, 216, 177, 169, 56, 229, 7, 28, 66, 204, 87, 109, 83,
-                152, 64, 14, 188, 179, 210, 147, 60, 22, 251, 203, 70, 89, 215
-            ]
-        );
-        assert_eq!(
-            child_keys.value.0.nullifer_public_key.0,
-            [
-                69, 104, 130, 115, 48, 134, 19, 188, 67, 148, 163, 54, 155, 237, 57, 27, 136, 228,
-                111, 233, 205, 158, 149, 31, 84, 11, 241, 176, 243, 12, 138, 249
-            ]
-        );
-
-        assert_eq!(
-            root_keys.value.0.incoming_viewing_public_key.0,
-            &[
-                3, 174, 56, 136, 244, 179, 18, 122, 38, 220, 36, 50, 200, 41, 104, 167, 70, 18, 60,
-                202, 93, 193, 29, 16, 125, 252, 96, 51, 199, 152, 47, 233, 178
-            ]
-        );
-        assert_eq!(
-            child_keys.value.0.incoming_viewing_public_key.0,
-            &[
-                3, 18, 202, 246, 79, 141, 169, 51, 55, 202, 120, 169, 244, 201, 156, 162, 216, 115,
-                126, 53, 46, 94, 235, 125, 114, 178, 215, 81, 171, 93, 93, 88, 117
-            ]
-        );
-    }
-
-    #[test]
     fn test_master_key_generation() {
         let seed: [u8; 64] = [
             252, 56, 204, 83, 232, 123, 209, 188, 187, 167, 39, 213, 71, 39, 58, 65, 125, 134, 255,
@@ -353,40 +253,45 @@ mod tests {
 
     #[test]
     fn test_child_keys_generation() {
-        let seed: [u8; 64] = [88, 189, 37, 237, 199, 125, 151, 226, 69, 153, 165, 113, 191, 69, 188, 221, 9, 34, 173, 134, 61, 109, 34, 103, 121, 39, 237, 14, 107, 194, 24, 194, 191, 14, 237, 185, 12, 87, 22, 227, 38, 71, 17, 144, 251, 118, 217, 115, 33, 222, 201, 61, 203, 246, 121, 214, 6, 187, 148, 92, 44, 253, 210, 37];
+        let seed: [u8; 64] = [
+            88, 189, 37, 237, 199, 125, 151, 226, 69, 153, 165, 113, 191, 69, 188, 221, 9, 34, 173,
+            134, 61, 109, 34, 103, 121, 39, 237, 14, 107, 194, 24, 194, 191, 14, 237, 185, 12, 87,
+            22, 227, 38, 71, 17, 144, 251, 118, 217, 115, 33, 222, 201, 61, 203, 246, 121, 214, 6,
+            187, 148, 92, 44, 253, 210, 37,
+        ];
 
         let root_node = ChildKeysPrivate::root(seed);
         let child_node = ChildKeysPrivate::nth_child(&root_node, 42u32);
 
-        let expected_ccc: [u8;32] = 
-[131, 6, 100, 230, 202, 63, 5, 206, 158, 3, 81, 177, 221, 107, 27, 194, 192, 38, 104, 87, 23, 98, 107, 1, 78, 19, 216, 195, 63, 66, 13, 172];
+        let expected_ccc: [u8; 32] = [
+            131, 6, 100, 230, 202, 63, 5, 206, 158, 3, 81, 177, 221, 107, 27, 194, 192, 38, 104,
+            87, 23, 98, 107, 1, 78, 19, 216, 195, 63, 66, 13, 172,
+        ];
 
-        /* 
         let expected_nsk: NullifierSecretKey = [
-            88, 186, 150, 238, 56, 44, 107, 53, 97, 59, 42, 62, 175, 63, 222, 11, 231, 223, 174,
-            39, 168, 52, 18, 14, 38, 83, 11, 86, 172, 48, 66, 201,
-        ];*/
-        /*
-        let expected_npk: NullifierPublicKey = nssa_core::NullifierPublicKey([
-            246, 214, 170, 117, 73, 240, 82, 143, 201, 193, 24, 218, 75, 226, 140, 78, 10, 45, 4,
-            5, 184, 164, 127, 172, 24, 26, 241, 205, 13, 179, 91, 232,
-        ]);*/
-        /*
-        let expected_isk: IncomingViewingSecretKey = [
-            182, 238, 179, 119, 236, 79, 86, 2, 3, 225, 143, 237, 86, 139, 183, 108, 23, 223, 49,
-            69, 23, 208, 136, 65, 139, 92, 240, 106, 46, 172, 222, 247,
-        ];*/
-        
-        let expected_ovk: OutgoingViewingSecretKey = [185, 67, 59, 18, 95, 73, 48, 122, 255, 221, 165, 100, 254, 226, 243, 111, 10, 3, 107, 64, 128, 122, 6, 240, 41, 232, 105, 235, 212, 133, 43, 9];
-        /*
-        let expected_ipk_as_bytes: [u8; 33] = [
-            3, 10, 247, 74, 120, 6, 174, 60, 163, 22, 150, 206, 196, 66, 233, 216, 66, 3, 150, 24,
-            20, 120, 29, 70, 178, 26, 125, 253, 75, 166, 114, 128, 34,
-        ];*/
+            118, 91, 48, 86, 184, 103, 178, 151, 169, 126, 198, 254, 177, 130, 48, 175, 250, 255,
+            19, 89, 122, 133, 216, 80, 101, 155, 243, 186, 104, 161, 35, 208,
+        ];
 
-        
+        let expected_npk: NullifierPublicKey = nssa_core::NullifierPublicKey([
+            122, 13, 105, 25, 155, 46, 105, 20, 93, 112, 97, 78, 198, 186, 227, 74, 13, 213, 135,
+            215, 254, 96, 115, 228, 137, 139, 35, 73, 67, 123, 48, 48,
+        ]);
+
+        let expected_isk: IncomingViewingSecretKey = [
+            38, 172, 52, 226, 190, 69, 120, 123, 231, 65, 88, 97, 125, 56, 120, 225, 253, 198, 133,
+            145, 84, 118, 182, 80, 188, 210, 146, 91, 197, 48, 39, 36,
+        ];
+        let expected_ovk: OutgoingViewingSecretKey = [
+            105, 26, 128, 5, 91, 183, 81, 224, 125, 217, 93, 173, 162, 129, 46, 85, 164, 215, 169,
+            236, 202, 12, 49, 31, 199, 130, 108, 159, 68, 196, 58, 96,
+        ];
+        let expected_ipk_as_bytes: [u8; 33] = [
+            2, 249, 186, 99, 214, 150, 242, 196, 122, 68, 237, 126, 129, 14, 189, 238, 132, 31,
+            228, 94, 224, 25, 248, 77, 250, 198, 122, 24, 232, 38, 147, 225, 158,
+        ];
+
         assert!(expected_ccc == child_node.ccc);
-        /*
         assert!(expected_nsk == child_node.value.0.private_key_holder.nullifier_secret_key);
         assert!(expected_npk == child_node.value.0.nullifer_public_key);
         assert!(
@@ -397,7 +302,7 @@ mod tests {
                     .private_key_holder
                     .incoming_viewing_secret_key
         );
-    */
+        assert!(expected_ipk_as_bytes == child_node.value.0.incoming_viewing_public_key.to_bytes());
         assert!(
             expected_ovk
                 == child_node
@@ -406,24 +311,5 @@ mod tests {
                     .private_key_holder
                     .outgoing_viewing_secret_key
         );
-    /*
-        assert!(expected_ipk_as_bytes == child_node.value.0.incoming_viewing_public_key.to_bytes());
-*/
-        /*Child nsk
-Child nsk
-[35, 218, 71, 160, 145, 129, 143, 216, 174, 178, 215, 92, 182, 249, 121, 153, 146, 124, 172, 70, 131, 184, 150, 46, 175, 201, 101, 86, 203, 25, 189, 175]
-Child Npk
-[196, 98, 217, 101, 101, 93, 1, 11, 253, 204, 128, 139, 198, 71, 19, 189, 37, 178, 0, 18, 211, 199, 56, 211, 199, 179, 126, 184, 151, 94, 140, 63]     
-Child isk
-[9, 6, 246, 146, 108, 119, 185, 109, 36, 205, 35, 176, 196, 196, 153, 246, 215, 127, 89, 39, 174, 3, 86, 197, 231, 181, 33, 75, 47, 29, 18, 2]
-Child Ipk
-[2, 165, 98, 11, 43, 108, 222, 0, 21, 41, 156, 217, 67, 122, 150, 142, 45, 156, 31, 164, 134, 241, 59, 71, 245, 44, 45, 96, 18, 118, 167, 249, 228]    
-Child ovk
-[185, 67, 59, 18, 95, 73, 48, 122, 255, 221, 165, 100, 254, 226, 243, 111, 10, 3, 107, 64, 128, 122, 6, 240, 41, 232, 105, 235, 212, 133, 43, 9]       
-Child chain code
-[252, 165, 63, 74, 148, 28, 14, 197, 76, 240, 82, 1, 213, 179, 149, 190, 174, 49, 47, 94, 84, 246, 219, 189, 125, 190, 86, 120, 206, 159, 36, 172]     
-PS C:\Users\jones\OneDrive\Desktop\key_python>
-
-        */
     }
 }

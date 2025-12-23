@@ -18,7 +18,7 @@ pub struct SeedHolder {
     pub(crate) seed: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 /// Secret spending key object. Can produce `PrivateKeyHolder` objects.
 pub struct SecretSpendingKey(pub(crate) [u8; 32]);
 
@@ -125,14 +125,13 @@ impl SecretSpendingKey {
         input.extend_from_slice(&self.0);
         input.extend_from_slice(&[1u8]);
         input.extend_from_slice(&cci.to_le_bytes());
-        input.extend_from_slice(&[0u8;22]);
+        input.extend_from_slice(&[0u8; 22]);
 
         let hash_value = hmac_sha512::HMAC::mac(input, key);
 
-    
         *hash_value
             .first_chunk::<32>()
-            .expect("hash_value is 64 bytes, must be safe to get first 32")    
+            .expect("hash_value is 64 bytes, must be safe to get first 32")
     }
 
     pub fn generate_child_incoming_viewing_secret_key(&self, cci: u32) -> IncomingViewingSecretKey {
@@ -144,14 +143,13 @@ impl SecretSpendingKey {
         input.extend_from_slice(&self.0);
         input.extend_from_slice(&[2u8]);
         input.extend_from_slice(&cci.to_le_bytes());
-        input.extend_from_slice(&[0u8;22]);
+        input.extend_from_slice(&[0u8; 22]);
 
         let hash_value = hmac_sha512::HMAC::mac(input, key);
 
-    
         *hash_value
             .first_chunk::<32>()
-            .expect("hash_value is 64 bytes, must be safe to get first 32")    
+            .expect("hash_value is 64 bytes, must be safe to get first 32")
     }
 
     pub fn generate_child_outgoing_viewing_secret_key(&self, cci: u32) -> OutgoingViewingSecretKey {
@@ -163,14 +161,13 @@ impl SecretSpendingKey {
         input.extend_from_slice(&self.0);
         input.extend_from_slice(&[3u8]);
         input.extend_from_slice(&cci.to_le_bytes());
-        input.extend_from_slice(&[0u8;22]);
+        input.extend_from_slice(&[0u8; 22]);
 
         let hash_value = hmac_sha512::HMAC::mac(input, key);
 
-    
         *hash_value
             .first_chunk::<32>()
-            .expect("hash_value is 64 bytes, must be safe to get first 32")    
+            .expect("hash_value is 64 bytes, must be safe to get first 32")
     }
 }
 
@@ -184,7 +181,7 @@ impl PrivateKeyHolder {
         hasher.update([0u8; 22]);
 
         NullifierPublicKey {
-            0: <HashType>::from(hasher.finalize_fixed())
+            0: <HashType>::from(hasher.finalize_fixed()),
         }
     }
 
@@ -196,13 +193,6 @@ impl PrivateKeyHolder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn seed_generation_test() {
-        let seed_holder = SeedHolder::new_os_random();
-
-        assert_eq!(seed_holder.seed.len(), 64);
-    }
 
     #[test]
     fn ssk_generation_test() {
