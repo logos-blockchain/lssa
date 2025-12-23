@@ -264,7 +264,6 @@ impl V02State {
 #[cfg(test)]
 pub mod tests {
 
-    
     use std::collections::HashMap;
 
     use nssa_core::{
@@ -284,7 +283,8 @@ pub mod tests {
             message::Message,
             witness_set::WitnessSet,
         },
-        program::Program, public_transaction,
+        program::Program,
+        public_transaction,
         signature::PrivateKey,
         state::MAX_NUMBER_CHAINED_CALLS,
     };

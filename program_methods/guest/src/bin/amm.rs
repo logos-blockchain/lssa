@@ -203,7 +203,7 @@ impl TokenHolding {
     fn new(definition_id: &AccountId) -> Self {
         Self {
             account_type: TOKEN_HOLDING_TYPE,
-            definition_id: definition_id.clone(),
+            definition_id: *definition_id,
             balance: 0,
         }
     }
@@ -392,9 +392,9 @@ fn compute_pool_pda_seed(
         .value()
         .cmp(definition_token_b_id.value())
     {
-        std::cmp::Ordering::Less => (definition_token_b_id.clone(), definition_token_a_id.clone()),
+        std::cmp::Ordering::Less => (definition_token_b_id, definition_token_a_id),
         std::cmp::Ordering::Greater => {
-            (definition_token_a_id.clone(), definition_token_b_id.clone())
+            (definition_token_a_id, definition_token_b_id)
         }
         std::cmp::Ordering::Equal => panic!("Definitions match"),
     };
@@ -535,9 +535,9 @@ fn new_definition(
 
     if pool.account_id
         != compute_pool_pda(
-            amm_program_id.clone(),
-            definition_token_a_id.clone(),
-            definition_token_b_id.clone(),
+            amm_program_id,
+            definition_token_a_id,
+            definition_token_b_id,
         )
     {
         panic!("Pool Definition Account ID does not match PDA");
@@ -545,22 +545,22 @@ fn new_definition(
 
     if vault_a.account_id
         != compute_vault_pda(
-            amm_program_id.clone(),
-            pool.account_id.clone(),
-            definition_token_a_id.clone(),
+            amm_program_id,
+            pool.account_id,
+            definition_token_a_id,
         )
         || vault_b.account_id
             != compute_vault_pda(
-                amm_program_id.clone(),
-                pool.account_id.clone(),
-                definition_token_b_id.clone(),
+                amm_program_id,
+                pool.account_id,
+                definition_token_b_id,
             )
     {
         panic!("Vault ID does not match PDA");
     }
 
     if pool_lp.account_id
-        != compute_liquidity_token_pda(amm_program_id.clone(), pool.account_id.clone())
+        != compute_liquidity_token_pda(amm_program_id, pool.account_id)
     {
         panic!("Liquidity pool Token Definition Account ID does not match PDA");
     }
@@ -584,12 +584,12 @@ fn new_definition(
     let pool_post_definition = PoolDefinition {
         definition_token_a_id,
         definition_token_b_id,
-        vault_a_id: vault_a.account_id.clone(),
-        vault_b_id: vault_b.account_id.clone(),
-        liquidity_pool_id: pool_lp.account_id.clone(),
-        liquidity_pool_supply: amount_a.clone(),
-        reserve_a: amount_a.clone(),
-        reserve_b: amount_b.clone(),
+        vault_a_id: vault_a.account_id,
+        vault_b_id: vault_b.account_id,
+        liquidity_pool_id: pool_lp.account_id,
+        liquidity_pool_supply: amount_a,
+        reserve_a: amount_a,
+        reserve_b: amount_b,
         fees: 0u128, //TODO: we assume all fees are 0 for now.
         active: true,
     };
@@ -646,7 +646,7 @@ fn new_definition(
         program_id: token_program_id,
         instruction_data,
         pre_states: vec![pool_lp_auth.clone(), user_holding_lp.clone()],
-        pda_seeds: vec![compute_liquidity_token_pda_seed(pool.account_id.clone())],
+        pda_seeds: vec![compute_liquidity_token_pda_seed(pool.account_id)],
     };
 
     chained_calls.push(call_token_lp);
@@ -728,7 +728,7 @@ fn swap(
                 amounts[0],
                 amounts[1],
                 &[pool_def_data.reserve_a, pool_def_data.reserve_b],
-                pool.account_id.clone(),
+                pool.account_id,
             );
 
             (chained_calls, [deposit_a, 0], [0, withdraw_b])
@@ -741,7 +741,7 @@ fn swap(
                 amounts[0],
                 amounts[1],
                 &[pool_def_data.reserve_b, pool_def_data.reserve_a],
-                pool.account_id.clone(),
+                pool.account_id,
             );
 
             (chained_calls, [0, withdraw_a], [deposit_b, 0])
@@ -962,7 +962,7 @@ fn add_liquidity(
         pool_definition_lp_auth.clone(),
         user_holding_lp.clone(),
         delta_lp,
-        vec![compute_liquidity_token_pda_seed(pool.account_id.clone())],
+        vec![compute_liquidity_token_pda_seed(pool.account_id)],
     );
 
     chained_call.push(call_token_lp);
@@ -1069,11 +1069,7 @@ fn remove_liquidity(
     let delta_lp: u128 =
         (pool_def_data.liquidity_pool_supply * amount_lp) / pool_def_data.liquidity_pool_supply;
 
-    let active: bool = if pool_def_data.liquidity_pool_supply - delta_lp == 0 {
-        false
-    } else {
-        true
-    };
+    let active: bool = pool_def_data.liquidity_pool_supply - delta_lp != 0;
 
     // 5. Update pool account
     let mut pool_post = pool.account.clone();
@@ -1096,8 +1092,8 @@ fn remove_liquidity(
         user_holding_a.clone(),
         withdraw_amount_a,
         vec![compute_vault_pda_seed(
-            pool.account_id.clone(),
-            pool_def_data.definition_token_a_id.clone(),
+            pool.account_id,
+            pool_def_data.definition_token_a_id,
         )],
     );
     //Chaincall for Token B withdraw
@@ -1107,8 +1103,8 @@ fn remove_liquidity(
         user_holding_b.clone(),
         withdraw_amount_b,
         vec![compute_vault_pda_seed(
-            pool.account_id.clone(),
-            pool_def_data.definition_token_b_id.clone(),
+            pool.account_id,
+            pool_def_data.definition_token_b_id,
         )],
     );
     //Chaincall for LP adjustment
@@ -1119,7 +1115,7 @@ fn remove_liquidity(
         pool_definition_lp_auth.clone(),
         user_holding_lp.clone(),
         delta_lp,
-        vec![compute_liquidity_token_pda_seed(pool.account_id.clone())],
+        vec![compute_liquidity_token_pda_seed(pool.account_id)],
     );
 
     chained_calls.push(call_token_lp);
