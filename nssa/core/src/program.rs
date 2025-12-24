@@ -108,6 +108,11 @@ impl AccountPostState {
     pub fn account_mut(&mut self) -> &mut Account {
         &mut self.account
     }
+
+    /// Consumes the post state and returns the underlying account
+    pub fn into_account(self) -> Account {
+        self.account
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
