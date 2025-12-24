@@ -3941,8 +3941,9 @@ pub mod tests {
         assert_eq!(to_post, expected_to_post);
     }
 
-    #[test]
-    fn test_private_chained_call() {
+    #[test_case::test_case(1; "single call")]
+    #[test_case::test_case(2; "two calls")]
+    fn test_private_chained_call(number_of_calls: u32) {
         // Arrange
         let chain_caller = Program::chain_caller();
         let auth_transfers = Program::authenticated_transfer_program();
@@ -3978,7 +3979,7 @@ pub mod tests {
         let instruction: (u128, ProgramId, u32, Option<PdaSeed>) = (
             amount,
             Program::authenticated_transfer_program().id(),
-            1,
+            number_of_calls,
             None,
         );
 
@@ -3999,14 +4000,14 @@ pub mod tests {
         let to_new_nonce = 0xdeadbeef2;
 
         let from_expected_post = Account {
-            balance: initial_balance - amount,
+            balance: initial_balance - number_of_calls as u128 * amount,
             nonce: from_new_nonce,
             ..from_account.account.clone()
         };
         let from_expected_commitment = Commitment::new(&from_keys.npk(), &from_expected_post);
 
         let to_expected_post = Account {
-            balance: amount,
+            balance: number_of_calls as u128 * amount,
             nonce: to_new_nonce,
             ..to_account.account.clone()
         };
