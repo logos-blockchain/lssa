@@ -119,7 +119,7 @@ impl PublicTransaction {
                 return Err(NssaError::MaxChainedCallsDepthExceeded);
             }
 
-            // Check the `program_id` corresponds to a deployed program
+            // Check that the `program_id` corresponds to a deployed program
             let Some(program) = state.programs().get(&chained_call.program_id) else {
                 return Err(NssaError::InvalidInput("Unknown program".into()));
             };
@@ -136,11 +136,11 @@ impl PublicTransaction {
             );
 
             let authorized_pdas =
-                self.compute_authorized_pdas(&caller_program_id, &chained_call.pda_seeds);
+                Self::compute_authorized_pdas(&caller_program_id, &chained_call.pda_seeds);
 
             for pre in &program_output.pre_states {
                 let account_id = pre.account_id;
-                // Check that the program output pre_states coinicide with the values in the public
+                // Check that the program output pre_states coincide with the values in the public
                 // state or with any modifications to those values during the chain of calls.
                 let expected_pre = state_diff
                     .get(&account_id)
@@ -202,7 +202,6 @@ impl PublicTransaction {
     }
 
     fn compute_authorized_pdas(
-        &self,
         caller_program_id: &Option<ProgramId>,
         pda_seeds: &[PdaSeed],
     ) -> HashSet<AccountId> {
