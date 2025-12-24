@@ -53,7 +53,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(definition_account_id),
                     PrivacyPreservingAccount::PrivateOwned(supply_account_id),
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await
@@ -81,7 +81,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(definition_account_id),
                     PrivacyPreservingAccount::Public(supply_account_id),
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await
@@ -109,7 +109,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(definition_account_id),
                     PrivacyPreservingAccount::PrivateOwned(supply_account_id),
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await
@@ -175,7 +175,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(sender_account_id),
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await
@@ -205,7 +205,7 @@ impl Token<'_> {
                         ipk: recipient_ipk,
                     },
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await
@@ -231,7 +231,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(sender_account_id),
                     PrivacyPreservingAccount::Public(recipient_account_id),
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await
@@ -258,7 +258,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(sender_account_id),
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await
@@ -289,7 +289,7 @@ impl Token<'_> {
                         ipk: recipient_ipk,
                     },
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
             )
             .await

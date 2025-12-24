@@ -19,7 +19,7 @@ impl NativeTokenTransfer<'_> {
                     PrivacyPreservingAccount::PrivateOwned(from),
                     PrivacyPreservingAccount::Public(to),
                 ],
-                &instruction_data,
+                instruction_data,
                 &program.into(),
                 tx_pre_check,
             )
