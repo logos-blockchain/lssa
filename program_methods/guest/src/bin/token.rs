@@ -6,54 +6,52 @@ use nssa_core::{
 };
 
 // The token program has three functions:
-// 1. New token definition.
-//    Arguments to this function are:
-//      * Two **default** accounts: [definition_account, holding_account].
-//        The first default account will be initialized with the token definition account values. The second account will
-//        be initialized to a token holding account for the new token, holding the entire total supply.
-//      * An instruction data of 23-bytes, indicating the total supply and the token name, with
-//        the following layout:
-//        [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
-//        The name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-// 2. Token transfer
-//    Arguments to this function are:
+// 1. New token definition. Arguments to this function are:
+//      * Two **default** accounts: [definition_account, holding_account]. The first default account
+//        will be initialized with the token definition account values. The second account will be
+//        initialized to a token holding account for the new token, holding the entire total supply.
+//      * An instruction data of 23-bytes, indicating the total supply and the token name, with the
+//        following layout: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)] The
+//        name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+// 2. Token transfer Arguments to this function are:
 //      * Two accounts: [sender_account, recipient_account].
-//      * An instruction data byte string of length 23, indicating the total supply with the following layout
-//        [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
-// 3. Initialize account with zero balance
-//    Arguments to this function are:
+//      * An instruction data byte string of length 23, indicating the total supply with the
+//        following layout [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00
+//        || 0x00 || 0x00].
+// 3. Initialize account with zero balance Arguments to this function are:
 //      * Two accounts: [definition_account, account_to_initialize].
-//      * An dummy byte string of length 23, with the following layout
-//        [0x02 || 0x00 || 0x00 || 0x00 || ... || 0x00 || 0x00].
-// 4. Burn tokens from a Token Holding account (thus lowering total supply)
-//    Arguments to this function are:
+//      * An dummy byte string of length 23, with the following layout [0x02 || 0x00 || 0x00 || 0x00
+//        || ... || 0x00 || 0x00].
+// 4. Burn tokens from a Token Holding account (thus lowering total supply) Arguments to this
+//    function are:
 //      * Two accounts: [definition_account, holding_account].
 //      * Authorization required: holding_account
-//      * An instruction data byte string of length 23, indicating the balance to burn with the folloiwng layout
+//      * An instruction data byte string of length 23, indicating the balance to burn with the
+//        folloiwng layout
 //       [0x03 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
-// 5. Mint additional supply of tokens tokens to a Token Holding account (thus increasing total supply)
-//    Arguments to this function are:
+// 5. Mint additional supply of tokens tokens to a Token Holding account (thus increasing total
+//    supply) Arguments to this function are:
 //      * Two accounts: [definition_account, holding_account].
 //      * Authorization required: definition_account
-//      * An instruction data byte string of length 23, indicating the balance to mint with the folloiwng layout
+//      * An instruction data byte string of length 23, indicating the balance to mint with the
+//        folloiwng layout
 //       [0x04 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00].
-// 6. New token definition with metadata.
-//    Arguments to this function are:
-//      * Three **default** accounts: [definition_account, metadata_account. holding_account].
-//        The first default account will be initialized with the token definition account values. The second account
-//        will be initialized to a token metadata account for the new token definition. The third account will be
-//        initialized to a token holding account for the new token, holding the entire total supply.
-//      * An instruction data of 474-bytes, indicating the token name, total supply, token standard, metadata standard
-//        and metadata_values (uri and creators).
-//        the following layout:
-//        [0x05 || total_supply (little-endian 16 bytes) || name (6 bytes) || token_standard || metadata_standard || metadata_values]
-//        The name cannot be equal to [0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-// 7. Print NFT copy from Master NFT
-//    Arguments to this function are:
+// 6. New token definition with metadata. Arguments to this function are:
+//      * Three **default** accounts: [definition_account, metadata_account. holding_account]. The
+//        first default account will be initialized with the token definition account values. The
+//        second account will be initialized to a token metadata account for the new token
+//        definition. The third account will be initialized to a token holding account for the new
+//        token, holding the entire total supply.
+//      * An instruction data of 474-bytes, indicating the token name, total supply, token standard,
+//        metadata standard and metadata_values (uri and creators). the following layout: [0x05 ||
+//        total_supply (little-endian 16 bytes) || name (6 bytes) || token_standard ||
+//        metadata_standard || metadata_values] The name cannot be equal to [0x00, 0x00, 0x00, 0x00,
+//        0x00, 0x00]
+// 7. Print NFT copy from Master NFT Arguments to this function are:
 //      * Two accounts: [master_nft, printed_account (default)].
 //      * Authorization required: master_nft
-//      * An dummy byte string of length 23, with the following layout
-//        [0x06 || 0x00 || 0x00 || 0x00 || ... || 0x00 || 0x00].
+//      * An dummy byte string of length 23, with the following layout [0x06 || 0x00 || 0x00 || 0x00
+//        || ... || 0x00 || 0x00].
 const TOKEN_STANDARD_FUNGIBLE_TOKEN: u8 = 0;
 const TOKEN_STANDARD_FUNGIBLE_ASSET: u8 = 1;
 const TOKEN_STANDARD_NONFUNGIBLE: u8 = 2;
@@ -242,41 +240,6 @@ impl TokenMetadata {
         }
 
         Data::try_from(bytes).expect("Invalid data")
-    }
-
-    fn parse(data: &Data) -> Option<Self> {
-        let data = Vec::<u8>::from(data.clone());
-
-        if data.len() != TOKEN_METADATA_DATA_SIZE || !is_metadata_type_valid(data[0]) {
-            None
-        } else {
-            let account_type = data[0];
-            let version = data[1];
-            let definition_id = AccountId::new(
-                data[2..34]
-                    .try_into()
-                    .expect("Token Program expects valid Account Id for Metadata"),
-            );
-            let uri: [u8; 200] = data[34..234]
-                .try_into()
-                .expect("Token Program expects valid uri for Metadata");
-            let creators: [u8; 250] = data[234..484]
-                .try_into()
-                .expect("Token Program expects valid creators for Metadata");
-            let primary_sale_date = u64::from_le_bytes(
-                data[484..TOKEN_METADATA_DATA_SIZE]
-                    .try_into()
-                    .expect("Token Program expects valid blockid for Metadata"),
-            );
-            Some(Self {
-                account_type,
-                version,
-                definition_id,
-                uri,
-                creators,
-                primary_sale_date,
-            })
-        }
     }
 }
 
@@ -495,7 +458,7 @@ fn new_definition_with_metadata(
         definition_id: definition_target_account.account_id,
         uri,
         creators,
-        primary_sale_date: 0u64, //TODO: future works to implement this
+        primary_sale_date: 0u64, // TODO: future works to implement this
     };
 
     let mut definition_target_account_post = definition_target_account.account.clone();
@@ -862,10 +825,9 @@ mod tests {
 
     use crate::{
         TOKEN_DEFINITION_DATA_SIZE, TOKEN_HOLDING_DATA_SIZE, TOKEN_HOLDING_NFT_MASTER,
-        TOKEN_HOLDING_NFT_PRINTED_COPY, TOKEN_HOLDING_STANDARD,
-        TOKEN_STANDARD_FUNGIBLE_TOKEN, TOKEN_STANDARD_NONFUNGIBLE, TokenDefinition, TokenHolding,
-        burn, mint_additional_supply, new_definition,
-        new_definition_with_metadata, print_nft, transfer,
+        TOKEN_HOLDING_NFT_PRINTED_COPY, TOKEN_HOLDING_STANDARD, TOKEN_STANDARD_FUNGIBLE_TOKEN,
+        TOKEN_STANDARD_NONFUNGIBLE, TokenDefinition, TokenHolding, burn, mint_additional_supply,
+        new_definition, new_definition_with_metadata, print_nft, transfer,
     };
 
     struct BalanceForTests;
@@ -1054,6 +1016,7 @@ mod tests {
                 account_id: IdForTests::pool_definition_id(),
             }
         }
+
         fn definition_account_mint() -> AccountWithMetadata {
             AccountWithMetadata {
                 account: Account {
@@ -1071,6 +1034,7 @@ mod tests {
                 account_id: IdForTests::pool_definition_id(),
             }
         }
+
         fn holding_same_definition_with_authorization_and_large_balance() -> AccountWithMetadata {
             AccountWithMetadata {
                 account: Account {
@@ -1087,6 +1051,7 @@ mod tests {
                 account_id: IdForTests::pool_definition_id(),
             }
         }
+
         fn definition_account_with_authorization_nonfungible() -> AccountWithMetadata {
             AccountWithMetadata {
                 account: Account {
@@ -1104,6 +1069,7 @@ mod tests {
                 account_id: IdForTests::pool_definition_id(),
             }
         }
+
         fn definition_account_uninit() -> AccountWithMetadata {
             AccountWithMetadata {
                 account: Account::default(),
@@ -1128,6 +1094,7 @@ mod tests {
                 account_id: IdForTests::holding_id(),
             }
         }
+
         fn definition_account_unclaimed() -> AccountWithMetadata {
             AccountWithMetadata {
                 account: Account {
@@ -1145,6 +1112,7 @@ mod tests {
                 account_id: IdForTests::pool_definition_id(),
             }
         }
+
         fn holding_account_unclaimed() -> AccountWithMetadata {
             AccountWithMetadata {
                 account: Account {
@@ -1210,23 +1178,6 @@ mod tests {
                 },
                 is_authorized: true,
                 account_id: IdForTests::holding_id(),
-            }
-        }
-
-        fn holding_account2_uninit_post_transfer() -> AccountWithMetadata {
-            AccountWithMetadata {
-                account: Account {
-                    program_owner: [0u32; 8],
-                    balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: TOKEN_HOLDING_STANDARD,
-                        definition_id: IdForTests::pool_definition_id(),
-                        balance: BalanceForTests::recipient_uninit_post_transfer(),
-                    }),
-                    nonce: 0,
-                },
-                is_authorized: true,
-                account_id: IdForTests::holding_id_2(),
             }
         }
 
@@ -1382,10 +1333,6 @@ mod tests {
             105_000
         }
 
-        fn recipient_uninit_post_transfer() -> u128 {
-            5_000
-        }
-
         fn transfer_amount() -> u128 {
             5_000
         }
@@ -1410,10 +1357,6 @@ mod tests {
 
         fn holding_id_2() -> AccountId {
             AccountId::new([42; 32])
-        }
-
-        fn metadata_id() -> AccountId {
-            AccountId::new([31; 32])
         }
     }
 
@@ -1688,7 +1631,7 @@ mod tests {
             AccountForTests::holding_account_master_nft(),
             AccountForTests::holding_account_uninit(),
         ];
-        let post_states = transfer(&pre_states, BalanceForTests::transfer_amount());
+        let _post_states = transfer(&pre_states, BalanceForTests::transfer_amount());
     }
 
     #[should_panic(expected = "Invalid balance in recipient account for NFT transfer")]
