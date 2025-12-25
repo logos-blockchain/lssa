@@ -1367,7 +1367,7 @@ mod tests {
         }
 
         fn mint_overflow() -> u128 {
-            2_u128.pow(128) - 40_000
+            u128::MAX - 40_000
         }
 
         fn init_supply_mint() -> u128 {
