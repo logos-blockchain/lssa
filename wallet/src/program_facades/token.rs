@@ -1,9 +1,6 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::{AccountId, program::Program};
-use nssa_core::{
-    NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey,
-    program::InstructionData,
-};
+use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
 
 use crate::{PrivacyPreservingAccount, WalletCore};
 
@@ -45,7 +42,9 @@ impl Token<'_> {
         name: [u8; 6],
         total_supply: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_definition(name, total_supply);
+        let instruction = token_program_preparation_definition(name, total_supply);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -54,7 +53,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(supply_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -73,7 +72,9 @@ impl Token<'_> {
         name: [u8; 6],
         total_supply: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_definition(name, total_supply);
+        let instruction = token_program_preparation_definition(name, total_supply);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -82,7 +83,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(supply_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -101,7 +102,9 @@ impl Token<'_> {
         name: [u8; 6],
         total_supply: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_definition(name, total_supply);
+        let instruction = token_program_preparation_definition(name, total_supply);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -110,7 +113,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(supply_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -167,7 +170,9 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_transfer(amount);
+        let instruction = token_program_preparation_transfer(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -176,7 +181,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -194,7 +199,9 @@ impl Token<'_> {
         recipient_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_transfer(amount);
+        let instruction = token_program_preparation_transfer(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -206,7 +213,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -223,7 +230,9 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_transfer(amount);
+        let instruction = token_program_preparation_transfer(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -232,7 +241,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(recipient_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -250,7 +259,9 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_transfer(amount);
+        let instruction = token_program_preparation_transfer(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -259,7 +270,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(recipient_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -278,7 +289,9 @@ impl Token<'_> {
         recipient_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_transfer(amount);
+        let instruction = token_program_preparation_transfer(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -290,7 +303,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -309,18 +322,13 @@ impl Token<'_> {
         amount: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![definition_account_id, holder_account_id];
-        let (instruction, program) = token_program_preparation_burn(amount);
-
-        // ToDo: Fix this by updating `nssa::public_transaction::Message::try_new` to get raw bytes
-        let instruction: [u32; 23] = instruction
-            .try_into()
-            .expect("Instruction vector should have len 32");
+        let instruction = token_program_preparation_burn(amount);
 
         let Ok(nonces) = self.0.get_accounts_nonces(vec![holder_account_id]).await else {
             return Err(ExecutionFailureKind::SequencerError);
         };
         let message = nssa::public_transaction::Message::try_new(
-            program.id(),
+            Program::token().id(),
             account_ids,
             nonces,
             instruction,
@@ -347,7 +355,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_burn(amount);
+        let instruction = token_program_preparation_burn(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -356,7 +366,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -373,7 +383,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_burn(amount);
+        let instruction = token_program_preparation_burn(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -382,7 +394,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(holder_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -400,7 +412,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_burn(amount);
+        let instruction = token_program_preparation_burn(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -409,7 +423,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -428,10 +442,7 @@ impl Token<'_> {
         amount: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![definition_account_id, holder_account_id];
-        let (instruction, program) = token_program_preparation_mint(amount);
-
-        // ToDo: Fix this by updating `nssa::public_transaction::Message::try_new` to get raw bytes
-        let instruction: [u32; 23] = instruction.try_into().unwrap();
+        let instruction = token_program_preparation_mint(amount);
 
         let Ok(nonces) = self
             .0
@@ -441,7 +452,7 @@ impl Token<'_> {
             return Err(ExecutionFailureKind::SequencerError);
         };
         let message = nssa::public_transaction::Message::try_new(
-            program.id(),
+            Program::token().id(),
             account_ids,
             nonces,
             instruction,
@@ -470,7 +481,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_mint(amount);
+        let instruction = token_program_preparation_mint(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -479,7 +492,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -497,7 +510,9 @@ impl Token<'_> {
         holder_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_mint(amount);
+        let instruction = token_program_preparation_mint(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -509,7 +524,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -526,7 +541,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_mint(amount);
+        let instruction = token_program_preparation_mint(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -535,7 +552,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(holder_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -553,7 +570,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_mint(amount);
+        let instruction = token_program_preparation_mint(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -562,7 +581,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(holder_account_id),
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -581,7 +600,9 @@ impl Token<'_> {
         holder_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let (instruction_data, program) = token_program_preparation_mint(amount);
+        let instruction = token_program_preparation_mint(amount);
+        let instruction_data =
+            Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
         self.0
             .send_privacy_preserving_tx(
@@ -593,7 +614,7 @@ impl Token<'_> {
                     },
                 ],
                 &instruction_data,
-                &program.into(),
+                &Program::token().into(),
             )
             .await
             .map(|(resp, secrets)| {
@@ -606,52 +627,41 @@ impl Token<'_> {
     }
 }
 
-fn token_program_preparation_transfer(amount: u128) -> (InstructionData, Program) {
+fn token_program_preparation_transfer(amount: u128) -> Vec<u8> {
     // Instruction must be: [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
     // 0x00 || 0x00 || 0x00].
     let mut instruction = vec![0u8; 23];
     instruction[0] = 0x01;
     instruction[1..17].copy_from_slice(&amount.to_le_bytes());
-    let instruction_data = Program::serialize_instruction(instruction).unwrap();
-    let program = Program::token();
 
-    (instruction_data, program)
+    instruction
 }
 
-fn token_program_preparation_definition(
-    name: [u8; 6],
-    total_supply: u128,
-) -> (InstructionData, Program) {
+fn token_program_preparation_definition(name: [u8; 6], total_supply: u128) -> Vec<u8> {
     // Instruction must be: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
     let mut instruction = vec![0u8; 23];
     instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
     instruction[17..].copy_from_slice(&name);
-    let instruction_data = Program::serialize_instruction(instruction).unwrap();
-    let program = Program::token();
 
-    (instruction_data, program)
+    instruction
 }
 
-fn token_program_preparation_burn(amount: u128) -> (InstructionData, Program) {
+fn token_program_preparation_burn(amount: u128) -> Vec<u8> {
     // Instruction must be: [0x03 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
     // 0x00 || 0x00 || 0x00].
-    let mut instruction = [0; 23];
+    let mut instruction = vec![0; 23];
     instruction[0] = 0x03;
     instruction[1..17].copy_from_slice(&amount.to_le_bytes());
-    let instruction_data = Program::serialize_instruction(instruction).unwrap();
-    let program = Program::token();
 
-    (instruction_data, program)
+    instruction
 }
 
-fn token_program_preparation_mint(amount: u128) -> (InstructionData, Program) {
+fn token_program_preparation_mint(amount: u128) -> Vec<u8> {
     // Instruction must be: [0x04 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
     // 0x00 || 0x00 || 0x00].
-    let mut instruction = [0; 23];
+    let mut instruction = vec![0; 23];
     instruction[0] = 0x04;
     instruction[1..17].copy_from_slice(&amount.to_le_bytes());
-    let instruction_data = Program::serialize_instruction(instruction).unwrap();
-    let program = Program::token();
 
-    (instruction_data, program)
+    instruction
 }
