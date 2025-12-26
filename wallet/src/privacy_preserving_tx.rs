@@ -1,3 +1,4 @@
+use anyhow::Result;
 use common::error::ExecutionFailureKind;
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use nssa::{AccountId, PrivateKey};
@@ -9,6 +10,7 @@ use nssa_core::{
 
 use crate::WalletCore;
 
+#[derive(Clone)]
 pub enum PrivacyPreservingAccount {
     Public(AccountId),
     PrivateOwned(AccountId),
@@ -16,6 +18,19 @@ pub enum PrivacyPreservingAccount {
         npk: NullifierPublicKey,
         ipk: IncomingViewingPublicKey,
     },
+}
+
+impl PrivacyPreservingAccount {
+    pub fn is_public(&self) -> bool {
+        matches!(&self, Self::Public(_))
+    }
+
+    pub fn is_private(&self) -> bool {
+        matches!(
+            &self,
+            Self::PrivateOwned(_) | Self::PrivateForeign { npk: _, ipk: _ }
+        )
+    }
 }
 
 pub struct PrivateAccountKeys {

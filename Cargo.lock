@@ -4757,6 +4757,7 @@ dependencies = [
  "nssa",
  "nssa_core",
  "rand 0.8.5",
+ "risc0-zkvm",
  "serde",
  "serde_json",
  "sha2",

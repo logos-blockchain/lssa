@@ -6,13 +6,14 @@ edition = "2024"
 [dependencies]
 risc0-zkvm.workspace = true
 borsh.workspace = true
-serde = { workspace = true }
+serde.workspace = true
 thiserror.workspace = true
-chacha20 = { version = "0.9", default-features = false }
 bytemuck.workspace = true
 k256 = { workspace = true, optional = true }
 base58 = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
+
+chacha20 = { version = "0.9", default-features = false }
 
 [dev-dependencies]
 serde_json.workspace = true

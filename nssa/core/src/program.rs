@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use risc0_zkvm::{DeserializeOwned, guest::env, serde::Deserializer};
 use serde::{Deserialize, Serialize};
 
-//#[cfg(feature = "host")]
-use crate::account::AccountId;
-use crate::account::{Account, AccountWithMetadata};
+use crate::account::{Account, AccountId, AccountWithMetadata};
 
 pub type ProgramId = [u32; 8];
 pub type InstructionData = Vec<u32>;
@@ -32,7 +30,6 @@ impl PdaSeed {
     }
 }
 
-//#[cfg(feature = "host")]
 impl From<(&ProgramId, &PdaSeed)> for AccountId {
     fn from(value: (&ProgramId, &PdaSeed)) -> Self {
         use risc0_zkvm::sha::{Impl, Sha256};

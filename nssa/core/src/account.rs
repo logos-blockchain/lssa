@@ -45,9 +45,9 @@ impl AccountWithMetadata {
 }
 
 #[derive(
+    Default,
     Copy,
     Clone,
-    Default,
     Serialize,
     Deserialize,
     PartialEq,

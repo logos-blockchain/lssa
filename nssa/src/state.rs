@@ -99,6 +99,7 @@ impl V02State {
 
         this.insert_program(Program::authenticated_transfer_program());
         this.insert_program(Program::token());
+        this.insert_program(Program::amm());
 
         this
     }
@@ -340,6 +341,7 @@ pub mod tests {
                 authenticated_transfers_program,
             );
             this.insert(Program::token().id(), Program::token());
+            this.insert(Program::amm().id(), Program::amm());
             this
         };
 
@@ -2152,7 +2154,7 @@ pub mod tests {
             &visibility_mask,
             &[0xdeadbeef1, 0xdeadbeef2],
             &[
-                (sender_keys.npk(), shared_secret.clone()),
+                (sender_keys.npk(), shared_secret),
                 (sender_keys.npk(), shared_secret),
             ],
             &private_account_nsks,
