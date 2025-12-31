@@ -15,11 +15,10 @@ impl NativeTokenTransfer<'_> {
         let instruction: u128 = 0;
 
         self.0
-            .send_privacy_preserving_tx_with_pre_check(
+            .send_privacy_preserving_tx(
                 vec![PrivacyPreservingAccount::PrivateOwned(from)],
                 &Program::serialize_instruction(instruction).unwrap(),
                 &Program::authenticated_transfer_program().into(),
-                |_| Ok(()),
             )
             .await
             .map(|(resp, secrets)| {

@@ -64,9 +64,7 @@ impl WalletSubcommand for NewSubcommand {
                     "Generated new account with account_id Public/{account_id} at path {chain_index}"
                 );
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::RegisterAccount { account_id })
             }
@@ -89,9 +87,7 @@ impl WalletSubcommand for NewSubcommand {
                     hex::encode(key.incoming_viewing_public_key.to_bytes())
                 );
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::RegisterAccount { account_id })
             }
@@ -243,9 +239,7 @@ impl WalletSubcommand for AccountSubcommand {
                 {
                     wallet_core.last_synced_block = curr_last_block;
 
-                    let path = wallet_core.store_persistent_data().await?;
-
-                    println!("Stored persistent data at {path:#?}");
+                    wallet_core.store_persistent_data().await?;
                 } else {
                     wallet_core.sync_to_block(curr_last_block).await?;
                 }
