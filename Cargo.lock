@@ -4989,7 +4989,6 @@ dependencies = [
  "log",
  "sequencer_core",
  "sequencer_rpc",
- "serde_json",
  "tokio",
 ]
 
