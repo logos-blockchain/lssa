@@ -740,9 +740,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -790,9 +788,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -831,9 +827,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -872,9 +866,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -923,9 +915,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -971,9 +961,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1009,9 +997,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1047,9 +1033,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1102,9 +1086,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     println!("Transaction data is {:?}", tx.message);
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1140,9 +1122,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1178,9 +1158,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1216,9 +1194,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1262,9 +1238,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                     println!("Transaction data is {:?}", tx.message);
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1323,9 +1297,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1371,9 +1343,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -1419,9 +1389,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
