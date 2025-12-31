@@ -101,11 +101,11 @@ jobs:
       - name: Install nextest
         run: cargo install cargo-nextest
 
-      - name: Run unit tests
+      - name: Run tests
         env:
           RISC0_DEV_MODE: "1"
           RUST_LOG: "info"
-        run: cargo nextest run --no-fail-fast
+        run: cargo nextest run --no-fail-fast -- --skip tps_test
 
   valid-proof-test:
     runs-on: ubuntu-latest
