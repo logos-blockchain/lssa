@@ -108,9 +108,7 @@ impl WalletSubcommand for ConfigSubcommand {
                     }
                 }
 
-                let path = wallet_core.store_config_changes().await?;
-
-                println!("Stored changed config at {path:#?}");
+                wallet_core.store_config_changes().await?
             }
             ConfigSubcommand::Description { key } => match key.as_str() {
                 "override_rust_log" => {

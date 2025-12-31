@@ -3,7 +3,7 @@ use nssa::{
     program::Program,
     public_transaction::{Message, WitnessSet},
 };
-use wallet::{WalletCore, helperfunctions::fetch_config};
+use wallet::WalletCore;
 
 // Before running this example, compile the `hello_world.rs` guest program with:
 //
@@ -24,11 +24,8 @@ use wallet::{WalletCore, helperfunctions::fetch_config};
 
 #[tokio::main]
 async fn main() {
-    // Load wallet config and storage
-    let wallet_config = fetch_config().await.unwrap();
-    let wallet_core = WalletCore::start_from_config_update_chain(wallet_config)
-        .await
-        .unwrap();
+    // Initialize wallet
+    let wallet_core = WalletCore::from_env().unwrap();
 
     // Parse arguments
     // First argument is the path to the program binary
