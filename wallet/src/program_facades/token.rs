@@ -176,7 +176,7 @@ impl ProgramArgs for TokenDefinitionArgs {
         let mut instruction = [0; 23];
         instruction[1..17].copy_from_slice(&self.total_supply.to_le_bytes());
         instruction[17..].copy_from_slice(&self.name);
-        let instruction_data = Program::serialize_instruction(instruction).unwrap();
+        let instruction_data = Program::serialize_instruction(instruction.to_vec()).unwrap();
         let program = Program::token();
 
         (instruction_data, program, |_| Ok(()))
@@ -201,7 +201,7 @@ impl ProgramArgs for TokenTransferArgs {
         let mut instruction = [0; 23];
         instruction[0] = 0x01;
         instruction[1..17].copy_from_slice(&self.amount.to_le_bytes());
-        let instruction_data = Program::serialize_instruction(instruction).unwrap();
+        let instruction_data = Program::serialize_instruction(instruction.to_vec()).unwrap();
         let program = Program::token();
 
         (instruction_data, program, |_| Ok(()))
@@ -226,7 +226,7 @@ impl ProgramArgs for TokenBurnArgs {
         let mut instruction = [0; 23];
         instruction[0] = 0x03;
         instruction[1..17].copy_from_slice(&self.amount.to_le_bytes());
-        let instruction_data = Program::serialize_instruction(instruction).unwrap();
+        let instruction_data = Program::serialize_instruction(instruction.to_vec()).unwrap();
         let program = Program::token();
 
         (instruction_data, program, |_| Ok(()))
@@ -251,7 +251,7 @@ impl ProgramArgs for TokenMintArgs {
         let mut instruction = [0; 23];
         instruction[0] = 0x04;
         instruction[1..17].copy_from_slice(&self.amount.to_le_bytes());
-        let instruction_data = Program::serialize_instruction(instruction).unwrap();
+        let instruction_data = Program::serialize_instruction(instruction.to_vec()).unwrap();
         let program = Program::token();
 
         (instruction_data, program, |_| Ok(()))
