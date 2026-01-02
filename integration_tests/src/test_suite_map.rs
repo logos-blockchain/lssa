@@ -23,8 +23,10 @@ use wallet::{
         account::{AccountSubcommand, NewSubcommand},
         config::ConfigSubcommand,
         programs::{
-            amm::AmmProgramAgnosticSubcommand, native_token_transfer::AuthTransferSubcommand,
-            pinata::PinataProgramAgnosticSubcommand, token::TokenProgramAgnosticSubcommand,
+            ArgsDefinitionOwned, ArgsHolderMaybeUnowned, ArgsHolderOwned, ArgsReceiverMaybeUnowned,
+            ArgsSenderOwned, ArgsSupplyOwned, amm::AmmProgramAgnosticSubcommand,
+            native_token_transfer::AuthTransferSubcommand, pinata::PinataProgramAgnosticSubcommand,
+            token::TokenProgramAgnosticSubcommand,
         },
     },
     config::PersistentStorage,
@@ -49,10 +51,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     pub async fn test_success() {
         info!("########## test_success ##########");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -115,12 +121,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         }
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(
-                &new_persistent_account_id,
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &new_persistent_account_id,
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -152,10 +162,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     pub async fn test_failure() {
         info!("########## test_failure ##########");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 1000000,
         });
 
@@ -193,10 +207,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     pub async fn test_success_two_transactions() {
         info!("########## test_success_two_transactions ##########");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -228,10 +246,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("First TX Success!");
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(ACC_SENDER),
-            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(ACC_SENDER),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -323,10 +345,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -386,12 +414,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -440,8 +472,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Burn 3 tokens from `recipient_acc`
         let subcommand = TokenProgramAgnosticSubcommand::Burn {
-            definition: make_public_account_input_from_str(&definition_account_id.to_string()),
-            holder: make_public_account_input_from_str(&recipient_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                ),
+            },
             amount: 3,
         };
 
@@ -482,12 +522,18 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Mint 10 tokens at `recipient_acc`
         let subcommand = TokenProgramAgnosticSubcommand::Mint {
-            definition: make_public_account_input_from_str(&definition_account_id.to_string()),
-            holder: Some(make_public_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            holder_npk: None,
-            holder_ipk: None,
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
             amount: 10,
         };
 
@@ -571,10 +617,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -620,12 +672,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -654,12 +710,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Transfer additional 7 tokens from `supply_acc` to the account at account_id
         // `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -687,8 +747,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Burn 3 tokens from `recipient_acc`
         let subcommand = TokenProgramAgnosticSubcommand::Burn {
-            definition: make_public_account_input_from_str(&definition_account_id.to_string()),
-            holder: make_private_account_input_from_str(&recipient_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                ),
+            },
             amount: 3,
         };
 
@@ -737,12 +805,18 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Mint 10 tokens at `recipient_acc`
         let subcommand = TokenProgramAgnosticSubcommand::Mint {
-            definition: make_public_account_input_from_str(&definition_account_id.to_string()),
-            holder: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            holder_npk: None,
-            holder_ipk: None,
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
             amount: 10,
         };
 
@@ -816,12 +890,18 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Mint 9 tokens at `recipient_acc2`
         let subcommand = TokenProgramAgnosticSubcommand::Mint {
-            definition: make_public_account_input_from_str(&definition_account_id.to_string()),
-            holder: None,
-            holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
-            holder_ipk: Some(hex::encode(
-                holder_keys.incoming_viewing_public_key.0.clone(),
-            )),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: None,
+                holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
+                holder_ipk: Some(hex::encode(
+                    holder_keys.incoming_viewing_public_key.0.clone(),
+                )),
+            },
             amount: 9,
         };
 
@@ -910,10 +990,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_private_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -982,12 +1068,18 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Mint 10 tokens at `recipient_acc_pub`
         let subcommand = TokenProgramAgnosticSubcommand::Mint {
-            definition: make_private_account_input_from_str(&definition_account_id.to_string()),
-            holder: Some(make_public_account_input_from_str(
-                &recipient_account_id_pub.to_string(),
-            )),
-            holder_npk: None,
-            holder_ipk: None,
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_public_account_input_from_str(
+                    &recipient_account_id_pub.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
             amount: 10,
         };
 
@@ -1037,12 +1129,18 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Mint 5 tokens at `recipient_acc_pr`
         let subcommand = TokenProgramAgnosticSubcommand::Mint {
-            definition: make_private_account_input_from_str(&definition_account_id.to_string()),
-            holder: None,
-            holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
-            holder_ipk: Some(hex::encode(
-                holder_keys.incoming_viewing_public_key.0.clone(),
-            )),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: None,
+                holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
+                holder_ipk: Some(hex::encode(
+                    holder_keys.incoming_viewing_public_key.0.clone(),
+                )),
+            },
             amount: 5,
         };
 
@@ -1094,12 +1192,18 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Mint 5 tokens at `recipient_acc_pr`
         let subcommand = TokenProgramAgnosticSubcommand::Mint {
-            definition: make_private_account_input_from_str(&definition_account_id.to_string()),
-            holder: Some(make_private_account_input_from_str(
-                &recipient_account_id_pr.to_string(),
-            )),
-            holder_npk: None,
-            holder_ipk: None,
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderMaybeUnowned {
+                holder: Some(make_private_account_input_from_str(
+                    &recipient_account_id_pr.to_string(),
+                )),
+                holder_npk: None,
+                holder_ipk: None,
+            },
             amount: 5,
         };
 
@@ -1146,8 +1250,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Burn 5 tokens at `recipient_acc_pub`
         let subcommand = TokenProgramAgnosticSubcommand::Burn {
-            definition: make_private_account_input_from_str(&definition_account_id.to_string()),
-            holder: make_public_account_input_from_str(&recipient_account_id_pub.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_public_account_input_from_str(
+                    &recipient_account_id_pub.to_string(),
+                ),
+            },
             amount: 5,
         };
 
@@ -1191,8 +1303,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Burn 5 tokens at `recipient_acc_pr`
         let subcommand = TokenProgramAgnosticSubcommand::Burn {
-            definition: make_private_account_input_from_str(&definition_account_id.to_string()),
-            holder: make_private_account_input_from_str(&recipient_account_id_pr.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            holder: ArgsHolderOwned {
+                holder_account_id: make_private_account_input_from_str(
+                    &recipient_account_id_pr.to_string(),
+                ),
+            },
             amount: 5,
         };
 
@@ -1276,10 +1396,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_private_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_private_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -1384,10 +1510,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -1439,12 +1571,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: None,
-            to_npk: Some(hex::encode(recipient_keys.nullifer_public_key.0)),
-            to_ipk: Some(hex::encode(
-                recipient_keys.incoming_viewing_public_key.0.clone(),
-            )),
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(hex::encode(recipient_keys.nullifer_public_key.0)),
+                to_ipk: Some(hex::encode(
+                    recipient_keys.incoming_viewing_public_key.0.clone(),
+                )),
+            },
             amount: 7,
         };
 
@@ -1523,10 +1659,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -1562,12 +1704,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1591,12 +1737,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Transfer additional 7 tokens from `supply_acc` to the account at account_id
         // `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1662,10 +1812,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id.to_string(),
-            ),
-            supply_account_id: make_private_account_input_from_str(&supply_account_id.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_private_account_input_from_str(
+                    &supply_account_id.to_string(),
+                ),
+            },
             name: "A NAME".to_string(),
             total_supply: 37,
         };
@@ -1711,12 +1867,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1740,12 +1900,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Transfer additional 7 tokens from `supply_acc` to the account at account_id
         // `recipient_account_id`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_private_account_input_from_str(&supply_account_id.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&supply_account_id.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -1774,10 +1938,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to: AccountId = ACC_RECEIVER_PRIVATE.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(&to.to_string())),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(&to.to_string())),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -1812,10 +1980,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: None,
-            to_npk: Some(to_npk_string),
-            to_ipk: Some(hex::encode(to_ipk.0)),
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(to_npk_string),
+                to_ipk: Some(hex::encode(to_ipk.0)),
+            },
             amount: 100,
         });
 
@@ -1881,10 +2053,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: None,
-            to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
-            to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
+                to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+            },
             amount: 100,
         });
 
@@ -1994,10 +2170,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to: AccountId = ACC_RECEIVER.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_public_account_input_from_str(&to.to_string())),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(&to.to_string())),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -2043,10 +2223,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to: AccountId = ACC_RECEIVER_PRIVATE.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(&to.to_string())),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(&to.to_string())),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
@@ -2087,10 +2271,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let from: AccountId = ACC_SENDER.parse().unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: None,
-            to_npk: Some(to_npk_string),
-            to_ipk: Some(hex::encode(to_ipk.0)),
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: None,
+                to_npk: Some(to_npk_string),
+                to_ipk: Some(hex::encode(to_ipk.0)),
+            },
             amount: 100,
         });
 
@@ -2475,24 +2663,32 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &to_account_id1.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &to_account_id1.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 100,
         });
 
         wallet::cli::execute_subcommand(command).await.unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&from.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &to_account_id2.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &to_account_id2.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 101,
         });
 
@@ -2525,24 +2721,32 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &to_account_id3.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &to_account_id3.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 102,
         });
 
         wallet::cli::execute_subcommand(command).await.unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&from.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &to_account_id4.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&from.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &to_account_id4.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 103,
         });
 
@@ -2602,24 +2806,32 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("########## TREE CHECKS END ##########");
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_private_account_input_from_str(&to_account_id1.to_string()),
-            to: Some(make_private_account_input_from_str(
-                &to_account_id2.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_private_account_input_from_str(&to_account_id1.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_private_account_input_from_str(
+                    &to_account_id2.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 10,
         });
 
         wallet::cli::execute_subcommand(command).await.unwrap();
 
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-            from: make_public_account_input_from_str(&to_account_id3.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &to_account_id4.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            sender: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&to_account_id3.to_string()),
+            },
+            receiver: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &to_account_id4.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 11,
         });
 
@@ -2730,10 +2942,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id_1.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id_1.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id_1.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id_1.to_string(),
+                ),
+            },
             name: "A NAM1".to_string(),
             total_supply: 37,
         };
@@ -2745,12 +2963,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id_1`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id_1.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id_1.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id_1.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id_1.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 
@@ -2762,10 +2984,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new token
         let subcommand = TokenProgramAgnosticSubcommand::New {
-            definition_account_id: make_public_account_input_from_str(
-                &definition_account_id_2.to_string(),
-            ),
-            supply_account_id: make_public_account_input_from_str(&supply_account_id_2.to_string()),
+            definition: ArgsDefinitionOwned {
+                definition_account_id: make_public_account_input_from_str(
+                    &definition_account_id_2.to_string(),
+                ),
+            },
+            supply: ArgsSupplyOwned {
+                supply_account_id: make_public_account_input_from_str(
+                    &supply_account_id_2.to_string(),
+                ),
+            },
             name: "A NAM2".to_string(),
             total_supply: 37,
         };
@@ -2779,12 +3007,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id_1`
         let subcommand = TokenProgramAgnosticSubcommand::Send {
-            from: make_public_account_input_from_str(&supply_account_id_2.to_string()),
-            to: Some(make_public_account_input_from_str(
-                &recipient_account_id_2.to_string(),
-            )),
-            to_npk: None,
-            to_ipk: None,
+            from: ArgsSenderOwned {
+                from: make_public_account_input_from_str(&supply_account_id_2.to_string()),
+            },
+            to: ArgsReceiverMaybeUnowned {
+                to: Some(make_public_account_input_from_str(
+                    &recipient_account_id_2.to_string(),
+                )),
+                to_npk: None,
+                to_ipk: None,
+            },
             amount: 7,
         };
 

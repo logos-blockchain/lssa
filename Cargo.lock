@@ -4756,6 +4756,7 @@ dependencies = [
  "log",
  "nssa",
  "nssa_core",
+ "paste",
  "rand 0.8.5",
  "risc0-zkvm",
  "serde",
