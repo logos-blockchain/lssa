@@ -84,21 +84,15 @@ impl Token<'_> {
         let account_ids = vec![definition_account_id, holder_account_id];
         let (instruction, program, _) = TokenBurnArgs { amount }.private_transfer_preparation();
 
-        // ToDo: Fix this by updating `nssa::public_transaction::Message::try_new` to get raw bytes
-        let instruction: [u32; 23] = instruction
-            .try_into()
-            .expect("Instruction vector should have len 32");
-
         let Ok(nonces) = self.0.get_accounts_nonces(vec![holder_account_id]).await else {
             return Err(ExecutionFailureKind::SequencerError);
         };
-        let message = nssa::public_transaction::Message::try_new(
+        let message = nssa::public_transaction::Message::new_preserialized(
             program.id(),
             account_ids,
             nonces,
             instruction,
-        )
-        .expect("Instruction should serialize");
+        );
 
         let signing_key = self
             .0
@@ -123,9 +117,6 @@ impl Token<'_> {
         let account_ids = vec![definition_account_id, holder_account_id];
         let (instruction, program, _) = TokenMintArgs { amount }.private_transfer_preparation();
 
-        // ToDo: Fix this by updating `nssa::public_transaction::Message::try_new` to get raw bytes
-        let instruction: [u32; 23] = instruction.try_into().unwrap();
-
         let Ok(nonces) = self
             .0
             .get_accounts_nonces(vec![definition_account_id])
@@ -133,13 +124,12 @@ impl Token<'_> {
         else {
             return Err(ExecutionFailureKind::SequencerError);
         };
-        let message = nssa::public_transaction::Message::try_new(
+        let message = nssa::public_transaction::Message::new_preserialized(
             program.id(),
             account_ids,
             nonces,
             instruction,
-        )
-        .unwrap();
+        );
 
         let Some(signing_key) = self
             .0
