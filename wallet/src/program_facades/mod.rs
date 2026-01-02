@@ -7,6 +7,7 @@ use nssa_core::program::InstructionData;
 
 use crate::{AccDecodeData, PrivacyPreservingAccount, WalletCore};
 
+pub mod amm;
 pub mod native_token_transfer;
 pub mod pinata;
 pub mod token;

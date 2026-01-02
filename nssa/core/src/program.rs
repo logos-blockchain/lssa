@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use risc0_zkvm::{DeserializeOwned, guest::env, serde::Deserializer};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "host")]
-use crate::account::AccountId;
-use crate::account::{Account, AccountWithMetadata};
+use crate::account::{Account, AccountId, AccountWithMetadata};
 
 pub type ProgramId = [u32; 8];
 pub type InstructionData = Vec<u32>;
@@ -22,8 +20,8 @@ pub struct ProgramInput<T> {
 /// Each program can derive up to `2^256` unique account IDs by choosing different
 /// seeds. PDAs allow programs to control namespaced account identifiers without
 /// collisions between programs.
-#[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug))]
 pub struct PdaSeed([u8; 32]);
 
 impl PdaSeed {
@@ -32,7 +30,6 @@ impl PdaSeed {
     }
 }
 
-#[cfg(feature = "host")]
 impl From<(&ProgramId, &PdaSeed)> for AccountId {
     fn from(value: (&ProgramId, &PdaSeed)) -> Self {
         use risc0_zkvm::sha::{Impl, Sha256};
@@ -54,8 +51,8 @@ impl From<(&ProgramId, &PdaSeed)> for AccountId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug,))]
 pub struct ChainedCall {
     /// The program ID of the program to execute
     pub program_id: ProgramId,

@@ -17,7 +17,7 @@ impl Token<'_> {
         let account_ids = vec![definition_account_id, supply_account_id];
         let program_id = nssa::program::Program::token().id();
         // Instruction must be: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
-        let mut instruction = [0; 23];
+        let mut instruction = vec![0u8; 23];
         instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
         instruction[17..].copy_from_slice(&name);
         let message = nssa::public_transaction::Message::try_new(
@@ -45,7 +45,7 @@ impl Token<'_> {
         let program_id = nssa::program::Program::token().id();
         // Instruction must be: [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
         // 0x00 || 0x00 || 0x00].
-        let mut instruction = [0; 23];
+        let mut instruction = vec![0u8; 23];
         instruction[0] = 0x01;
         instruction[1..17].copy_from_slice(&amount.to_le_bytes());
         let Ok(nonces) = self.0.get_accounts_nonces(vec![sender_account_id]).await else {

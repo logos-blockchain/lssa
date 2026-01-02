@@ -1,3 +1,4 @@
+use anyhow::Result;
 use common::error::ExecutionFailureKind;
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use nssa::{AccountId, PrivateKey};
@@ -25,6 +26,10 @@ impl PrivacyPreservingAccount {
             &Self::PrivateOwned(acc_id) => Some(acc_id),
             _ => None,
         }
+    }
+
+    pub fn is_public(&self) -> bool {
+        matches!(&self, Self::Public(_))
     }
 
     pub fn is_private(&self) -> bool {

@@ -3,69 +3,14 @@ use base58::ToBase58;
 use clap::Subcommand;
 use itertools::Itertools as _;
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
-use nssa::{Account, AccountId, program::Program};
+use nssa::{Account, program::Program};
 use serde::Serialize;
 
 use crate::{
-    WalletCore,
+    TokenDefinition, TokenHolding, WalletCore,
     cli::{SubcommandReturnValue, WalletSubcommand},
     helperfunctions::{AccountPrivacyKind, HumanReadableAccount, parse_addr_with_privacy_prefix},
 };
-
-const TOKEN_DEFINITION_TYPE: u8 = 0;
-const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
-
-const TOKEN_HOLDING_TYPE: u8 = 1;
-const TOKEN_HOLDING_DATA_SIZE: usize = 49;
-
-struct TokenDefinition {
-    #[allow(unused)]
-    account_type: u8,
-    name: [u8; 6],
-    total_supply: u128,
-}
-
-struct TokenHolding {
-    #[allow(unused)]
-    account_type: u8,
-    definition_id: AccountId,
-    balance: u128,
-}
-
-impl TokenDefinition {
-    fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != TOKEN_DEFINITION_DATA_SIZE || data[0] != TOKEN_DEFINITION_TYPE {
-            None
-        } else {
-            let account_type = data[0];
-            let name = data[1..7].try_into().unwrap();
-            let total_supply = u128::from_le_bytes(data[7..].try_into().unwrap());
-
-            Some(Self {
-                account_type,
-                name,
-                total_supply,
-            })
-        }
-    }
-}
-
-impl TokenHolding {
-    fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
-            None
-        } else {
-            let account_type = data[0];
-            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
-            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
-            Some(Self {
-                definition_id,
-                balance,
-                account_type,
-            })
-        }
-    }
-}
 
 /// Represents generic chain CLI subcommand
 #[derive(Subcommand, Debug, Clone)]
@@ -344,6 +289,8 @@ impl WalletSubcommand for AccountSubcommand {
 
 #[cfg(test)]
 mod tests {
+    use nssa::AccountId;
+
     use crate::cli::account::{TokedDefinitionAccountView, TokenDefinition};
 
     #[test]
@@ -352,6 +299,7 @@ mod tests {
             account_type: 1,
             name: [137, 12, 14, 3, 5, 4],
             total_supply: 100,
+            metadata_id: AccountId::new([0; 32]),
         };
 
         let token_def_view: TokedDefinitionAccountView = token_def.into();
@@ -365,6 +313,7 @@ mod tests {
             account_type: 1,
             name: [240, 159, 146, 150, 66, 66],
             total_supply: 100,
+            metadata_id: AccountId::new([0; 32]),
         };
 
         let token_def_view: TokedDefinitionAccountView = token_def.into();
@@ -378,6 +327,7 @@ mod tests {
             account_type: 1,
             name: [78, 65, 77, 69, 0, 0],
             total_supply: 100,
+            metadata_id: AccountId::new([0; 32]),
         };
 
         let token_def_view: TokedDefinitionAccountView = token_def.into();

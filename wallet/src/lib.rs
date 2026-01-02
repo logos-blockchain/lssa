@@ -18,7 +18,9 @@ use nssa::{
         circuit::ProgramWithDependencies, message::EncryptedAccountData,
     },
 };
-use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
+use nssa_core::{
+    Commitment, MembershipProof, SharedSecretKey, account::Data, program::InstructionData,
+};
 pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
 
@@ -43,6 +45,82 @@ pub mod program_facades;
 pub enum AccDecodeData {
     Skip,
     Decode(nssa_core::SharedSecretKey, AccountId),
+}
+
+const TOKEN_DEFINITION_DATA_SIZE: usize = 55;
+
+const TOKEN_HOLDING_TYPE: u8 = 1;
+const TOKEN_HOLDING_DATA_SIZE: usize = 49;
+const TOKEN_STANDARD_FUNGIBLE_TOKEN: u8 = 0;
+const TOKEN_STANDARD_NONFUNGIBLE: u8 = 2;
+
+struct TokenDefinition {
+    #[allow(unused)]
+    account_type: u8,
+    name: [u8; 6],
+    total_supply: u128,
+    #[allow(unused)]
+    metadata_id: AccountId,
+}
+
+struct TokenHolding {
+    #[allow(unused)]
+    account_type: u8,
+    definition_id: AccountId,
+    balance: u128,
+}
+
+impl TokenDefinition {
+    fn parse(data: &Data) -> Option<Self> {
+        let data = Vec::<u8>::from(data.clone());
+
+        if data.len() != TOKEN_DEFINITION_DATA_SIZE {
+            None
+        } else {
+            let account_type = data[0];
+            let name = data[1..7].try_into().expect("Name must be a 6 bytes");
+            let total_supply = u128::from_le_bytes(
+                data[7..23]
+                    .try_into()
+                    .expect("Total supply must be 16 bytes little-endian"),
+            );
+            let metadata_id = AccountId::new(
+                data[23..TOKEN_DEFINITION_DATA_SIZE]
+                    .try_into()
+                    .expect("Token Program expects valid Account Id for Metadata"),
+            );
+
+            let this = Some(Self {
+                account_type,
+                name,
+                total_supply,
+                metadata_id,
+            });
+
+            match account_type {
+                TOKEN_STANDARD_NONFUNGIBLE if total_supply != 1 => None,
+                TOKEN_STANDARD_FUNGIBLE_TOKEN if metadata_id != AccountId::new([0; 32]) => None,
+                _ => this,
+            }
+        }
+    }
+}
+
+impl TokenHolding {
+    fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
+            None
+        } else {
+            let account_type = data[0];
+            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
+            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
+            Some(Self {
+                definition_id,
+                balance,
+                account_type,
+            })
+        }
+    }
 }
 
 pub struct WalletCore {
@@ -251,7 +329,6 @@ impl WalletCore {
         }
 
         println!("Transaction data is {:?}", tx.message);
-
         Ok(())
     }
 
@@ -292,7 +369,7 @@ impl WalletCore {
             &produce_random_nonces(private_account_keys.len()),
             &private_account_keys
                 .iter()
-                .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
+                .map(|keys| (keys.npk.clone(), keys.ssk))
                 .collect::<Vec<_>>(),
             &acc_manager.private_account_auth(),
             &acc_manager.private_account_membership_proofs(),

@@ -82,7 +82,7 @@ fn main() {
     let winner_token_holding_post = winner_token_holding.account.clone();
     pinata_definition_post.data = data.next_data();
 
-    let mut instruction_data: [u8; 23] = [0; 23];
+    let mut instruction_data = vec![0; 23];
     instruction_data[0] = 1;
     instruction_data[1..17].copy_from_slice(&PRIZE.to_le_bytes());
 
