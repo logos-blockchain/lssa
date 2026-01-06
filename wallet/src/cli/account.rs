@@ -20,6 +20,9 @@ pub enum AccountSubcommand {
         /// Flag to get raw account data
         #[arg(short, long)]
         raw: bool,
+        /// Display keys (npk, ipk) for private accounts
+        #[arg(short, long)]
+        keys: bool,
         /// Valid 32 byte base58 string with privacy prefix
         #[arg(short, long)]
         account_id: String,
@@ -32,12 +35,6 @@ pub enum AccountSubcommand {
     /// List all accounts owned by the wallet
     #[command(visible_alias = "ls")]
     List {},
-    /// Get keys (npk, ipk) for a private account
-    Keys {
-        /// Valid 32 byte base58 string with privacy prefix
-        #[arg(short, long)]
-        account_id: String,
-    },
 }
 
 /// Represents generic register CLI subcommand
@@ -163,7 +160,11 @@ impl WalletSubcommand for AccountSubcommand {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            AccountSubcommand::Get { raw, account_id } => {
+            AccountSubcommand::Get {
+                raw,
+                keys,
+                account_id,
+            } => {
                 let (account_id, addr_kind) = parse_addr_with_privacy_prefix(&account_id)?;
 
                 let account_id = account_id.parse()?;
@@ -228,6 +229,24 @@ impl WalletSubcommand for AccountSubcommand {
 
                 println!("{}", acc_view);
 
+                if keys {
+                    if addr_kind != AccountPrivacyKind::Private {
+                        anyhow::bail!("--keys option only works for private accounts");
+                    }
+
+                    let (key, _) = wallet_core
+                        .storage
+                        .user_data
+                        .get_private_account(&account_id)
+                        .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
+
+                    println!("npk {}", hex::encode(key.nullifer_public_key.0));
+                    println!(
+                        "ipk {}",
+                        hex::encode(key.incoming_viewing_public_key.to_bytes())
+                    );
+                }
+
                 Ok(SubcommandReturnValue::Empty)
             }
             AccountSubcommand::New(new_subcommand) => {
@@ -287,29 +306,6 @@ impl WalletSubcommand for AccountSubcommand {
                     .format(",\n");
 
                 println!("{accounts}");
-                Ok(SubcommandReturnValue::Empty)
-            }
-            AccountSubcommand::Keys { account_id } => {
-                let (account_id, addr_kind) = parse_addr_with_privacy_prefix(&account_id)?;
-
-                if addr_kind != AccountPrivacyKind::Private {
-                    anyhow::bail!("Keys command only works for private accounts");
-                }
-
-                let account_id = account_id.parse()?;
-
-                let (key, _) = wallet_core
-                    .storage
-                    .user_data
-                    .get_private_account(&account_id)
-                    .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
-
-                println!("npk {}", hex::encode(key.nullifer_public_key.0));
-                println!(
-                    "ipk {}",
-                    hex::encode(key.incoming_viewing_public_key.to_bytes())
-                );
-
                 Ok(SubcommandReturnValue::Empty)
             }
         }
