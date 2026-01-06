@@ -2199,6 +2199,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee796ad498c8d9a1d68e477df8f754ed784ef875de1414ebdaf169f70a6a784"
 
 [[package]]
+name = "indexer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base58",
+ "common",
+ "futures",
+ "log",
+ "nssa",
+ "nssa_core",
+ "serde",
+ "storage",
+ "tokio",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

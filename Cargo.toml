@@ -19,7 +19,7 @@ members = [
   "integration_tests/proc_macro_test_attribute",
   "examples/program_deployment",
   "examples/program_deployment/methods",
-  "examples/program_deployment/methods/guest",
+  "examples/program_deployment/methods/guest", "indexer",
 ]
 
 [workspace.dependencies]

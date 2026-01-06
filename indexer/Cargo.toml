@@ -1,0 +1,19 @@
+[package]
+name = "indexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nssa.workspace = true
+nssa_core.workspace = true
+common.workspace = true
+storage.workspace = true
+
+base58.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+futures.workspace = true
