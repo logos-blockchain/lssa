@@ -36,6 +36,12 @@ pub enum AccountSubcommand {
         #[arg(short, long)]
         long: bool,
     },
+    /// Get keys (npk, ipk) for a private account
+    Keys {
+        /// Valid 32 byte base58 string with privacy prefix
+        #[arg(short, long)]
+        account_id: String,
+    },
 }
 
 /// Represents generic register CLI subcommand
@@ -350,6 +356,29 @@ impl WalletSubcommand for AccountSubcommand {
                         None => println!("  Not found in local storage"),
                     }
                 }
+
+                Ok(SubcommandReturnValue::Empty)
+            }
+            AccountSubcommand::Keys { account_id } => {
+                let (account_id, addr_kind) = parse_addr_with_privacy_prefix(&account_id)?;
+
+                if addr_kind != AccountPrivacyKind::Private {
+                    anyhow::bail!("Keys command only works for private accounts");
+                }
+
+                let account_id = account_id.parse()?;
+
+                let (key, _) = wallet_core
+                    .storage
+                    .user_data
+                    .get_private_account(&account_id)
+                    .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
+
+                println!("npk {}", hex::encode(key.nullifer_public_key.0));
+                println!(
+                    "ipk {}",
+                    hex::encode(key.incoming_viewing_public_key.to_bytes())
+                );
 
                 Ok(SubcommandReturnValue::Empty)
             }
