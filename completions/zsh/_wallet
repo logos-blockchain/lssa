@@ -10,6 +10,8 @@ _wallet() {
     typeset -A opt_args
 
     _arguments -C \
+        '(-c --continuous-run)'{-c,--continuous-run}'[Continuous run flag]' \
+        '--auth[Basic authentication in the format user or user\:password]:auth:' \
         '1: :->command' \
         '*:: :->args'
 
@@ -23,6 +25,9 @@ _wallet() {
                 'token:Token program interaction subcommand'
                 'amm:AMM program interaction subcommand'
                 'check-health:Check the wallet can connect to the node and builtin local programs match the remote versions'
+                'config:Command to setup config, get and set config fields'
+                'restore-keys:Restoring keys from given password at given depth'
+                'deploy-program:Deploy a program'
                 'help:Print help message or the help of the given subcommand(s)'
             )
             _describe -t commands 'wallet commands' commands
@@ -46,6 +51,15 @@ _wallet() {
                     ;;
                 amm)
                     _wallet_amm
+                    ;;
+                config)
+                    _wallet_config
+                    ;;
+                restore-keys)
+                    _wallet_restore_keys
+                    ;;
+                deploy-program)
+                    _wallet_deploy_program
                     ;;
                 help)
                     _wallet_help
@@ -137,6 +151,7 @@ _wallet_account() {
             subcommands=(
                 'get:Get account data'
                 'list:List all accounts'
+                'ls:List all accounts (alias for list)'
                 'new:Produce new public or private account'
                 'sync-private:Sync private accounts'
                 'help:Print this message or the help of the given subcommand(s)'
@@ -147,11 +162,22 @@ _wallet_account() {
             case $line[1] in
                 get)
                     _arguments \
+                        '--raw[Get raw account data]' \
                         '--account-id[Account ID to query]:account_id:_wallet_account_ids'
                     ;;
                 new)
-                    _arguments \
-                        '1:account type:(public private)'
+                    _arguments -C \
+                        '1: :->account_type' \
+                        '*:: :->new_args'
+                    case $state in
+                        account_type)
+                            compadd public private
+                            ;;
+                        new_args)
+                            _arguments \
+                                '--cci[Chain index of a parent node]:chain_index:'
+                            ;;
+                    esac
                     ;;
             esac
             ;;
@@ -188,7 +214,7 @@ _wallet_pinata() {
 # token subcommand
 _wallet_token() {
     local -a subcommands
-    
+
     _arguments -C \
         '1: :->subcommand' \
         '*:: :->args'
@@ -198,6 +224,8 @@ _wallet_token() {
             subcommands=(
                 'new:Produce a new token'
                 'send:Send tokens from one account to another with variable privacy'
+                'burn:Burn tokens on holder, modify definition'
+                'mint:Mint tokens on holder, modify definition'
                 'help:Print this message or the help of the given subcommand(s)'
             )
             _describe -t subcommands 'token subcommands' subcommands
@@ -214,8 +242,24 @@ _wallet_token() {
                 send)
                     _arguments \
                         '--from[Source holding account ID]:from_account:_wallet_account_ids' \
-                        '--to[Destination holding account ID]:to_account:_wallet_account_ids' \
+                        '--to[Destination holding account ID (for owned accounts)]:to_account:_wallet_account_ids' \
+                        '--to-npk[Destination nullifier public key (for foreign private accounts)]:npk:' \
+                        '--to-ipk[Destination viewing public key (for foreign private accounts)]:ipk:' \
                         '--amount[Amount of tokens to send]:amount:'
+                    ;;
+                burn)
+                    _arguments \
+                        '--definition[Definition account ID]:definition_account:_wallet_account_ids' \
+                        '--holder[Holder account ID]:holder_account:_wallet_account_ids' \
+                        '--amount[Amount of tokens to burn]:amount:'
+                    ;;
+                mint)
+                    _arguments \
+                        '--definition[Definition account ID]:definition_account:_wallet_account_ids' \
+                        '--holder[Holder account ID (for owned accounts)]:holder_account:_wallet_account_ids' \
+                        '--holder-npk[Holder nullifier public key (for foreign private accounts)]:npk:' \
+                        '--holder-ipk[Holder viewing public key (for foreign private accounts)]:ipk:' \
+                        '--amount[Amount of tokens to mint]:amount:'
                     ;;
             esac
             ;;
@@ -282,6 +326,64 @@ _wallet_amm() {
     esac
 }
 
+# config subcommand
+_wallet_config() {
+    local -a subcommands
+    local -a config_keys
+
+    config_keys=(
+        'all'
+        'override_rust_log'
+        'sequencer_addr'
+        'seq_poll_timeout_millis'
+        'seq_tx_poll_max_blocks'
+        'seq_poll_max_retries'
+        'seq_block_poll_max_amount'
+        'initial_accounts'
+        'basic_auth'
+    )
+
+    _arguments -C \
+        '1: :->subcommand' \
+        '*:: :->args'
+
+    case $state in
+        subcommand)
+            subcommands=(
+                'get:Getter of config fields'
+                'set:Setter of config fields'
+                'description:Prints description of corresponding field'
+                'help:Print this message or the help of the given subcommand(s)'
+            )
+            _describe -t subcommands 'config subcommands' subcommands
+            ;;
+        args)
+            case $line[1] in
+                get|description)
+                    compadd -a config_keys
+                    ;;
+                set)
+                    _arguments \
+                        '1:key:compadd -a config_keys' \
+                        '2:value:'
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+# restore-keys subcommand
+_wallet_restore_keys() {
+    _arguments \
+        '(-d --depth)'{-d,--depth}'[How deep in tree accounts may be]:depth:'
+}
+
+# deploy-program subcommand
+_wallet_deploy_program() {
+    _arguments \
+        '1:binary filepath:_files'
+}
+
 # help subcommand
 _wallet_help() {
     local -a commands
@@ -293,6 +395,9 @@ _wallet_help() {
         'token:Token program interaction subcommand'
         'amm:AMM program interaction subcommand'
         'check-health:Check the wallet can connect to the node'
+        'config:Command to setup config, get and set config fields'
+        'restore-keys:Restoring keys from given password at given depth'
+        'deploy-program:Deploy a program'
     )
     _describe -t commands 'wallet commands' commands
 }
