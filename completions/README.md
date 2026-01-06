@@ -13,6 +13,24 @@ Works with both vanilla zsh and oh-my-zsh.
 - Dynamic account ID completion via `wallet account list`
 - Descriptions for all commands and options
 
+Note that only accounts created by the user auto-complete.
+Preconfigured accounts and accounts only with `/` (no number) are not completed.
+
+e.g.:
+
+```
+▶ wallet account list 
+Preconfigured Public/Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw,
+Preconfigured Public/BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy,
+Preconfigured Private/3oCG8gqdKLMegw4rRfyaMQvuPHpcASt7xwttsmnZLSkw,
+Preconfigured Private/AKTcXgJ1xoynta1Ec7y6Jso1z1JQtHqd7aPQ1h9er6xX,
+/ Public/8DstRgMQrB2N9a7ymv98RDDbt8nctrP9ZzaNRSpKDZSu,
+/0 Public/2gJJjtG9UivBGEhA1Jz6waZQx1cwfYupC5yvKEweHaeH,
+/ Private/Bcv15B36bs1VqvQAdY6ZGFM1KioByNQQsB92KTNAx6u2
+```
+
+Only `Public/2gJJjtG9UivBGEhA1Jz6waZQx1cwfYupC5yvKEweHaeH` is used for completion.
+
 ### Supported Commands
 
 | Command                | Description                                                 |
