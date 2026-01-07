@@ -54,9 +54,9 @@ impl KeyNode for ChildKeysPublic {
         hash_input.extend_from_slice(&cci.to_le_bytes());
 
         let hash_value = match ((2u32).pow(31)).cmp(&cci) {
-            /// Harden
+            // Harden
             std::cmp::Ordering::Less => self.nth_child_harden_hash(cci),
-            /// Non-harden
+            // Non-harden
             std::cmp::Ordering::Greater => self.nth_child_nonharden_hash(cci),
             std::cmp::Ordering::Equal => self.nth_child_nonharden_hash(cci),
         };
