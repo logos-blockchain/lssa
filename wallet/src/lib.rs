@@ -145,9 +145,10 @@ impl WalletCore {
         let PersistentStorage {
             accounts: persistent_accounts,
             last_synced_block,
+            labels,
         } = fetch_persistent_storage().await?;
 
-        let storage = WalletChainStore::new(config, persistent_accounts)?;
+        let storage = WalletChainStore::new(config, persistent_accounts, labels)?;
 
         Ok(Self {
             storage,
@@ -186,7 +187,11 @@ impl WalletCore {
         let home = get_home()?;
         let storage_path = home.join("storage.json");
 
-        let data = produce_data_for_storage(&self.storage.user_data, self.last_synced_block);
+        let data = produce_data_for_storage(
+            &self.storage.user_data,
+            self.last_synced_block,
+            self.storage.labels.clone(),
+        );
         let storage = serde_json::to_vec_pretty(&data)?;
 
         let mut storage_file = tokio::fs::File::create(storage_path.as_path()).await?;

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use anyhow::Result;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
@@ -134,6 +134,7 @@ pub async fn fetch_persistent_storage() -> Result<PersistentStorage> {
 pub fn produce_data_for_storage(
     user_data: &NSSAUserData,
     last_synced_block: u64,
+    labels: HashMap<String, String>,
 ) -> PersistentStorage {
     let mut vec_for_storage = vec![];
 
@@ -187,6 +188,7 @@ pub fn produce_data_for_storage(
     PersistentStorage {
         accounts: vec_for_storage,
         last_synced_block,
+        labels,
     }
 }
 

@@ -16,12 +16,14 @@ use crate::config::{InitialAccountData, PersistentAccountData, WalletConfig};
 pub struct WalletChainStore {
     pub user_data: NSSAUserData,
     pub wallet_config: WalletConfig,
+    pub labels: HashMap<String, String>,
 }
 
 impl WalletChainStore {
     pub fn new(
         config: WalletConfig,
         persistent_accounts: Vec<PersistentAccountData>,
+        labels: HashMap<String, String>,
     ) -> Result<Self> {
         if persistent_accounts.is_empty() {
             anyhow::bail!("Roots not found; please run setup beforehand");
@@ -85,6 +87,7 @@ impl WalletChainStore {
                 private_tree,
             )?,
             wallet_config: config,
+            labels,
         })
     }
 
@@ -120,6 +123,7 @@ impl WalletChainStore {
                 private_tree,
             )?,
             wallet_config: config,
+            labels: HashMap::new(),
         })
     }
 
@@ -291,6 +295,6 @@ mod tests {
         let config = create_sample_wallet_config();
         let accs = create_sample_persistent_accounts();
 
-        let _ = WalletChainStore::new(config.clone(), accs).unwrap();
+        let _ = WalletChainStore::new(config.clone(), accs, HashMap::new()).unwrap();
     }
 }

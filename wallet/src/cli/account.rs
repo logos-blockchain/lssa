@@ -32,6 +32,15 @@ pub enum AccountSubcommand {
     /// List all accounts owned by the wallet
     #[command(visible_alias = "ls")]
     List {},
+    /// Set a label for an account
+    Label {
+        /// Valid 32 byte base58 string with privacy prefix
+        #[arg(short, long)]
+        account_id: String,
+        /// The label to assign to the account
+        #[arg(short, long)]
+        label: String,
+    },
 }
 
 /// Represents generic register CLI subcommand
@@ -158,9 +167,13 @@ impl WalletSubcommand for AccountSubcommand {
     ) -> Result<SubcommandReturnValue> {
         match self {
             AccountSubcommand::Get { raw, account_id } => {
-                let (account_id, addr_kind) = parse_addr_with_privacy_prefix(&account_id)?;
+                let (account_id_str, addr_kind) = parse_addr_with_privacy_prefix(&account_id)?;
 
-                let account_id = account_id.parse()?;
+                let account_id: nssa::AccountId = account_id_str.parse()?;
+
+                if let Some(label) = wallet_core.storage.labels.get(&account_id_str) {
+                    println!("Label: {label}");
+                }
 
                 let account = match addr_kind {
                     AccountPrivacyKind::Public => {
@@ -254,33 +267,55 @@ impl WalletSubcommand for AccountSubcommand {
             }
             AccountSubcommand::List {} => {
                 let user_data = &wallet_core.storage.user_data;
+                let labels = &wallet_core.storage.labels;
+
+                let format_with_label = |prefix: &str, id: &nssa::AccountId| {
+                    let id_str = id.to_string();
+                    if let Some(label) = labels.get(&id_str) {
+                        format!("{prefix} [{label}]")
+                    } else {
+                        prefix.to_string()
+                    }
+                };
+
                 let accounts = user_data
                     .default_pub_account_signing_keys
                     .keys()
-                    .map(|id| format!("Preconfigured Public/{id}"))
+                    .map(|id| format_with_label(&format!("Preconfigured Public/{id}"), id))
                     .chain(
                         user_data
                             .default_user_private_accounts
                             .keys()
-                            .map(|id| format!("Preconfigured Private/{id}")),
+                            .map(|id| format_with_label(&format!("Preconfigured Private/{id}"), id)),
                     )
-                    .chain(
-                        user_data
-                            .public_key_tree
-                            .account_id_map
-                            .iter()
-                            .map(|(id, chain_index)| format!("{chain_index} Public/{id}")),
-                    )
-                    .chain(
-                        user_data
-                            .private_key_tree
-                            .account_id_map
-                            .iter()
-                            .map(|(id, chain_index)| format!("{chain_index} Private/{id}")),
-                    )
+                    .chain(user_data.public_key_tree.account_id_map.iter().map(
+                        |(id, chain_index)| {
+                            format_with_label(&format!("{chain_index} Public/{id}"), id)
+                        },
+                    ))
+                    .chain(user_data.private_key_tree.account_id_map.iter().map(
+                        |(id, chain_index)| {
+                            format_with_label(&format!("{chain_index} Private/{id}"), id)
+                        },
+                    ))
                     .format(",\n");
 
                 println!("{accounts}");
+                Ok(SubcommandReturnValue::Empty)
+            }
+            AccountSubcommand::Label { account_id, label } => {
+                let (account_id_str, _) = parse_addr_with_privacy_prefix(&account_id)?;
+
+                wallet_core
+                    .storage
+                    .labels
+                    .insert(account_id_str.clone(), label.clone());
+
+                let path = wallet_core.store_persistent_data().await?;
+
+                println!("Label '{label}' set for account {account_id_str}");
+                println!("Stored persistent data at {path:#?}");
+
                 Ok(SubcommandReturnValue::Empty)
             }
         }
