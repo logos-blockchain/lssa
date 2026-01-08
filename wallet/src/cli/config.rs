@@ -10,7 +10,13 @@ use crate::{
 #[derive(Subcommand, Debug, Clone)]
 pub enum ConfigSubcommand {
     /// Getter of config fields
-    Get { key: String },
+    Get {
+        /// Print all config fields
+        #[arg(short, long)]
+        all: bool,
+        /// Config field key to get
+        key: Option<String>,
+    },
     /// Setter of config fields
     Set { key: String, value: String },
     /// Prints description of corresponding field
@@ -23,58 +29,66 @@ impl WalletSubcommand for ConfigSubcommand {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            ConfigSubcommand::Get { key } => match key.as_str() {
-                "all" => {
+            ConfigSubcommand::Get { all, key } => {
+                if all {
                     let config_str =
                         serde_json::to_string_pretty(&wallet_core.storage.wallet_config)?;
 
                     println!("{config_str}");
-                }
-                "override_rust_log" => {
-                    if let Some(value) = &wallet_core.storage.wallet_config.override_rust_log {
-                        println!("{value}");
-                    } else {
-                        println!("Not set");
+                } else if let Some(key) = key {
+                    match key.as_str() {
+                        "override_rust_log" => {
+                            if let Some(value) =
+                                &wallet_core.storage.wallet_config.override_rust_log
+                            {
+                                println!("{value}");
+                            } else {
+                                println!("Not set");
+                            }
+                        }
+                        "sequencer_addr" => {
+                            println!("{}", wallet_core.storage.wallet_config.sequencer_addr);
+                        }
+                        "seq_poll_timeout_millis" => {
+                            println!(
+                                "{}",
+                                wallet_core.storage.wallet_config.seq_poll_timeout_millis
+                            );
+                        }
+                        "seq_tx_poll_max_blocks" => {
+                            println!(
+                                "{}",
+                                wallet_core.storage.wallet_config.seq_tx_poll_max_blocks
+                            );
+                        }
+                        "seq_poll_max_retries" => {
+                            println!("{}", wallet_core.storage.wallet_config.seq_poll_max_retries);
+                        }
+                        "seq_block_poll_max_amount" => {
+                            println!(
+                                "{}",
+                                wallet_core.storage.wallet_config.seq_block_poll_max_amount
+                            );
+                        }
+                        "initial_accounts" => {
+                            println!("{:#?}", wallet_core.storage.wallet_config.initial_accounts);
+                        }
+                        "basic_auth" => {
+                            if let Some(basic_auth) = &wallet_core.storage.wallet_config.basic_auth
+                            {
+                                println!("{basic_auth}");
+                            } else {
+                                println!("Not set");
+                            }
+                        }
+                        _ => {
+                            println!("Unknown field");
+                        }
                     }
+                } else {
+                    println!("Please provide a key or use --all flag");
                 }
-                "sequencer_addr" => {
-                    println!("{}", wallet_core.storage.wallet_config.sequencer_addr);
-                }
-                "seq_poll_timeout_millis" => {
-                    println!(
-                        "{}",
-                        wallet_core.storage.wallet_config.seq_poll_timeout_millis
-                    );
-                }
-                "seq_tx_poll_max_blocks" => {
-                    println!(
-                        "{}",
-                        wallet_core.storage.wallet_config.seq_tx_poll_max_blocks
-                    );
-                }
-                "seq_poll_max_retries" => {
-                    println!("{}", wallet_core.storage.wallet_config.seq_poll_max_retries);
-                }
-                "seq_block_poll_max_amount" => {
-                    println!(
-                        "{}",
-                        wallet_core.storage.wallet_config.seq_block_poll_max_amount
-                    );
-                }
-                "initial_accounts" => {
-                    println!("{:#?}", wallet_core.storage.wallet_config.initial_accounts);
-                }
-                "basic_auth" => {
-                    if let Some(basic_auth) = &wallet_core.storage.wallet_config.basic_auth {
-                        println!("{basic_auth}");
-                    } else {
-                        println!("Not set");
-                    }
-                }
-                _ => {
-                    println!("Unknown field");
-                }
-            },
+            }
             ConfigSubcommand::Set { key, value } => {
                 match key.as_str() {
                     "override_rust_log" => {
