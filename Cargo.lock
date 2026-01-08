@@ -957,13 +957,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "common-http-client",
- "futures",
- "log",
  "reqwest",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "url",
 ]
 
 [[package]]

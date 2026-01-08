@@ -1,0 +1,9 @@
+name: Install Nomos circuits
+description: Installs Nomos circuits for compatibility
+runs:
+  using: "composite"
+  steps:
+    - name: Install risc0
+      run: |
+        /home/runner/lssa/ci_scripts/setup-nomos-circuits.sh
+      shell: bash
