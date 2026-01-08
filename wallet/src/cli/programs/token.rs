@@ -1,21 +1,26 @@
 use anyhow::Result;
-use clap::Subcommand;
+use clap::{Args, Subcommand};
 use common::transaction::NSSATransaction;
+use paste::paste;
 
 use crate::{
-    WalletCore,
+    PrivacyPreservingAccount, WalletCore,
     cli::{
         SubcommandReturnValue, WalletSubcommand,
-        programs::{
-            ArgsDefinitionOwned, ArgsHolderMaybeUnowned, ArgsHolderOwned, ArgsReceiverMaybeUnowned,
-            ArgsSenderOwned, ArgsSupplyOwned, ParsePrivacyPreservingAccount,
-        },
+        programs::{ArgsReceiverMaybeUnowned, ArgsSenderOwned, ParsePrivacyPreservingAccount},
     },
+    helperfunctions::{AccountPrivacyKind, parse_addr_with_privacy_prefix},
+    maybe_unowned_account_name, owned_account_name,
     program_facades::{
         send_privacy_preserving_transaction_unified,
         token::{Token, TokenBurnArgs, TokenDefinitionArgs, TokenMintArgs, TokenTransferArgs},
     },
 };
+
+owned_account_name!(ArgsDefinitionOwned, definition_account_id);
+owned_account_name!(ArgsSupplyOwned, supply_account_id);
+owned_account_name!(ArgsHolderOwned, holder_account_id);
+maybe_unowned_account_name!(ArgsHolderMaybeUnowned, holder);
 
 /// Represents generic CLI subcommand for a wallet working with token program
 #[derive(Subcommand, Debug, Clone)]

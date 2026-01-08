@@ -23,10 +23,14 @@ use wallet::{
         account::{AccountSubcommand, NewSubcommand},
         config::ConfigSubcommand,
         programs::{
-            ArgsDefinitionOwned, ArgsHolderMaybeUnowned, ArgsHolderOwned, ArgsReceiverMaybeUnowned,
-            ArgsSenderOwned, ArgsSupplyOwned, amm::AmmProgramAgnosticSubcommand,
-            native_token_transfer::AuthTransferSubcommand, pinata::PinataProgramAgnosticSubcommand,
-            token::TokenProgramAgnosticSubcommand,
+            ArgsReceiverMaybeUnowned, ArgsSenderOwned,
+            amm::AmmProgramAgnosticSubcommand,
+            native_token_transfer::AuthTransferSubcommand,
+            pinata::PinataProgramAgnosticSubcommand,
+            token::{
+                ArgsDefinitionOwned, ArgsHolderMaybeUnowned, ArgsHolderOwned, ArgsSupplyOwned,
+                TokenProgramAgnosticSubcommand,
+            },
         },
     },
     config::PersistentStorage,

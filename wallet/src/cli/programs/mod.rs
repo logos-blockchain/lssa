@@ -16,6 +16,7 @@ trait ParsePrivacyPreservingAccount {
     fn parse(&self) -> Result<PrivacyPreservingAccount>;
 }
 
+#[macro_export]
 macro_rules! owned_account_name {
     ($classname: ident, $field: ident) => {
         #[derive(Debug, Args, Clone)]
@@ -43,10 +44,8 @@ macro_rules! owned_account_name {
 }
 
 owned_account_name!(ArgsSenderOwned, from);
-owned_account_name!(ArgsDefinitionOwned, definition_account_id);
-owned_account_name!(ArgsSupplyOwned, supply_account_id);
-owned_account_name!(ArgsHolderOwned, holder_account_id);
 
+#[macro_export]
 macro_rules! maybe_unowned_account_name {
     ($classname: ident, $field: ident) => {
         paste! {
@@ -107,4 +106,3 @@ macro_rules! maybe_unowned_account_name {
 }
 
 maybe_unowned_account_name!(ArgsReceiverMaybeUnowned, to);
-maybe_unowned_account_name!(ArgsHolderMaybeUnowned, holder);
