@@ -12,6 +12,4 @@ thiserror.workspace = true
 url.workspace = true
 futures.workspace = true
 serde_json.workspace = true
-const-hex.workspace = true
-serde_with.workspace = true
-ed25519-dalek                = { workspace = true, features = ["rand_core", "serde", "zeroize"] }
+common-http-client.workspace = true
