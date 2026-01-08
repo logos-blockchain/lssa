@@ -1,7 +1,6 @@
 use anyhow::Result;
 use common_http_client::CommonHttpClient;
-pub use common_http_client::BasicAuthCredentials;
-pub use common_http_client::Error;
+pub use common_http_client::{BasicAuthCredentials, Error};
 use reqwest::Client;
 
 // Simple wrapper
@@ -15,7 +14,8 @@ impl BedrockClient {
                 .timeout(std::time::Duration::from_secs(60))
                 .build()?;
 
-        Ok(BedrockClient(CommonHttpClient::new_with_client(client, auth)))
+        Ok(BedrockClient(CommonHttpClient::new_with_client(
+            client, auth,
+        )))
     }
 }
-
