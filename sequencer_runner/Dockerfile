@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     clang \
     && rm -rf /var/lib/apt/lists/*
 
+# Nomos circuits for compatibility
+RUN chmod 777 /ci_scripts/setup-nomos-circuits.sh
+    && /ci_scripts/setup-nomos-circuits.sh
+
 WORKDIR /sequencer_runner
 
 # Planner stage - generates dependency recipe
