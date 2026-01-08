@@ -5,5 +5,5 @@ runs:
   steps:
     - name: Install risc0
       run: |
-        /home/runner/lssa/ci_scripts/setup-nomos-circuits.sh
+        /home/runner/work/lssa/lssa/ci_scripts/setup-nomos-circuits.sh
       shell: bash
