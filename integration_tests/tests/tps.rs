@@ -1,6 +1,9 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use anyhow::Result;
+use integration_tests::TestContext;
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
+use log::info;
 use nssa::{
     Account, AccountId, PrivacyPreservingTransaction, PrivateKey, PublicKey, PublicTransaction,
     privacy_preserving_transaction::{self as pptx, circuit},
@@ -13,6 +16,78 @@ use nssa_core::{
     encryption::IncomingViewingPublicKey,
 };
 use sequencer_core::config::{AccountInitialData, CommitmentsInitialData, SequencerConfig};
+use tokio::test;
+
+// TODO: Make a proper benchmark instead of an ad-hoc test
+#[test]
+pub async fn tps_test() -> Result<()> {
+    let num_transactions = 300 * 5;
+    let target_tps = 12;
+
+    let tps_test = TpsTestManager::new(target_tps, num_transactions);
+    let ctx = TestContext::new_with_sequencer_config(tps_test.generate_sequencer_config()).await?;
+
+    let target_time = tps_test.target_time();
+    info!(
+        "TPS test begin. Target time is {target_time:?} for {num_transactions} transactions ({target_tps} TPS)"
+    );
+
+    let txs = tps_test.build_public_txs();
+    let now = Instant::now();
+
+    let mut tx_hashes = vec![];
+    for (i, tx) in txs.into_iter().enumerate() {
+        let tx_hash = ctx
+            .sequencer_client()
+            .send_tx_public(tx)
+            .await
+            .unwrap()
+            .tx_hash;
+        info!("Sent tx {i}");
+        tx_hashes.push(tx_hash);
+    }
+
+    for (i, tx_hash) in tx_hashes.iter().enumerate() {
+        loop {
+            if now.elapsed().as_millis() > target_time.as_millis() {
+                panic!("TPS test failed by timeout");
+            }
+
+            let tx_obj = ctx
+                .sequencer_client()
+                .get_transaction_by_hash(tx_hash.clone())
+                .await
+                .inspect_err(|err| {
+                    log::warn!(
+                        "Failed to get transaction by hash {tx_hash:#?} with error: {err:#?}"
+                    )
+                });
+
+            if let Ok(tx_obj) = tx_obj
+                && tx_obj.transaction.is_some()
+            {
+                info!("Found tx {i} with hash {tx_hash}");
+                break;
+            }
+        }
+    }
+    let time_elapsed = now.elapsed().as_secs();
+
+    let tx_processed = tx_hashes.len();
+    let actual_tps = tx_processed as u64 / time_elapsed;
+    info!("Processed {tx_processed} transactions in {time_elapsed:?} ({actual_tps} TPS)",);
+
+    assert_eq!(tx_processed, num_transactions);
+
+    assert!(
+        time_elapsed <= target_time.as_secs(),
+        "Elapsed time {time_elapsed:?} exceeded target time {target_time:?}"
+    );
+
+    info!("TPS test finished successfully");
+
+    Ok(())
+}
 
 pub(crate) struct TpsTestManager {
     public_keypairs: Vec<(PrivateKey, AccountId)>,
@@ -32,7 +107,7 @@ impl TpsTestManager {
                 let account_id = AccountId::from(&public_key);
                 (private_key, account_id)
             })
-            .collect::<Vec<_>>();
+            .collect();
         Self {
             public_keypairs,
             target_tps,
@@ -72,7 +147,7 @@ impl TpsTestManager {
     /// Generates a sequencer configuration with initial balance in a number of public accounts.
     /// The transactions generated with the function `build_public_txs` will be valid in a node
     /// started with the config from this method.
-    pub(crate) fn generate_tps_test_config(&self) -> SequencerConfig {
+    pub(crate) fn generate_sequencer_config(&self) -> SequencerConfig {
         // Create public public keypairs
         let initial_public_accounts = self
             .public_keypairs
@@ -118,7 +193,7 @@ impl TpsTestManager {
 /// it may take a while to run. In normal execution of the node this transaction will be accepted
 /// only once. Disabling the node's nullifier uniqueness check allows to submit this transaction
 /// multiple times with the purpose of testing the node's processing performance.
-#[allow(unused)]
+#[expect(dead_code, reason = "No idea if we need this, should we remove it?")]
 fn build_privacy_transaction() -> PrivacyPreservingTransaction {
     let program = Program::authenticated_transfer_program();
     let sender_nsk = [1; 32];

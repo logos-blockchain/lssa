@@ -1,38 +1,25 @@
-use std::path::PathBuf;
+//! This library contains common code for integration tests.
+
+use std::{net::SocketAddr, path::PathBuf, sync::LazyLock};
 
 use actix_web::dev::ServerHandle;
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use clap::Parser;
 use common::{
     sequencer_client::SequencerClient,
     transaction::{EncodedTransaction, NSSATransaction},
 };
-use log::{info, warn};
+use futures::FutureExt as _;
+use log::debug;
 use nssa::PrivacyPreservingTransaction;
 use nssa_core::Commitment;
 use sequencer_core::config::SequencerConfig;
-use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
+use wallet::{WalletCore, config::WalletConfigOverrides};
 
-use crate::test_suite_map::{prepare_function_map, tps_test};
-
-#[macro_use]
-extern crate proc_macro_test_attribute;
-
-pub mod test_suite_map;
-
-mod tps_test_utils;
-
-#[derive(Parser, Debug)]
-#[clap(version)]
-struct Args {
-    /// Path to configs
-    home_dir: PathBuf,
-    /// Test name
-    test_name: String,
-}
+// TODO: Remove this and control time from tests
+pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 
 pub const ACC_SENDER: &str = "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy";
 pub const ACC_RECEIVER: &str = "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw";
@@ -40,104 +27,181 @@ pub const ACC_RECEIVER: &str = "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw";
 pub const ACC_SENDER_PRIVATE: &str = "3oCG8gqdKLMegw4rRfyaMQvuPHpcASt7xwttsmnZLSkw";
 pub const ACC_RECEIVER_PRIVATE: &str = "AKTcXgJ1xoynta1Ec7y6Jso1z1JQtHqd7aPQ1h9er6xX";
 
-pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
-
 pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &str = "data_changer.bin";
 
-fn make_public_account_input_from_str(account_id: &str) -> String {
+static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
+
+/// Test context which sets up a sequencer and a wallet for integration tests.
+///
+/// It's memory and logically safe to create multiple instances of this struct in parallel tests,
+/// as each instance uses its own temporary directories for sequencer and wallet data.
+pub struct TestContext {
+    sequencer_server_handle: ServerHandle,
+    sequencer_loop_handle: JoinHandle<Result<()>>,
+    sequencer_client: SequencerClient,
+    wallet: WalletCore,
+    _temp_sequencer_dir: TempDir,
+    _temp_wallet_dir: TempDir,
+}
+
+impl TestContext {
+    /// Create new test context.
+    pub async fn new() -> Result<Self> {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+
+        let sequencer_config_path =
+            PathBuf::from(manifest_dir).join("configs/sequencer/sequencer_config.json");
+
+        let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
+            .context("Failed to create sequencer config from file")?;
+
+        Self::new_with_sequencer_config(sequencer_config).await
+    }
+
+    /// Create new test context with custom sequencer config.
+    ///
+    /// `home` and `port` fields of the provided config will be overridden to meet tests parallelism
+    /// requirements.
+    pub async fn new_with_sequencer_config(sequencer_config: SequencerConfig) -> Result<Self> {
+        // Ensure logger is initialized only once
+        *LOGGER;
+
+        debug!("Test context setup");
+
+        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, temp_sequencer_dir) =
+            Self::setup_sequencer(sequencer_config)
+                .await
+                .context("Failed to setup sequencer")?;
+
+        // Convert 0.0.0.0 to 127.0.0.1 for client connections
+        // When binding to port 0, the server binds to 0.0.0.0:<random_port>
+        // but clients need to connect to 127.0.0.1:<port> to work reliably
+        let sequencer_addr = if sequencer_addr.ip().is_unspecified() {
+            format!("http://127.0.0.1:{}", sequencer_addr.port())
+        } else {
+            format!("http://{sequencer_addr}")
+        };
+
+        let (wallet, temp_wallet_dir) = Self::setup_wallet(sequencer_addr.clone())
+            .await
+            .context("Failed to setup wallet")?;
+
+        let sequencer_client =
+            SequencerClient::new(sequencer_addr).context("Failed to create sequencer client")?;
+
+        Ok(Self {
+            sequencer_server_handle,
+            sequencer_loop_handle,
+            sequencer_client,
+            wallet,
+            _temp_sequencer_dir: temp_sequencer_dir,
+            _temp_wallet_dir: temp_wallet_dir,
+        })
+    }
+
+    async fn setup_sequencer(
+        mut config: SequencerConfig,
+    ) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>, TempDir)> {
+        let temp_sequencer_dir =
+            tempfile::tempdir().context("Failed to create temp dir for sequencer home")?;
+
+        debug!(
+            "Using temp sequencer home at {:?}",
+            temp_sequencer_dir.path()
+        );
+        config.home = temp_sequencer_dir.path().to_owned();
+        // Setting port to 0 lets the OS choose a free port for us
+        config.port = 0;
+
+        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle) =
+            sequencer_runner::startup_sequencer(config).await?;
+
+        Ok((
+            sequencer_server_handle,
+            sequencer_addr,
+            sequencer_loop_handle,
+            temp_sequencer_dir,
+        ))
+    }
+
+    async fn setup_wallet(sequencer_addr: String) -> Result<(WalletCore, TempDir)> {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let wallet_config_source_path =
+            PathBuf::from(manifest_dir).join("configs/wallet/wallet_config.json");
+
+        let temp_wallet_dir =
+            tempfile::tempdir().context("Failed to create temp dir for wallet home")?;
+
+        let config_path = temp_wallet_dir.path().join("wallet_config.json");
+        std::fs::copy(&wallet_config_source_path, &config_path)
+            .context("Failed to copy wallet config to temp dir")?;
+
+        let storage_path = temp_wallet_dir.path().join("storage.json");
+        let config_overrides = WalletConfigOverrides {
+            sequencer_addr: Some(sequencer_addr),
+            ..Default::default()
+        };
+
+        let wallet = WalletCore::new_init_storage(
+            config_path,
+            storage_path,
+            Some(config_overrides),
+            "test_pass".to_owned(),
+        )
+        .context("Failed to init wallet")?;
+        wallet
+            .store_persistent_data()
+            .await
+            .context("Failed to store wallet persistent data")?;
+
+        Ok((wallet, temp_wallet_dir))
+    }
+
+    /// Get reference to the wallet.
+    pub fn wallet(&self) -> &WalletCore {
+        &self.wallet
+    }
+
+    /// Get mutable reference to the wallet.
+    pub fn wallet_mut(&mut self) -> &mut WalletCore {
+        &mut self.wallet
+    }
+
+    /// Get reference to the sequencer client.
+    pub fn sequencer_client(&self) -> &SequencerClient {
+        &self.sequencer_client
+    }
+}
+
+impl Drop for TestContext {
+    fn drop(&mut self) {
+        debug!("Test context cleanup");
+
+        let Self {
+            sequencer_server_handle,
+            sequencer_loop_handle,
+            sequencer_client: _,
+            wallet: _,
+            _temp_sequencer_dir,
+            _temp_wallet_dir,
+        } = self;
+
+        sequencer_loop_handle.abort();
+
+        // Can't wait here as Drop can't be async, but anyway stop signal should be sent
+        sequencer_server_handle.stop(true).now_or_never();
+    }
+}
+
+pub fn format_public_account_id(account_id: &str) -> String {
     format!("Public/{account_id}")
 }
 
-fn make_private_account_input_from_str(account_id: &str) -> String {
+pub fn format_private_account_id(account_id: &str) -> String {
     format!("Private/{account_id}")
 }
 
-#[allow(clippy::type_complexity)]
-pub async fn pre_test(
-    home_dir: PathBuf,
-) -> Result<(ServerHandle, JoinHandle<Result<()>>, TempDir)> {
-    wallet::cli::execute_setup("test_pass".to_owned()).await?;
-
-    let home_dir_sequencer = home_dir.join("sequencer");
-
-    let mut sequencer_config =
-        sequencer_runner::config::from_file(home_dir_sequencer.join("sequencer_config.json"))
-            .unwrap();
-
-    let temp_dir_sequencer = replace_home_dir_with_temp_dir_in_configs(&mut sequencer_config);
-
-    let (seq_http_server_handle, sequencer_loop_handle) =
-        startup_sequencer(sequencer_config).await?;
-
-    Ok((
-        seq_http_server_handle,
-        sequencer_loop_handle,
-        temp_dir_sequencer,
-    ))
-}
-
-pub fn replace_home_dir_with_temp_dir_in_configs(
-    sequencer_config: &mut SequencerConfig,
-) -> TempDir {
-    let temp_dir_sequencer = tempfile::tempdir().unwrap();
-
-    sequencer_config.home = temp_dir_sequencer.path().to_path_buf();
-
-    temp_dir_sequencer
-}
-
-#[allow(clippy::type_complexity)]
-pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)) {
-    let (seq_http_server_handle, sequencer_loop_handle, _) = residual;
-
-    info!("Cleanup");
-
-    sequencer_loop_handle.abort();
-    seq_http_server_handle.stop(true).await;
-
-    let wallet_home = wallet::helperfunctions::get_home().unwrap();
-    let persistent_data_home = wallet_home.join("storage.json");
-
-    // Removing persistent accounts after run to not affect other executions
-    // Not necessary an error, if fails as there is tests for failure scenario
-    let _ = std::fs::remove_file(persistent_data_home)
-        .inspect_err(|err| warn!("Failed to remove persistent data with err {err:#?}"));
-
-    // At this point all of the references to sequencer_core must be lost.
-    // So they are dropped and tempdirs will be dropped too,
-}
-
-pub async fn main_tests_runner() -> Result<()> {
-    env_logger::init();
-
-    let args = Args::parse();
-    let Args {
-        home_dir,
-        test_name,
-    } = args;
-
-    let function_map = prepare_function_map();
-
-    match test_name.as_str() {
-        "all" => {
-            // Tests that use default config
-            for (_, fn_pointer) in function_map {
-                fn_pointer(home_dir.clone()).await;
-            }
-            // Run TPS test with its own specific config
-            tps_test().await;
-        }
-        _ => {
-            let fn_pointer = function_map.get(&test_name).expect("Unknown test name");
-
-            fn_pointer(home_dir.clone()).await;
-        }
-    }
-
-    Ok(())
-}
-
-async fn fetch_privacy_preserving_tx(
+pub async fn fetch_privacy_preserving_tx(
     seq_client: &SequencerClient,
     tx_hash: String,
 ) -> PrivacyPreservingTransaction {
@@ -161,7 +225,7 @@ async fn fetch_privacy_preserving_tx(
     }
 }
 
-async fn verify_commitment_is_in_state(
+pub async fn verify_commitment_is_in_state(
     commitment: Commitment,
     seq_client: &SequencerClient,
 ) -> bool {
@@ -173,15 +237,15 @@ async fn verify_commitment_is_in_state(
 
 #[cfg(test)]
 mod tests {
-    use crate::{make_private_account_input_from_str, make_public_account_input_from_str};
+    use super::{format_private_account_id, format_public_account_id};
 
     #[test]
     fn correct_account_id_from_prefix() {
         let account_id1 = "cafecafe";
         let account_id2 = "deadbeaf";
 
-        let account_id1_pub = make_public_account_input_from_str(account_id1);
-        let account_id2_priv = make_private_account_input_from_str(account_id2);
+        let account_id1_pub = format_public_account_id(account_id1);
+        let account_id2_priv = format_private_account_id(account_id2);
 
         assert_eq!(account_id1_pub, "Public/cafecafe".to_string());
         assert_eq!(account_id2_priv, "Private/deadbeaf".to_string());

@@ -44,8 +44,10 @@ impl SequencerClient {
     ) -> Result<Self> {
         Ok(Self {
             client: Client::builder()
-                //Add more fiedls if needed
+                // Add more fields if needed
                 .timeout(std::time::Duration::from_secs(60))
+                // Should be kept in sync with server keep-alive settings
+                .pool_idle_timeout(std::time::Duration::from_secs(5))
                 .build()?,
             sequencer_addr,
             basic_auth,
@@ -60,6 +62,10 @@ impl SequencerClient {
         let request =
             rpc_primitives::message::Request::from_payload_version_2_0(method.to_string(), payload);
 
+        log::debug!(
+            "Calling method {method} with payload {request:?} to sequencer at {}",
+            self.sequencer_addr
+        );
         let mut call_builder = self.client.post(&self.sequencer_addr);
 
         if let Some((username, password)) = &self.basic_auth {

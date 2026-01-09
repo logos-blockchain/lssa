@@ -1,4 +1,4 @@
-use std::{io, sync::Arc};
+use std::{io, net::SocketAddr, sync::Arc};
 
 use actix_cors::Cors;
 use actix_web::{App, Error as HttpError, HttpResponse, HttpServer, http, middleware, web};
@@ -42,25 +42,24 @@ fn get_cors(cors_allowed_origins: &[String]) -> Cors {
         .max_age(3600)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn new_http_server(
     config: RpcConfig,
     seuquencer_core: Arc<Mutex<SequencerCore>>,
     mempool_handle: MemPoolHandle<EncodedTransaction>,
-) -> io::Result<actix_web::dev::Server> {
+) -> io::Result<(actix_web::dev::Server, SocketAddr)> {
     let RpcConfig {
         addr,
         cors_allowed_origins,
         limits_config,
     } = config;
-    info!(target:NETWORK, "Starting http server at {addr}");
+    info!(target:NETWORK, "Starting HTTP server at {addr}");
     let handler = web::Data::new(JsonHandler {
         sequencer_state: seuquencer_core.clone(),
         mempool_handle,
     });
 
     // HTTP server
-    Ok(HttpServer::new(move || {
+    let http_server = HttpServer::new(move || {
         App::new()
             .wrap(get_cors(&cors_allowed_origins))
             .app_data(handler.clone())
@@ -70,6 +69,14 @@ pub fn new_http_server(
     })
     .bind(addr)?
     .shutdown_timeout(SHUTDOWN_TIMEOUT_SECS)
-    .disable_signals()
-    .run())
+    .disable_signals();
+
+    let [addr] = http_server
+        .addrs()
+        .try_into()
+        .expect("Exactly one address bound is expected for sequencer HTTP server");
+
+    info!(target:NETWORK, "HTTP server started at {addr}");
+
+    Ok((http_server.run(), addr))
 }

@@ -1,36 +1,65 @@
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use clap::{CommandFactory as _, Parser as _};
-use tokio::runtime::Builder;
-use wallet::cli::{Args, execute_continuous_run_with_auth, execute_subcommand_with_auth};
-
-pub const NUM_THREADS: usize = 2;
+use wallet::{
+    WalletCore,
+    cli::{Args, execute_continuous_run, execute_subcommand, read_password_from_stdin},
+    config::WalletConfigOverrides,
+    helperfunctions::{fetch_config_path, fetch_persistent_storage_path},
+};
 
 // TODO #169: We have sample configs for sequencer, but not for wallet
 // TODO #168: Why it requires config as a directory? Maybe better to deduce directory from config
 // file path?
 // TODO #172: Why it requires config as env var while sequencer_runner accepts as
 // argument?
-fn main() -> Result<()> {
-    let runtime = Builder::new_multi_thread()
-        .worker_threads(NUM_THREADS)
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let args = Args::parse();
+#[tokio::main]
+async fn main() -> Result<()> {
+    let Args {
+        continuous_run,
+        auth,
+        command,
+    } = Args::parse();
 
     env_logger::init();
 
-    runtime.block_on(async move {
-        if let Some(command) = args.command {
-            let _output = execute_subcommand_with_auth(command, args.auth).await?;
-            Ok(())
-        } else if args.continuous_run {
-            execute_continuous_run_with_auth(args.auth).await
+    let config_path = fetch_config_path().context("Could not fetch config path")?;
+    let storage_path =
+        fetch_persistent_storage_path().context("Could not fetch persistent storage path")?;
+
+    // Override basic auth if provided via CLI
+    let config_overrides = WalletConfigOverrides {
+        basic_auth: auth.map(|auth| auth.parse()).transpose()?.map(Some),
+        ..Default::default()
+    };
+
+    if let Some(command) = command {
+        let mut wallet = if !storage_path.exists() {
+            // TODO: Maybe move to `WalletCore::from_env()` or similar?
+
+            println!("Persistent storage not found, need to execute setup");
+
+            let password = read_password_from_stdin()?;
+            let wallet = WalletCore::new_init_storage(
+                config_path,
+                storage_path,
+                Some(config_overrides),
+                password,
+            )?;
+
+            wallet.store_persistent_data().await?;
+            wallet
         } else {
-            let help = Args::command().render_long_help();
-            println!("{help}");
-            Ok(())
-        }
-    })
+            WalletCore::new_update_chain(config_path, storage_path, Some(config_overrides))?
+        };
+        let _output = execute_subcommand(&mut wallet, command).await?;
+        Ok(())
+    } else if continuous_run {
+        let mut wallet =
+            WalletCore::new_update_chain(config_path, storage_path, Some(config_overrides))?;
+        execute_continuous_run(&mut wallet).await
+    } else {
+        let help = Args::command().render_long_help();
+        println!("{help}");
+        Ok(())
+    }
 }
