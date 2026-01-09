@@ -2865,6 +2865,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee796ad498c8d9a1d68e477df8f754ed784ef875de1414ebdaf169f70a6a784"
 
 [[package]]
+name = "indexer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "base58",
+ "base64",
+ "bedrock_client",
+ "borsh",
+ "bytemuck",
+ "clap",
+ "common",
+ "env_logger",
+ "futures",
+ "hex",
+ "indicatif",
+ "itertools 0.14.0",
+ "key_protocol",
+ "log",
+ "nssa",
+ "nssa_core",
+ "rand 0.8.5",
+ "risc0-zkvm",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
