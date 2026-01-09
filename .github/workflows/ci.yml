@@ -70,8 +70,6 @@ jobs:
 
       - uses: ./.github/actions/install-risc0
 
-      - uses: ./.github/actions/install-nomos-circuits-compatibility
-
       - name: Install active toolchain
         run: rustup install
 
@@ -97,8 +95,6 @@ jobs:
 
       - uses: ./.github/actions/install-risc0
 
-      - uses: ./.github/actions/install-nomos-circuits-compatibility
-
       - name: Install active toolchain
         run: rustup install
 
@@ -122,8 +118,6 @@ jobs:
 
       - uses: ./.github/actions/install-risc0
 
-      - uses: ./.github/actions/install-nomos-circuits-compatibility
-
       - name: Install active toolchain
         run: rustup install
 
@@ -144,8 +138,6 @@ jobs:
       - uses: ./.github/actions/install-system-deps
 
       - uses: ./.github/actions/install-risc0
-
-      - uses: ./.github/actions/install-nomos-circuits-compatibility
 
       - name: Install active toolchain
         run: rustup install
@@ -168,8 +160,6 @@ jobs:
           ref: ${{ github.head_ref }}
 
       - uses: ./.github/actions/install-risc0
-
-      - uses: ./.github/actions/install-nomos-circuits-compatibility
 
       - name: Install just
         run: cargo install just

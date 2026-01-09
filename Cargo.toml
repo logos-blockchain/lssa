@@ -79,7 +79,7 @@ base58 = "0.2.0"
 itertools = "0.14.0"
 url = "2.5.4"
 
-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git", branch = "marbella-offsite-2025-12" }
+common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git", branch = "feat-skip-zk-build" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",

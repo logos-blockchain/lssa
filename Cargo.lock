@@ -368,15 +368,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
-name = "archery"
-version = "1.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e0a5f99dfebb87bb342d0f53bb92c81842e100bbb915223e38349580e5441d"
-dependencies = [
- "triomphe",
-]
-
-[[package]]
 name = "ark-bls12-381"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1107,7 +1098,7 @@ dependencies = [
 [[package]]
 name = "broadcast-service"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "async-trait",
  "derivative",
@@ -1277,35 +1268,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chain-service"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "async-trait",
- "broadcast-service",
- "bytes",
- "cryptarchia-engine",
- "cryptarchia-sync",
- "futures",
- "groth16",
- "nomos-core",
- "nomos-ledger",
- "nomos-network",
- "nomos-storage",
- "nomos-utils",
- "num-bigint",
- "overwatch",
- "serde",
- "serde_with",
- "services-utils",
- "strum",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-futures",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1332,7 +1294,7 @@ dependencies = [
 [[package]]
 name = "circuits-prover"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "circuits-utils",
  "tempfile",
@@ -1341,7 +1303,7 @@ dependencies = [
 [[package]]
 name = "circuits-utils"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "dirs",
 ]
@@ -1433,10 +1395,9 @@ dependencies = [
 [[package]]
 name = "common-http-client"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "broadcast-service",
- "chain-service",
  "futures",
  "nomos-core",
  "nomos-da-messages",
@@ -1490,15 +1451,6 @@ name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
-
-[[package]]
-name = "convert_case"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baaaa0ecca5b51987b9423ccdc971514dd8b0bb7b4060b983d3664dad3f1f89f"
-dependencies = [
- "unicode-segmentation",
-]
 
 [[package]]
 name = "convert_case"
@@ -1578,7 +1530,7 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 [[package]]
 name = "cryptarchia-engine"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "cfg_eval",
  "nomos-utils",
@@ -1586,23 +1538,6 @@ dependencies = [
  "serde_with",
  "thiserror 1.0.69",
  "time",
- "tracing",
-]
-
-[[package]]
-name = "cryptarchia-sync"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "bytes",
- "cryptarchia-engine",
- "futures",
- "nomos-core",
- "rand 0.8.5",
- "serde",
- "serde_with",
- "thiserror 1.0.69",
- "tokio",
  "tracing",
 ]
 
@@ -2409,7 +2344,7 @@ dependencies = [
 [[package]]
 name = "groth16"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ec 0.4.2",
@@ -3082,7 +3017,7 @@ dependencies = [
 [[package]]
 name = "key-management-system-keys"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3107,7 +3042,7 @@ dependencies = [
 [[package]]
 name = "key-management-system-macros"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3138,7 +3073,7 @@ dependencies = [
 [[package]]
 name = "kzgrs"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "ark-bls12-381",
  "ark-ec 0.4.2",
@@ -3157,7 +3092,7 @@ dependencies = [
 [[package]]
 name = "kzgrs-backend"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "ark-ff 0.4.2",
  "ark-poly 0.4.2",
@@ -3239,7 +3174,6 @@ dependencies = [
  "bs58",
  "hkdf",
  "multihash",
- "serde",
  "sha2",
  "thiserror 2.0.17",
  "tracing",
@@ -3443,18 +3377,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mmr"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "ark-ff 0.4.2",
- "groth16",
- "poseidon2",
- "rpds",
- "serde",
-]
-
-[[package]]
 name = "multiaddr"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3563,7 +3485,7 @@ dependencies = [
 [[package]]
 name = "nomos-blend-crypto"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "blake2",
  "groth16",
@@ -3579,31 +3501,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "nomos-blend-message"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "blake2",
- "derivative",
- "groth16",
- "itertools 0.14.0",
- "key-management-system-keys",
- "nomos-blend-crypto",
- "nomos-blend-proofs",
- "nomos-core",
- "nomos-utils",
- "serde",
- "serde-big-array",
- "serde_with",
- "thiserror 1.0.69",
- "tracing",
- "zeroize",
-]
-
-[[package]]
 name = "nomos-blend-proofs"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "ed25519-dalek",
  "generic-array 1.3.5",
@@ -3618,7 +3518,7 @@ dependencies = [
 [[package]]
 name = "nomos-core"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "ark-ff 0.4.2",
  "async-trait",
@@ -3648,7 +3548,7 @@ dependencies = [
 [[package]]
 name = "nomos-da-messages"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "blake2",
  "futures",
@@ -3661,7 +3561,7 @@ dependencies = [
 [[package]]
 name = "nomos-http-api-common"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "axum",
  "governor",
@@ -3674,67 +3574,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "nomos-ledger"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "cryptarchia-engine",
- "groth16",
- "key-management-system-keys",
- "mmr",
- "nomos-blend-crypto",
- "nomos-blend-message",
- "nomos-blend-proofs",
- "nomos-core",
- "nomos-utils",
- "num-bigint",
- "rand 0.8.5",
- "rpds",
- "serde",
- "thiserror 1.0.69",
- "tracing",
- "utxotree",
-]
-
-[[package]]
-name = "nomos-network"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "async-trait",
- "cryptarchia-sync",
- "futures",
- "nomos-core",
- "overwatch",
- "serde",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
-name = "nomos-storage"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "async-trait",
- "bytes",
- "cryptarchia-engine",
- "futures",
- "libp2p-identity",
- "multiaddr",
- "nomos-core",
- "overwatch",
- "serde",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "nomos-utils"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "async-trait",
  "blake2",
@@ -3975,24 +3817,11 @@ source = "git+https://github.com/logos-co/Overwatch?rev=f5a9902#f5a99022f389d65a
 dependencies = [
  "async-trait",
  "futures",
- "overwatch-derive",
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
  "tokio-util",
  "tracing",
-]
-
-[[package]]
-name = "overwatch-derive"
-version = "0.1.0"
-source = "git+https://github.com/logos-co/Overwatch?rev=f5a9902#f5a99022f389d65adbd55e51f1e3f9eead62432a"
-dependencies = [
- "convert_case 0.8.0",
- "proc-macro-error2",
- "proc-macro2",
- "quote",
- "syn 2.0.111",
 ]
 
 [[package]]
@@ -4101,7 +3930,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 [[package]]
 name = "pol"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "circuits-prover",
  "circuits-utils",
@@ -4129,7 +3958,7 @@ dependencies = [
 [[package]]
 name = "poq"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "circuits-prover",
  "circuits-utils",
@@ -4151,7 +3980,7 @@ checksum = "f84267b20a16ea918e43c6a88433c2d54fa145c92a811b5b047ccbe153674483"
 [[package]]
 name = "poseidon2"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -4202,28 +4031,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "219cb19e96be00ab2e37d6e299658a0cfa83e52429179969b0f0121b4ac46983"
 dependencies = [
  "toml_edit 0.23.10+spec-1.0.0",
-]
-
-[[package]]
-name = "proc-macro-error-attr2"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96de42df36bb9bba5542fe9f1a054b8cc87e172759a1868aa05c1f3acc89dfc5"
-dependencies = [
- "proc-macro2",
- "quote",
-]
-
-[[package]]
-name = "proc-macro-error2"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11ec05c52be0a07b08061f7dd003e7d7092e0472bc731b4af7bb1ef876109802"
-dependencies = [
- "proc-macro-error-attr2",
- "proc-macro2",
- "quote",
- "syn 2.0.111",
 ]
 
 [[package]]
@@ -4849,16 +4656,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rpds"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e75f485e819d4d3015e6c0d55d02a4fd3db47c1993d9e603e0361fba2bffb34"
-dependencies = [
- "archery",
- "serde",
-]
-
-[[package]]
 name = "rrs-lib"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5201,15 +4998,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-big-array"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11fc7cc2c76d73e0f27ee52abbd64eec84d46f370c88371120433196934e4b7f"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5313,21 +5101,6 @@ checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
 dependencies = [
  "base16ct",
  "serde",
-]
-
-[[package]]
-name = "services-utils"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "async-trait",
- "futures",
- "log",
- "overwatch",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
 ]
 
 [[package]]
@@ -5974,16 +5747,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "pin-project",
- "tracing",
-]
-
-[[package]]
 name = "tracing-subscriber"
 version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5991,12 +5754,6 @@ checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
 dependencies = [
  "tracing-core",
 ]
-
-[[package]]
-name = "triomphe"
-version = "0.1.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd69c5aa8f924c7519d6372789a74eac5b94fb0f8fcf0d4a97eb0bfc3e785f39"
 
 [[package]]
 name = "try-lock"
@@ -6100,20 +5857,6 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
-
-[[package]]
-name = "utxotree"
-version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
-dependencies = [
- "ark-ff 0.4.2",
- "groth16",
- "num-bigint",
- "poseidon2",
- "rpds",
- "serde",
- "thiserror 1.0.69",
-]
 
 [[package]]
 name = "valuable"
@@ -6561,7 +6304,7 @@ checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 [[package]]
 name = "witness-generator"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "circuits-utils",
  "tempfile",
@@ -6716,7 +6459,7 @@ dependencies = [
 [[package]]
 name = "zksign"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=marbella-offsite-2025-12#b47525f893353b0441a34a62b87c85ad27fb8519"
+source = "git+https://github.com/logos-blockchain/logos-blockchain.git?branch=feat-skip-zk-build#fde542bb8398189fe5e9bad688a527618261f63d"
 dependencies = [
  "circuits-prover",
  "circuits-utils",
