@@ -52,9 +52,13 @@ if [ -d ".git" ]; then
   git reset --hard origin/main
 else
   echo "Cloning repository..."
-  git clone https://github.com/vacp2p/nescience-testnet.git .
+  git clone https://github.com/logos-blockchain/lssa.git .
   git checkout main
 fi
+
+# Install Nomos circuits for compatibility
+chmod 777 /ci_scripts/setup-nomos-circuits.sh
+/ci_scripts/setup-nomos-circuits.sh
 
 # Build sequencer_runner and wallet in release mode
 echo "Building sequencer_runner"
