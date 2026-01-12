@@ -5,6 +5,8 @@ use nssa_core::{
 use rand::{RngCore, rngs::OsRng};
 use sha2::Digest;
 
+use crate::key_management::secret_holders::OutgoingViewingSecretKey;
+
 #[derive(Debug)]
 /// Ephemeral secret key holder. Non-clonable as intended for one-time use. Produces ephemeral
 /// public keys. Can produce shared secret for sender.
@@ -24,12 +26,18 @@ pub fn produce_one_sided_shared_secret_receiver(
 }
 
 impl EphemeralKeyHolder {
-    pub fn new(receiver_nullifier_public_key: &NullifierPublicKey) -> Self {
+    pub fn new(sender_outgoing_viewing_key: &OutgoingViewingSecretKey, receiver_nullifier_public_key: &NullifierPublicKey) -> Self {
         let mut nonce_bytes = [0; 16];
         OsRng.fill_bytes(&mut nonce_bytes);
+        let mut hasher_receiver = sha2::Sha256::new();
+        hasher_receiver.update(receiver_nullifier_public_key);
+        hasher_receiver.update(nonce_bytes);
+        let hasher_receiver: [u8;32] = hasher_receiver.finalize().into();
+
         let mut hasher = sha2::Sha256::new();
-        hasher.update(receiver_nullifier_public_key);
-        hasher.update(nonce_bytes);
+        hasher.update(sender_outgoing_viewing_key);
+        hasher.update(hasher_receiver);
+
 
         Self {
             ephemeral_secret_key: hasher.finalize().into(),
