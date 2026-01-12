@@ -14,9 +14,13 @@ use key_protocol::key_management::key_tree::{chain_index::ChainIndex, traits::Ke
 use log::info;
 use nssa::{
     Account, AccountId, PrivacyPreservingTransaction,
-    privacy_preserving_transaction::message::EncryptedAccountData, program::Program,
+    privacy_preserving_transaction::{
+        circuit::ProgramWithDependencies, message::EncryptedAccountData,
+    },
 };
-use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
+use nssa_core::{
+    Commitment, MembershipProof, SharedSecretKey, account::Data, program::InstructionData,
+};
 pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
 
@@ -37,6 +41,87 @@ pub mod helperfunctions;
 pub mod poller;
 mod privacy_preserving_tx;
 pub mod program_facades;
+
+pub enum AccDecodeData {
+    Skip,
+    Decode(nssa_core::SharedSecretKey, AccountId),
+}
+
+const TOKEN_DEFINITION_DATA_SIZE: usize = 55;
+
+const TOKEN_HOLDING_TYPE: u8 = 1;
+const TOKEN_HOLDING_DATA_SIZE: usize = 49;
+const TOKEN_STANDARD_FUNGIBLE_TOKEN: u8 = 0;
+const TOKEN_STANDARD_NONFUNGIBLE: u8 = 2;
+
+struct TokenDefinition {
+    #[allow(unused)]
+    account_type: u8,
+    name: [u8; 6],
+    total_supply: u128,
+    #[allow(unused)]
+    metadata_id: AccountId,
+}
+
+struct TokenHolding {
+    #[allow(unused)]
+    account_type: u8,
+    definition_id: AccountId,
+    balance: u128,
+}
+
+impl TokenDefinition {
+    fn parse(data: &Data) -> Option<Self> {
+        let data = Vec::<u8>::from(data.clone());
+
+        if data.len() != TOKEN_DEFINITION_DATA_SIZE {
+            None
+        } else {
+            let account_type = data[0];
+            let name = data[1..7].try_into().expect("Name must be a 6 bytes");
+            let total_supply = u128::from_le_bytes(
+                data[7..23]
+                    .try_into()
+                    .expect("Total supply must be 16 bytes little-endian"),
+            );
+            let metadata_id = AccountId::new(
+                data[23..TOKEN_DEFINITION_DATA_SIZE]
+                    .try_into()
+                    .expect("Token Program expects valid Account Id for Metadata"),
+            );
+
+            let this = Some(Self {
+                account_type,
+                name,
+                total_supply,
+                metadata_id,
+            });
+
+            match account_type {
+                TOKEN_STANDARD_NONFUNGIBLE if total_supply != 1 => None,
+                TOKEN_STANDARD_FUNGIBLE_TOKEN if metadata_id != AccountId::new([0; 32]) => None,
+                _ => this,
+            }
+        }
+    }
+}
+
+impl TokenHolding {
+    fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
+            None
+        } else {
+            let account_type = data[0];
+            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
+            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
+            Some(Self {
+                definition_id,
+                balance,
+                account_type,
+            })
+        }
+    }
+}
 
 pub struct WalletCore {
     pub storage: WalletChainStore,
@@ -218,28 +303,32 @@ impl WalletCore {
     pub fn decode_insert_privacy_preserving_transaction_results(
         &mut self,
         tx: nssa::privacy_preserving_transaction::PrivacyPreservingTransaction,
-        acc_decode_data: &[(nssa_core::SharedSecretKey, AccountId)],
+        acc_decode_mask: &[AccDecodeData],
     ) -> Result<()> {
-        for (output_index, (secret, acc_account_id)) in acc_decode_data.iter().enumerate() {
-            let acc_ead = tx.message.encrypted_private_post_states[output_index].clone();
-            let acc_comm = tx.message.new_commitments[output_index].clone();
+        for (output_index, acc_decode_data) in acc_decode_mask.iter().enumerate() {
+            match acc_decode_data {
+                AccDecodeData::Decode(secret, acc_account_id) => {
+                    let acc_ead = tx.message.encrypted_private_post_states[output_index].clone();
+                    let acc_comm = tx.message.new_commitments[output_index].clone();
 
-            let res_acc = nssa_core::EncryptionScheme::decrypt(
-                &acc_ead.ciphertext,
-                secret,
-                &acc_comm,
-                output_index as u32,
-            )
-            .unwrap();
+                    let res_acc = nssa_core::EncryptionScheme::decrypt(
+                        &acc_ead.ciphertext,
+                        secret,
+                        &acc_comm,
+                        output_index as u32,
+                    )
+                    .unwrap();
 
-            println!("Received new acc {res_acc:#?}");
+                    println!("Received new acc {res_acc:#?}");
 
-            self.storage
-                .insert_private_account_data(*acc_account_id, res_acc);
+                    self.storage
+                        .insert_private_account_data(*acc_account_id, res_acc);
+                }
+                AccDecodeData::Skip => {}
+            }
         }
 
         println!("Transaction data is {:?}", tx.message);
-
         Ok(())
     }
 
@@ -247,7 +336,7 @@ impl WalletCore {
         &self,
         accounts: Vec<PrivacyPreservingAccount>,
         instruction_data: &InstructionData,
-        program: &Program,
+        program: &ProgramWithDependencies,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
         self.send_privacy_preserving_tx_with_pre_check(accounts, instruction_data, program, |_| {
             Ok(())
@@ -259,7 +348,7 @@ impl WalletCore {
         &self,
         accounts: Vec<PrivacyPreservingAccount>,
         instruction_data: &InstructionData,
-        program: &Program,
+        program: &ProgramWithDependencies,
         tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
         let acc_manager = privacy_preserving_tx::AccountManager::new(self, accounts).await?;
@@ -280,10 +369,11 @@ impl WalletCore {
             &produce_random_nonces(private_account_keys.len()),
             &private_account_keys
                 .iter()
-                .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
+                .map(|keys| (keys.npk.clone(), keys.ssk))
                 .collect::<Vec<_>>(),
             &acc_manager.private_account_auth(),
-            &program.to_owned().into(),
+            &acc_manager.private_account_membership_proofs(),
+            &program.to_owned(),
         )
         .unwrap();
 
@@ -303,7 +393,7 @@ impl WalletCore {
             nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
                 &message,
                 proof,
-                &acc_manager.witness_signing_keys(),
+                &acc_manager.public_account_auth(),
             );
         let tx = PrivacyPreservingTransaction::new(message, witness_set);
 

@@ -10,10 +10,10 @@ TO COMPLETE
 
 TO COMPLETE
 
-[ ] Change ...
-[ ] Add ...
-[ ] Fix ...
-[ ] ...
+- [ ] Change ...
+- [ ] Add ...
+- [ ] Fix ...
+- [ ] ...
 
 ## 🧪 How to Test
 
@@ -37,7 +37,7 @@ TO COMPLETE IF APPLICABLE
 
 *Mark only completed items. A complete PR should have all boxes ticked.*
 
-[ ] Complete PR description
-[ ] Implement the core functionality
-[ ] Add/update tests
-[ ] Add/update documentation and inline comments
+- [ ] Complete PR description
+- [ ] Implement the core functionality
+- [ ] Add/update tests
+- [ ] Add/update documentation and inline comments

@@ -1,0 +1,36 @@
+# Build artifacts
+target/
+**/target/
+
+# RocksDB data
+rocksdb/
+**/rocksdb/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+ci_scripts/
+
+# Documentation
+*.md
+!README.md
+
+# Configs (copy selectively if needed)
+configs/
+
+# License
+LICENSE

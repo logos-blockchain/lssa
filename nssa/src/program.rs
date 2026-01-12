@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::{
     error::NssaError,
-    program_methods::{AUTHENTICATED_TRANSFER_ELF, PINATA_ELF, TOKEN_ELF},
+    program_methods::{AMM_ELF, AUTHENTICATED_TRANSFER_ELF, PINATA_ELF, TOKEN_ELF},
 };
 
 /// Maximum number of cycles for a public execution.
@@ -94,6 +94,10 @@ impl Program {
         // This unwrap won't panic since the `TOKEN_ELF` comes from risc0 build of
         // `program_methods`
         Self::new(TOKEN_ELF.to_vec()).unwrap()
+    }
+
+    pub fn amm() -> Self {
+        Self::new(AMM_ELF.to_vec()).expect("The AMM program must be a valid Risc0 program")
     }
 }
 
@@ -219,6 +223,15 @@ mod tests {
             Program {
                 id: CLAIMER_ID,
                 elf: CLAIMER_ELF.to_vec(),
+            }
+        }
+
+        pub fn noop() -> Self {
+            use test_program_methods::{NOOP_ELF, NOOP_ID};
+
+            Program {
+                id: NOOP_ID,
+                elf: NOOP_ELF.to_vec(),
             }
         }
 

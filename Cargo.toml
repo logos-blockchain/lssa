@@ -12,15 +12,42 @@ members = [
   "common",
   "nssa",
   "nssa/core",
+  "program_methods",
+  "program_methods/guest",
+  "test_program_methods",
+  "test_program_methods/guest",
   "integration_tests/proc_macro_test_attribute",
   "examples/program_deployment",
+  "examples/program_deployment/methods",
+  "examples/program_deployment/methods/guest",
 ]
 
 [workspace.dependencies]
+nssa = { path = "nssa" }
+nssa_core = { path = "nssa/core" }
+common = { path = "common" }
+mempool = { path = "mempool" }
+storage = { path = "storage" }
+key_protocol = { path = "key_protocol" }
+sequencer_core = { path = "sequencer_core" }
+sequencer_rpc = { path = "sequencer_rpc" }
+sequencer_runner = { path = "sequencer_runner" }
+wallet = { path = "wallet" }
+test_program_methods = { path = "test_program_methods" }
+
+tokio = { version = "1.28.2", features = [
+  "net",
+  "rt-multi-thread",
+  "sync",
+  "fs",
+] }
+risc0-zkvm = { version = "3.0.3", features = ['std'] }
+risc0-build = "3.0.3"
 anyhow = "1.0.98"
 num_cpus = "1.13.1"
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-probe = { version = "0.1.2" }
+serde = { version = "1.0.60", default-features = false, features = ["derive"] }
 serde_json = "1.0.81"
 actix = "0.13.0"
 actix-cors = "0.6.1"
@@ -33,9 +60,9 @@ lru = "0.7.8"
 thiserror = "2.0.12"
 sha2 = "0.10.8"
 hex = "0.4.3"
+bytemuck = "1.24.0"
 aes-gcm = "0.10.3"
 toml = "0.7.4"
-secp256k1-zkp = "0.11.0"
 bincode = "1.3.3"
 tempfile = "3.14.0"
 light-poseidon = "0.3.0"
@@ -50,46 +77,21 @@ borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
 
-rocksdb = { version = "0.21.0", default-features = false, features = [
+rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",
+  "bindgen-runtime",
 ] }
-
-[workspace.dependencies.rand]
-features = ["std", "std_rng", "getrandom"]
-version = "0.8.5"
-
-[workspace.dependencies.k256]
-features = ["ecdsa-core", "arithmetic", "expose-field", "serde", "pem"]
-version = "0.13.3"
-
-[workspace.dependencies.elliptic-curve]
-features = ["arithmetic"]
-version = "0.13.8"
-
-[workspace.dependencies.serde]
-features = ["derive"]
-version = "1.0.60"
-
-[workspace.dependencies.actix-web]
-default-features = false
-features = ["macros"]
-version = "=4.1.0"
-
-[workspace.dependencies.clap]
-features = ["derive", "env"]
-version = "4.5.42"
-
-[workspace.dependencies.tokio-retry]
-version = "0.3.0"
-
-[workspace.dependencies.reqwest]
-features = ["json"]
-version = "0.11.16"
-
-[workspace.dependencies.tokio]
-features = ["net", "rt-multi-thread", "sync", "fs"]
-version = "1.28.2"
-
-[workspace.dependencies.tracing]
-features = ["std"]
-version = "0.1.13"
+rand = { version = "0.8.5", features = ["std", "std_rng", "getrandom"] }
+k256 = { version = "0.13.3", features = [
+  "ecdsa-core",
+  "arithmetic",
+  "expose-field",
+  "serde",
+  "pem",
+] }
+elliptic-curve = { version = "0.13.8", features = ["arithmetic"] }
+actix-web = { version = "=4.1.0", default-features = false, features = [
+  "macros",
+] }
+clap = { version = "4.5.42", features = ["derive", "env"] }
+reqwest = { version = "0.11.16", features = ["json"] }

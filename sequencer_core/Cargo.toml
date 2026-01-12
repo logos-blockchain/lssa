@@ -4,26 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+nssa.workspace = true
+nssa_core.workspace = true
+common.workspace = true
+storage.workspace = true
+mempool.workspace = true
+
 base58.workspace = true
 anyhow.workspace = true
 serde.workspace = true
-rand.workspace = true
 tempfile.workspace = true
 chrono.workspace = true
 log.workspace = true
-nssa-core = { path = "../nssa/core", features = ["host"] }
-
-[dependencies.storage]
-path = "../storage"
-
-[dependencies.mempool]
-path = "../mempool"
-
-[dependencies.common]
-path = "../common"
-
-[dependencies.nssa]
-path = "../nssa"
 
 [features]
 default = []

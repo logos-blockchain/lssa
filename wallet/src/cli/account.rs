@@ -3,69 +3,14 @@ use base58::ToBase58;
 use clap::Subcommand;
 use itertools::Itertools as _;
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
-use nssa::{Account, AccountId, program::Program};
+use nssa::{Account, program::Program};
 use serde::Serialize;
 
 use crate::{
-    WalletCore,
+    TokenDefinition, TokenHolding, WalletCore,
     cli::{SubcommandReturnValue, WalletSubcommand},
     helperfunctions::{AccountPrivacyKind, HumanReadableAccount, parse_addr_with_privacy_prefix},
 };
-
-const TOKEN_DEFINITION_TYPE: u8 = 0;
-const TOKEN_DEFINITION_DATA_SIZE: usize = 23;
-
-const TOKEN_HOLDING_TYPE: u8 = 1;
-const TOKEN_HOLDING_DATA_SIZE: usize = 49;
-
-struct TokenDefinition {
-    #[allow(unused)]
-    account_type: u8,
-    name: [u8; 6],
-    total_supply: u128,
-}
-
-struct TokenHolding {
-    #[allow(unused)]
-    account_type: u8,
-    definition_id: AccountId,
-    balance: u128,
-}
-
-impl TokenDefinition {
-    fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != TOKEN_DEFINITION_DATA_SIZE || data[0] != TOKEN_DEFINITION_TYPE {
-            None
-        } else {
-            let account_type = data[0];
-            let name = data[1..7].try_into().unwrap();
-            let total_supply = u128::from_le_bytes(data[7..].try_into().unwrap());
-
-            Some(Self {
-                account_type,
-                name,
-                total_supply,
-            })
-        }
-    }
-}
-
-impl TokenHolding {
-    fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
-            None
-        } else {
-            let account_type = data[0];
-            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
-            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
-            Some(Self {
-                definition_id,
-                balance,
-                account_type,
-            })
-        }
-    }
-}
 
 /// Represents generic chain CLI subcommand
 #[derive(Subcommand, Debug, Clone)]
@@ -86,7 +31,11 @@ pub enum AccountSubcommand {
     SyncPrivate {},
     /// List all accounts owned by the wallet
     #[command(visible_alias = "ls")]
-    List {},
+    List {
+        /// Show detailed account information (like `account get`)
+        #[arg(short, long)]
+        long: bool,
+    },
 }
 
 /// Represents generic register CLI subcommand
@@ -206,6 +155,50 @@ impl From<TokenHolding> for TokedHoldingAccountView {
     }
 }
 
+/// Formats account details for display, returning (description, json_view)
+fn format_account_details(account: &Account) -> (String, String) {
+    let auth_tr_prog_id = Program::authenticated_transfer_program().id();
+    let token_prog_id = Program::token().id();
+
+    match &account.program_owner {
+        _ if account.program_owner == auth_tr_prog_id => {
+            let acc_view: AuthenticatedTransferAccountView = account.clone().into();
+            (
+                "Account owned by authenticated transfer program".to_string(),
+                serde_json::to_string(&acc_view).unwrap(),
+            )
+        }
+        _ if account.program_owner == token_prog_id => {
+            if let Some(token_def) = TokenDefinition::parse(&account.data) {
+                let acc_view: TokedDefinitionAccountView = token_def.into();
+                (
+                    "Definition account owned by token program".to_string(),
+                    serde_json::to_string(&acc_view).unwrap(),
+                )
+            } else if let Some(token_hold) = TokenHolding::parse(&account.data) {
+                let acc_view: TokedHoldingAccountView = token_hold.into();
+                (
+                    "Holding account owned by token program".to_string(),
+                    serde_json::to_string(&acc_view).unwrap(),
+                )
+            } else {
+                let account_hr: HumanReadableAccount = account.clone().into();
+                (
+                    "Unknown token program account".to_string(),
+                    serde_json::to_string(&account_hr).unwrap(),
+                )
+            }
+        }
+        _ => {
+            let account_hr: HumanReadableAccount = account.clone().into();
+            (
+                "Account".to_string(),
+                serde_json::to_string(&account_hr).unwrap(),
+            )
+        }
+    }
+}
+
 impl WalletSubcommand for AccountSubcommand {
     async fn handle_subcommand(
         self,
@@ -239,43 +232,9 @@ impl WalletSubcommand for AccountSubcommand {
                     return Ok(SubcommandReturnValue::Empty);
                 }
 
-                let auth_tr_prog_id = Program::authenticated_transfer_program().id();
-                let token_prog_id = Program::token().id();
-
-                let acc_view = match &account.program_owner {
-                    _ if account.program_owner == auth_tr_prog_id => {
-                        let acc_view: AuthenticatedTransferAccountView = account.into();
-
-                        println!("Account owned by authenticated transfer program");
-
-                        serde_json::to_string(&acc_view)?
-                    }
-                    _ if account.program_owner == token_prog_id => {
-                        if let Some(token_def) = TokenDefinition::parse(&account.data) {
-                            let acc_view: TokedDefinitionAccountView = token_def.into();
-
-                            println!("Definition account owned by token program");
-
-                            serde_json::to_string(&acc_view)?
-                        } else if let Some(token_hold) = TokenHolding::parse(&account.data) {
-                            let acc_view: TokedHoldingAccountView = token_hold.into();
-
-                            println!("Holding account owned by token program");
-
-                            serde_json::to_string(&acc_view)?
-                        } else {
-                            anyhow::bail!(
-                                "Invalid data for account {account_id:#?} with token program"
-                            );
-                        }
-                    }
-                    _ => {
-                        let account_hr: HumanReadableAccount = account.clone().into();
-                        serde_json::to_string(&account_hr).unwrap()
-                    }
-                };
-
-                println!("{}", acc_view);
+                let (description, json_view) = format_account_details(&account);
+                println!("{description}");
+                println!("{json_view}");
 
                 Ok(SubcommandReturnValue::Empty)
             }
@@ -307,35 +266,97 @@ impl WalletSubcommand for AccountSubcommand {
 
                 Ok(SubcommandReturnValue::SyncedToBlock(curr_last_block))
             }
-            AccountSubcommand::List {} => {
+            AccountSubcommand::List { long } => {
                 let user_data = &wallet_core.storage.user_data;
-                let accounts = user_data
-                    .default_pub_account_signing_keys
-                    .keys()
-                    .map(|id| format!("Preconfigured Public/{id}"))
-                    .chain(
-                        user_data
-                            .default_user_private_accounts
-                            .keys()
-                            .map(|id| format!("Preconfigured Private/{id}")),
-                    )
-                    .chain(
-                        user_data
-                            .public_key_tree
-                            .account_id_map
-                            .iter()
-                            .map(|(id, chain_index)| format!("{chain_index} Public/{id}")),
-                    )
-                    .chain(
-                        user_data
-                            .private_key_tree
-                            .account_id_map
-                            .iter()
-                            .map(|(id, chain_index)| format!("{chain_index} Private/{id}")),
-                    )
-                    .format(",\n");
 
-                println!("{accounts}");
+                if !long {
+                    let accounts = user_data
+                        .default_pub_account_signing_keys
+                        .keys()
+                        .map(|id| format!("Preconfigured Public/{id}"))
+                        .chain(
+                            user_data
+                                .default_user_private_accounts
+                                .keys()
+                                .map(|id| format!("Preconfigured Private/{id}")),
+                        )
+                        .chain(
+                            user_data
+                                .public_key_tree
+                                .account_id_map
+                                .iter()
+                                .map(|(id, chain_index)| format!("{chain_index} Public/{id}")),
+                        )
+                        .chain(
+                            user_data
+                                .private_key_tree
+                                .account_id_map
+                                .iter()
+                                .map(|(id, chain_index)| format!("{chain_index} Private/{id}")),
+                        )
+                        .format(",\n");
+
+                    println!("{accounts}");
+                    return Ok(SubcommandReturnValue::Empty);
+                }
+
+                // Detailed listing with --long flag
+                // Preconfigured public accounts
+                for id in user_data.default_pub_account_signing_keys.keys() {
+                    println!("Preconfigured Public/{id}");
+                    match wallet_core.get_account_public(*id).await {
+                        Ok(account) if account != Account::default() => {
+                            let (description, json_view) = format_account_details(&account);
+                            println!("  {description}");
+                            println!("  {json_view}");
+                        }
+                        Ok(_) => println!("  Uninitialized"),
+                        Err(e) => println!("  Error fetching account: {e}"),
+                    }
+                }
+
+                // Preconfigured private accounts
+                for id in user_data.default_user_private_accounts.keys() {
+                    println!("Preconfigured Private/{id}");
+                    match wallet_core.get_account_private(id) {
+                        Some(account) if account != Account::default() => {
+                            let (description, json_view) = format_account_details(&account);
+                            println!("  {description}");
+                            println!("  {json_view}");
+                        }
+                        Some(_) => println!("  Uninitialized"),
+                        None => println!("  Not found in local storage"),
+                    }
+                }
+
+                // Public key tree accounts
+                for (id, chain_index) in user_data.public_key_tree.account_id_map.iter() {
+                    println!("{chain_index} Public/{id}");
+                    match wallet_core.get_account_public(*id).await {
+                        Ok(account) if account != Account::default() => {
+                            let (description, json_view) = format_account_details(&account);
+                            println!("  {description}");
+                            println!("  {json_view}");
+                        }
+                        Ok(_) => println!("  Uninitialized"),
+                        Err(e) => println!("  Error fetching account: {e}"),
+                    }
+                }
+
+                // Private key tree accounts
+                for (id, chain_index) in user_data.private_key_tree.account_id_map.iter() {
+                    println!("{chain_index} Private/{id}");
+                    match wallet_core.get_account_private(id) {
+                        Some(account) if account != Account::default() => {
+                            let (description, json_view) = format_account_details(&account);
+                            println!("  {description}");
+                            println!("  {json_view}");
+                        }
+                        Some(_) => println!("  Uninitialized"),
+                        None => println!("  Not found in local storage"),
+                    }
+                }
+
                 Ok(SubcommandReturnValue::Empty)
             }
         }
@@ -344,6 +365,8 @@ impl WalletSubcommand for AccountSubcommand {
 
 #[cfg(test)]
 mod tests {
+    use nssa::AccountId;
+
     use crate::cli::account::{TokedDefinitionAccountView, TokenDefinition};
 
     #[test]
@@ -352,6 +375,7 @@ mod tests {
             account_type: 1,
             name: [137, 12, 14, 3, 5, 4],
             total_supply: 100,
+            metadata_id: AccountId::new([0; 32]),
         };
 
         let token_def_view: TokedDefinitionAccountView = token_def.into();
@@ -365,6 +389,7 @@ mod tests {
             account_type: 1,
             name: [240, 159, 146, 150, 66, 66],
             total_supply: 100,
+            metadata_id: AccountId::new([0; 32]),
         };
 
         let token_def_view: TokedDefinitionAccountView = token_def.into();
@@ -378,6 +403,7 @@ mod tests {
             account_type: 1,
             name: [78, 65, 77, 69, 0, 0],
             total_supply: 100,
+            metadata_id: AccountId::new([0; 32]),
         };
 
         let token_def_view: TokedDefinitionAccountView = token_def.into();
