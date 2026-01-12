@@ -2884,6 +2884,7 @@ dependencies = [
  "itertools 0.14.0",
  "key_protocol",
  "log",
+ "nomos-core",
  "nssa",
  "nssa_core",
  "rand 0.8.5",

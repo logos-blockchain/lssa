@@ -30,3 +30,4 @@ async-stream = "0.3.6"
 indicatif = { version = "0.18.3", features = ["improved_unicode"] }
 risc0-zkvm.workspace = true
 url.workspace = true
+nomos-core.workspace = true
