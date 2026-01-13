@@ -270,7 +270,7 @@ Now that we have a public account initialized by the authenticated transfer prog
 
 ```bash
 # Complete with your id
-wallet pinata claim --to Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet pinata claim --to-addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 ```
 
 After the claim succeeds, the account will be funded with some tokens:
