@@ -232,7 +232,7 @@ To query the account’s current status, run:
 
 ```bash
 # Replace the id with yours
-wallet account get --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet account get --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 
 # Output:
 Account is Uninitialized
@@ -251,13 +251,13 @@ Initialize the account by running:
 # This command submits a public transaction executing the `init` function of the
 # Authenticated-transfer program. The wallet polls the sequencer until the
 # transaction is included in a block, which may take several seconds.
-wallet auth-transfer init --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet auth-transfer init --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 ```
 
 After it completes, check the updated account status:
 
 ```bash
-wallet account get --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet account get --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 
 # Output:
 Account owned by authenticated transfer program
@@ -276,7 +276,7 @@ wallet pinata claim --to Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 After the claim succeeds, the account will be funded with some tokens:
 
 ```bash
-wallet account get --account-id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+wallet account get --addr Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
 
 # Output:
 Account owned by authenticated transfer program
@@ -320,7 +320,7 @@ Once that succeeds we can check the states.
 
 ```bash
 # Sender account
-wallet account get --account-id Public/HrA8TVjBS8UVf9akV7LRhyh6k4c7F6PS7PvqgtPmKAT8
+wallet account get --addr Public/HrA8TVjBS8UVf9akV7LRhyh6k4c7F6PS7PvqgtPmKAT8
 
 # Output:
 Account owned by authenticated transfer program
@@ -329,7 +329,7 @@ Account owned by authenticated transfer program
 
 ```bash
 # Recipient account
-wallet account get --account-id Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
+wallet account get --addr Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
 
 # Output:
 Account owned by authenticated transfer program
@@ -369,7 +369,7 @@ Also, the account id for private accounts is derived from the `npk` value. But w
 Just like public accounts, new private accounts start out uninitialized:
 
 ```bash
-wallet account get --account-id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
+wallet account get --addr Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
 
 # Output:
 Account is Uninitialized
@@ -398,7 +398,7 @@ After it succeeds, check both accounts:
 
 ```bash
 # Public sender account
-wallet account get --account-id Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
+wallet account get --addr Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
 
 # Output:
 Account owned by authenticated transfer program
@@ -407,7 +407,7 @@ Account owned by authenticated transfer program
 
 ```bash
 # Private recipient account
-wallet account get --account-id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
+wallet account get --addr Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
 
 # Output:
 Account owned by authenticated transfer program
@@ -520,7 +520,7 @@ wallet token new \
 After it succeeds, we can inspect the two accounts to see how they were initialized.
 
 ```bash
-wallet account get --account-id Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
+wallet account get --addr Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
 
 # Output:
 Definition account owned by token program
@@ -528,7 +528,7 @@ Definition account owned by token program
 ```
 
 ```bash
-wallet account get --account-id Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
+wallet account get --addr Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
 
 # Output:
 Holding account owned by token program
@@ -573,7 +573,7 @@ wallet token new \
 After it succeeds, we can check their values
 
 ```bash
-wallet account get --account-id Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii
+wallet account get --addr Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii
 
 # Output:
 Definition account owned by token program
@@ -581,7 +581,7 @@ Definition account owned by token program
 ```
 
 ```bash
-wallet account get --account-id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
+wallet account get --addr Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
 
 # Output:
 Holding account owned by token program
@@ -617,7 +617,7 @@ wallet token send \
 Let's inspect the public account:
 
 ```bash
-wallet account get --account-id Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
+wallet account get --addr Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
 
 # Output:
 Holding account owned by token program
@@ -679,7 +679,7 @@ wallet amm new \
 The newly created account is owned by the token program, meaning that LP tokens are managed by the same token infrastructure as regular tokens.
 
 ```bash
-wallet account get --account-id Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf
+wallet account get --addr Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf
 
 # Output:
 Holding account owned by token program
