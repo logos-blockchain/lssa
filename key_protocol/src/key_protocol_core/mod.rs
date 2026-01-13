@@ -165,6 +165,14 @@ impl NSSAUserData {
                 .map(Into::into)
         }
     }
+
+    pub fn account_ids(&self) -> impl Iterator<Item = &nssa::AccountId> {
+        self.default_pub_account_signing_keys
+            .keys()
+            .chain(self.public_key_tree.account_id_map.keys())
+            .chain(self.default_user_private_accounts.keys())
+            .chain(self.private_key_tree.account_id_map.keys())
+    }
 }
 
 impl Default for NSSAUserData {

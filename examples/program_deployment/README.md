@@ -41,13 +41,15 @@ In a second terminal, from the `lssa` root directory, compile the example Risc0 
 ```bash
 cargo risczero build --manifest-path examples/program_deployment/methods/guest/Cargo.toml
 ```
-The compiled `.bin` files will appear under:
+Because this repository is organized as a Cargo workspace, build artifacts are written to the
+shared `target/` directory at the workspace root by default. The compiled `.bin` files will
+appear under:
 ```
-examples/program_deployment/methods/guest/target/riscv32im-risc0-zkvm-elf/docker/
+target/riscv32im-risc0-zkvm-elf/docker/
 ```
 For convenience, export this path:
 ```bash
-export EXAMPLE_PROGRAMS_BUILD_DIR=$(pwd)/examples/program_deployment/methods/guest/target/riscv32im-risc0-zkvm-elf/docker
+export EXAMPLE_PROGRAMS_BUILD_DIR=$(pwd)/target/riscv32im-risc0-zkvm-elf/docker
 ```
 
 > [!IMPORTANT]
