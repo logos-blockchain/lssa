@@ -50,7 +50,7 @@ pub async fn startup_sequencer(
             let id = {
                 let mut state = seq_core_wrapped.lock().await;
 
-                state.produce_new_block_with_mempool_transactions()?
+                state.produce_new_block_and_post_to_settlement_layer().await?
             };
 
             info!("Block with id {id} created");

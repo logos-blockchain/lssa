@@ -17,6 +17,13 @@ serde_json.workspace = true
 tempfile.workspace = true
 chrono.workspace = true
 log.workspace = true
+bedrock_client.workspace = true
+key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+nomos-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+zksign = { git = "https://github.com/logos-blockchain/logos-blockchain.git", default-features = false }
+rand.workspace = true
+reqwest.workspace = true
+borsh.workspace = true
 
 [features]
 default = []

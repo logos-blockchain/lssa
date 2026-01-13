@@ -9,6 +9,7 @@ sequencer_core = { workspace = true, features = ["testnet"] }
 sequencer_rpc.workspace = true
 
 clap = { workspace = true, features = ["derive", "env"] }
+zksign = { git = "https://github.com/logos-blockchain/logos-blockchain.git", default-features = false }
 anyhow.workspace = true
 env_logger.workspace = true
 log.workspace = true

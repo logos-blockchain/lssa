@@ -185,6 +185,7 @@ impl TpsTestManager {
             initial_accounts: initial_public_accounts,
             initial_commitments: vec![initial_commitment],
             signing_key: [37; 32],
+            bedrock_config: None
         }
     }
 }
