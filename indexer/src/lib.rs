@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
-use common::block::HashableBlockData;
+use common::block::{BlockHash, HashableBlockData};
 use futures::StreamExt;
 use nomos_core::mantle::{
     Op, SignedMantleTx,
@@ -9,22 +9,24 @@ use nomos_core::mantle::{
 use tokio::sync::mpsc::Sender;
 use url::Url;
 
-use crate::config::IndexerConfig;
+use crate::{config::IndexerConfig, state::IndexerState};
 
 pub mod config;
+pub mod state;
 
 pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
     pub bedrock_url: Url,
-    pub channel_sender: Sender<HashableBlockData>,
+    pub channel_sender: Sender<BlockHash>,
     pub config: IndexerConfig,
+    pub state: IndexerState,
 }
 
 impl IndexerCore {
     pub fn new(
         addr: &str,
         auth: Option<BasicAuthCredentials>,
-        sender: Sender<HashableBlockData>,
+        sender: Sender<BlockHash>,
         config: IndexerConfig,
     ) -> Result<Self> {
         Ok(Self {
@@ -32,6 +34,10 @@ impl IndexerCore {
             bedrock_url: Url::parse(addr)?,
             channel_sender: sender,
             config,
+            // No state setup for now, future task.
+            state: IndexerState {
+                latest_seen_block: 0,
+            },
         })
     }
 
@@ -58,7 +64,8 @@ impl IndexerCore {
                 );
 
                 for l2_block in l2_blocks_parsed {
-                    self.channel_sender.send(l2_block).await?;
+                    // Sending data into sequencer, may need to be expanded.
+                    self.channel_sender.send(l2_block.block_hash()).await?;
                 }
             }
         }

@@ -19,7 +19,7 @@ members = [
   "examples/program_deployment",
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
-  "bedrock_client", 
+  "bedrock_client",
   "indexer",
 ]
 

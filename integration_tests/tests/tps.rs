@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use indexer::config::IndexerConfig;
 use integration_tests::TestContext;
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use log::info;
@@ -185,6 +186,12 @@ impl TpsTestManager {
             initial_accounts: initial_public_accounts,
             initial_commitments: vec![initial_commitment],
             signing_key: [37; 32],
+            bedrock_addr: "0.0.0.0".to_string(),
+            bedrock_auth: ("".to_string(), "".to_string()),
+            indexer_config: IndexerConfig {
+                resubscribe_interval: 100,
+                channel_id: [42; 32].into(),
+            },
         }
     }
 }

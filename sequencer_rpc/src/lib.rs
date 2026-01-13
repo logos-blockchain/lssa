@@ -8,6 +8,7 @@ use common::{
     rpc_primitives::errors::{RpcError, RpcErrorKind},
     transaction::EncodedTransaction,
 };
+use indexer::IndexerCore;
 use mempool::MemPoolHandle;
 pub use net_utils::*;
 use sequencer_core::SequencerCore;
@@ -20,6 +21,9 @@ use self::types::err_rpc::RpcErr;
 // ToDo: Add necessary fields
 pub struct JsonHandler {
     sequencer_state: Arc<Mutex<SequencerCore>>,
+    // No functionality for now.
+    #[allow(unused)]
+    indexer_state: Arc<Mutex<IndexerCore>>,
     mempool_handle: MemPoolHandle<EncodedTransaction>,
 }
 

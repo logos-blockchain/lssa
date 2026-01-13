@@ -340,7 +340,9 @@ mod tests {
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
+    use bedrock_client::BasicAuthCredentials;
     use common::{test_utils::sequencer_sign_key_for_testing, transaction::EncodedTransaction};
+    use indexer::{IndexerCore, config::IndexerConfig};
     use sequencer_core::{
         SequencerCore,
         config::{AccountInitialData, SequencerConfig},
@@ -388,12 +390,30 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
+            bedrock_addr: "0.0.0.0".to_string(),
+            bedrock_auth: ("".to_string(), "".to_string()),
+            indexer_config: IndexerConfig {
+                resubscribe_interval: 100,
+                channel_id: [42; 32].into(),
+            },
         }
     }
 
     async fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
         let config = sequencer_config_for_tests();
-        let (mut sequencer_core, mempool_handle) = SequencerCore::start_from_config(config);
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        let indexer_core = IndexerCore::new(
+            &config.bedrock_addr,
+            Some(BasicAuthCredentials::new(
+                config.bedrock_auth.0.clone(),
+                Some(config.bedrock_auth.1.clone()),
+            )),
+            sender,
+            config.indexer_config.clone(),
+        )
+        .unwrap();
+        let (mut sequencer_core, mempool_handle) =
+            SequencerCore::start_from_config(config, receiver);
         let initial_accounts = sequencer_core.sequencer_config().initial_accounts.clone();
 
         let signing_key = nssa::PrivateKey::try_new([1; 32]).unwrap();
@@ -419,10 +439,12 @@ mod tests {
             .unwrap();
 
         let sequencer_core = Arc::new(Mutex::new(sequencer_core));
+        let indexer_core = Arc::new(Mutex::new(indexer_core));
 
         (
             JsonHandler {
                 sequencer_state: sequencer_core,
+                indexer_state: indexer_core,
                 mempool_handle,
             },
             initial_accounts,

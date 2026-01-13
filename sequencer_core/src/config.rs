@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use indexer::config::IndexerConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -47,6 +48,12 @@ pub struct SequencerConfig {
     pub initial_commitments: Vec<CommitmentsInitialData>,
     /// Sequencer own signing key
     pub signing_key: [u8; 32],
+    /// Bedrock addr
+    pub bedrock_addr: String,
+    /// Bedrock auth
+    pub bedrock_auth: (String, String),
+    /// Indexer config
+    pub indexer_config: IndexerConfig,
 }
 
 impl SequencerConfig {
