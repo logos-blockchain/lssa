@@ -13,7 +13,9 @@ use tokio::test;
 use wallet::cli::{
     Command, SubcommandReturnValue,
     account::{AccountSubcommand, NewSubcommand},
-    programs::native_token_transfer::AuthTransferSubcommand,
+    programs::{
+        ArgsReceiverMaybeUnowned, ArgsSenderOwned, native_token_transfer::AuthTransferSubcommand,
+    },
 };
 
 #[test]
@@ -24,10 +26,14 @@ async fn private_transfer_to_owned_account() -> Result<()> {
     let to: AccountId = ACC_RECEIVER_PRIVATE.parse()?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&to.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
 
@@ -63,10 +69,14 @@ async fn private_transfer_to_foreign_account() -> Result<()> {
     let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: None,
-        to_npk: Some(to_npk_string),
-        to_ipk: Some(hex::encode(to_ipk.0)),
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: None,
+            to_npk: Some(to_npk_string),
+            to_ipk: Some(hex::encode(to_ipk.0)),
+        },
         amount: 100,
     });
 
@@ -111,10 +121,14 @@ async fn deshielded_transfer_to_public_account() -> Result<()> {
     assert_eq!(from_acc.balance, 10000);
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_public_account_id(&to.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(&to.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
 
@@ -174,10 +188,14 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
 
     // Send to this account using claiming path (using npk and ipk instead of account ID)
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: None,
-        to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
-        to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: None,
+            to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
+            to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+        },
         amount: 100,
     });
 
@@ -222,10 +240,14 @@ async fn shielded_transfer_to_owned_private_account() -> Result<()> {
     let to: AccountId = ACC_RECEIVER_PRIVATE.parse()?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&to.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
 
@@ -267,10 +289,14 @@ async fn shielded_transfer_to_foreign_account() -> Result<()> {
     let from: AccountId = ACC_SENDER.parse()?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
-        to: None,
-        to_npk: Some(to_npk_string),
-        to_ipk: Some(hex::encode(to_ipk.0)),
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: None,
+            to_npk: Some(to_npk_string),
+            to_ipk: Some(hex::encode(to_ipk.0)),
+        },
         amount: 100,
     });
 
@@ -337,10 +363,14 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
 
     // Send transfer using nullifier and incoming viewing public keys
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: None,
-        to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
-        to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: None,
+            to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
+            to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+        },
         amount: 100,
     });
 

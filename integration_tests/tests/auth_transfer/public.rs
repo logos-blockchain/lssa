@@ -10,7 +10,9 @@ use tokio::test;
 use wallet::cli::{
     Command, SubcommandReturnValue,
     account::{AccountSubcommand, NewSubcommand},
-    programs::native_token_transfer::AuthTransferSubcommand,
+    programs::{
+        ArgsReceiverMaybeUnowned, ArgsSenderOwned, native_token_transfer::AuthTransferSubcommand,
+    },
 };
 
 #[test]
@@ -18,10 +20,14 @@ async fn successful_transfer_to_existing_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(ACC_SENDER),
-        to: Some(format_public_account_id(ACC_RECEIVER)),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(ACC_SENDER),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
 
@@ -73,10 +79,14 @@ pub async fn successful_transfer_to_new_account() -> Result<()> {
     }
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(ACC_SENDER),
-        to: Some(format_public_account_id(&new_persistent_account_id)),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(ACC_SENDER),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(&new_persistent_account_id)),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
 
@@ -109,10 +119,14 @@ async fn failed_transfer_with_insufficient_balance() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(ACC_SENDER),
-        to: Some(format_public_account_id(ACC_RECEIVER)),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(ACC_SENDER),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 1000000,
     });
 
@@ -147,10 +161,14 @@ async fn two_consecutive_successful_transfers() -> Result<()> {
 
     // First transfer
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(ACC_SENDER),
-        to: Some(format_public_account_id(ACC_RECEIVER)),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(ACC_SENDER),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
 
@@ -179,10 +197,14 @@ async fn two_consecutive_successful_transfers() -> Result<()> {
 
     // Second transfer
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(ACC_SENDER),
-        to: Some(format_public_account_id(ACC_RECEIVER)),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(ACC_SENDER),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
 
