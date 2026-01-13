@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chain_storage::WalletChainStore;
 use common::{
@@ -25,10 +25,8 @@ pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    config::PersistentStorage,
-    helperfunctions::{
-        fetch_persistent_storage, get_home, produce_data_for_storage, produce_random_nonces,
-    },
+    config::{PersistentStorage, WalletConfigOverrides},
+    helperfunctions::{produce_data_for_storage, produce_random_nonces},
     poller::TxPoller,
 };
 
@@ -124,91 +122,133 @@ impl TokenHolding {
 }
 
 pub struct WalletCore {
-    pub storage: WalletChainStore,
-    pub poller: TxPoller,
+    config_path: PathBuf,
+    storage: WalletChainStore,
+    storage_path: PathBuf,
+    poller: TxPoller,
+    // TODO: Make all fields private
     pub sequencer_client: Arc<SequencerClient>,
     pub last_synced_block: u64,
 }
 
 impl WalletCore {
-    pub async fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
-        let basic_auth = config
-            .basic_auth
-            .as_ref()
-            .map(|auth| (auth.username.clone(), auth.password.clone()));
-        let client = Arc::new(SequencerClient::new_with_auth(
-            config.sequencer_addr.clone(),
-            basic_auth,
-        )?);
-        let tx_poller = TxPoller::new(config.clone(), client.clone());
+    /// Construct wallet using [`HOME_DIR_ENV_VAR`] env var for paths or user home dir if not set.
+    pub fn from_env() -> Result<Self> {
+        let config_path = helperfunctions::fetch_config_path()?;
+        let storage_path = helperfunctions::fetch_persistent_storage_path()?;
 
+        Self::new_update_chain(config_path, storage_path, None)
+    }
+
+    pub fn new_update_chain(
+        config_path: PathBuf,
+        storage_path: PathBuf,
+        config_overrides: Option<WalletConfigOverrides>,
+    ) -> Result<Self> {
         let PersistentStorage {
             accounts: persistent_accounts,
             last_synced_block,
-        } = fetch_persistent_storage().await?;
+        } = PersistentStorage::from_path(&storage_path)
+            .with_context(|| format!("Failed to read persistent storage at {storage_path:#?}"))?;
 
-        let storage = WalletChainStore::new(config, persistent_accounts)?;
-
-        Ok(Self {
-            storage,
-            poller: tx_poller,
-            sequencer_client: client.clone(),
+        Self::new(
+            config_path,
+            storage_path,
+            config_overrides,
+            |config| WalletChainStore::new(config, persistent_accounts),
             last_synced_block,
-        })
+        )
     }
 
-    pub async fn start_from_config_new_storage(
-        config: WalletConfig,
+    pub fn new_init_storage(
+        config_path: PathBuf,
+        storage_path: PathBuf,
+        config_overrides: Option<WalletConfigOverrides>,
         password: String,
     ) -> Result<Self> {
+        Self::new(
+            config_path,
+            storage_path,
+            config_overrides,
+            |config| WalletChainStore::new_storage(config, password),
+            0,
+        )
+    }
+
+    fn new(
+        config_path: PathBuf,
+        storage_path: PathBuf,
+        config_overrides: Option<WalletConfigOverrides>,
+        storage_ctor: impl FnOnce(WalletConfig) -> Result<WalletChainStore>,
+        last_synced_block: u64,
+    ) -> Result<Self> {
+        let mut config = WalletConfig::from_path_or_initialize_default(&config_path)
+            .with_context(|| format!("Failed to deserialize wallet config at {config_path:#?}"))?;
+        if let Some(config_overrides) = config_overrides {
+            config.apply_overrides(config_overrides);
+        }
+
         let basic_auth = config
             .basic_auth
             .as_ref()
             .map(|auth| (auth.username.clone(), auth.password.clone()));
-        let client = Arc::new(SequencerClient::new_with_auth(
+        let sequencer_client = Arc::new(SequencerClient::new_with_auth(
             config.sequencer_addr.clone(),
             basic_auth,
         )?);
-        let tx_poller = TxPoller::new(config.clone(), client.clone());
+        let tx_poller = TxPoller::new(config.clone(), Arc::clone(&sequencer_client));
 
-        let storage = WalletChainStore::new_storage(config, password)?;
+        let storage = storage_ctor(config)?;
 
         Ok(Self {
+            config_path,
+            storage_path,
             storage,
             poller: tx_poller,
-            sequencer_client: client.clone(),
-            last_synced_block: 0,
+            sequencer_client,
+            last_synced_block,
         })
     }
 
-    /// Store persistent data at home
-    pub async fn store_persistent_data(&self) -> Result<PathBuf> {
-        let home = get_home()?;
-        let storage_path = home.join("storage.json");
+    /// Get configuration with applied overrides
+    pub fn config(&self) -> &WalletConfig {
+        &self.storage.wallet_config
+    }
 
-        let data = produce_data_for_storage(&self.storage.user_data, self.last_synced_block);
-        let storage = serde_json::to_vec_pretty(&data)?;
+    /// Get storage
+    pub fn storage(&self) -> &WalletChainStore {
+        &self.storage
+    }
 
-        let mut storage_file = tokio::fs::File::create(storage_path.as_path()).await?;
-        storage_file.write_all(&storage).await?;
-
-        info!("Stored data at {storage_path:#?}");
-
-        Ok(storage_path)
+    /// Reset storage
+    pub fn reset_storage(&mut self, password: String) -> Result<()> {
+        self.storage = WalletChainStore::new_storage(self.storage.wallet_config.clone(), password)?;
+        Ok(())
     }
 
     /// Store persistent data at home
-    pub async fn store_config_changes(&self) -> Result<PathBuf> {
-        let home = get_home()?;
-        let config_path = home.join("wallet_config.json");
+    pub async fn store_persistent_data(&self) -> Result<()> {
+        let data = produce_data_for_storage(&self.storage.user_data, self.last_synced_block);
+        let storage = serde_json::to_vec_pretty(&data)?;
+
+        let mut storage_file = tokio::fs::File::create(&self.storage_path).await?;
+        storage_file.write_all(&storage).await?;
+
+        println!("Stored persistent accounts at {:#?}", self.storage_path);
+
+        Ok(())
+    }
+
+    /// Store persistent data at home
+    pub async fn store_config_changes(&self) -> Result<()> {
         let config = serde_json::to_vec_pretty(&self.storage.wallet_config)?;
 
-        let mut config_file = tokio::fs::File::create(config_path.as_path()).await?;
+        let mut config_file = tokio::fs::File::create(&self.config_path).await?;
         config_file.write_all(&config).await?;
 
-        info!("Stored data at {config_path:#?}");
+        info!("Stored data at {:#?}", self.config_path);
 
-        Ok(config_path)
+        Ok(())
     }
 
     pub fn create_new_account_public(

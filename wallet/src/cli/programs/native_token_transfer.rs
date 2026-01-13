@@ -66,9 +66,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
 
                         println!("Transaction data is {transfer_tx:?}");
 
-                        let path = wallet_core.store_persistent_data().await?;
-
-                        println!("Stored persistent accounts at {path:#?}");
+                        wallet_core.store_persistent_data().await?;
                     }
                     AccountPrivacyKind::Private => {
                         let mut account_ids = vec![];
@@ -96,9 +94,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                             )?;
                         }
 
-                        let path = wallet_core.store_persistent_data().await?;
-
-                        println!("Stored persistent accounts at {path:#?}");
+                        wallet_core.store_persistent_data().await?;
                     }
                 }
 

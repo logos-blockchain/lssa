@@ -1,10 +1,11 @@
 {
   "override_rust_log": null,
-  "sequencer_addr": "http://127.0.0.1:3040",
+  "sequencer_addr": "",
   "seq_poll_timeout_millis": 12000,
   "seq_tx_poll_max_blocks": 5,
   "seq_poll_max_retries": 5,
   "seq_block_poll_max_amount": 100,
+  "basic_auth": null,
   "initial_accounts": [
     {
       "Public": {
@@ -542,6 +543,5 @@
         }
       }
     }
-  ],
-  "basic_auth": null
+  ]
 }

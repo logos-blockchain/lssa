@@ -1,12 +1,12 @@
 {
-    "home": "./sequencer",
+    "home": "",
     "override_rust_log": null,
     "genesis_id": 1,
     "is_genesis_random": true,
     "max_num_tx_in_block": 20,
     "mempool_max_size": 10000,
     "block_create_timeout_millis": 10000,
-    "port": 3040,
+    "port": 0,
     "initial_accounts": [
         {
             "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",

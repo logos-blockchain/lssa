@@ -2248,20 +2248,18 @@ dependencies = [
 name = "integration_tests"
 version = "0.1.0"
 dependencies = [
- "actix",
  "actix-web",
  "anyhow",
  "base64 0.22.1",
  "borsh",
- "clap",
  "common",
  "env_logger",
+ "futures",
  "hex",
  "key_protocol",
  "log",
  "nssa",
  "nssa_core",
- "proc_macro_test_attribute",
  "sequencer_core",
  "sequencer_runner",
  "tempfile",
@@ -2845,6 +2843,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "optfield"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "969ccca8ffc4fb105bd131a228107d5c9dd89d9d627edf3295cbe979156f9712"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3016,10 +3025,6 @@ dependencies = [
  "syn 2.0.111",
  "version_check",
 ]
-
-[[package]]
-name = "proc_macro_test_attribute"
-version = "0.1.0"
 
 [[package]]
 name = "program_deployment"
@@ -3904,6 +3909,7 @@ dependencies = [
  "nssa",
  "nssa_core",
  "serde",
+ "serde_json",
  "storage",
  "tempfile",
  "tokio",
@@ -3946,7 +3952,6 @@ dependencies = [
  "log",
  "sequencer_core",
  "sequencer_rpc",
- "serde_json",
  "tokio",
 ]
 
@@ -4757,6 +4762,7 @@ dependencies = [
  "nssa",
  "nssa_core",
  "paste",
+ "optfield",
  "rand 0.8.5",
  "risc0-zkvm",
  "serde",

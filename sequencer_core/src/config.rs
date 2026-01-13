@@ -1,5 +1,10 @@
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -42,4 +47,13 @@ pub struct SequencerConfig {
     pub initial_commitments: Vec<CommitmentsInitialData>,
     /// Sequencer own signing key
     pub signing_key: [u8; 32],
+}
+
+impl SequencerConfig {
+    pub fn from_path(config_home: &Path) -> Result<SequencerConfig> {
+        let file = File::open(config_home)?;
+        let reader = BufReader::new(file);
+
+        Ok(serde_json::from_reader(reader)?)
+    }
 }
