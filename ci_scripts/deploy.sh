@@ -56,10 +56,6 @@ else
   git checkout main
 fi
 
-# Install Nomos circuits for compatibility
-chmod 777 /ci_scripts/setup-nomos-circuits.sh
-/ci_scripts/setup-nomos-circuits.sh
-
 # Build sequencer_runner and wallet in release mode
 echo "Building sequencer_runner"
 # That could be just `cargo build --release --bin sequencer_runner --bin wallet`
