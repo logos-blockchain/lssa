@@ -43,7 +43,7 @@ impl From<Program> for ProgramWithDependencies {
 }
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution
-/// circuit
+/// circuit.
 #[expect(clippy::too_many_arguments, reason = "TODO: fix later")]
 pub fn execute_and_prove(
     pre_states: Vec<AccountWithMetadata>,
@@ -86,8 +86,6 @@ pub fn execute_and_prove(
             .journal
             .decode()
             .map_err(|e| NssaError::ProgramOutputDeserializationError(e.to_string()))?;
-
-        // TODO: Why private execution doesn't care about public account authorization?
 
         // TODO: remove clone
         program_outputs.push(program_output.clone());

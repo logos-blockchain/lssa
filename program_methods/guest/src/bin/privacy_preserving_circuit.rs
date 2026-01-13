@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque, hash_map::Entry},
     convert::Infallible,
 };
 
@@ -10,8 +10,8 @@ use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata, Nonce},
     compute_digest_for_path,
     program::{
-        ChainedCall, DEFAULT_PROGRAM_ID, MAX_NUMBER_CHAINED_CALLS, ProgramId, ProgramOutput,
-        validate_execution,
+        AccountPostState, ChainedCall, DEFAULT_PROGRAM_ID, MAX_NUMBER_CHAINED_CALLS, ProgramId,
+        ProgramOutput, validate_execution,
     },
 };
 use risc0_zkvm::{guest::env, serde::to_vec};
@@ -51,7 +51,7 @@ impl ExecutionState {
     /// Validate program outputs and derive the overall execution state.
     pub fn derive_from_outputs(program_id: ProgramId, program_outputs: Vec<ProgramOutput>) -> Self {
         let Some(first_output) = program_outputs.first() else {
-            panic!("Program outputs is empty")
+            panic!("No program outputs provided");
         };
 
         let initial_call = ChainedCall {
@@ -60,7 +60,7 @@ impl ExecutionState {
             pre_states: first_output.pre_states.clone(),
             pda_seeds: Vec::new(),
         };
-        let mut chained_calls = VecDeque::from_iter([initial_call]);
+        let mut chained_calls = VecDeque::from_iter([(initial_call, None)]);
 
         let mut execution_state = ExecutionState {
             pre_states: Vec::new(),
@@ -69,7 +69,7 @@ impl ExecutionState {
         let mut last_program_id = program_id;
         let mut program_outputs_iter = program_outputs.into_iter();
         let mut chain_calls_counter = 0;
-        while let Some(chained_call) = chained_calls.pop_front() {
+        while let Some((chained_call, caller_program_id)) = chained_calls.pop_front() {
             assert!(
                 chain_calls_counter <= MAX_NUMBER_CHAINED_CALLS,
                 "Max chained calls depth is exceeded"
@@ -93,8 +93,6 @@ impl ExecutionState {
                 |_: Infallible| unreachable!("Infallible error is never constructed"),
             );
 
-            // TODO: Why private execution doesn't care about public account authorization?
-
             // Check that the program is well behaved.
             // See the # Programs section for the definition of the `validate_execution` method.
             let execution_valid = validate_execution(
@@ -105,10 +103,19 @@ impl ExecutionState {
             assert!(execution_valid, "Bad behaved program");
 
             for next_call in program_output.chained_calls.iter().rev() {
-                chained_calls.push_front(next_call.clone());
+                chained_calls.push_front((next_call.clone(), Some(chained_call.program_id)));
             }
 
-            execution_state.populate_from_output(chained_call.program_id, program_output);
+            let authorized_pdas = nssa_core::program::compute_authorized_pdas(
+                caller_program_id,
+                &chained_call.pda_seeds,
+            );
+            execution_state.validate_and_sync_states(
+                chained_call.program_id,
+                authorized_pdas,
+                program_output.pre_states,
+                program_output.post_states,
+            );
             last_program_id = chained_call.program_id;
             chain_calls_counter += 1;
         }
@@ -118,7 +125,7 @@ impl ExecutionState {
             "Inner call without a chained call found",
         );
 
-        // Claim accounts
+        // Claim accounts which were not explicitly claimed during execution
         for account in execution_state.post_states.values_mut() {
             if account.program_owner == DEFAULT_PROGRAM_ID {
                 account.program_owner = last_program_id;
@@ -128,17 +135,48 @@ impl ExecutionState {
         execution_state
     }
 
-    fn populate_from_output(&mut self, program_id: ProgramId, program_output: ProgramOutput) {
-        for (pre, mut post) in program_output
-            .pre_states
-            .into_iter()
-            .zip(program_output.post_states)
-        {
+    /// Validate program pre and post states and populate the execution state.
+    fn validate_and_sync_states(
+        &mut self,
+        program_id: ProgramId,
+        authorized_pdas: HashSet<AccountId>,
+        pre_states: Vec<AccountWithMetadata>,
+        post_states: Vec<AccountPostState>,
+    ) {
+        for (pre, mut post) in pre_states.into_iter().zip(post_states) {
             let pre_account_id = pre.account_id;
-            if let Some(account_pre) = self.post_states.get(&pre_account_id) {
-                assert_eq!(account_pre, &pre.account, "Inconsistent pre state");
-            } else {
-                self.pre_states.push(pre);
+            let post_states_entry = self.post_states.entry(pre.account_id);
+            match &post_states_entry {
+                Entry::Occupied(occupied) => {
+                    // Ensure that new pre state is the same as known post state
+                    assert_eq!(
+                        occupied.get(),
+                        &pre.account,
+                        "Inconsistent pre state for account {pre_account_id:?}",
+                    );
+
+                    let previous_is_authorized = self
+                        .pre_states
+                        .iter()
+                        .find(|acc| acc.account_id == pre_account_id)
+                        .map(|acc| acc.is_authorized)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Pre state must exist in execution state for account {pre_account_id:?}",
+                            )
+                        });
+
+                    let is_authorized =
+                        previous_is_authorized || authorized_pdas.contains(&pre_account_id);
+
+                    assert_eq!(
+                        pre.is_authorized, is_authorized,
+                        "Inconsistent authorization for account {pre_account_id:?}",
+                    );
+                }
+                Entry::Vacant(_) => {
+                    self.pre_states.push(pre);
+                }
             }
 
             if post.requires_claim() {
@@ -146,11 +184,11 @@ impl ExecutionState {
                 if post.account().program_owner == DEFAULT_PROGRAM_ID {
                     post.account_mut().program_owner = program_id;
                 } else {
-                    panic!("Cannot claim an initialized account")
+                    panic!("Cannot claim an initialized account {pre_account_id:?}");
                 }
             }
 
-            self.post_states.insert(pre_account_id, post.into_account());
+            post_states_entry.insert_entry(post.into_account());
         }
     }
 

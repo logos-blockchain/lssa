@@ -30,6 +30,20 @@ impl PdaSeed {
     }
 }
 
+pub fn compute_authorized_pdas(
+    caller_program_id: Option<ProgramId>,
+    pda_seeds: &[PdaSeed],
+) -> HashSet<AccountId> {
+    caller_program_id
+        .map(|caller_program_id| {
+            pda_seeds
+                .iter()
+                .map(|pda_seed| AccountId::from((&caller_program_id, pda_seed)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 impl From<(&ProgramId, &PdaSeed)> for AccountId {
     fn from(value: (&ProgramId, &PdaSeed)) -> Self {
         use risc0_zkvm::sha::{Impl, Sha256};

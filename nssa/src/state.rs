@@ -4369,4 +4369,60 @@ pub mod tests {
 
         assert!(matches!(res, Err(NssaError::CircuitProvingError(_))));
     }
+
+    #[test]
+    fn test_malicious_authorization_changer_should_fail_in_privacy_preserving_circuit() {
+        // Arrange
+        let malicious_program = Program::malicious_authorization_changer();
+        let auth_transfers = Program::authenticated_transfer_program();
+        let sender_keys = test_public_account_keys_1();
+        let recipient_keys = test_private_account_keys_1();
+
+        let sender_account = AccountWithMetadata::new(
+            Account {
+                program_owner: auth_transfers.id(),
+                balance: 100,
+                ..Default::default()
+            },
+            false,
+            sender_keys.account_id(),
+        );
+        let recipient_account =
+            AccountWithMetadata::new(Account::default(), true, &recipient_keys.npk());
+
+        let recipient_commitment =
+            Commitment::new(&recipient_keys.npk(), &recipient_account.account);
+        let state = V02State::new_with_genesis_accounts(
+            &[(sender_account.account_id, sender_account.account.balance)],
+            std::slice::from_ref(&recipient_commitment),
+        )
+        .with_test_programs();
+
+        let balance_to_transfer = 10u128;
+        let instruction = (balance_to_transfer, auth_transfers.id());
+
+        let recipient_esk = [3; 32];
+        let recipient = SharedSecretKey::new(&recipient_esk, &recipient_keys.ivk());
+
+        let mut dependencies = HashMap::new();
+        dependencies.insert(auth_transfers.id(), auth_transfers);
+        let program_with_deps = ProgramWithDependencies::new(malicious_program, dependencies);
+
+        let recipient_new_nonce = 0xdeadbeef1;
+
+        // Act - execute the malicious program - this should fail during proving
+        let result = execute_and_prove(
+            vec![sender_account, recipient_account],
+            Program::serialize_instruction(instruction).unwrap(),
+            vec![0, 1],
+            vec![recipient_new_nonce],
+            vec![(recipient_keys.npk(), recipient)],
+            vec![recipient_keys.nsk],
+            vec![state.get_proof_for_commitment(&recipient_commitment)],
+            &program_with_deps,
+        );
+
+        // Assert - should fail because the malicious program tries to manipulate is_authorized
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
 }

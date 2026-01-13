@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use log::debug;
 use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata},
-    program::{ChainedCall, DEFAULT_PROGRAM_ID, PdaSeed, ProgramId, validate_execution},
+    program::{ChainedCall, DEFAULT_PROGRAM_ID, validate_execution},
 };
 use sha2::{Digest, digest::FixedOutput};
 
@@ -135,8 +135,10 @@ impl PublicTransaction {
                 chained_call.program_id, program_output
             );
 
-            let authorized_pdas =
-                Self::compute_authorized_pdas(&caller_program_id, &chained_call.pda_seeds);
+            let authorized_pdas = nssa_core::program::compute_authorized_pdas(
+                caller_program_id,
+                &chained_call.pda_seeds,
+            );
 
             for pre in &program_output.pre_states {
                 let account_id = pre.account_id;
@@ -199,20 +201,6 @@ impl PublicTransaction {
         }
 
         Ok(state_diff)
-    }
-
-    fn compute_authorized_pdas(
-        caller_program_id: &Option<ProgramId>,
-        pda_seeds: &[PdaSeed],
-    ) -> HashSet<AccountId> {
-        if let Some(caller_program_id) = caller_program_id {
-            pda_seeds
-                .iter()
-                .map(|pda_seed| AccountId::from((caller_program_id, pda_seed)))
-                .collect()
-        } else {
-            HashSet::new()
-        }
     }
 }
 

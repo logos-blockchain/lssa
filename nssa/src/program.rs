@@ -235,6 +235,17 @@ mod tests {
             }
         }
 
+        pub fn malicious_authorization_changer() -> Self {
+            use test_program_methods::{
+                MALICIOUS_AUTHORIZATION_CHANGER_ELF, MALICIOUS_AUTHORIZATION_CHANGER_ID,
+            };
+
+            Program {
+                id: MALICIOUS_AUTHORIZATION_CHANGER_ID,
+                elf: MALICIOUS_AUTHORIZATION_CHANGER_ELF.to_vec(),
+            }
+        }
+
         pub fn modified_transfer_program() -> Self {
             use test_program_methods::MODIFIED_TRANSFER_ELF;
             // This unwrap won't panic since the `MODIFIED_TRANSFER_ELF` comes from risc0 build of
