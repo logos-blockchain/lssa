@@ -390,7 +390,7 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
-            bedrock_addr: "0.0.0.0".to_string(),
+            bedrock_addr: "http://127.0.0.1:8080".to_string(),
             bedrock_auth: ("".to_string(), "".to_string()),
             indexer_config: IndexerConfig {
                 resubscribe_interval: 100,

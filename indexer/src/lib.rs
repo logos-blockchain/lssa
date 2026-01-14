@@ -2,6 +2,7 @@ use anyhow::Result;
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
 use common::block::{BlockHash, HashableBlockData};
 use futures::StreamExt;
+use log::info;
 use nomos_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
@@ -49,8 +50,12 @@ impl IndexerCore {
                 .await?,
         );
 
+        info!("Block stream joined");
+
         while let Some(block_info) = stream_pinned.next().await {
             let header_id = block_info.header_id;
+
+            info!("Observed L1 block at height {}", block_info.height);
 
             if let Some(l1_block) = self
                 .bedrock_client
@@ -58,6 +63,8 @@ impl IndexerCore {
                 .get_block_by_id(self.bedrock_url.clone(), header_id)
                 .await?
             {
+                info!("Extracted L1 block at height {} with data {l1_block:#?}", block_info.height);
+
                 let l2_blocks_parsed = parse_blocks(
                     l1_block.into_transactions().into_iter(),
                     &self.config.channel_id,

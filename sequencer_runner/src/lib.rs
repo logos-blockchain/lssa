@@ -22,7 +22,7 @@ struct Args {
 
 pub async fn startup_sequencer(
     app_config: SequencerConfig,
-) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>)> {
+) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>, JoinHandle<Result<()>>)> {
     let block_timeout = app_config.block_create_timeout_millis;
     let port = app_config.port;
 
@@ -78,7 +78,18 @@ pub async fn startup_sequencer(
         }
     });
 
-    Ok((http_server_handle, addr, main_loop_handle))
+    let indexer_loop_handle = tokio::spawn(async move {
+        {
+            let indexer_guard = indexer_core_wrapped.lock().await;
+            let res = indexer_guard.subscribe_parse_block_stream().await;
+
+            info!("Indexer loop res is {res:#?}");
+        }
+
+        Ok(())
+    });
+
+    Ok((http_server_handle, addr, main_loop_handle, indexer_loop_handle))
 }
 
 pub async fn main_runner() -> Result<()> {
@@ -98,9 +109,10 @@ pub async fn main_runner() -> Result<()> {
     }
 
     // ToDo: Add restart on failures
-    let (_, _, main_loop_handle) = startup_sequencer(app_config).await?;
+    let (_, _, main_loop_handle, indexer_loop_handle) = startup_sequencer(app_config).await?;
 
     main_loop_handle.await??;
+    indexer_loop_handle.await??;
 
     Ok(())
 }

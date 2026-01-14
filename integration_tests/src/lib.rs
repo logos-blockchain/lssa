@@ -38,6 +38,7 @@ static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 pub struct TestContext {
     sequencer_server_handle: ServerHandle,
     sequencer_loop_handle: JoinHandle<Result<()>>,
+    indexer_loop_handle: JoinHandle<Result<()>>,
     sequencer_client: SequencerClient,
     wallet: WalletCore,
     _temp_sequencer_dir: TempDir,
@@ -68,7 +69,7 @@ impl TestContext {
 
         debug!("Test context setup");
 
-        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, temp_sequencer_dir) =
+        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, temp_sequencer_dir, indexer_loop_handle) =
             Self::setup_sequencer(sequencer_config)
                 .await
                 .context("Failed to setup sequencer")?;
@@ -92,6 +93,7 @@ impl TestContext {
         Ok(Self {
             sequencer_server_handle,
             sequencer_loop_handle,
+            indexer_loop_handle,
             sequencer_client,
             wallet,
             _temp_sequencer_dir: temp_sequencer_dir,
@@ -101,7 +103,7 @@ impl TestContext {
 
     async fn setup_sequencer(
         mut config: SequencerConfig,
-    ) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>, TempDir)> {
+    ) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>, TempDir, JoinHandle<Result<()>>)> {
         let temp_sequencer_dir =
             tempfile::tempdir().context("Failed to create temp dir for sequencer home")?;
 
@@ -113,7 +115,7 @@ impl TestContext {
         // Setting port to 0 lets the OS choose a free port for us
         config.port = 0;
 
-        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle) =
+        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, indexer_loop_handle) =
             sequencer_runner::startup_sequencer(config).await?;
 
         Ok((
@@ -121,6 +123,7 @@ impl TestContext {
             sequencer_addr,
             sequencer_loop_handle,
             temp_sequencer_dir,
+            indexer_loop_handle
         ))
     }
 
@@ -180,6 +183,7 @@ impl Drop for TestContext {
         let Self {
             sequencer_server_handle,
             sequencer_loop_handle,
+            indexer_loop_handle,
             sequencer_client: _,
             wallet: _,
             _temp_sequencer_dir,
@@ -187,6 +191,7 @@ impl Drop for TestContext {
         } = self;
 
         sequencer_loop_handle.abort();
+        indexer_loop_handle.abort();
 
         // Can't wait here as Drop can't be async, but anyway stop signal should be sent
         sequencer_server_handle.stop(true).now_or_never();
