@@ -52,7 +52,7 @@ impl KeyNode for ChildKeysPublic {
     }
 
     fn nth_child(&self, cci: u32) -> Self {
-        let hash_value = self.clone().compute_hash_value(cci);
+        let hash_value = self.compute_hash_value(cci);
 
         let csk = secp256k1::SecretKey::from_byte_array(
             *hash_value
