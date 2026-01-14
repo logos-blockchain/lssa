@@ -13,7 +13,7 @@ pub struct ChildKeysPublic {
 }
 
 impl ChildKeysPublic {
-    fn compute_hash_value(self, cci: u32) -> [u8; 64] {
+    fn compute_hash_value(&self, cci: u32) -> [u8; 64] {
         let mut hash_input = vec![];
 
         match ((2u32).pow(31)).cmp(&cci) {
