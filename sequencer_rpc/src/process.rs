@@ -345,7 +345,7 @@ mod tests {
     use indexer::{IndexerCore, config::IndexerConfig};
     use sequencer_core::{
         SequencerCore,
-        config::{AccountInitialData, SequencerConfig},
+        config::{AccountInitialData, BedrockConfig, SequencerConfig},
     };
     use serde_json::Value;
     use tempfile::tempdir;
@@ -390,31 +390,37 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
-            bedrock_addr: "http://127.0.0.1:8080".to_string(),
-            bedrock_auth: ("".to_string(), "".to_string()),
-            indexer_config: IndexerConfig {
-                resubscribe_interval: 100,
+            bedrock_config: Some(BedrockConfig {
                 channel_id: [42; 32].into(),
-            },
-            bedrock_config: None,
+                node_url: "http://localhost:8080".to_string(),
+                user: "user".to_string(),
+                password: None,
+                indexer_config: IndexerConfig {
+                    resubscribe_interval: 100,
+                },
+            }),
         }
     }
 
     async fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
         let config = sequencer_config_for_tests();
+        let bedrock_config = config.bedrock_config.clone().unwrap();
+
         let (sender, receiver) = tokio::sync::mpsc::channel(100);
         let indexer_core = IndexerCore::new(
-            &config.bedrock_addr,
+            &bedrock_config.node_url,
             Some(BasicAuthCredentials::new(
-                config.bedrock_auth.0.clone(),
-                Some(config.bedrock_auth.1.clone()),
+                bedrock_config.user.clone(),
+                bedrock_config.password.clone(),
             )),
             sender,
-            config.indexer_config.clone(),
+            bedrock_config.indexer_config.clone(),
+            bedrock_config.channel_id.into(),
         )
         .unwrap();
+
         let (mut sequencer_core, mempool_handle) =
-            SequencerCore::start_from_config(config, receiver);
+            SequencerCore::start_from_config(config, Some(receiver));
         let initial_accounts = sequencer_core.sequencer_config().initial_accounts.clone();
 
         let signing_key = nssa::PrivateKey::try_new([1; 32]).unwrap();
@@ -445,7 +451,7 @@ mod tests {
         (
             JsonHandler {
                 sequencer_state: sequencer_core,
-                indexer_state: indexer_core,
+                indexer_state: Some(indexer_core),
                 mempool_handle,
             },
             initial_accounts,

@@ -1,5 +1,9 @@
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
+
 #[derive(Debug)]
 pub struct IndexerState {
     // Only one field for now, for testing.
-    pub latest_seen_block: u64,
+    pub latest_seen_block: Arc<RwLock<u64>>,
 }

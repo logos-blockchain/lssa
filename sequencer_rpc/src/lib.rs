@@ -23,7 +23,7 @@ pub struct JsonHandler {
     sequencer_state: Arc<Mutex<SequencerCore>>,
     // No functionality for now.
     #[allow(unused)]
-    indexer_state: Arc<Mutex<IndexerCore>>,
+    indexer_state: Option<Arc<Mutex<IndexerCore>>>,
     mempool_handle: MemPoolHandle<EncodedTransaction>,
 }
 

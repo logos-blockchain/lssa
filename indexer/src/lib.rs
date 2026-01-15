@@ -1,25 +1,29 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
-use common::block::{BlockHash, HashableBlockData};
+use common::block::HashableBlockData;
 use futures::StreamExt;
 use log::info;
 use nomos_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
-use tokio::sync::mpsc::Sender;
+use tokio::sync::{RwLock, mpsc::Sender};
 use url::Url;
 
-use crate::{config::IndexerConfig, state::IndexerState};
+use crate::{config::IndexerConfig, message::IndexerToSequencerMessage, state::IndexerState};
 
 pub mod config;
+pub mod message;
 pub mod state;
 
 pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
-    pub bedrock_url: Url,
-    pub channel_sender: Sender<BlockHash>,
+    pub channel_sender: Sender<IndexerToSequencerMessage>,
     pub config: IndexerConfig,
+    pub bedrock_url: Url,
+    pub channel_id: ChannelId,
     pub state: IndexerState,
 }
 
@@ -27,17 +31,19 @@ impl IndexerCore {
     pub fn new(
         addr: &str,
         auth: Option<BasicAuthCredentials>,
-        sender: Sender<BlockHash>,
+        sender: Sender<IndexerToSequencerMessage>,
         config: IndexerConfig,
+        channel_id: ChannelId,
     ) -> Result<Self> {
         Ok(Self {
             bedrock_client: BedrockClient::new(auth)?,
             bedrock_url: Url::parse(addr)?,
             channel_sender: sender,
             config,
+            channel_id,
             // No state setup for now, future task.
             state: IndexerState {
-                latest_seen_block: 0,
+                latest_seen_block: Arc::new(RwLock::new(0)),
             },
         })
     }
@@ -63,16 +69,29 @@ impl IndexerCore {
                 .get_block_by_id(self.bedrock_url.clone(), header_id)
                 .await?
             {
-                info!("Extracted L1 block at height {} with data {l1_block:#?}", block_info.height);
+                info!("Extracted L1 block at height {}", block_info.height);
 
-                let l2_blocks_parsed = parse_blocks(
-                    l1_block.into_transactions().into_iter(),
-                    &self.config.channel_id,
-                );
+                let l2_blocks_parsed =
+                    parse_blocks(l1_block.into_transactions().into_iter(), &self.channel_id);
 
                 for l2_block in l2_blocks_parsed {
+                    // State modification, will be updated in future
+                    {
+                        let mut guard = self.state.latest_seen_block.write().await;
+                        if l2_block.block_id > *guard {
+                            *guard = l2_block.block_id;
+                        }
+                    }
+
                     // Sending data into sequencer, may need to be expanded.
-                    self.channel_sender.send(l2_block.block_hash()).await?;
+                    let message = IndexerToSequencerMessage::BlockObserved {
+                        l1_block_id: block_info.height,
+                        l2_block_height: l2_block.block_id,
+                    };
+
+                    self.channel_sender.send(message.clone()).await?;
+
+                    info!("Sent message {:#?} to sequencer", message);
                 }
             }
         }
@@ -96,7 +115,6 @@ pub fn parse_blocks(
                         inscription,
                         ..
                     }) if channel_id == decoded_channel_id => {
-                        // Assuming, that it is how block will be inscribed on l1
                         borsh::from_slice::<HashableBlockData>(inscription).ok()
                     }
                     _ => None,

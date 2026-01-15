@@ -154,14 +154,5 @@
         37,
         37,
         37
-    ],
-    "bedrock_addr": "http://127.0.0.1:8080",
-    "bedrock_auth": [
-        "user",
-        "password"
-    ],
-    "indexer_config": {
-        "resubscribe_interval": 1000,
-        "channel_id": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
-    }
+    ]
 }

@@ -47,7 +47,7 @@ pub fn new_http_server(
     config: RpcConfig,
     seuquencer_core: Arc<Mutex<SequencerCore>>,
     mempool_handle: MemPoolHandle<EncodedTransaction>,
-    indexer_core: Arc<Mutex<IndexerCore>>,
+    indexer_core: Option<Arc<Mutex<IndexerCore>>>,
 ) -> io::Result<(actix_web::dev::Server, SocketAddr)> {
     let RpcConfig {
         addr,
