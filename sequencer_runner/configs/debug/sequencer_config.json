@@ -157,6 +157,6 @@
     ],
     "bedrock_config": {
         "channel_id": [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        "node_url": "http://localhost:34485"
+        "node_url": "http://localhost:45403"
     }
 }
