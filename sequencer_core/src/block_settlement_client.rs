@@ -12,6 +12,7 @@ use reqwest::Url;
 
 use crate::config::BedrockConfig;
 
+/// A component that posts block data to logos blockchain
 pub struct BlockSettlementClient {
     bedrock_node_url: Url,
     bedrock_client: BedrockClient,
@@ -21,9 +22,9 @@ pub struct BlockSettlementClient {
 
 impl BlockSettlementClient {
     pub fn new(home: &Path, config: &BedrockConfig) -> Self {
-        let bedrock_signing_key =
-            load_or_create_signing_key(&home.join("bedrock_signing_key")).unwrap();
-        let bedrock_node_url = Url::parse(&config.node_url).unwrap();
+        let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key"))
+            .expect("Signing key should load or be created successfully");
+        let bedrock_node_url = Url::parse(&config.node_url).expect("Bedrock URL should be a valid URL");
         let bedrock_channel_id = ChannelId::from(config.channel_id);
         let bedrock_client =
             BedrockClient::new(None).expect("Bedrock client should be able to initialize");
