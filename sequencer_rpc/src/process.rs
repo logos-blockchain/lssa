@@ -396,6 +396,7 @@ mod tests {
                 resubscribe_interval: 100,
                 channel_id: [42; 32].into(),
             },
+            bedrock_config: None,
         }
     }
 

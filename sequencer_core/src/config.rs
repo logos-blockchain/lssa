@@ -54,6 +54,16 @@ pub struct SequencerConfig {
     pub bedrock_auth: (String, String),
     /// Indexer config
     pub indexer_config: IndexerConfig,
+    /// Bedrock configuration options
+    pub bedrock_config: Option<BedrockConfig>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BedrockConfig {
+    /// Bedrock channel ID
+    pub channel_id: [u8; 32],
+    /// Bedrock Url
+    pub node_url: String,
 }
 
 impl SequencerConfig {
