@@ -28,5 +28,5 @@ futures.workspace = true
 risc0-zkvm.workspace = true
 async-stream = "0.3.6"
 indicatif = { version = "0.18.3", features = ["improved_unicode"] }
-paste.workspace = true
+paste = "1.0.15"
 optfield = "0.4.0"

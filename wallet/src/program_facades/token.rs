@@ -82,7 +82,7 @@ impl Token<'_> {
         amount: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![definition_account_id, holder_account_id];
-        let (instruction, program, _) = TokenBurnArgs { amount }.private_transfer_preparation();
+        let (instruction, program, _) = TokenBurnArgs { amount }.prepare_private_transfer();
 
         let Ok(nonces) = self.0.get_accounts_nonces(vec![holder_account_id]).await else {
             return Err(ExecutionFailureKind::SequencerError);
@@ -115,7 +115,7 @@ impl Token<'_> {
         amount: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![definition_account_id, holder_account_id];
-        let (instruction, program, _) = TokenMintArgs { amount }.private_transfer_preparation();
+        let (instruction, program, _) = TokenMintArgs { amount }.prepare_private_transfer();
 
         let Ok(nonces) = self
             .0
@@ -155,7 +155,7 @@ pub struct TokenDefinitionArgs {
 }
 
 impl ProgramArgs for TokenDefinitionArgs {
-    fn private_transfer_preparation(
+    fn prepare_private_transfer(
         &self,
     ) -> (
         InstructionData,
@@ -179,7 +179,7 @@ pub struct TokenTransferArgs {
 }
 
 impl ProgramArgs for TokenTransferArgs {
-    fn private_transfer_preparation(
+    fn prepare_private_transfer(
         &self,
     ) -> (
         InstructionData,
@@ -204,7 +204,7 @@ pub struct TokenBurnArgs {
 }
 
 impl ProgramArgs for TokenBurnArgs {
-    fn private_transfer_preparation(
+    fn prepare_private_transfer(
         &self,
     ) -> (
         InstructionData,
@@ -229,7 +229,7 @@ pub struct TokenMintArgs {
 }
 
 impl ProgramArgs for TokenMintArgs {
-    fn private_transfer_preparation(
+    fn prepare_private_transfer(
         &self,
     ) -> (
         InstructionData,

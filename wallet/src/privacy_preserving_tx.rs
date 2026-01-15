@@ -39,7 +39,7 @@ impl PrivacyPreservingAccount {
         )
     }
 
-    pub fn prepare_authorized_account(account_id: AccountId, privacy: AccountPrivacyKind) -> Self {
+    pub fn from_privacy_kind(account_id: AccountId, privacy: AccountPrivacyKind) -> Self {
         match privacy {
             AccountPrivacyKind::Private => Self::PrivateOwned(account_id),
             AccountPrivacyKind::Public => Self::Public(account_id),

@@ -13,7 +13,7 @@ pub mod pinata;
 pub mod token;
 
 pub trait ProgramArgs {
-    fn private_transfer_preparation(
+    fn prepare_private_transfer(
         &self,
     ) -> (
         InstructionData,
@@ -27,7 +27,7 @@ pub async fn send_privacy_preserving_transaction_unified<PD: ProgramArgs>(
     acc_vector: Vec<PrivacyPreservingAccount>,
     method_data: PD,
 ) -> Result<(SendTxResponse, Vec<AccDecodeData>), ExecutionFailureKind> {
-    let (instruction_data, program, tx_pre_check) = method_data.private_transfer_preparation();
+    let (instruction_data, program, tx_pre_check) = method_data.prepare_private_transfer();
 
     wallet_core
         .send_privacy_preserving_tx_with_pre_check(

@@ -18,15 +18,15 @@ trait ParsePrivacyPreservingAccount {
 
 #[macro_export]
 macro_rules! owned_account_name {
-    ($classname: ident, $field: ident) => {
+    ($structname: ident, $field: ident) => {
         #[derive(Debug, Args, Clone)]
-        pub struct $classname {
+        pub struct $structname {
             /// $field - valid 32 byte base58 string with privacy prefix
             #[arg(long)]
             pub $field: String,
         }
 
-        impl ParsePrivacyPreservingAccount for $classname {
+        impl ParsePrivacyPreservingAccount for $structname {
             fn parse(&self) -> Result<PrivacyPreservingAccount> {
                 let (account_id, privacy) = parse_addr_with_privacy_prefix(&self.$field)?;
 
@@ -47,10 +47,10 @@ owned_account_name!(ArgsSenderOwned, from);
 
 #[macro_export]
 macro_rules! maybe_unowned_account_name {
-    ($classname: ident, $field: ident) => {
+    ($structname: ident, $field: ident) => {
         paste! {
         #[derive(Debug, Args, Clone)]
-        pub struct $classname {
+        pub struct $structname {
             /// $field - valid 32 byte base58 string with privacy prefix
             #[arg(long)]
             pub $field: Option<String>,
@@ -62,7 +62,7 @@ macro_rules! maybe_unowned_account_name {
             pub [<$field _ipk>]: Option<String>,
         }
 
-        impl ParsePrivacyPreservingAccount for $classname {
+        impl ParsePrivacyPreservingAccount for $structname {
             fn parse(&self) -> Result<PrivacyPreservingAccount> {
                 match (&self.$field, &self.[<$field _npk>], &self.[<$field _ipk>]) {
                     (None, None, None) => {
@@ -74,28 +74,28 @@ macro_rules! maybe_unowned_account_name {
                         );
                     }
                     (_, Some(_), None) | (_, None, Some(_)) => {
-                        anyhow::bail!("List of public keys is uncomplete");
+                        anyhow::bail!("List of public keys is incomplete");
                     }
                     (Some($field), None, None) => ArgsSenderOwned {
                         from: $field.clone(),
                     }
                     .parse(),
-                    (None, Some([<$field _npk>]), Some([<$field _ipk>])) => {
-                        let [<$field _npk_res>] = hex::decode([<$field _npk>])?;
-                        let mut [<$field _npk>] = [0; 32];
-                        [<$field _npk>].copy_from_slice(&[<$field _npk_res>]);
-                        let [<$field _npk>] = nssa_core::NullifierPublicKey([<$field _npk>]);
+                    (None, Some(npk), Some(ipk)) => {
+                        let npk_res = hex::decode(npk)?;
+                        let mut npk = [0; 32];
+                        npk.copy_from_slice(&npk_res);
+                        let npk = nssa_core::NullifierPublicKey(npk);
 
-                        let [<$field _ipk_res>] = hex::decode([<$field _ipk>])?;
-                        let mut [<$field _ipk>] = [0u8; 33];
-                        [<$field _ipk>].copy_from_slice(&[<$field _ipk_res>]);
-                        let [<$field _ipk>] = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
-                            [<$field _ipk>].to_vec(),
+                        let ipk_res = hex::decode(ipk)?;
+                        let mut ipk = [0u8; 33];
+                        ipk.copy_from_slice(&ipk_res);
+                        let ipk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                            ipk.to_vec(),
                         );
 
                         Ok(PrivacyPreservingAccount::PrivateForeign {
-                            npk: [<$field _npk>],
-                            ipk: [<$field _ipk>],
+                            npk,
+                            ipk,
                         })
                     }
                 }

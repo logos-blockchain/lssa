@@ -17,7 +17,7 @@ pub struct NativeBalanceToMove {
 pub struct InitArgs {}
 
 impl ProgramArgs for NativeBalanceToMove {
-    fn private_transfer_preparation(
+    fn prepare_private_transfer(
         &self,
     ) -> (
         InstructionData,
@@ -40,7 +40,7 @@ impl ProgramArgs for NativeBalanceToMove {
 }
 
 impl ProgramArgs for InitArgs {
-    fn private_transfer_preparation(
+    fn prepare_private_transfer(
         &self,
     ) -> (
         InstructionData,

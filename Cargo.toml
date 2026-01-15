@@ -75,7 +75,6 @@ chrono = "0.4.41"
 borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
-paste = "1.0.15"
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",
