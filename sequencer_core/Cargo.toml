@@ -18,9 +18,8 @@ tempfile.workspace = true
 chrono.workspace = true
 log.workspace = true
 bedrock_client.workspace = true
-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
-nomos-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
-zksign = { git = "https://github.com/logos-blockchain/logos-blockchain.git", default-features = false }
+key-management-system-service.workspace = true
+nomos-core.workspace=true
 rand.workspace = true
 reqwest.workspace = true
 borsh.workspace = true

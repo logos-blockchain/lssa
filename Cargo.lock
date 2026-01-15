@@ -957,7 +957,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "common-http-client",
- "key-management-system-service",
  "reqwest",
 ]
 
@@ -5175,7 +5174,6 @@ dependencies = [
  "storage",
  "tempfile",
  "tokio",
- "zksign",
 ]
 
 [[package]]
@@ -5216,7 +5214,6 @@ dependencies = [
  "sequencer_core",
  "sequencer_rpc",
  "tokio",
- "zksign",
 ]
 
 [[package]]
