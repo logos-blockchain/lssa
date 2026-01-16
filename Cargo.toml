@@ -12,6 +12,8 @@ members = [
   "common",
   "nssa",
   "nssa/core",
+  "programs/token/core",
+  "programs/token",
   "program_methods",
   "program_methods/guest",
   "test_program_methods",
@@ -32,6 +34,8 @@ sequencer_core = { path = "sequencer_core" }
 sequencer_rpc = { path = "sequencer_rpc" }
 sequencer_runner = { path = "sequencer_runner" }
 wallet = { path = "wallet" }
+token_core = { path = "programs/token/core" }
+token_program = { path = "programs/token" }
 test_program_methods = { path = "test_program_methods" }
 
 tokio = { version = "1.28.2", features = [
