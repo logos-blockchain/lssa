@@ -99,7 +99,6 @@ impl WalletSubcommand for NewSubcommand {
     }
 }
 
-
 #[derive(Debug, Serialize)]
 pub struct TokedDefinitionAccountView {
     pub account_type: String,
