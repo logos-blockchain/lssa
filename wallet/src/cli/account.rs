@@ -3,7 +3,7 @@ use base58::ToBase58;
 use clap::Subcommand;
 use itertools::Itertools as _;
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
-use nssa::{Account, program::Program};
+use nssa::{Account, PublicKey, program::Program};
 use serde::Serialize;
 
 use crate::{
@@ -20,7 +20,7 @@ pub enum AccountSubcommand {
         /// Flag to get raw account data
         #[arg(short, long)]
         raw: bool,
-        /// Display keys (npk, ipk) for private accounts
+        /// Display keys (pk for public accounts, npk/ipk for private accounts)
         #[arg(short, long)]
         keys: bool,
         /// Valid 32 byte base58 string with privacy prefix
@@ -67,9 +67,18 @@ impl WalletSubcommand for NewSubcommand {
             NewSubcommand::Public { cci } => {
                 let (account_id, chain_index) = wallet_core.create_new_account_public(cci);
 
+                let private_key = wallet_core
+                    .storage
+                    .user_data
+                    .get_pub_account_signing_key(&account_id)
+                    .unwrap();
+
+                let public_key = PublicKey::new_from_private_key(private_key);
+
                 println!(
                     "Generated new account with account_id Public/{account_id} at path {chain_index}"
                 );
+                println!("With pk {}", hex::encode(public_key.value()));
 
                 wallet_core.store_persistent_data().await?;
 
@@ -240,21 +249,31 @@ impl WalletSubcommand for AccountSubcommand {
                 println!("{json_view}");
 
                 if keys {
-                    if addr_kind != AccountPrivacyKind::Private {
-                        anyhow::bail!("--keys option only works for private accounts");
+                    match addr_kind {
+                        AccountPrivacyKind::Public => {
+                            let private_key = wallet_core
+                                .storage
+                                .user_data
+                                .get_pub_account_signing_key(&account_id)
+                                .ok_or(anyhow::anyhow!("Public account not found in storage"))?;
+
+                            let public_key = PublicKey::new_from_private_key(private_key);
+                            println!("pk {}", hex::encode(public_key.value()));
+                        }
+                        AccountPrivacyKind::Private => {
+                            let (key, _) = wallet_core
+                                .storage
+                                .user_data
+                                .get_private_account(&account_id)
+                                .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
+
+                            println!("npk {}", hex::encode(key.nullifer_public_key.0));
+                            println!(
+                                "ipk {}",
+                                hex::encode(key.incoming_viewing_public_key.to_bytes())
+                            );
+                        }
                     }
-
-                    let (key, _) = wallet_core
-                        .storage
-                        .user_data
-                        .get_private_account(&account_id)
-                        .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
-
-                    println!("npk {}", hex::encode(key.nullifer_public_key.0));
-                    println!(
-                        "ipk {}",
-                        hex::encode(key.incoming_viewing_public_key.to_bytes())
-                    );
                 }
 
                 Ok(SubcommandReturnValue::Empty)
