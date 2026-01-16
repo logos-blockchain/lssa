@@ -273,6 +273,7 @@ pub mod tests {
         encryption::{EphemeralPublicKey, IncomingViewingPublicKey, Scalar},
         program::{PdaSeed, ProgramId},
     };
+    use token_core::{TokenDefinition, TokenHolding};
 
     use crate::{
         PublicKey, PublicTransaction, V02State,
@@ -2284,53 +2285,6 @@ pub mod tests {
         ));
     }
 
-    // TODO: repeated code needs to be cleaned up
-    // from token.rs (also repeated in amm.rs)
-    const TOKEN_DEFINITION_DATA_SIZE: usize = 55;
-
-    const TOKEN_HOLDING_DATA_SIZE: usize = 49;
-
-    struct TokenDefinition {
-        account_type: u8,
-        name: [u8; 6],
-        total_supply: u128,
-        metadata_id: AccountId,
-    }
-
-    struct TokenHolding {
-        account_type: u8,
-        definition_id: AccountId,
-        balance: u128,
-    }
-    impl TokenDefinition {
-        fn into_data(self) -> Data {
-            let mut bytes = Vec::<u8>::new();
-            bytes.extend_from_slice(&[self.account_type]);
-            bytes.extend_from_slice(&self.name);
-            bytes.extend_from_slice(&self.total_supply.to_le_bytes());
-            bytes.extend_from_slice(&self.metadata_id.to_bytes());
-
-            if bytes.len() != TOKEN_DEFINITION_DATA_SIZE {
-                panic!("Invalid Token Definition data");
-            }
-
-            Data::try_from(bytes).expect("Token definition data size must fit into data")
-        }
-    }
-
-    impl TokenHolding {
-        fn into_data(self) -> Data {
-            let mut bytes = [0; TOKEN_HOLDING_DATA_SIZE];
-            bytes[0] = self.account_type;
-            bytes[1..33].copy_from_slice(&self.definition_id.to_bytes());
-            bytes[33..].copy_from_slice(&self.balance.to_le_bytes());
-            bytes
-                .to_vec()
-                .try_into()
-                .expect("33 bytes should fit into Data")
-        }
-    }
-
     // TODO repeated code should ultimately be removed;
     fn compute_pool_pda(
         amm_program_id: ProgramId,
@@ -2703,8 +2657,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::user_token_a_holding_init(),
                 }),
@@ -2716,8 +2669,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::user_token_b_holding_init(),
                 }),
@@ -2749,11 +2701,10 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenDefinition::into_data(TokenDefinition {
-                    account_type: 0u8,
-                    name: [1u8; 6],
+                data: Data::from(&TokenDefinition::Fungible {
+                    name: String::from("test"),
                     total_supply: BalanceForTests::token_a_supply(),
-                    metadata_id: AccountId::new([0; 32]),
+                    metadata_id: None,
                 }),
                 nonce: 0,
             }
@@ -2763,11 +2714,10 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenDefinition::into_data(TokenDefinition {
-                    account_type: 0u8,
-                    name: [1u8; 6],
+                data: Data::from(&TokenDefinition::Fungible {
+                    name: String::from("test"),
                     total_supply: BalanceForTests::token_b_supply(),
-                    metadata_id: AccountId::new([0; 32]),
+                    metadata_id: None,
                 }),
                 nonce: 0,
             }
@@ -2777,11 +2727,10 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenDefinition::into_data(TokenDefinition {
-                    account_type: 0u8,
-                    name: [1u8; 6],
+                data: Data::from(&TokenDefinition::Fungible {
+                    name: String::from("LP Token"),
                     total_supply: BalanceForTests::token_lp_supply(),
-                    metadata_id: AccountId::new([0; 32]),
+                    metadata_id: None,
                 }),
                 nonce: 0,
             }
@@ -2791,8 +2740,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::vault_a_balance_init(),
                 }),
@@ -2804,8 +2752,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::vault_b_balance_init(),
                 }),
@@ -2817,8 +2764,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_lp_definition_id(),
                     balance: BalanceForTests::user_token_lp_holding_init(),
                 }),
@@ -2830,8 +2776,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::vault_a_balance_swap_1(),
                 }),
@@ -2843,8 +2788,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::vault_b_balance_swap_1(),
                 }),
@@ -2876,8 +2820,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::user_token_a_holding_swap_1(),
                 }),
@@ -2889,8 +2832,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::user_token_b_holding_swap_1(),
                 }),
@@ -2902,8 +2844,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::vault_a_balance_swap_2(),
                 }),
@@ -2915,8 +2856,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::vault_b_balance_swap_2(),
                 }),
@@ -2948,8 +2888,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::user_token_a_holding_swap_2(),
                 }),
@@ -2961,8 +2900,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::user_token_b_holding_swap_2(),
                 }),
@@ -2974,8 +2912,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::vault_a_balance_add(),
                 }),
@@ -2987,8 +2924,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::vault_b_balance_add(),
                 }),
@@ -3020,8 +2956,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::user_token_a_holding_add(),
                 }),
@@ -3033,8 +2968,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::user_token_b_holding_add(),
                 }),
@@ -3046,8 +2980,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_lp_definition_id(),
                     balance: BalanceForTests::user_token_lp_holding_add(),
                 }),
@@ -3059,11 +2992,10 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenDefinition::into_data(TokenDefinition {
-                    account_type: 0u8,
-                    name: [1u8; 6],
+                data: Data::from(&TokenDefinition::Fungible {
+                    name: String::from("LP Token"),
                     total_supply: BalanceForTests::token_lp_supply_add(),
-                    metadata_id: AccountId::new([0; 32]),
+                    metadata_id: None,
                 }),
                 nonce: 0,
             }
@@ -3073,8 +3005,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::vault_a_balance_remove(),
                 }),
@@ -3086,8 +3017,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::vault_b_balance_remove(),
                 }),
@@ -3119,8 +3049,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::user_token_a_holding_remove(),
                 }),
@@ -3132,8 +3061,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::user_token_b_holding_remove(),
                 }),
@@ -3145,8 +3073,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_lp_definition_id(),
                     balance: BalanceForTests::user_token_lp_holding_remove(),
                 }),
@@ -3158,11 +3085,10 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenDefinition::into_data(TokenDefinition {
-                    account_type: 0u8,
-                    name: [1u8; 6],
+                data: Data::from(&TokenDefinition::Fungible {
+                    name: String::from("LP Token"),
                     total_supply: BalanceForTests::token_lp_supply_remove(),
-                    metadata_id: AccountId::new([0; 32]),
+                    metadata_id: None,
                 }),
                 nonce: 0,
             }
@@ -3172,11 +3098,10 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenDefinition::into_data(TokenDefinition {
-                    account_type: 0u8,
-                    name: [1u8; 6],
+                data: Data::from(&TokenDefinition::Fungible {
+                    name: String::from("LP Token"),
                     total_supply: 0,
-                    metadata_id: AccountId::new([0; 32]),
+                    metadata_id: None,
                 }),
                 nonce: 0,
             }
@@ -3186,8 +3111,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: 0,
                 }),
@@ -3199,8 +3123,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: 0,
                 }),
@@ -3232,8 +3155,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_a_definition_id(),
                     balance: BalanceForTests::user_token_a_holding_new_definition(),
                 }),
@@ -3245,8 +3167,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_b_definition_id(),
                     balance: BalanceForTests::user_token_b_holding_new_definition(),
                 }),
@@ -3258,8 +3179,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_lp_definition_id(),
                     balance: BalanceForTests::user_token_a_holding_new_definition(),
                 }),
@@ -3271,11 +3191,10 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenDefinition::into_data(TokenDefinition {
-                    account_type: 0u8,
-                    name: [1u8; 6],
+                data: Data::from(&TokenDefinition::Fungible {
+                    name: String::from("LP Token"),
                     total_supply: BalanceForTests::vault_a_balance_init(),
-                    metadata_id: AccountId::new([0; 32]),
+                    metadata_id: None,
                 }),
                 nonce: 0,
             }
@@ -3305,8 +3224,7 @@ pub mod tests {
             Account {
                 program_owner: Program::token().id(),
                 balance: 0u128,
-                data: TokenHolding::into_data(TokenHolding {
-                    account_type: 1u8,
+                data: Data::from(&TokenHolding::Fungible {
                     definition_id: IdForTests::token_lp_definition_id(),
                     balance: 0,
                 }),
@@ -4071,13 +3989,13 @@ pub mod tests {
         let pinata_token_holding_id = AccountId::from((&pinata_token.id(), &PdaSeed::new([0; 32])));
         let winner_token_holding_id = AccountId::new([3; 32]);
 
-        let mut expected_winner_account_data = [0; 49];
-        expected_winner_account_data[0] = 1;
-        expected_winner_account_data[1..33].copy_from_slice(pinata_token_definition_id.value());
-        expected_winner_account_data[33..].copy_from_slice(&150u128.to_le_bytes());
+        let expected_winner_account_holding = token_core::TokenHolding::Fungible {
+            definition_id: pinata_token_definition_id,
+            balance: 150,
+        };
         let expected_winner_token_holding_post = Account {
             program_owner: token.id(),
-            data: expected_winner_account_data.to_vec().try_into().unwrap(),
+            data: Data::from(&expected_winner_account_holding),
             ..Account::default()
         };
 
@@ -4087,10 +4005,10 @@ pub mod tests {
         // Execution of the token program to create new token for the pinata token
         // definition and supply accounts
         let total_supply: u128 = 10_000_000;
-        // instruction: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
-        let mut instruction = vec![0; 23];
-        instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
-        instruction[17..].copy_from_slice(b"PINATA");
+        let instruction = token_core::Instruction::NewFungibleDefinition {
+            name: String::from("PINATA"),
+            total_supply,
+        };
         let message = public_transaction::Message::try_new(
             token.id(),
             vec![pinata_token_definition_id, pinata_token_holding_id],
@@ -4102,9 +4020,8 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        // Execution of the token program transfer just to initialize the winner token account
-        let mut instruction = vec![0; 23];
-        instruction[0] = 2;
+        // Execution of winner's token holding account initialization
+        let instruction = token_core::Instruction::InitializeAccount;
         let message = public_transaction::Message::try_new(
             token.id(),
             vec![pinata_token_definition_id, winner_token_holding_id],

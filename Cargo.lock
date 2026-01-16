@@ -2263,6 +2263,7 @@ dependencies = [
  "sequencer_core",
  "sequencer_runner",
  "tempfile",
+ "token_core",
  "tokio",
  "wallet",
 ]
@@ -2671,6 +2672,7 @@ dependencies = [
  "test-case",
  "test_program_methods",
  "thiserror",
+ "token_core",
 ]
 
 [[package]]
@@ -3052,6 +3054,8 @@ dependencies = [
  "nssa_core",
  "risc0-zkvm",
  "serde",
+ "token_core",
+ "token_program",
 ]
 
 [[package]]
@@ -4441,6 +4445,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "token_core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "nssa_core",
+ "serde",
+]
+
+[[package]]
+name = "token_program"
+version = "0.1.0"
+dependencies = [
+ "nssa_core",
+ "token_core",
+]
+
+[[package]]
 name = "tokio"
 version = "1.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4801,6 +4822,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "token_core",
  "tokio",
 ]
 
