@@ -26,7 +26,7 @@ impl BlockSettlementClient {
             .expect("Signing key should load or be created successfully");
         let bedrock_node_url =
             Url::parse(&config.node_url).expect("Bedrock URL should be a valid URL");
-        let bedrock_channel_id = ChannelId::from(config.channel_id);
+        let bedrock_channel_id = config.channel_id;
         let bedrock_client =
             BedrockClient::new(None).expect("Bedrock client should be able to initialize");
         Self {
@@ -78,7 +78,8 @@ impl BlockSettlementClient {
     pub async fn post_and_wait(&self, block_data: &HashableBlockData) -> Result<u64> {
         let msg_id: MsgId = {
             let mut this = [0; 32];
-            this[0..8].copy_from_slice(&block_data.block_id.to_le_bytes());
+            // Bandaid solution
+            this[0..8].copy_from_slice(&(block_data.block_id - 2).to_le_bytes());
             this.into()
         };
 

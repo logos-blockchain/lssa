@@ -43,7 +43,7 @@ pub async fn startup_sequencer(
             )),
             sender,
             bedrock_config.indexer_config.clone(),
-            bedrock_config.channel_id.into(),
+            bedrock_config.channel_id,
         )?;
 
         info!("Indexer core set up");

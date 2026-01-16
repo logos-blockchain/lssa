@@ -16,10 +16,10 @@ use common::{
             GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
             GetBlockRangeDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
             GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
-            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
-            GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest,
-            SendTxResponse,
+            GetLastSeenL2BlockAtIndexerRequest, GetProgramIdsRequest, GetProgramIdsResponse,
+            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse,
+            SendTxRequest, SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -44,6 +44,7 @@ pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT: &str = "get_account";
 pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
 pub const GET_PROGRAM_IDS: &str = "get_program_ids";
+pub const GET_LAST_SEEN_L2_BLOCK_AT_INDEXER: &str = "get_last_seen_l2_block_at_indexer";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -314,6 +315,27 @@ impl JsonHandler {
         respond(response)
     }
 
+    async fn process_get_last_seen_l2_block_at_indexer(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
+        let _get_last_req = GetLastSeenL2BlockAtIndexerRequest::parse(Some(request.params))?;
+
+        let last_block = {
+            if let Some(indexer_state) = &self.indexer_state {
+                let state = indexer_state.lock().await;
+
+                *state.state.latest_seen_block.read().await
+            } else {
+                0
+            }
+        };
+
+        let response = GetLastBlockResponse { last_block };
+
+        respond(response)
+    }
+
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -329,6 +351,10 @@ impl JsonHandler {
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
             GET_PROGRAM_IDS => self.process_get_program_ids(request).await,
+            GET_LAST_SEEN_L2_BLOCK_AT_INDEXER => {
+                self.process_get_last_seen_l2_block_at_indexer(request)
+                    .await
+            }
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
@@ -397,6 +423,8 @@ mod tests {
                 password: None,
                 indexer_config: IndexerConfig {
                     resubscribe_interval: 100,
+                    start_delay: 1000,
+                    limit_retry: 10,
                 },
             }),
         }
@@ -415,7 +443,7 @@ mod tests {
             )),
             sender,
             bedrock_config.indexer_config.clone(),
-            bedrock_config.channel_id.into(),
+            bedrock_config.channel_id,
         )
         .unwrap();
 

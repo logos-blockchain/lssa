@@ -215,12 +215,9 @@ impl Drop for TestContext {
         } = self;
 
         sequencer_loop_handle.abort();
-        match indexer_loop_handle {
-            Some(handle) => {
-                handle.abort();
-            }
-            None => {}
-        };
+        if let Some(handle) = indexer_loop_handle {
+            handle.abort();
+        }
 
         // Can't wait here as Drop can't be async, but anyway stop signal should be sent
         sequencer_server_handle.stop(true).now_or_never();

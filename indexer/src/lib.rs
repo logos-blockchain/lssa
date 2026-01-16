@@ -10,6 +10,7 @@ use nomos_core::mantle::{
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
 use tokio::sync::{RwLock, mpsc::Sender};
+use tokio_retry::Retry;
 use url::Url;
 
 use crate::{config::IndexerConfig, message::IndexerToSequencerMessage, state::IndexerState};
@@ -49,54 +50,66 @@ impl IndexerCore {
     }
 
     pub async fn subscribe_parse_block_stream(&self) -> Result<()> {
-        let mut stream_pinned = Box::pin(
-            self.bedrock_client
-                .0
-                .get_lib_stream(self.bedrock_url.clone())
-                .await?,
-        );
+        loop {
+            let mut stream_pinned = Box::pin(
+                self.bedrock_client
+                    .0
+                    .get_lib_stream(self.bedrock_url.clone())
+                    .await?,
+            );
 
-        info!("Block stream joined");
+            info!("Block stream joined");
 
-        while let Some(block_info) = stream_pinned.next().await {
-            let header_id = block_info.header_id;
+            while let Some(block_info) = stream_pinned.next().await {
+                let header_id = block_info.header_id;
 
-            info!("Observed L1 block at height {}", block_info.height);
+                info!("Observed L1 block at height {}", block_info.height);
 
-            if let Some(l1_block) = self
-                .bedrock_client
-                .0
-                .get_block_by_id(self.bedrock_url.clone(), header_id)
+                // Simple retry strategy on requests
+                let strategy =
+                    tokio_retry::strategy::FibonacciBackoff::from_millis(self.config.start_delay)
+                        .take(self.config.limit_retry);
+
+                if let Some(l1_block) = Retry::spawn(strategy, || {
+                    self.bedrock_client
+                        .0
+                        .get_block_by_id(self.bedrock_url.clone(), header_id)
+                })
                 .await?
-            {
-                info!("Extracted L1 block at height {}", block_info.height);
+                {
+                    info!("Extracted L1 block at height {}", block_info.height);
 
-                let l2_blocks_parsed =
-                    parse_blocks(l1_block.into_transactions().into_iter(), &self.channel_id);
+                    let l2_blocks_parsed =
+                        parse_blocks(l1_block.into_transactions().into_iter(), &self.channel_id);
 
-                for l2_block in l2_blocks_parsed {
-                    // State modification, will be updated in future
-                    {
-                        let mut guard = self.state.latest_seen_block.write().await;
-                        if l2_block.block_id > *guard {
-                            *guard = l2_block.block_id;
+                    for l2_block in l2_blocks_parsed {
+                        // State modification, will be updated in future
+                        {
+                            let mut guard = self.state.latest_seen_block.write().await;
+                            if l2_block.block_id > *guard {
+                                *guard = l2_block.block_id;
+                            }
                         }
+
+                        // Sending data into sequencer, may need to be expanded.
+                        let message = IndexerToSequencerMessage::BlockObserved {
+                            l1_block_id: block_info.height,
+                            l2_block_height: l2_block.block_id,
+                        };
+
+                        self.channel_sender.send(message.clone()).await?;
+
+                        info!("Sent message {:#?} to sequencer", message);
                     }
-
-                    // Sending data into sequencer, may need to be expanded.
-                    let message = IndexerToSequencerMessage::BlockObserved {
-                        l1_block_id: block_info.height,
-                        l2_block_height: l2_block.block_id,
-                    };
-
-                    self.channel_sender.send(message.clone()).await?;
-
-                    info!("Sent message {:#?} to sequencer", message);
                 }
             }
-        }
 
-        Ok(())
+            // Refetch stream after delay
+            tokio::time::sleep(std::time::Duration::from_millis(
+                self.config.resubscribe_interval,
+            ))
+            .await;
+        }
     }
 }
 

@@ -156,12 +156,14 @@
         37
     ],
     "bedrock_config": {
-        "channel_id": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+        "channel_id": "0101010101010101010101010101010101010101010101010101010101010101",
         "node_url": "http://127.0.0.1:8080",
         "user": "user",
         "password": null,
         "indexer_config": {
-            "resubscribe_interval": 1000
+            "resubscribe_interval": 1000,
+            "start_delay": 1000,
+            "limit_retry": 10
         }
     }
 }

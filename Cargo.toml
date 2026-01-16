@@ -80,6 +80,7 @@ borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
 url = "2.5.4"
+tokio-retry = "0.3.0"
 
 common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }

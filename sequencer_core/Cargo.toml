@@ -21,7 +21,7 @@ log.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 bedrock_client.workspace = true
 key-management-system-service.workspace = true
-nomos-core.workspace=true
+nomos-core.workspace = true
 rand.workspace = true
 reqwest.workspace = true
 borsh.workspace = true
