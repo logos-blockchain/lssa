@@ -1258,14 +1258,6 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                 name,
                 total_supply,
             } => {
-                let name = name.as_bytes();
-                if name.len() > 6 {
-                    // TODO: return error
-                    panic!("Name length mismatch");
-                }
-                let mut name_bytes = [0; 6];
-                name_bytes[..name.len()].copy_from_slice(name);
-
                 let definition_account_id: AccountId = definition_account_id.parse().unwrap();
                 let supply_account_id: AccountId = supply_account_id.parse().unwrap();
 
@@ -1273,7 +1265,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                     .send_new_definition_private_owned_definiton_and_supply(
                         definition_account_id,
                         supply_account_id,
-                        name_bytes,
+                        name,
                         total_supply,
                     )
                     .await?;
@@ -1307,14 +1299,6 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                 name,
                 total_supply,
             } => {
-                let name = name.as_bytes();
-                if name.len() > 6 {
-                    // TODO: return error
-                    panic!("Name length mismatch");
-                }
-                let mut name_bytes = [0; 6];
-                name_bytes[..name.len()].copy_from_slice(name);
-
                 let definition_account_id: AccountId = definition_account_id.parse().unwrap();
                 let supply_account_id: AccountId = supply_account_id.parse().unwrap();
 
@@ -1322,7 +1306,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                     .send_new_definition_private_owned_definiton(
                         definition_account_id,
                         supply_account_id,
-                        name_bytes,
+                        name,
                         total_supply,
                     )
                     .await?;
@@ -1353,14 +1337,6 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                 name,
                 total_supply,
             } => {
-                let name = name.as_bytes();
-                if name.len() > 6 {
-                    // TODO: return error
-                    panic!("Name length mismatch");
-                }
-                let mut name_bytes = [0; 6];
-                name_bytes[..name.len()].copy_from_slice(name);
-
                 let definition_account_id: AccountId = definition_account_id.parse().unwrap();
                 let supply_account_id: AccountId = supply_account_id.parse().unwrap();
 
@@ -1368,7 +1344,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                     .send_new_definition_private_owned_supply(
                         definition_account_id,
                         supply_account_id,
-                        name_bytes,
+                        name,
                         total_supply,
                     )
                     .await?;
@@ -1399,18 +1375,11 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                 name,
                 total_supply,
             } => {
-                let name = name.as_bytes();
-                if name.len() > 6 {
-                    // TODO: return error
-                    panic!();
-                }
-                let mut name_bytes = [0; 6];
-                name_bytes[..name.len()].copy_from_slice(name);
                 Token(wallet_core)
                     .send_new_definition(
                         definition_account_id.parse().unwrap(),
                         supply_account_id.parse().unwrap(),
-                        name_bytes,
+                        name,
                         total_supply,
                     )
                     .await?;
