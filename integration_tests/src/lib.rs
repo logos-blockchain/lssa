@@ -38,6 +38,7 @@ static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 pub struct TestContext {
     sequencer_server_handle: ServerHandle,
     sequencer_loop_handle: JoinHandle<Result<()>>,
+    indexer_loop_handle: Option<JoinHandle<Result<()>>>,
     sequencer_client: SequencerClient,
     wallet: WalletCore,
     _temp_sequencer_dir: TempDir,
@@ -45,12 +46,25 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    /// Create new test context.
+    /// Create new test context in detached mode. Default.
     pub async fn new() -> Result<Self> {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
 
         let sequencer_config_path =
-            PathBuf::from(manifest_dir).join("configs/sequencer/sequencer_config.json");
+            PathBuf::from(manifest_dir).join("configs/sequencer/detached/sequencer_config.json");
+
+        let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
+            .context("Failed to create sequencer config from file")?;
+
+        Self::new_with_sequencer_config(sequencer_config).await
+    }
+
+    /// Create new test context in local bedrock node attached mode.
+    pub async fn new_bedrock_local_attached() -> Result<Self> {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+
+        let sequencer_config_path = PathBuf::from(manifest_dir)
+            .join("configs/sequencer/bedrock_local_attached/sequencer_config.json");
 
         let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
             .context("Failed to create sequencer config from file")?;
@@ -68,10 +82,15 @@ impl TestContext {
 
         debug!("Test context setup");
 
-        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, temp_sequencer_dir) =
-            Self::setup_sequencer(sequencer_config)
-                .await
-                .context("Failed to setup sequencer")?;
+        let (
+            sequencer_server_handle,
+            sequencer_addr,
+            sequencer_loop_handle,
+            temp_sequencer_dir,
+            indexer_loop_handle,
+        ) = Self::setup_sequencer(sequencer_config)
+            .await
+            .context("Failed to setup sequencer")?;
 
         // Convert 0.0.0.0 to 127.0.0.1 for client connections
         // When binding to port 0, the server binds to 0.0.0.0:<random_port>
@@ -92,6 +111,7 @@ impl TestContext {
         Ok(Self {
             sequencer_server_handle,
             sequencer_loop_handle,
+            indexer_loop_handle,
             sequencer_client,
             wallet,
             _temp_sequencer_dir: temp_sequencer_dir,
@@ -101,7 +121,13 @@ impl TestContext {
 
     async fn setup_sequencer(
         mut config: SequencerConfig,
-    ) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>, TempDir)> {
+    ) -> Result<(
+        ServerHandle,
+        SocketAddr,
+        JoinHandle<Result<()>>,
+        TempDir,
+        Option<JoinHandle<Result<()>>>,
+    )> {
         let temp_sequencer_dir =
             tempfile::tempdir().context("Failed to create temp dir for sequencer home")?;
 
@@ -113,7 +139,7 @@ impl TestContext {
         // Setting port to 0 lets the OS choose a free port for us
         config.port = 0;
 
-        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle) =
+        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, indexer_loop_handle) =
             sequencer_runner::startup_sequencer(config).await?;
 
         Ok((
@@ -121,6 +147,7 @@ impl TestContext {
             sequencer_addr,
             sequencer_loop_handle,
             temp_sequencer_dir,
+            indexer_loop_handle,
         ))
     }
 
@@ -180,6 +207,7 @@ impl Drop for TestContext {
         let Self {
             sequencer_server_handle,
             sequencer_loop_handle,
+            indexer_loop_handle,
             sequencer_client: _,
             wallet: _,
             _temp_sequencer_dir,
@@ -187,6 +215,9 @@ impl Drop for TestContext {
         } = self;
 
         sequencer_loop_handle.abort();
+        if let Some(handle) = indexer_loop_handle {
+            handle.abort();
+        }
 
         // Can't wait here as Drop can't be async, but anyway stop signal should be sent
         sequencer_server_handle.stop(true).now_or_never();

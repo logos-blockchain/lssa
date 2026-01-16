@@ -16,10 +16,10 @@ use common::{
             GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
             GetBlockRangeDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
             GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
-            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
-            GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest,
-            SendTxResponse,
+            GetLastSeenL2BlockAtIndexerRequest, GetProgramIdsRequest, GetProgramIdsResponse,
+            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse,
+            SendTxRequest, SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -44,6 +44,7 @@ pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT: &str = "get_account";
 pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
 pub const GET_PROGRAM_IDS: &str = "get_program_ids";
+pub const GET_LAST_SEEN_L2_BLOCK_AT_INDEXER: &str = "get_last_seen_l2_block_at_indexer";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -314,6 +315,27 @@ impl JsonHandler {
         respond(response)
     }
 
+    async fn process_get_last_seen_l2_block_at_indexer(
+        &self,
+        request: Request,
+    ) -> Result<Value, RpcErr> {
+        let _get_last_req = GetLastSeenL2BlockAtIndexerRequest::parse(Some(request.params))?;
+
+        let last_block = {
+            if let Some(indexer_state) = &self.indexer_state {
+                let state = indexer_state.lock().await;
+
+                *state.state.latest_seen_block.read().await
+            } else {
+                0
+            }
+        };
+
+        let response = GetLastBlockResponse { last_block };
+
+        respond(response)
+    }
+
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -329,6 +351,10 @@ impl JsonHandler {
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
             GET_PROGRAM_IDS => self.process_get_program_ids(request).await,
+            GET_LAST_SEEN_L2_BLOCK_AT_INDEXER => {
+                self.process_get_last_seen_l2_block_at_indexer(request)
+                    .await
+            }
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
@@ -340,10 +366,12 @@ mod tests {
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
+    use bedrock_client::BasicAuthCredentials;
     use common::{test_utils::sequencer_sign_key_for_testing, transaction::EncodedTransaction};
+    use indexer::{IndexerCore, config::IndexerConfig};
     use sequencer_core::{
         SequencerCore,
-        config::{AccountInitialData, SequencerConfig},
+        config::{AccountInitialData, BedrockConfig, SequencerConfig},
     };
     use serde_json::Value;
     use tempfile::tempdir;
@@ -388,12 +416,39 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
+            bedrock_config: Some(BedrockConfig {
+                channel_id: [42; 32].into(),
+                node_url: "http://localhost:8080".to_string(),
+                user: "user".to_string(),
+                password: None,
+                indexer_config: IndexerConfig {
+                    resubscribe_interval: 100,
+                    start_delay: 1000,
+                    limit_retry: 10,
+                },
+            }),
         }
     }
 
     async fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
         let config = sequencer_config_for_tests();
-        let (mut sequencer_core, mempool_handle) = SequencerCore::start_from_config(config);
+        let bedrock_config = config.bedrock_config.clone().unwrap();
+
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        let indexer_core = IndexerCore::new(
+            &bedrock_config.node_url,
+            Some(BasicAuthCredentials::new(
+                bedrock_config.user.clone(),
+                bedrock_config.password.clone(),
+            )),
+            sender,
+            bedrock_config.indexer_config.clone(),
+            bedrock_config.channel_id,
+        )
+        .unwrap();
+
+        let (mut sequencer_core, mempool_handle) =
+            SequencerCore::start_from_config(config, Some(receiver));
         let initial_accounts = sequencer_core.sequencer_config().initial_accounts.clone();
 
         let signing_key = nssa::PrivateKey::try_new([1; 32]).unwrap();
@@ -419,10 +474,12 @@ mod tests {
             .unwrap();
 
         let sequencer_core = Arc::new(Mutex::new(sequencer_core));
+        let indexer_core = Arc::new(Mutex::new(indexer_core));
 
         (
             JsonHandler {
                 sequencer_state: sequencer_core,
+                indexer_state: Some(indexer_core),
                 mempool_handle,
             },
             initial_accounts,

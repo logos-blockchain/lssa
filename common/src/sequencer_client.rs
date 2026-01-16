@@ -18,9 +18,10 @@ use crate::{
             GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest,
             GetAccountsNoncesResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
             GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
-            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
-            GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, SendTxRequest, SendTxResponse,
+            GetLastSeenL2BlockAtIndexerRequest, GetProgramIdsRequest, GetProgramIdsResponse,
+            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetTransactionByHashRequest, GetTransactionByHashResponse, SendTxRequest,
+            SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -344,6 +345,24 @@ impl SequencerClient {
         let resp_deser = serde_json::from_value::<GetProgramIdsResponse>(resp)
             .unwrap()
             .program_ids;
+
+        Ok(resp_deser)
+    }
+
+    /// Get last seen l2 block at indexer
+    pub async fn get_last_seen_l2_block_at_indexer(
+        &self,
+    ) -> Result<GetLastBlockResponse, SequencerClientError> {
+        let last_req = GetLastSeenL2BlockAtIndexerRequest {};
+
+        let req = serde_json::to_value(last_req).unwrap();
+
+        let resp = self
+            .call_method_with_payload("get_last_seen_l2_block_at_indexer", req)
+            .await
+            .unwrap();
+
+        let resp_deser = serde_json::from_value(resp).unwrap();
 
         Ok(resp_deser)
     }

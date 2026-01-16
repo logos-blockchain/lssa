@@ -2,8 +2,10 @@ use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 use actix_web::dev::ServerHandle;
 use anyhow::Result;
+use bedrock_client::BasicAuthCredentials;
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
+use indexer::IndexerCore;
 use log::info;
 use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
@@ -20,20 +22,51 @@ struct Args {
 
 pub async fn startup_sequencer(
     app_config: SequencerConfig,
-) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>)> {
+) -> Result<(
+    ServerHandle,
+    SocketAddr,
+    JoinHandle<Result<()>>,
+    Option<JoinHandle<Result<()>>>,
+)> {
     let block_timeout = app_config.block_create_timeout_millis;
     let port = app_config.port;
 
-    let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config);
+    // ToDo: Maybe make buffer size configurable.
+    let (indexer_core, receiver) = if let Some(bedrock_config) = app_config.bedrock_config.clone() {
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+
+        let indexer_core = IndexerCore::new(
+            &bedrock_config.node_url,
+            Some(BasicAuthCredentials::new(
+                bedrock_config.user.clone(),
+                bedrock_config.password.clone(),
+            )),
+            sender,
+            bedrock_config.indexer_config.clone(),
+            bedrock_config.channel_id,
+        )?;
+
+        info!("Indexer core set up");
+
+        (Some(indexer_core), Some(receiver))
+    } else {
+        info!("Bedrock config not provided, skipping indexer setup");
+
+        (None, None)
+    };
+
+    let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config, receiver);
 
     info!("Sequencer core set up");
 
+    let indexer_core_wrapped = indexer_core.map(|core| Arc::new(Mutex::new(core)));
     let seq_core_wrapped = Arc::new(Mutex::new(sequencer_core));
 
     let (http_server, addr) = new_http_server(
         RpcConfig::with_port(port),
         Arc::clone(&seq_core_wrapped),
         mempool_handle,
+        indexer_core_wrapped.clone(),
     )?;
     info!("HTTP server started");
     let http_server_handle = http_server.handle();
@@ -50,7 +83,9 @@ pub async fn startup_sequencer(
             let id = {
                 let mut state = seq_core_wrapped.lock().await;
 
-                state.produce_new_block_with_mempool_transactions()?
+                state
+                    .produce_new_block_and_post_to_settlement_layer()
+                    .await?
             };
 
             info!("Block with id {id} created");
@@ -59,7 +94,25 @@ pub async fn startup_sequencer(
         }
     });
 
-    Ok((http_server_handle, addr, main_loop_handle))
+    let indexer_loop_handle = indexer_core_wrapped.map(|indexer_core_wrapped| {
+        tokio::spawn(async move {
+            {
+                let indexer_guard = indexer_core_wrapped.lock().await;
+                let res = indexer_guard.subscribe_parse_block_stream().await;
+
+                info!("Indexer loop res is {res:#?}");
+            }
+
+            Ok(())
+        })
+    });
+
+    Ok((
+        http_server_handle,
+        addr,
+        main_loop_handle,
+        indexer_loop_handle,
+    ))
 }
 
 pub async fn main_runner() -> Result<()> {
@@ -79,9 +132,13 @@ pub async fn main_runner() -> Result<()> {
     }
 
     // ToDo: Add restart on failures
-    let (_, _, main_loop_handle) = startup_sequencer(app_config).await?;
+    let (_, _, main_loop_handle, indexer_loop_handle) = startup_sequencer(app_config).await?;
 
     main_loop_handle.await??;
+
+    if indexer_loop_handle.is_some() {
+        indexer_loop_handle.unwrap().await??;
+    }
 
     Ok(())
 }

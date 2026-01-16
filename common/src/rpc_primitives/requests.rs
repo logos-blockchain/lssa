@@ -73,6 +73,9 @@ pub struct GetProofForCommitmentRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProgramIdsRequest {}
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetLastSeenL2BlockAtIndexerRequest {}
+
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -87,6 +90,7 @@ parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
 parse_request!(GetProgramIdsRequest);
+parse_request!(GetLastSeenL2BlockAtIndexerRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
