@@ -110,7 +110,8 @@ pub enum PersistentAccountData {
 pub struct PersistentStorage {
     pub accounts: Vec<PersistentAccountData>,
     pub last_synced_block: u64,
-    /// Account labels keyed by account ID string (e.g., "2rnKprXqWGWJTkDZKsQbFXa4ctKRbapsdoTKQFnaVGG8")
+    /// Account labels keyed by account ID string (e.g.,
+    /// "2rnKprXqWGWJTkDZKsQbFXa4ctKRbapsdoTKQFnaVGG8")
     #[serde(default)]
     pub labels: HashMap<String, String>,
 }

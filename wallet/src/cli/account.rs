@@ -291,12 +291,9 @@ impl WalletSubcommand for AccountSubcommand {
                         .default_pub_account_signing_keys
                         .keys()
                         .map(|id| format_with_label(&format!("Preconfigured Public/{id}"), id))
-                        .chain(
-                            user_data
-                                .default_user_private_accounts
-                                .keys()
-                                .map(|id| format_with_label(&format!("Preconfigured Private/{id}"), id)),
-                        )
+                        .chain(user_data.default_user_private_accounts.keys().map(|id| {
+                            format_with_label(&format!("Preconfigured Private/{id}"), id)
+                        }))
                         .chain(user_data.public_key_tree.account_id_map.iter().map(
                             |(id, chain_index)| {
                                 format_with_label(&format!("{chain_index} Public/{id}"), id)
@@ -316,7 +313,10 @@ impl WalletSubcommand for AccountSubcommand {
                 // Detailed listing with --long flag
                 // Preconfigured public accounts
                 for id in user_data.default_pub_account_signing_keys.keys() {
-                    println!("{}", format_with_label(&format!("Preconfigured Public/{id}"), id));
+                    println!(
+                        "{}",
+                        format_with_label(&format!("Preconfigured Public/{id}"), id)
+                    );
                     match wallet_core.get_account_public(*id).await {
                         Ok(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
@@ -330,7 +330,10 @@ impl WalletSubcommand for AccountSubcommand {
 
                 // Preconfigured private accounts
                 for id in user_data.default_user_private_accounts.keys() {
-                    println!("{}", format_with_label(&format!("Preconfigured Private/{id}"), id));
+                    println!(
+                        "{}",
+                        format_with_label(&format!("Preconfigured Private/{id}"), id)
+                    );
                     match wallet_core.get_account_private(id) {
                         Some(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
@@ -344,7 +347,10 @@ impl WalletSubcommand for AccountSubcommand {
 
                 // Public key tree accounts
                 for (id, chain_index) in user_data.public_key_tree.account_id_map.iter() {
-                    println!("{}", format_with_label(&format!("{chain_index} Public/{id}"), id));
+                    println!(
+                        "{}",
+                        format_with_label(&format!("{chain_index} Public/{id}"), id)
+                    );
                     match wallet_core.get_account_public(*id).await {
                         Ok(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
@@ -358,7 +364,10 @@ impl WalletSubcommand for AccountSubcommand {
 
                 // Private key tree accounts
                 for (id, chain_index) in user_data.private_key_tree.account_id_map.iter() {
-                    println!("{}", format_with_label(&format!("{chain_index} Private/{id}"), id));
+                    println!(
+                        "{}",
+                        format_with_label(&format!("{chain_index} Private/{id}"), id)
+                    );
                     match wallet_core.get_account_private(id) {
                         Some(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
