@@ -7,7 +7,11 @@ use tokio::test;
 use wallet::cli::{
     Command, SubcommandReturnValue,
     account::{AccountSubcommand, NewSubcommand},
-    programs::{amm::AmmProgramAgnosticSubcommand, token::TokenProgramAgnosticSubcommand},
+    programs::{
+        ArgsReceiverMaybeUnowned, ArgsSenderOwned,
+        amm::AmmProgramAgnosticSubcommand,
+        token::{ArgsDefinitionOwned, ArgsSupplyOwned, TokenProgramAgnosticSubcommand},
+    },
 };
 
 #[test]
@@ -88,8 +92,12 @@ async fn amm_public() -> Result<()> {
 
     // Create new token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id_1.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id_1.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id_1.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_public_account_id(&supply_account_id_1.to_string()),
+        },
         name: "A NAM1".to_string(),
         total_supply: 37,
     };
@@ -99,12 +107,16 @@ async fn amm_public() -> Result<()> {
 
     // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id_1`
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id_1.to_string()),
-        to: Some(format_public_account_id(
-            &recipient_account_id_1.to_string(),
-        )),
-        to_npk: None,
-        to_ipk: None,
+        from: ArgsSenderOwned {
+            from: format_public_account_id(&supply_account_id_1.to_string()),
+        },
+        to: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(
+                &recipient_account_id_1.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 7,
     };
 
@@ -114,8 +126,12 @@ async fn amm_public() -> Result<()> {
 
     // Create new token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id_2.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id_2.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id_2.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_public_account_id(&supply_account_id_2.to_string()),
+        },
         name: "A NAM2".to_string(),
         total_supply: 37,
     };
@@ -125,12 +141,16 @@ async fn amm_public() -> Result<()> {
 
     // Transfer 7 tokens from `supply_acc` to the account at account_id `recipient_account_id_2`
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id_2.to_string()),
-        to: Some(format_public_account_id(
-            &recipient_account_id_2.to_string(),
-        )),
-        to_npk: None,
-        to_ipk: None,
+        from: ArgsSenderOwned {
+            from: format_public_account_id(&supply_account_id_2.to_string()),
+        },
+        to: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(
+                &recipient_account_id_2.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 7,
     };
 
