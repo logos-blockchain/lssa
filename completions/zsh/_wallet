@@ -162,8 +162,13 @@ _wallet_account() {
             case $line[1] in
                 get)
                     _arguments \
-                        '--raw[Get raw account data]' \
-                        '--account-id[Account ID to query]:account_id:_wallet_account_ids'
+                        '(-r --raw)'{-r,--raw}'[Get raw account data]' \
+                        '(-k --keys)'{-k,--keys}'[Display keys (pk for public accounts, npk/ipk for private accounts)]' \
+                        '(-a --account-id)'{-a,--account-id}'[Account ID to query]:account_id:_wallet_account_ids'
+                    ;;
+                list|ls)
+                    _arguments \
+                        '(-l --long)'{-l,--long}'[Display detailed account information]'
                     ;;
                 new)
                     _arguments -C \
