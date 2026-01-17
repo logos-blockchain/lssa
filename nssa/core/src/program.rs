@@ -107,6 +107,13 @@ impl AccountPostState {
         }
     }
 
+    /// Creates a post state that requests ownership of the account
+    /// if the account's program owner is the default program ID.
+    pub fn new_claimed_if_default(account: Account) -> Self {
+        let claim = account.program_owner == DEFAULT_PROGRAM_ID;
+        Self { account, claim }
+    }
+
     /// Returns `true` if this post state requests that the account
     /// be claimed (owned) by the executing program.
     pub fn requires_claim(&self) -> bool {

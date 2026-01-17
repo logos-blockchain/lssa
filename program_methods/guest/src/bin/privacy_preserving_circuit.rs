@@ -41,7 +41,7 @@ fn main() {
     env::commit(&output);
 }
 
-/// World state before and after program execution.
+/// State of the involved accounts before and after program execution.
 struct ExecutionState {
     pre_states: Vec<AccountWithMetadata>,
     post_states: HashMap<AccountId, Account>,
@@ -66,9 +66,10 @@ impl ExecutionState {
             pre_states: Vec::new(),
             post_states: HashMap::new(),
         };
-        let mut last_program_id = program_id;
+
         let mut program_outputs_iter = program_outputs.into_iter();
         let mut chain_calls_counter = 0;
+
         while let Some((chained_call, caller_program_id)) = chained_calls.pop_front() {
             assert!(
                 chain_calls_counter <= MAX_NUMBER_CHAINED_CALLS,
@@ -116,7 +117,6 @@ impl ExecutionState {
                 program_output.pre_states,
                 program_output.post_states,
             );
-            last_program_id = chained_call.program_id;
             chain_calls_counter += 1;
         }
 
@@ -125,11 +125,25 @@ impl ExecutionState {
             "Inner call without a chained call found",
         );
 
-        // Claim accounts which were not explicitly claimed during execution
-        for account in execution_state.post_states.values_mut() {
-            if account.program_owner == DEFAULT_PROGRAM_ID {
-                account.program_owner = last_program_id;
-            }
+        // Check that all modified uninitialized accounts were claimed
+        for (account_id, post) in execution_state
+            .pre_states
+            .iter()
+            .filter(|a| a.account.program_owner == DEFAULT_PROGRAM_ID)
+            .map(|a| {
+                let post = execution_state
+                    .post_states
+                    .get(&a.account_id)
+                    .expect("Post state must exist for pre state");
+                (a, post)
+            })
+            .filter(|(pre_default, post)| pre_default.account != **post)
+            .map(|(pre, post)| (pre.account_id, post))
+        {
+            assert_ne!(
+                post.program_owner, DEFAULT_PROGRAM_ID,
+                "Account {account_id:?} was modified but not claimed"
+            );
         }
 
         execution_state
