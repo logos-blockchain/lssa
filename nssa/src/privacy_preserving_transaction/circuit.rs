@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     MembershipProof, NullifierPublicKey, NullifierSecretKey, PrivacyPreservingCircuitInput,
     PrivacyPreservingCircuitOutput, SharedSecretKey,
     account::AccountWithMetadata,
-    program::{InstructionData, ProgramId, ProgramOutput},
+    program::{ChainedCall, InstructionData, ProgramId, ProgramOutput},
 };
 use risc0_zkvm::{ExecutorEnv, InnerReceipt, Receipt, default_prover};
 
@@ -43,27 +43,44 @@ impl From<Program> for ProgramWithDependencies {
 }
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution
-/// circuit
+/// circuit.
 #[expect(clippy::too_many_arguments, reason = "TODO: fix later")]
 pub fn execute_and_prove(
-    pre_states: &[AccountWithMetadata],
-    instruction_data: &InstructionData,
-    visibility_mask: &[u8],
-    private_account_nonces: &[u128],
-    private_account_keys: &[(NullifierPublicKey, SharedSecretKey)],
-    private_account_nsks: &[NullifierSecretKey],
-    private_account_membership_proofs: &[Option<MembershipProof>],
+    pre_states: Vec<AccountWithMetadata>,
+    instruction_data: InstructionData,
+    visibility_mask: Vec<u8>,
+    private_account_nonces: Vec<u128>,
+    private_account_keys: Vec<(NullifierPublicKey, SharedSecretKey)>,
+    private_account_nsks: Vec<NullifierSecretKey>,
+    private_account_membership_proofs: Vec<Option<MembershipProof>>,
     program_with_dependencies: &ProgramWithDependencies,
 ) -> Result<(PrivacyPreservingCircuitOutput, Proof), NssaError> {
-    let mut program = &program_with_dependencies.program;
-    let dependencies = &program_with_dependencies.dependencies;
-    let mut instruction_data = instruction_data.clone();
-    let mut pre_states = pre_states.to_vec();
+    let ProgramWithDependencies {
+        program,
+        dependencies,
+    } = program_with_dependencies;
     let mut env_builder = ExecutorEnv::builder();
     let mut program_outputs = Vec::new();
 
-    for _i in 0..MAX_NUMBER_CHAINED_CALLS {
-        let inner_receipt = execute_and_prove_program(program, &pre_states, &instruction_data)?;
+    let initial_call = ChainedCall {
+        program_id: program.id(),
+        instruction_data: instruction_data.clone(),
+        pre_states,
+        pda_seeds: vec![],
+    };
+
+    let mut chained_calls = VecDeque::from_iter([(initial_call, program)]);
+    let mut chain_calls_counter = 0;
+    while let Some((chained_call, program)) = chained_calls.pop_front() {
+        if chain_calls_counter >= MAX_NUMBER_CHAINED_CALLS {
+            return Err(NssaError::MaxChainedCallsDepthExceeded);
+        }
+
+        let inner_receipt = execute_and_prove_program(
+            program,
+            &chained_call.pre_states,
+            &chained_call.instruction_data,
+        )?;
 
         let program_output: ProgramOutput = inner_receipt
             .journal
@@ -76,39 +93,23 @@ pub fn execute_and_prove(
         // Prove circuit.
         env_builder.add_assumption(inner_receipt);
 
-        // TODO: Remove when multi-chain calls are supported in the circuit
-        assert!(program_output.chained_calls.len() <= 1);
-        // TODO: Modify when multi-chain calls are supported in the circuit
-        if let Some(next_call) = program_output.chained_calls.first() {
-            program = dependencies
-                .get(&next_call.program_id)
+        for new_call in program_output.chained_calls.into_iter().rev() {
+            let next_program = dependencies
+                .get(&new_call.program_id)
                 .ok_or(NssaError::InvalidProgramBehavior)?;
-            instruction_data = next_call.instruction_data.clone();
-            // Build post states with metadata for next call
-            let mut post_states_with_metadata = Vec::new();
-            for (pre, post) in program_output
-                .pre_states
-                .iter()
-                .zip(program_output.post_states)
-            {
-                let mut post_with_metadata = pre.clone();
-                post_with_metadata.account = post.account().clone();
-                post_states_with_metadata.push(post_with_metadata);
-            }
-
-            pre_states = next_call.pre_states.clone();
-        } else {
-            break;
+            chained_calls.push_front((new_call, next_program));
         }
+
+        chain_calls_counter += 1;
     }
 
     let circuit_input = PrivacyPreservingCircuitInput {
         program_outputs,
-        visibility_mask: visibility_mask.to_vec(),
-        private_account_nonces: private_account_nonces.to_vec(),
-        private_account_keys: private_account_keys.to_vec(),
-        private_account_nsks: private_account_nsks.to_vec(),
-        private_account_membership_proofs: private_account_membership_proofs.to_vec(),
+        visibility_mask,
+        private_account_nonces,
+        private_account_keys,
+        private_account_nsks,
+        private_account_membership_proofs,
         program_id: program_with_dependencies.program.id(),
     };
 
@@ -215,13 +216,13 @@ mod tests {
         let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
 
         let (output, proof) = execute_and_prove(
-            &[sender, recipient],
-            &Program::serialize_instruction(balance_to_move).unwrap(),
-            &[0, 2],
-            &[0xdeadbeef],
-            &[(recipient_keys.npk(), shared_secret)],
-            &[],
-            &[None],
+            vec![sender, recipient],
+            Program::serialize_instruction(balance_to_move).unwrap(),
+            vec![0, 2],
+            vec![0xdeadbeef],
+            vec![(recipient_keys.npk(), shared_secret)],
+            vec![],
+            vec![None],
             &Program::authenticated_transfer_program().into(),
         )
         .unwrap();
@@ -311,16 +312,16 @@ mod tests {
         let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.ivk());
 
         let (output, proof) = execute_and_prove(
-            &[sender_pre.clone(), recipient],
-            &Program::serialize_instruction(balance_to_move).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![sender_pre.clone(), recipient],
+            Program::serialize_instruction(balance_to_move).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (sender_keys.npk(), shared_secret_1),
                 (recipient_keys.npk(), shared_secret_2),
             ],
-            &[sender_keys.nsk],
-            &[commitment_set.get_proof_for(&commitment_sender), None],
+            vec![sender_keys.nsk],
+            vec![commitment_set.get_proof_for(&commitment_sender), None],
             &program.into(),
         )
         .unwrap();

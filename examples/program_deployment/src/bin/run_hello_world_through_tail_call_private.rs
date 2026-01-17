@@ -58,7 +58,7 @@ async fn main() {
     wallet_core
         .send_privacy_preserving_tx(
             accounts,
-            &Program::serialize_instruction(instruction).unwrap(),
+            Program::serialize_instruction(instruction).unwrap(),
             &program_with_dependencies,
         )
         .await

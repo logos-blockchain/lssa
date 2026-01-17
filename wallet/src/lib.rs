@@ -375,7 +375,7 @@ impl WalletCore {
     pub async fn send_privacy_preserving_tx(
         &self,
         accounts: Vec<PrivacyPreservingAccount>,
-        instruction_data: &InstructionData,
+        instruction_data: InstructionData,
         program: &ProgramWithDependencies,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
         self.send_privacy_preserving_tx_with_pre_check(accounts, instruction_data, program, |_| {
@@ -387,7 +387,7 @@ impl WalletCore {
     pub async fn send_privacy_preserving_tx_with_pre_check(
         &self,
         accounts: Vec<PrivacyPreservingAccount>,
-        instruction_data: &InstructionData,
+        instruction_data: InstructionData,
         program: &ProgramWithDependencies,
         tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
@@ -403,16 +403,16 @@ impl WalletCore {
 
         let private_account_keys = acc_manager.private_account_keys();
         let (output, proof) = nssa::privacy_preserving_transaction::circuit::execute_and_prove(
-            &pre_states,
+            pre_states,
             instruction_data,
-            acc_manager.visibility_mask(),
-            &produce_random_nonces(private_account_keys.len()),
-            &private_account_keys
+            acc_manager.visibility_mask().to_vec(),
+            produce_random_nonces(private_account_keys.len()),
+            private_account_keys
                 .iter()
                 .map(|keys| (keys.npk.clone(), keys.ssk))
                 .collect::<Vec<_>>(),
-            &acc_manager.private_account_auth(),
-            &acc_manager.private_account_membership_proofs(),
+            acc_manager.private_account_auth(),
+            acc_manager.private_account_membership_proofs(),
             &program.to_owned(),
         )
         .unwrap();
