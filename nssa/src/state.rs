@@ -504,6 +504,7 @@ pub mod tests {
             self.insert_program(Program::chain_caller());
             self.insert_program(Program::amm());
             self.insert_program(Program::claimer());
+            self.insert_program(Program::changer_claimer());
             self
         }
 
@@ -4368,6 +4369,108 @@ pub mod tests {
         );
 
         assert!(matches!(res, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_public_changer_claimer_no_data_change_no_claim_succeeds() {
+        let initial_data = [];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let account_id = AccountId::new([1; 32]);
+        let program_id = Program::changer_claimer().id();
+        // Don't change data (None) and don't claim (false)
+        let instruction: (Option<Vec<u8>>, bool) = (None, false);
+
+        let message =
+            public_transaction::Message::try_new(program_id, vec![account_id], vec![], instruction)
+                .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+
+        // Should succeed - no changes made, no claim needed
+        assert!(result.is_ok());
+        // Account should remain default/unclaimed
+        assert_eq!(state.get_account_by_id(&account_id), Account::default());
+    }
+
+    #[test]
+    fn test_public_changer_claimer_data_change_no_claim_fails() {
+        let initial_data = [];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let account_id = AccountId::new([1; 32]);
+        let program_id = Program::changer_claimer().id();
+        // Change data but don't claim (false) - should fail
+        let new_data = vec![1, 2, 3, 4, 5];
+        let instruction: (Option<Vec<u8>>, bool) = (Some(new_data), false);
+
+        let message =
+            public_transaction::Message::try_new(program_id, vec![account_id], vec![], instruction)
+                .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+
+        // Should fail - cannot modify data without claiming the account
+        assert!(matches!(result, Err(NssaError::InvalidProgramBehavior)));
+    }
+
+    #[test]
+    fn test_private_changer_claimer_no_data_change_no_claim_succeeds() {
+        let program = Program::changer_claimer();
+        let sender_keys = test_private_account_keys_1();
+        let private_account =
+            AccountWithMetadata::new(Account::default(), true, &sender_keys.npk());
+        // Don't change data (None) and don't claim (false)
+        let instruction: (Option<Vec<u8>>, bool) = (None, false);
+
+        let result = execute_and_prove(
+            vec![private_account],
+            Program::serialize_instruction(instruction).unwrap(),
+            vec![1],
+            vec![2],
+            vec![(
+                sender_keys.npk(),
+                SharedSecretKey::new(&[3; 32], &sender_keys.ivk()),
+            )],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
+            &program.into(),
+        );
+
+        // Should succeed - no changes made, no claim needed
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_private_changer_claimer_data_change_no_claim_fails() {
+        let program = Program::changer_claimer();
+        let sender_keys = test_private_account_keys_1();
+        let private_account =
+            AccountWithMetadata::new(Account::default(), true, &sender_keys.npk());
+        // Change data but don't claim (false) - should fail
+        let new_data = vec![1, 2, 3, 4, 5];
+        let instruction: (Option<Vec<u8>>, bool) = (Some(new_data), false);
+
+        let result = execute_and_prove(
+            vec![private_account],
+            Program::serialize_instruction(instruction).unwrap(),
+            vec![1],
+            vec![2],
+            vec![(
+                sender_keys.npk(),
+                SharedSecretKey::new(&[3; 32], &sender_keys.ivk()),
+            )],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
+            &program.into(),
+        );
+
+        // Should fail - cannot modify data without claiming the account
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
     }
 
     #[test]

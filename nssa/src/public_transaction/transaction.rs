@@ -200,6 +200,22 @@ impl PublicTransaction {
             chain_calls_counter += 1;
         }
 
+        // Check that all modified uninitialized accounts where claimed
+        for post in state_diff.iter().filter_map(|(account_id, post)| {
+            let pre = state.get_account_by_id(account_id);
+            if pre.program_owner != DEFAULT_PROGRAM_ID {
+                return None;
+            }
+            if pre == *post {
+                return None;
+            }
+            Some(post)
+        }) {
+            if post.program_owner == DEFAULT_PROGRAM_ID {
+                return Err(NssaError::InvalidProgramBehavior);
+            }
+        }
+
         Ok(state_diff)
     }
 }
