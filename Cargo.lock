@@ -2939,7 +2939,6 @@ dependencies = [
  "env_logger",
  "futures",
  "hex",
- "indexer",
  "key_protocol",
  "log",
  "nssa",
