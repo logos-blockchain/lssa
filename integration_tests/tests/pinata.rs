@@ -112,7 +112,10 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
     // Create new private account
     let result = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Private { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Private {
+            cci: None,
+            label: None,
+        })),
     )
     .await?;
     let SubcommandReturnValue::RegisterAccount {
