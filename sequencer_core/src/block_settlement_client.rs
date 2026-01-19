@@ -87,9 +87,8 @@ impl BlockSettlementClient {
             .post_transaction(self.bedrock_node_url.clone(), tx.clone())
             .await?;
 
-        match tx.mantle_tx.ops.first() {
-            Some(Op::ChannelInscribe(inscribe)) => self.last_message_id = inscribe.id(),
-            _ => {}
+        if let Some(Op::ChannelInscribe(inscribe)) = tx.mantle_tx.ops.first() {
+            self.last_message_id = inscribe.id();
         }
 
         Ok(block_data.block_id)
