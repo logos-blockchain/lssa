@@ -93,6 +93,9 @@ Generated new account with account_id Public/BzdBoL4JRa5M873cuWb9rbYgASr1pXyaAZ1
 ```
 The relevant part is the account id `BzdBoL4JRa5M873cuWb9rbYgASr1pXyaAZ1YW9ertWH9`
 
+> [!NOTE]
+> You can optionally assign a label to the account for easier identification using the `--label` option: `wallet account new public --label "my-account"`. Labels must be unique across all accounts.
+
 ## Check the account state
 New accounts are always Uninitialized. Verify:
 ```bash
@@ -268,6 +271,9 @@ You'll see an output similar to:
 Generated new account with account_id Private/7EDHyxejuynBpmbLuiEym9HMUyCYxZDuF8X3B89ADeMr at path /0
 ```
 The relevant part for this tutorial is the account id `7EDHyxejuynBpmbLuiEym9HMUyCYxZDuF8X3B89ADeMr`
+
+> [!NOTE]
+> As with public accounts, you can use the `--label` option to assign a label: `wallet account new private --label "my-private-account"`.
 
 You can check it's uninitialized with 
 

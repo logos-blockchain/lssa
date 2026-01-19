@@ -51,7 +51,10 @@ async fn successful_transfer_to_existing_account() -> Result<()> {
 pub async fn successful_transfer_to_new_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None }));
+    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+        cci: None,
+        label: None,
+    }));
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command)
         .await
@@ -212,7 +215,10 @@ async fn two_consecutive_successful_transfers() -> Result<()> {
 async fn initialize_public_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None }));
+    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+        cci: None,
+        label: None,
+    }));
     let result = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
     let SubcommandReturnValue::RegisterAccount { account_id } = result else {
         anyhow::bail!("Expected RegisterAccount return value");

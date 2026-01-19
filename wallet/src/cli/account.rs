@@ -58,12 +58,18 @@ pub enum NewSubcommand {
         #[arg(long)]
         /// Chain index of a parent node
         cci: Option<ChainIndex>,
+        #[arg(short, long)]
+        /// Label to assign to the new account
+        label: Option<String>,
     },
     /// Register new private account
     Private {
         #[arg(long)]
         /// Chain index of a parent node
         cci: Option<ChainIndex>,
+        #[arg(short, long)]
+        /// Label to assign to the new account
+        label: Option<String>,
     },
 }
 
@@ -73,7 +79,17 @@ impl WalletSubcommand for NewSubcommand {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            NewSubcommand::Public { cci } => {
+            NewSubcommand::Public { cci, label } => {
+                if let Some(ref label) = label
+                    && wallet_core
+                        .storage
+                        .labels
+                        .values()
+                        .any(|l| l.to_string() == *label)
+                {
+                    anyhow::bail!("Label '{label}' is already in use by another account");
+                }
+
                 let (account_id, chain_index) = wallet_core.create_new_account_public(cci);
 
                 let private_key = wallet_core
@@ -84,6 +100,13 @@ impl WalletSubcommand for NewSubcommand {
 
                 let public_key = PublicKey::new_from_private_key(private_key);
 
+                if let Some(label) = label {
+                    wallet_core
+                        .storage
+                        .labels
+                        .insert(account_id.to_string(), Label::new(label));
+                }
+
                 println!(
                     "Generated new account with account_id Public/{account_id} at path {chain_index}"
                 );
@@ -93,8 +116,25 @@ impl WalletSubcommand for NewSubcommand {
 
                 Ok(SubcommandReturnValue::RegisterAccount { account_id })
             }
-            NewSubcommand::Private { cci } => {
+            NewSubcommand::Private { cci, label } => {
+                if let Some(ref label) = label
+                    && wallet_core
+                        .storage
+                        .labels
+                        .values()
+                        .any(|l| l.to_string() == *label)
+                {
+                    anyhow::bail!("Label '{label}' is already in use by another account");
+                }
+
                 let (account_id, chain_index) = wallet_core.create_new_account_private(cci);
+
+                if let Some(label) = label {
+                    wallet_core
+                        .storage
+                        .labels
+                        .insert(account_id.to_string(), Label::new(label));
+                }
 
                 let (key, _) = wallet_core
                     .storage
@@ -378,6 +418,20 @@ impl WalletSubcommand for AccountSubcommand {
             }
             AccountSubcommand::Label { account_id, label } => {
                 let (account_id_str, _) = parse_addr_with_privacy_prefix(&account_id)?;
+
+                // Check if label is already used by a different account
+                if let Some(existing_account) = wallet_core
+                    .storage
+                    .labels
+                    .iter()
+                    .find(|(_, l)| l.to_string() == label)
+                    .map(|(a, _)| a.clone())
+                    && existing_account != account_id_str
+                {
+                    anyhow::bail!(
+                        "Label '{label}' is already in use by account {existing_account}"
+                    );
+                }
 
                 let old_label = wallet_core
                     .storage

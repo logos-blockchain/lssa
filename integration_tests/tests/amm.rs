@@ -19,7 +19,10 @@ async fn amm_public() -> Result<()> {
         account_id: definition_account_id_1,
     } = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: None,
+            label: None,
+        })),
     )
     .await?
     else {
@@ -31,7 +34,10 @@ async fn amm_public() -> Result<()> {
         account_id: supply_account_id_1,
     } = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: None,
+            label: None,
+        })),
     )
     .await?
     else {
@@ -43,7 +49,10 @@ async fn amm_public() -> Result<()> {
         account_id: recipient_account_id_1,
     } = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: None,
+            label: None,
+        })),
     )
     .await?
     else {
@@ -55,7 +64,10 @@ async fn amm_public() -> Result<()> {
         account_id: definition_account_id_2,
     } = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: None,
+            label: None,
+        })),
     )
     .await?
     else {
@@ -67,7 +79,10 @@ async fn amm_public() -> Result<()> {
         account_id: supply_account_id_2,
     } = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: None,
+            label: None,
+        })),
     )
     .await?
     else {
@@ -79,7 +94,10 @@ async fn amm_public() -> Result<()> {
         account_id: recipient_account_id_2,
     } = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: None,
+            label: None,
+        })),
     )
     .await?
     else {
@@ -144,7 +162,10 @@ async fn amm_public() -> Result<()> {
         account_id: user_holding_lp,
     } = wallet::cli::execute_subcommand(
         ctx.wallet_mut(),
-        Command::Account(AccountSubcommand::New(NewSubcommand::Public { cci: None })),
+        Command::Account(AccountSubcommand::New(NewSubcommand::Public {
+            cci: None,
+            label: None,
+        })),
     )
     .await?
     else {
