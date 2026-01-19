@@ -24,6 +24,7 @@ async fn restore_keys_from_seed() -> Result<()> {
     // Create first private account at root
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
         cci: Some(ChainIndex::root()),
+        label: None,
     }));
     let result = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
     let SubcommandReturnValue::RegisterAccount {
@@ -36,6 +37,7 @@ async fn restore_keys_from_seed() -> Result<()> {
     // Create second private account at /0
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
         cci: Some(ChainIndex::from_str("/0")?),
+        label: None,
     }));
     let result = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
     let SubcommandReturnValue::RegisterAccount {
@@ -70,6 +72,7 @@ async fn restore_keys_from_seed() -> Result<()> {
     // Create first public account at root
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
         cci: Some(ChainIndex::root()),
+        label: None,
     }));
     let result = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
     let SubcommandReturnValue::RegisterAccount {
@@ -82,6 +85,7 @@ async fn restore_keys_from_seed() -> Result<()> {
     // Create second public account at /0
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
         cci: Some(ChainIndex::from_str("/0")?),
+        label: None,
     }));
     let result = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
     let SubcommandReturnValue::RegisterAccount {
