@@ -323,9 +323,9 @@ impl JsonHandler {
 
         let last_block = {
             if let Some(indexer_state) = &self.indexer_state {
-                let state = indexer_state.lock().await;
+                let last_seen_block = indexer_state.latest_seen_block.read().await;
 
-                *state.state.latest_seen_block.read().await
+                *last_seen_block
             } else {
                 0
             }
@@ -474,12 +474,11 @@ mod tests {
             .unwrap();
 
         let sequencer_core = Arc::new(Mutex::new(sequencer_core));
-        let indexer_core = Arc::new(Mutex::new(indexer_core));
 
         (
             JsonHandler {
                 sequencer_state: sequencer_core,
-                indexer_state: Some(indexer_core),
+                indexer_state: Some(indexer_core.state.clone()),
                 mempool_handle,
             },
             initial_accounts,

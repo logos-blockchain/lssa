@@ -6,7 +6,7 @@ use bedrock_client::BasicAuthCredentials;
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
 use indexer::IndexerCore;
-use log::info;
+use log::{error, info};
 use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -59,14 +59,14 @@ pub async fn startup_sequencer(
 
     info!("Sequencer core set up");
 
-    let indexer_core_wrapped = indexer_core.map(|core| Arc::new(Mutex::new(core)));
+    let indexer_state_wrapped = indexer_core.as_ref().map(|core| core.state.clone());
     let seq_core_wrapped = Arc::new(Mutex::new(sequencer_core));
 
     let (http_server, addr) = new_http_server(
         RpcConfig::with_port(port),
         Arc::clone(&seq_core_wrapped),
         mempool_handle,
-        indexer_core_wrapped.clone(),
+        indexer_state_wrapped,
     )?;
     info!("HTTP server started");
     let http_server_handle = http_server.handle();
@@ -94,13 +94,11 @@ pub async fn startup_sequencer(
         }
     });
 
-    let indexer_loop_handle = indexer_core_wrapped.map(|indexer_core_wrapped| {
+    let indexer_loop_handle = indexer_core.map(|indexer_core| {
         tokio::spawn(async move {
-            {
-                let indexer_guard = indexer_core_wrapped.lock().await;
-                let res = indexer_guard.subscribe_parse_block_stream().await;
-
-                info!("Indexer loop res is {res:#?}");
+            match indexer_core.subscribe_parse_block_stream().await {
+                Ok(()) => unreachable!(),
+                Err(err) => error!("Indexer loop failed with error: {err:#?}"),
             }
 
             Ok(())

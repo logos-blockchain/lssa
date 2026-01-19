@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
 use common::block::HashableBlockData;
-use futures::StreamExt;
-use log::info;
+use futures::{StreamExt, TryFutureExt};
+use log::{info, warn};
 use nomos_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
@@ -74,6 +74,7 @@ impl IndexerCore {
                     self.bedrock_client
                         .0
                         .get_block_by_id(self.bedrock_url.clone(), header_id)
+                        .inspect_err(|err| warn!("Block fetching failed with err: {err:#?}"))
                 })
                 .await?
                 {
