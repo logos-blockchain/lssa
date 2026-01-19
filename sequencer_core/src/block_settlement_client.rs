@@ -18,6 +18,7 @@ pub struct BlockSettlementClient {
     bedrock_client: BedrockClient,
     bedrock_signing_key: Ed25519Key,
     bedrock_channel_id: ChannelId,
+    last_message_id: MsgId,
 }
 
 impl BlockSettlementClient {
@@ -34,11 +35,12 @@ impl BlockSettlementClient {
             bedrock_client,
             bedrock_signing_key,
             bedrock_channel_id,
+            last_message_id: MsgId::from([0; 32]),
         }
     }
 
     /// Create and sign a transaction for inscribing data
-    pub fn create_inscribe_tx(&self, data: Vec<u8>, parent: MsgId) -> SignedMantleTx {
+    pub fn create_inscribe_tx(&self, data: Vec<u8>) -> SignedMantleTx {
         let verifying_key_bytes = self.bedrock_signing_key.public_key().to_bytes();
         let verifying_key =
             Ed25519PublicKey::from_bytes(&verifying_key_bytes).expect("valid ed25519 public key");
@@ -46,7 +48,7 @@ impl BlockSettlementClient {
         let inscribe_op = InscriptionOp {
             channel_id: self.bedrock_channel_id,
             inscription: data,
-            parent,
+            parent: self.last_message_id,
             signer: verifying_key,
         };
 
@@ -75,22 +77,20 @@ impl BlockSettlementClient {
     }
 
     /// Post a transaction to the node and wait for inclusion
-    pub async fn post_and_wait(&self, block_data: &HashableBlockData) -> Result<u64> {
-        let msg_id: MsgId = {
-            let mut this = [0; 32];
-            // Bandaid solution
-            this[0..8].copy_from_slice(&(block_data.block_id - 2).to_le_bytes());
-            this.into()
-        };
-
+    pub async fn post_and_wait(&mut self, block_data: &HashableBlockData) -> Result<u64> {
         let inscription_data = borsh::to_vec(&block_data)?;
-        let tx = self.create_inscribe_tx(inscription_data, msg_id);
+        let tx = self.create_inscribe_tx(inscription_data);
 
         // Post the transaction
         self.bedrock_client
             .0
             .post_transaction(self.bedrock_node_url.clone(), tx.clone())
             .await?;
+
+        match tx.mantle_tx.ops.first() {
+            Some(Op::ChannelInscribe(inscribe)) => self.last_message_id = inscribe.id(),
+            _ => {}
+        }
 
         Ok(block_data.block_id)
     }

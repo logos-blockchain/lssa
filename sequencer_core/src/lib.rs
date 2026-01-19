@@ -157,7 +157,7 @@ impl SequencerCore {
     pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
         let block_data = self.produce_new_block_with_mempool_transactions()?;
 
-        if let Some(block_settlement) = &self.block_settlement_client {
+        if let Some(block_settlement) = self.block_settlement_client.as_mut() {
             block_settlement.post_and_wait(&block_data).await?;
             log::info!("Posted block data to Bedrock");
         }
