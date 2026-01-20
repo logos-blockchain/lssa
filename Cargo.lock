@@ -4748,6 +4748,7 @@ dependencies = [
  "async-stream",
  "base58",
  "base64 0.22.1",
+ "bip39",
  "borsh",
  "bytemuck",
  "clap",
