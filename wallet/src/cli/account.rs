@@ -342,7 +342,7 @@ impl WalletSubcommand for AccountSubcommand {
                                 .iter()
                                 .map(|(id, chain_index)| format!("{chain_index} Private/{id}")),
                         )
-                        .format(",\n");
+                        .format("\n");
 
                     println!("{accounts}");
                     return Ok(SubcommandReturnValue::Empty);
