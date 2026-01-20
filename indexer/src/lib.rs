@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
@@ -45,6 +45,7 @@ impl IndexerCore {
             // No state setup for now, future task.
             state: IndexerState {
                 latest_seen_block: Arc::new(RwLock::new(0)),
+                finality_map: Arc::new(RwLock::new(HashMap::new())),
             },
         })
     }
@@ -93,7 +94,7 @@ impl IndexerCore {
                         }
 
                         // Sending data into sequencer, may need to be expanded.
-                        let message = IndexerToSequencerMessage::BlockObserved {
+                        let message = IndexerToSequencerMessage::FinalizedBlockObserved {
                             l1_block_id: block_info.height,
                             l2_block_height: l2_block.block_id,
                         };
