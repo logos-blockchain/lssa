@@ -12,7 +12,9 @@ use tokio::test;
 use wallet::cli::{
     Command, SubcommandReturnValue,
     account::{AccountSubcommand, NewSubcommand},
-    programs::native_token_transfer::AuthTransferSubcommand,
+    programs::{
+        ArgsReceiverMaybeUnowned, ArgsSenderOwned, native_token_transfer::AuthTransferSubcommand,
+    },
 };
 
 #[test]
@@ -47,20 +49,28 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Send to first private account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to_account_id1.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&to_account_id1.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 100,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
     // Send to second private account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to_account_id2.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&to_account_id2.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 101,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
@@ -93,20 +103,28 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Send to first public account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
-        to: Some(format_public_account_id(&to_account_id3.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(&to_account_id3.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 102,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
     // Send to second public account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
-        to: Some(format_public_account_id(&to_account_id4.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(&from.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(&to_account_id4.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 103,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
@@ -166,19 +184,27 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Test that restored accounts can send transactions
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&to_account_id1.to_string()),
-        to: Some(format_private_account_id(&to_account_id2.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_private_account_id(&to_account_id1.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&to_account_id2.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 10,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&to_account_id3.to_string()),
-        to: Some(format_public_account_id(&to_account_id4.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        sender: ArgsSenderOwned {
+            from: format_public_account_id(&to_account_id3.to_string()),
+        },
+        receiver: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(&to_account_id4.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 11,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;

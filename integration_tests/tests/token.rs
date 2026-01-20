@@ -12,7 +12,13 @@ use tokio::test;
 use wallet::cli::{
     Command, SubcommandReturnValue,
     account::{AccountSubcommand, NewSubcommand},
-    programs::token::TokenProgramAgnosticSubcommand,
+    programs::{
+        ArgsReceiverMaybeUnowned, ArgsSenderOwned,
+        token::{
+            ArgsDefinitionOwned, ArgsHolderMaybeUnowned, ArgsHolderOwned, ArgsSupplyOwned,
+            TokenProgramAgnosticSubcommand,
+        },
+    },
 };
 
 #[test]
@@ -60,8 +66,12 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Create new token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        },
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -110,10 +120,14 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Transfer 7 tokens from supply_acc to recipient_account_id
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id.to_string()),
-        to: Some(format_public_account_id(&recipient_account_id.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        from: ArgsSenderOwned {
+            from: format_public_account_id(&supply_account_id.to_string()),
+        },
+        to: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(&recipient_account_id.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 7,
     };
 
@@ -146,8 +160,12 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Burn 3 tokens from recipient_acc
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: format_public_account_id(&recipient_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id.to_string()),
+        },
+        holder: ArgsHolderOwned {
+            holder_account_id: format_public_account_id(&recipient_account_id.to_string()),
+        },
         amount: 3,
     };
 
@@ -182,10 +200,14 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Mint 10 tokens at recipient_acc
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: Some(format_public_account_id(&recipient_account_id.to_string())),
-        holder_npk: None,
-        holder_ipk: None,
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id.to_string()),
+        },
+        holder: ArgsHolderMaybeUnowned {
+            holder: Some(format_public_account_id(&recipient_account_id.to_string())),
+            holder_npk: None,
+            holder_ipk: None,
+        },
         amount: 10,
     };
 
@@ -271,8 +293,12 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     // Create new token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        },
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -306,10 +332,14 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     // Transfer 7 tokens from supply_acc to recipient_account_id
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        from: ArgsSenderOwned {
+            from: format_private_account_id(&supply_account_id.to_string()),
+        },
+        to: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&recipient_account_id.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 7,
     };
 
@@ -332,8 +362,12 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     // Burn 3 tokens from recipient_acc
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: format_private_account_id(&recipient_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id.to_string()),
+        },
+        holder: ArgsHolderOwned {
+            holder_account_id: format_private_account_id(&recipient_account_id.to_string()),
+        },
         amount: 3,
     };
 
@@ -415,8 +449,12 @@ async fn create_token_with_private_definition() -> Result<()> {
 
     // Create token with private definition
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_private_account_id(&definition_account_id.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        },
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -472,12 +510,16 @@ async fn create_token_with_private_definition() -> Result<()> {
 
     // Mint to public account
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
-        holder: Some(format_public_account_id(
-            &recipient_account_id_public.to_string(),
-        )),
-        holder_npk: None,
-        holder_ipk: None,
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_private_account_id(&definition_account_id.to_string()),
+        },
+        holder: ArgsHolderMaybeUnowned {
+            holder: Some(format_public_account_id(
+                &recipient_account_id_public.to_string(),
+            )),
+            holder_npk: None,
+            holder_ipk: None,
+        },
         amount: 10,
     };
 
@@ -511,12 +553,16 @@ async fn create_token_with_private_definition() -> Result<()> {
 
     // Mint to private account
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
-        holder: Some(format_private_account_id(
-            &recipient_account_id_private.to_string(),
-        )),
-        holder_npk: None,
-        holder_ipk: None,
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_private_account_id(&definition_account_id.to_string()),
+        },
+        holder: ArgsHolderMaybeUnowned {
+            holder: Some(format_private_account_id(
+                &recipient_account_id_private.to_string(),
+            )),
+            holder_npk: None,
+            holder_ipk: None,
+        },
         amount: 5,
     };
 
@@ -580,8 +626,12 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
 
     // Create token with both private definition and supply
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_private_account_id(&definition_account_id.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        },
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -628,10 +678,14 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
 
     // Transfer tokens
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        from: ArgsSenderOwned {
+            from: format_private_account_id(&supply_account_id.to_string()),
+        },
+        to: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&recipient_account_id.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 7,
     };
 
@@ -716,8 +770,12 @@ async fn shielded_token_transfer() -> Result<()> {
 
     // Create token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        },
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -729,13 +787,16 @@ async fn shielded_token_transfer() -> Result<()> {
 
     // Perform shielded transfer: public supply -> private recipient
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        from: ArgsSenderOwned {
+            from: format_public_account_id(&supply_account_id.to_string()),
+        },
+        to: ArgsReceiverMaybeUnowned {
+            to: Some(format_private_account_id(&recipient_account_id.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 7,
     };
-
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
 
     info!("Waiting for next block creation");
@@ -813,8 +874,12 @@ async fn deshielded_token_transfer() -> Result<()> {
 
     // Create token with private supply
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_public_account_id(&definition_account_id.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        },
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -826,10 +891,14 @@ async fn deshielded_token_transfer() -> Result<()> {
 
     // Perform deshielded transfer: private supply -> public recipient
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_public_account_id(&recipient_account_id.to_string())),
-        to_npk: None,
-        to_ipk: None,
+        from: ArgsSenderOwned {
+            from: format_private_account_id(&supply_account_id.to_string()),
+        },
+        to: ArgsReceiverMaybeUnowned {
+            to: Some(format_public_account_id(&recipient_account_id.to_string())),
+            to_npk: None,
+            to_ipk: None,
+        },
         amount: 7,
     };
 
@@ -897,8 +966,12 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
 
     // Create token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_private_account_id(&definition_account_id.to_string()),
+        },
+        supply: ArgsSupplyOwned {
+            supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        },
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -932,10 +1005,14 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
 
     // Mint using claiming path (foreign account)
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
-        holder: None,
-        holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
-        holder_ipk: Some(hex::encode(holder_keys.incoming_viewing_public_key.0)),
+        definition: ArgsDefinitionOwned {
+            definition_account_id: format_private_account_id(&definition_account_id.to_string()),
+        },
+        holder: ArgsHolderMaybeUnowned {
+            holder: None,
+            holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
+            holder_ipk: Some(hex::encode(holder_keys.incoming_viewing_public_key.0)),
+        },
         amount: 9,
     };
 

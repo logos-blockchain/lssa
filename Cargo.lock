@@ -4762,6 +4762,7 @@ dependencies = [
  "nssa",
  "nssa_core",
  "optfield",
+ "paste",
  "rand 0.8.5",
  "risc0-zkvm",
  "serde",
