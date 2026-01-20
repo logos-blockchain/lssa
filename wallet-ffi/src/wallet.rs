@@ -115,7 +115,7 @@ pub unsafe extern "C" fn wallet_ffi_create_new(
     };
 
     match WalletCore::new_init_storage(config_path, storage_path, None, password) {
-        Ok(core) => {
+        Ok((core, _mnemonic)) => {
             let wrapper = Box::new(WalletWrapper {
                 core: Mutex::new(core),
             });
