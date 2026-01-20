@@ -155,6 +155,8 @@ cargo install --path wallet --force
 
 Run `wallet help` to check everything went well.
 
+Some completion scripts exists, see the [completions](./completions/README.md) folder.
+
 ## Tutorial
 
 This tutorial walks you through creating accounts and executing NSSA programs in both public and private contexts.
