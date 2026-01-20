@@ -53,7 +53,7 @@ impl SequencerCore {
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let genesis_block = hashable_data.into_block(&signing_key);
+        let genesis_block = hashable_data.into_pending_block(&signing_key);
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
@@ -196,7 +196,7 @@ impl SequencerCore {
 
         let block = hashable_data
             .clone()
-            .into_block(self.block_store.signing_key());
+            .into_pending_block(self.block_store.signing_key());
 
         self.block_store.put_block_at_id(block)?;
 

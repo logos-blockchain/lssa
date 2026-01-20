@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use common::block::{Block, HashableBlockData};
+use common::block::Block;
 use error::DbError;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
@@ -26,6 +26,8 @@ pub const DB_META_FIRST_BLOCK_IN_DB_KEY: &str = "first_block_in_db";
 pub const DB_META_LAST_BLOCK_IN_DB_KEY: &str = "last_block_in_db";
 /// Key base for storing metainformation which describe if first block has been set
 pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
+/// Key base for storing metainformation about the last finalized block on Bedrock
+pub const DB_META_LAST_FINALIZED_BLOCK_ID: &str = "last_finalized_block_id";
 
 /// Key base for storing snapshot which describe block id
 pub const DB_SNAPSHOT_BLOCK_ID_KEY: &str = "block_id";
@@ -75,6 +77,7 @@ impl RocksDBIO {
             dbio.put_meta_first_block_in_db(block)?;
             dbio.put_meta_is_first_block_set()?;
             dbio.put_meta_last_block_in_db(block_id)?;
+            dbio.put_meta_last_finalized_block_id(None)?;
 
             Ok(dbio)
         } else {
@@ -232,6 +235,28 @@ impl RocksDBIO {
         Ok(())
     }
 
+    pub fn put_meta_last_finalized_block_id(&self, block_id: Option<u64>) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        self.db
+            .put_cf(
+                &cf_meta,
+                borsh::to_vec(&DB_META_LAST_FINALIZED_BLOCK_ID).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize DB_META_LAST_FINALIZED_BLOCK_ID".to_string()),
+                    )
+                })?,
+                borsh::to_vec(&block_id).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize last block id".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
     pub fn put_meta_is_first_block_set(&self) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
@@ -269,7 +294,7 @@ impl RocksDBIO {
                         Some("Failed to serialize block id".to_string()),
                     )
                 })?,
-                borsh::to_vec(&HashableBlockData::from(block)).map_err(|err| {
+                borsh::to_vec(&block).map_err(|err| {
                     DbError::borsh_cast_message(
                         err,
                         Some("Failed to serialize block data".to_string()),
@@ -280,7 +305,7 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn get_block(&self, block_id: u64) -> DbResult<HashableBlockData> {
+    pub fn get_block(&self, block_id: u64) -> DbResult<Block> {
         let cf_block = self.block_column();
         let res = self
             .db
@@ -296,14 +321,12 @@ impl RocksDBIO {
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
         if let Some(data) = res {
-            Ok(
-                borsh::from_slice::<HashableBlockData>(&data).map_err(|serr| {
-                    DbError::borsh_cast_message(
-                        serr,
-                        Some("Failed to deserialize block data".to_string()),
-                    )
-                })?,
-            )
+            Ok(borsh::from_slice::<Block>(&data).map_err(|serr| {
+                DbError::borsh_cast_message(
+                    serr,
+                    Some("Failed to deserialize block data".to_string()),
+                )
+            })?)
         } else {
             Err(DbError::db_interaction_error(
                 "Block on this id not found".to_string(),
