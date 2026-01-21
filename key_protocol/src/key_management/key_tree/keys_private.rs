@@ -31,7 +31,7 @@ impl KeyNode for ChildKeysPrivate {
             .last_chunk::<32>()
             .expect("hash_value is 64 bytes, must be safe to get last 32");
 
-        //TODO: check these generations
+        // TODO: check these generations
         let nsk = ssk.generate_nullifier_secret_key();
         let vsk = ssk.generate_viewing_secret_key();
 

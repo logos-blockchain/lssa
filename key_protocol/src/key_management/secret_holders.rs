@@ -154,7 +154,7 @@ impl PrivateKeyHolder {
 mod tests {
     use super::*;
 
-    //TODO? are these necessary?
+    // TODO? are these necessary?
     #[test]
     fn seed_generation_test() {
         let seed_holder = SeedHolder::new_os_random();

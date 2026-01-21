@@ -57,11 +57,7 @@ impl Message {
     pub fn try_from_circuit_output(
         public_account_ids: Vec<AccountId>,
         nonces: Vec<Nonce>,
-        public_keys: Vec<(
-            NullifierPublicKey,
-            ViewingPublicKey,
-            EphemeralPublicKey,
-        )>,
+        public_keys: Vec<(NullifierPublicKey, ViewingPublicKey, EphemeralPublicKey)>,
         output: PrivacyPreservingCircuitOutput,
     ) -> Result<Self, NssaError> {
         if public_keys.len() != output.ciphertexts.len() {

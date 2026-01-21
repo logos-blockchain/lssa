@@ -270,7 +270,7 @@ pub mod tests {
     use nssa_core::{
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
         account::{Account, AccountId, AccountWithMetadata, Nonce, data::Data},
-        encryption::{EphemeralPublicKey, ViewingPublicKey, Scalar},
+        encryption::{EphemeralPublicKey, Scalar, ViewingPublicKey},
         program::{PdaSeed, ProgramId},
     };
 
