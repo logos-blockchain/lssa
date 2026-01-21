@@ -7,3 +7,4 @@ edition = "2024"
 reqwest.workspace = true
 anyhow.workspace = true
 common-http-client.workspace = true
+nomos-core.workspace = true
