@@ -17,7 +17,9 @@ pub(crate) struct WalletWrapper {
 }
 
 /// Helper to get the wallet wrapper from an opaque handle.
-pub(crate) fn get_wallet(handle: *mut WalletHandle) -> Result<&'static WalletWrapper, WalletFfiError> {
+pub(crate) fn get_wallet(
+    handle: *mut WalletHandle,
+) -> Result<&'static WalletWrapper, WalletFfiError> {
     if handle.is_null() {
         set_last_error("Null wallet handle");
         return Err(WalletFfiError::NullPointer);
@@ -27,7 +29,9 @@ pub(crate) fn get_wallet(handle: *mut WalletHandle) -> Result<&'static WalletWra
 
 /// Helper to get a mutable reference to the wallet wrapper.
 #[allow(dead_code)]
-pub(crate) fn get_wallet_mut(handle: *mut WalletHandle) -> Result<&'static mut WalletWrapper, WalletFfiError> {
+pub(crate) fn get_wallet_mut(
+    handle: *mut WalletHandle,
+) -> Result<&'static mut WalletWrapper, WalletFfiError> {
     if handle.is_null() {
         set_last_error("Null wallet handle");
         return Err(WalletFfiError::NullPointer);

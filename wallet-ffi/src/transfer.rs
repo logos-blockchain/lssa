@@ -1,6 +1,6 @@
 //! Token transfer functions.
 
-use std::ffi::{CString, c_ulonglong};
+use std::ffi::{c_ulonglong, CString};
 use std::ptr;
 
 use common::error::ExecutionFailureKind;

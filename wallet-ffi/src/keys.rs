@@ -147,9 +147,7 @@ pub extern "C" fn wallet_ffi_free_private_account_keys(keys: *mut FfiPrivateAcco
 
     unsafe {
         let keys = &*keys;
-        if !keys.incoming_viewing_public_key.is_null()
-            && keys.incoming_viewing_public_key_len > 0
-        {
+        if !keys.incoming_viewing_public_key.is_null() && keys.incoming_viewing_public_key_len > 0 {
             let slice = std::slice::from_raw_parts_mut(
                 keys.incoming_viewing_public_key as *mut u8,
                 keys.incoming_viewing_public_key_len,
