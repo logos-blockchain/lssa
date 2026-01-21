@@ -22,7 +22,7 @@ pub enum AuthTransferSubcommand {
     },
     /// Send native tokens from one account to another with variable privacy
     ///
-    /// If receiver is private, then `to` and (`to_npk` , `to_ipk`) is a mutually exclusive
+    /// If receiver is private, then `to` and (`to_npk` , `to_vpk`) is a mutually exclusive
     /// patterns.
     ///
     /// First is used for owned accounts, second otherwise.
@@ -36,9 +36,9 @@ pub enum AuthTransferSubcommand {
         /// to_npk - valid 32 byte hex string
         #[arg(long)]
         to_npk: Option<String>,
-        /// to_ipk - valid 33 byte hex string
+        /// to_vpk - valid 33 byte hex string
         #[arg(long)]
-        to_ipk: Option<String>,
+        to_vpk: Option<String>,
         /// amount - amount of balance to move
         #[arg(long)]
         amount: u128,
@@ -104,10 +104,10 @@ impl WalletSubcommand for AuthTransferSubcommand {
                 from,
                 to,
                 to_npk,
-                to_ipk,
+                to_vpk,
                 amount,
             } => {
-                let underlying_subcommand = match (to, to_npk, to_ipk) {
+                let underlying_subcommand = match (to, to_npk, to_vpk) {
                     (None, None, None) => {
                         anyhow::bail!(
                             "Provide either account account_id of receiver or their public keys"
@@ -156,7 +156,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                             }
                         }
                     }
-                    (None, Some(to_npk), Some(to_ipk)) => {
+                    (None, Some(to_npk), Some(to_vpk)) => {
                         let (from, from_privacy) = parse_addr_with_privacy_prefix(&from)?;
 
                         match from_privacy {
@@ -165,7 +165,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                                     NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
                                         from,
                                         to_npk,
-                                        to_ipk,
+                                        to_vpk,
                                         amount,
                                     },
                                 )
@@ -175,7 +175,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                                     NativeTokenTransferProgramSubcommandShielded::ShieldedForeign {
                                         from,
                                         to_npk,
-                                        to_ipk,
+                                        to_vpk,
                                         amount,
                                     },
                                 )
@@ -257,9 +257,9 @@ pub enum NativeTokenTransferProgramSubcommandShielded {
         /// to_npk - valid 32 byte hex string
         #[arg(long)]
         to_npk: String,
-        /// to_ipk - valid 33 byte hex string
+        /// to_vpk - valid 33 byte hex string
         #[arg(long)]
-        to_ipk: String,
+        to_vpk: String,
         /// amount - amount of balance to move
         #[arg(long)]
         amount: u128,
@@ -294,9 +294,9 @@ pub enum NativeTokenTransferProgramSubcommandPrivate {
         /// to_npk - valid 32 byte hex string
         #[arg(long)]
         to_npk: String,
-        /// to_ipk - valid 33 byte hex string
+        /// to_vpk - valid 33 byte hex string
         #[arg(long)]
-        to_ipk: String,
+        to_vpk: String,
         /// amount - amount of balance to move
         #[arg(long)]
         amount: u128,
@@ -340,7 +340,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
             NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
                 from,
                 to_npk,
-                to_ipk,
+                to_vpk,
                 amount,
             } => {
                 let from: AccountId = from.parse().unwrap();
@@ -349,14 +349,14 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                 to_npk.copy_from_slice(&to_npk_res);
                 let to_npk = nssa_core::NullifierPublicKey(to_npk);
 
-                let to_ipk_res = hex::decode(to_ipk)?;
-                let mut to_ipk = [0u8; 33];
-                to_ipk.copy_from_slice(&to_ipk_res);
-                let to_ipk =
-                    nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
+                let to_vpk_res = hex::decode(to_vpk)?;
+                let mut to_vpk = [0u8; 33];
+                to_vpk.copy_from_slice(&to_vpk_res);
+                let to_vpk =
+                    nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_vpk.to_vec());
 
                 let (res, [secret_from, _]) = NativeTokenTransfer(wallet_core)
-                    .send_private_transfer_to_outer_account(from, to_npk, to_ipk, amount)
+                    .send_private_transfer_to_outer_account(from, to_npk, to_vpk, amount)
                     .await?;
 
                 println!("Results of tx send are {res:#?}");
@@ -420,7 +420,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
             NativeTokenTransferProgramSubcommandShielded::ShieldedForeign {
                 from,
                 to_npk,
-                to_ipk,
+                to_vpk,
                 amount,
             } => {
                 let from: AccountId = from.parse().unwrap();
@@ -430,14 +430,14 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
                 to_npk.copy_from_slice(&to_npk_res);
                 let to_npk = nssa_core::NullifierPublicKey(to_npk);
 
-                let to_ipk_res = hex::decode(to_ipk)?;
-                let mut to_ipk = [0u8; 33];
-                to_ipk.copy_from_slice(&to_ipk_res);
-                let to_ipk =
-                    nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
+                let to_vpk_res = hex::decode(to_vpk)?;
+                let mut to_vpk = [0u8; 33];
+                to_vpk.copy_from_slice(&to_vpk_res);
+                let to_vpk =
+                    nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_vpk.to_vec());
 
                 let (res, _) = NativeTokenTransfer(wallet_core)
-                    .send_shielded_transfer_to_outer_account(from, to_npk, to_ipk, amount)
+                    .send_shielded_transfer_to_outer_account(from, to_npk, to_vpk, amount)
                     .await?;
 
                 println!("Results of tx send are {res:#?}");

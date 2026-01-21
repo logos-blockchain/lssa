@@ -13,12 +13,12 @@ pub struct EphemeralKeyHolder {
 }
 
 pub fn produce_one_sided_shared_secret_receiver(
-    ipk: &ViewingPublicKey,
+    vpk: &ViewingPublicKey,
 ) -> (SharedSecretKey, EphemeralPublicKey) {
     let mut esk = [0; 32];
     OsRng.fill_bytes(&mut esk);
     (
-        SharedSecretKey::new(&esk, ipk),
+        SharedSecretKey::new(&esk, vpk),
         EphemeralPublicKey::from_scalar(esk),
     )
 }
