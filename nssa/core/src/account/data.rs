@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub const DATA_MAX_LENGTH_IN_BYTES: usize = 100 * 1024; // 100 KiB
 
-#[derive(Default, Clone, PartialEq, Eq, Serialize, BorshSerialize)]
-#[cfg_attr(any(feature = "host", test), derive(Debug))]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, BorshSerialize)]
 pub struct Data(Vec<u8>);
 
 impl Data {

@@ -11,11 +11,13 @@ use tokio::test;
 use wallet::cli::{
     Command, SubcommandReturnValue,
     account::{AccountSubcommand, NewSubcommand},
-    programs::pinata::PinataProgramAgnosticSubcommand,
+    programs::{
+        native_token_transfer::AuthTransferSubcommand, pinata::PinataProgramAgnosticSubcommand,
+    },
 };
 
 #[test]
-async fn claim_pinata_to_public_account() -> Result<()> {
+async fn claim_pinata_to_existing_public_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
     let pinata_prize = 150;
@@ -120,8 +122,26 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
         anyhow::bail!("Expected RegisterAccount return value");
     };
 
+    let winner_account_id_formatted = format_private_account_id(&winner_account_id.to_string());
+
+    // Initialize account under auth transfer program
+    let command = Command::AuthTransfer(AuthTransferSubcommand::Init {
+        account_id: winner_account_id_formatted.clone(),
+    });
+    wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
+
+    info!("Waiting for next block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let new_commitment = ctx
+        .wallet()
+        .get_private_account_commitment(&winner_account_id)
+        .context("Failed to get private account commitment")?;
+    assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
+
+    // Claim pinata to the new private account
     let command = Command::Pinata(PinataProgramAgnosticSubcommand::Claim {
-        to: format_private_account_id(&winner_account_id.to_string()),
+        to: winner_account_id_formatted,
     });
 
     let pinata_balance_pre = ctx
