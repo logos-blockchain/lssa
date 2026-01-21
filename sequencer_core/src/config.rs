@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -56,7 +57,7 @@ pub struct BedrockConfig {
     /// Bedrock channel ID
     pub channel_id: [u8; 32],
     /// Bedrock Url
-    pub node_url: String,
+    pub node_url: Url,
 }
 
 impl SequencerConfig {

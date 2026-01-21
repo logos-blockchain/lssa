@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use bedrock_client::BedrockClient;
 use common::block::HashableBlockData;
 use key_management_system_service::keys::{ED25519_SECRET_KEY_SIZE, Ed25519Key, Ed25519PublicKey};
@@ -25,8 +25,7 @@ impl BlockSettlementClient {
     pub fn new(home: &Path, config: &BedrockConfig) -> Self {
         let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key"))
             .expect("Signing key should load or be created successfully");
-        let bedrock_node_url =
-            Url::parse(&config.node_url).expect("Bedrock URL should be a valid URL");
+        let bedrock_node_url = config.node_url.clone();
         let bedrock_channel_id = ChannelId::from(config.channel_id);
         let bedrock_client =
             BedrockClient::new(None).expect("Bedrock client should be able to initialize");
@@ -96,20 +95,17 @@ impl BlockSettlementClient {
 }
 
 /// Load signing key from file or generate a new one if it doesn't exist
-fn load_or_create_signing_key(path: &Path) -> Result<Ed25519Key, ()> {
+fn load_or_create_signing_key(path: &Path) -> Result<Ed25519Key> {
     if path.exists() {
-        let key_bytes = fs::read(path).map_err(|_| ())?;
-        if key_bytes.len() != ED25519_SECRET_KEY_SIZE {
-            // TODO: proper error
-            return Err(());
-        }
-        let key_array: [u8; ED25519_SECRET_KEY_SIZE] =
-            key_bytes.try_into().expect("length already checked");
+        let key_bytes = fs::read(path)?;
+        let key_array: [u8; ED25519_SECRET_KEY_SIZE] = key_bytes
+            .try_into()
+            .map_err(|_| anyhow!("Found key with incorrect length"))?;
         Ok(Ed25519Key::from_bytes(&key_array))
     } else {
         let mut key_bytes = [0u8; ED25519_SECRET_KEY_SIZE];
         rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut key_bytes);
-        fs::write(path, key_bytes).map_err(|_| ())?;
+        fs::write(path, key_bytes)?;
         Ok(Ed25519Key::from_bytes(&key_bytes))
     }
 }
