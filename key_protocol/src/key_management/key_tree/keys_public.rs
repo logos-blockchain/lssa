@@ -107,8 +107,9 @@ impl<'a> From<&'a ChildKeysPublic> for &'a nssa::PrivateKey {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use nssa::{PrivateKey, PublicKey};
+
+    use super::*;
 
     #[test]
     fn test_master_keys_generation() {
