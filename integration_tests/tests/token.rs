@@ -113,7 +113,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
         from: format_public_account_id(&supply_account_id.to_string()),
         to: Some(format_public_account_id(&recipient_account_id.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 
@@ -185,7 +185,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
         definition: format_public_account_id(&definition_account_id.to_string()),
         holder: Some(format_public_account_id(&recipient_account_id.to_string())),
         holder_npk: None,
-        holder_ipk: None,
+        holder_vpk: None,
         amount: 10,
     };
 
@@ -309,7 +309,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
         from: format_private_account_id(&supply_account_id.to_string()),
         to: Some(format_private_account_id(&recipient_account_id.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 
@@ -477,7 +477,7 @@ async fn create_token_with_private_definition() -> Result<()> {
             &recipient_account_id_public.to_string(),
         )),
         holder_npk: None,
-        holder_ipk: None,
+        holder_vpk: None,
         amount: 10,
     };
 
@@ -516,7 +516,7 @@ async fn create_token_with_private_definition() -> Result<()> {
             &recipient_account_id_private.to_string(),
         )),
         holder_npk: None,
-        holder_ipk: None,
+        holder_vpk: None,
         amount: 5,
     };
 
@@ -631,7 +631,7 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
         from: format_private_account_id(&supply_account_id.to_string()),
         to: Some(format_private_account_id(&recipient_account_id.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 
@@ -732,7 +732,7 @@ async fn shielded_token_transfer() -> Result<()> {
         from: format_public_account_id(&supply_account_id.to_string()),
         to: Some(format_private_account_id(&recipient_account_id.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 
@@ -829,7 +829,7 @@ async fn deshielded_token_transfer() -> Result<()> {
         from: format_private_account_id(&supply_account_id.to_string()),
         to: Some(format_public_account_id(&recipient_account_id.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 
@@ -935,7 +935,7 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
         definition: format_private_account_id(&definition_account_id.to_string()),
         holder: None,
         holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
-        holder_ipk: Some(hex::encode(holder_keys.incoming_viewing_public_key.0)),
+        holder_vpk: Some(hex::encode(holder_keys.viewing_public_key.0)),
         amount: 9,
     };
 

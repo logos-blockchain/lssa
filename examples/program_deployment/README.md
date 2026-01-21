@@ -219,7 +219,7 @@ This is the account that the program will claim and write data into.
 let bytecode: Vec<u8> = std::fs::read(program_path).unwrap();
 let program = Program::new(bytecode).unwrap();
 ```
-The Risc0 ELF is read from disk and wrapped in a Program object, which can be used to compute the program ID. The ID is used by the node to identify which program is invoked by the transaction.
+The Risc0 ELF is read from dvsk and wrapped in a Program object, which can be used to compute the program ID. The ID is used by the node to identify which program is invoked by the transaction.
 
 
 ### 4. Preparing the instruction data

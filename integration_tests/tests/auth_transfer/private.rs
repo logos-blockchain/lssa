@@ -27,7 +27,7 @@ async fn private_transfer_to_owned_account() -> Result<()> {
         from: format_private_account_id(&from.to_string()),
         to: Some(format_private_account_id(&to.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 
@@ -60,13 +60,13 @@ async fn private_transfer_to_foreign_account() -> Result<()> {
     let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
     let to_npk = NullifierPublicKey([42; 32]);
     let to_npk_string = hex::encode(to_npk.0);
-    let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
+    let to_vpk = Secp256k1Point::from_scalar(to_npk.0);
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
         from: format_private_account_id(&from.to_string()),
         to: None,
         to_npk: Some(to_npk_string),
-        to_ipk: Some(hex::encode(to_ipk.0)),
+        to_vpk: Some(hex::encode(to_vpk.0)),
         amount: 100,
     });
 
@@ -114,7 +114,7 @@ async fn deshielded_transfer_to_public_account() -> Result<()> {
         from: format_private_account_id(&from.to_string()),
         to: Some(format_public_account_id(&to.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 
@@ -172,12 +172,12 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
         .cloned()
         .context("Failed to get private account")?;
 
-    // Send to this account using claiming path (using npk and ipk instead of account ID)
+    // Send to this account using claiming path (using npk and vpk instead of account ID)
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
         from: format_private_account_id(&from.to_string()),
         to: None,
         to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
-        to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+        to_vpk: Some(hex::encode(to_keys.viewing_public_key.0)),
         amount: 100,
     });
 
@@ -225,7 +225,7 @@ async fn shielded_transfer_to_owned_private_account() -> Result<()> {
         from: format_public_account_id(&from.to_string()),
         to: Some(format_private_account_id(&to.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 
@@ -263,14 +263,14 @@ async fn shielded_transfer_to_foreign_account() -> Result<()> {
 
     let to_npk = NullifierPublicKey([42; 32]);
     let to_npk_string = hex::encode(to_npk.0);
-    let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
+    let to_vpk = Secp256k1Point::from_scalar(to_npk.0);
     let from: AccountId = ACC_SENDER.parse()?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
         from: format_public_account_id(&from.to_string()),
         to: None,
         to_npk: Some(to_npk_string),
-        to_ipk: Some(hex::encode(to_ipk.0)),
+        to_vpk: Some(hex::encode(to_vpk.0)),
         amount: 100,
     });
 
@@ -335,12 +335,12 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
         .cloned()
         .context("Failed to get private account")?;
 
-    // Send transfer using nullifier and incoming viewing public keys
+    // Send transfer using nullifier and  viewing public keys
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
         from: format_private_account_id(&from.to_string()),
         to: None,
         to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
-        to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+        to_vpk: Some(hex::encode(to_keys.viewing_public_key.0)),
         amount: 100,
     });
 

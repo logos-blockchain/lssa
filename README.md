@@ -362,10 +362,10 @@ wallet account new private
 # Output:
 Generated new account with account_id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
 With npk e6366f79d026c8bd64ae6b3d601f0506832ec682ab54897f205fffe64ec0d951
-With ipk 02ddc96d0eb56e00ce14994cfdaec5ae1f76244180a919545983156e3519940a17
+With vpk 02ddc96d0eb56e00ce14994cfdaec5ae1f76244180a919545983156e3519940a17
 ```
 
-For now, focus only on the account id. Ignore the `npk` and `ipk` values. These are the Nullifier public key and the Viewing public key. They are stored locally in the wallet and are used internally to build privacy-preserving transactions.
+For now, focus only on the account id. Ignore the `npk` and `vpk` values. These are the Nullifier public key and the Viewing public key. They are stored locally in the wallet and are used internally to build privacy-preserving transactions.
 Also, the account id for private accounts is derived from the `npk` value. But we won't need them now.
 
 Just like public accounts, new private accounts start out uninitialized:
@@ -439,16 +439,16 @@ wallet account new private
 # Output:
 Generated new account with account_id Private/AukXPRBmrYVqoqEW2HTs7N3hvTn3qdNFDcxDHVr5hMm5
 With npk 0c95ebc4b3830f53da77bb0b80a276a776cdcf6410932acc718dcdb3f788a00e
-With ipk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72
+With vpk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72
 ```
 
-Now we'll ignore the private account ID and focus on the `npk` and `ipk` values. We'll need this to send tokens to a foreign private account. Syntax is very similar.
+Now we'll ignore the private account ID and focus on the `npk` and `vpk` values. We'll need this to send tokens to a foreign private account. Syntax is very similar.
 
 ```bash
 wallet auth-transfer send \
     --from Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS \
     --to-npk 0c95ebc4b3830f53da77bb0b80a276a776cdcf6410932acc718dcdb3f788a00e \
-    --to-ipk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72 \
+    --to-vpk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72 \
     --amount 3
 ```
 
@@ -557,7 +557,7 @@ wallet account new private
 # Output:
 Generated new account with account_id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
 With npk 6a2dfe433cf28e525aa0196d719be3c16146f7ee358ca39595323f94fde38f93
-With ipk 03d59abf4bee974cc12ddb44641c19f0b5441fef39191f047c988c29a77252a577
+With vpk 03d59abf4bee974cc12ddb44641c19f0b5441fef39191f047c988c29a77252a577
 ```
 
 And we use them to create the token.

@@ -1,6 +1,6 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::{AccountId, program::Program};
-use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
+use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::ViewingPublicKey};
 
 use crate::{PrivacyPreservingAccount, WalletCore};
 
@@ -196,7 +196,7 @@ impl Token<'_> {
         &self,
         sender_account_id: AccountId,
         recipient_npk: NullifierPublicKey,
-        recipient_ipk: IncomingViewingPublicKey,
+        recipient_vpk: ViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
         let instruction = token_program_preparation_transfer(amount);
@@ -209,7 +209,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(sender_account_id),
                     PrivacyPreservingAccount::PrivateForeign {
                         npk: recipient_npk,
-                        ipk: recipient_ipk,
+                        vpk: recipient_vpk,
                     },
                 ],
                 instruction_data,
@@ -286,7 +286,7 @@ impl Token<'_> {
         &self,
         sender_account_id: AccountId,
         recipient_npk: NullifierPublicKey,
-        recipient_ipk: IncomingViewingPublicKey,
+        recipient_vpk: ViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let instruction = token_program_preparation_transfer(amount);
@@ -299,7 +299,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(sender_account_id),
                     PrivacyPreservingAccount::PrivateForeign {
                         npk: recipient_npk,
-                        ipk: recipient_ipk,
+                        vpk: recipient_vpk,
                     },
                 ],
                 instruction_data,
@@ -507,7 +507,7 @@ impl Token<'_> {
         &self,
         definition_account_id: AccountId,
         holder_npk: NullifierPublicKey,
-        holder_ipk: IncomingViewingPublicKey,
+        holder_vpk: ViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
         let instruction = token_program_preparation_mint(amount);
@@ -520,7 +520,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::PrivateOwned(definition_account_id),
                     PrivacyPreservingAccount::PrivateForeign {
                         npk: holder_npk,
-                        ipk: holder_ipk,
+                        vpk: holder_vpk,
                     },
                 ],
                 instruction_data,
@@ -597,7 +597,7 @@ impl Token<'_> {
         &self,
         definition_account_id: AccountId,
         holder_npk: NullifierPublicKey,
-        holder_ipk: IncomingViewingPublicKey,
+        holder_vpk: ViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let instruction = token_program_preparation_mint(amount);
@@ -610,7 +610,7 @@ impl Token<'_> {
                     PrivacyPreservingAccount::Public(definition_account_id),
                     PrivacyPreservingAccount::PrivateForeign {
                         npk: holder_npk,
-                        ipk: holder_ipk,
+                        vpk: holder_vpk,
                     },
                 ],
                 instruction_data,

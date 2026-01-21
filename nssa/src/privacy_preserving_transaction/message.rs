@@ -2,7 +2,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     Commitment, CommitmentSetDigest, Nullifier, NullifierPublicKey, PrivacyPreservingCircuitOutput,
     account::{Account, Nonce},
-    encryption::{Ciphertext, EphemeralPublicKey, IncomingViewingPublicKey},
+    encryption::{Ciphertext, EphemeralPublicKey, ViewingPublicKey},
 };
 use sha2::{Digest, Sha256};
 
@@ -21,10 +21,10 @@ impl EncryptedAccountData {
     fn new(
         ciphertext: Ciphertext,
         npk: NullifierPublicKey,
-        ivk: IncomingViewingPublicKey,
+        vpk: ViewingPublicKey,
         epk: EphemeralPublicKey,
     ) -> Self {
-        let view_tag = Self::compute_view_tag(npk, ivk);
+        let view_tag = Self::compute_view_tag(npk, vpk);
         Self {
             ciphertext,
             epk,
@@ -32,12 +32,12 @@ impl EncryptedAccountData {
         }
     }
 
-    /// Computes the tag as the first byte of SHA256("/NSSA/v0.2/ViewTag/" || Npk || Ivk)
-    pub fn compute_view_tag(npk: NullifierPublicKey, ivk: IncomingViewingPublicKey) -> ViewTag {
+    /// Computes the tag as the first byte of SHA256("/NSSA/v0.2/ViewTag/" || Npk || vpk)
+    pub fn compute_view_tag(npk: NullifierPublicKey, vpk: ViewingPublicKey) -> ViewTag {
         let mut hasher = Sha256::new();
         hasher.update(b"/NSSA/v0.2/ViewTag/");
         hasher.update(npk.to_byte_array());
-        hasher.update(ivk.to_bytes());
+        hasher.update(vpk.to_bytes());
         let digest: [u8; 32] = hasher.finalize().into();
         digest[0]
     }
@@ -59,7 +59,7 @@ impl Message {
         nonces: Vec<Nonce>,
         public_keys: Vec<(
             NullifierPublicKey,
-            IncomingViewingPublicKey,
+            ViewingPublicKey,
             EphemeralPublicKey,
         )>,
         output: PrivacyPreservingCircuitOutput,
@@ -74,8 +74,8 @@ impl Message {
             .ciphertexts
             .into_iter()
             .zip(public_keys)
-            .map(|(ciphertext, (npk, ivk, epk))| {
-                EncryptedAccountData::new(ciphertext, npk, ivk, epk)
+            .map(|(ciphertext, (npk, vpk, epk))| {
+                EncryptedAccountData::new(ciphertext, npk, vpk, epk)
             })
             .collect();
         Ok(Self {
@@ -94,7 +94,7 @@ pub mod tests {
     use nssa_core::{
         Commitment, EncryptionScheme, Nullifier, NullifierPublicKey, SharedSecretKey,
         account::Account,
-        encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
+        encryption::{EphemeralPublicKey, ViewingPublicKey},
     };
     use sha2::{Digest, Sha256};
 
@@ -142,21 +142,21 @@ pub mod tests {
     #[test]
     fn test_encrypted_account_data_constructor() {
         let npk = NullifierPublicKey::from(&[1; 32]);
-        let ivk = IncomingViewingPublicKey::from_scalar([2; 32]);
+        let vpk = ViewingPublicKey::from_scalar([2; 32]);
         let account = Account::default();
         let commitment = Commitment::new(&npk, &account);
         let esk = [3; 32];
-        let shared_secret = SharedSecretKey::new(&esk, &ivk);
+        let shared_secret = SharedSecretKey::new(&esk, &vpk);
         let epk = EphemeralPublicKey::from_scalar(esk);
         let ciphertext = EncryptionScheme::encrypt(&account, &shared_secret, &commitment, 2);
         let encrypted_account_data =
-            EncryptedAccountData::new(ciphertext.clone(), npk.clone(), ivk.clone(), epk.clone());
+            EncryptedAccountData::new(ciphertext.clone(), npk.clone(), vpk.clone(), epk.clone());
 
         let expected_view_tag = {
             let mut hasher = Sha256::new();
             hasher.update(b"/NSSA/v0.2/ViewTag/");
             hasher.update(npk.to_byte_array());
-            hasher.update(ivk.to_bytes());
+            hasher.update(vpk.to_bytes());
             let digest: [u8; 32] = hasher.finalize().into();
             digest[0]
         };
@@ -165,7 +165,7 @@ pub mod tests {
         assert_eq!(encrypted_account_data.epk, epk);
         assert_eq!(
             encrypted_account_data.view_tag,
-            EncryptedAccountData::compute_view_tag(npk, ivk)
+            EncryptedAccountData::compute_view_tag(npk, vpk)
         );
         assert_eq!(encrypted_account_data.view_tag, expected_view_tag);
     }

@@ -97,7 +97,7 @@ _wallet_auth_transfer() {
                         '--from[Source account ID]:from_account:_wallet_account_ids' \
                         '--to[Destination account ID (for owned accounts)]:to_account:_wallet_account_ids' \
                         '--to-npk[Destination nullifier public key (for foreign private accounts)]:npk:' \
-                        '--to-ipk[Destination viewing public key (for foreign private accounts)]:ipk:' \
+                        '--to-vpk[Destination viewing public key (for foreign private accounts)]:vpk:' \
                         '--amount[Amount of native tokens to send]:amount:'
                     ;;
             esac
@@ -163,7 +163,7 @@ _wallet_account() {
                 get)
                     _arguments \
                         '(-r --raw)'{-r,--raw}'[Get raw account data]' \
-                        '(-k --keys)'{-k,--keys}'[Display keys (pk for public accounts, npk/ipk for private accounts)]' \
+                        '(-k --keys)'{-k,--keys}'[Display keys (pk for public accounts, npk/vpk for private accounts)]' \
                         '(-a --account-id)'{-a,--account-id}'[Account ID to query]:account_id:_wallet_account_ids'
                     ;;
                 list|ls)
@@ -249,7 +249,7 @@ _wallet_token() {
                         '--from[Source holding account ID]:from_account:_wallet_account_ids' \
                         '--to[Destination holding account ID (for owned accounts)]:to_account:_wallet_account_ids' \
                         '--to-npk[Destination nullifier public key (for foreign private accounts)]:npk:' \
-                        '--to-ipk[Destination viewing public key (for foreign private accounts)]:ipk:' \
+                        '--to-vpk[Destination viewing public key (for foreign private accounts)]:vpk:' \
                         '--amount[Amount of tokens to send]:amount:'
                     ;;
                 burn)
@@ -263,7 +263,7 @@ _wallet_token() {
                         '--definition[Definition account ID]:definition_account:_wallet_account_ids' \
                         '--holder[Holder account ID (for owned accounts)]:holder_account:_wallet_account_ids' \
                         '--holder-npk[Holder nullifier public key (for foreign private accounts)]:npk:' \
-                        '--holder-ipk[Holder viewing public key (for foreign private accounts)]:ipk:' \
+                        '--holder-vpk[Holder viewing public key (for foreign private accounts)]:vpk:' \
                         '--amount[Amount of tokens to mint]:amount:'
                     ;;
             esac

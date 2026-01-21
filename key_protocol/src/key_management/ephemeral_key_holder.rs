@@ -1,6 +1,6 @@
 use nssa_core::{
     NullifierPublicKey, SharedSecretKey,
-    encryption::{EphemeralPublicKey, EphemeralSecretKey, IncomingViewingPublicKey},
+    encryption::{EphemeralPublicKey, EphemeralSecretKey, ViewingPublicKey},
 };
 use rand::{RngCore, rngs::OsRng};
 use sha2::Digest;
@@ -13,7 +13,7 @@ pub struct EphemeralKeyHolder {
 }
 
 pub fn produce_one_sided_shared_secret_receiver(
-    ipk: &IncomingViewingPublicKey,
+    ipk: &ViewingPublicKey,
 ) -> (SharedSecretKey, EphemeralPublicKey) {
     let mut esk = [0; 32];
     OsRng.fill_bytes(&mut esk);
@@ -42,11 +42,8 @@ impl EphemeralKeyHolder {
 
     pub fn calculate_shared_secret_sender(
         &self,
-        receiver_incoming_viewing_public_key: &IncomingViewingPublicKey,
+        receiver_viewing_public_key: &ViewingPublicKey,
     ) -> SharedSecretKey {
-        SharedSecretKey::new(
-            &self.ephemeral_secret_key,
-            receiver_incoming_viewing_public_key,
-        )
+        SharedSecretKey::new(&self.ephemeral_secret_key, receiver_viewing_public_key)
     }
 }
