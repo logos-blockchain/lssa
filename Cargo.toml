@@ -85,6 +85,7 @@ tokio-retry = "0.3.0"
 common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 nomos-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",

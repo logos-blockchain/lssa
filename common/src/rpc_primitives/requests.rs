@@ -220,3 +220,8 @@ pub struct GetInitialTestnetAccountsResponse {
     pub account_id: String,
     pub balance: u64,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetLastSeenL2BlockResponse {
+    pub last_block: Option<u64>,
+}

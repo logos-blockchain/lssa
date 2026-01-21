@@ -134,8 +134,8 @@ pub async fn main_runner() -> Result<()> {
 
     main_loop_handle.await??;
 
-    if indexer_loop_handle.is_some() {
-        indexer_loop_handle.unwrap().await??;
+    if let Some(indexer_loop_handle) = indexer_loop_handle {
+        indexer_loop_handle.await??;
     }
 
     Ok(())

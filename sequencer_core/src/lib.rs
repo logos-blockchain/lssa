@@ -9,7 +9,7 @@ use common::{
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::SequencerConfig;
-use indexer::message::IndexerToSequencerMessage;
+use indexer::message::Message;
 use log::warn;
 use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
@@ -27,9 +27,8 @@ pub struct SequencerCore {
     mempool: MemPool<EncodedTransaction>,
     sequencer_config: SequencerConfig,
     chain_height: u64,
-    // No logic here for now
-    #[allow(unused)]
-    receiver: Option<Receiver<IndexerToSequencerMessage>>,
+    #[expect(unused, reason = "No logic here for now")]
+    receiver: Option<Receiver<Message>>,
     block_settlement_client: Option<BlockSettlementClient>,
 }
 
@@ -51,7 +50,7 @@ impl SequencerCore {
     /// Start Sequencer from configuration and construct transaction sender
     pub fn start_from_config(
         config: SequencerConfig,
-        receiver: Option<Receiver<IndexerToSequencerMessage>>,
+        receiver: Option<Receiver<Message>>,
     ) -> (Self, MemPoolHandle<EncodedTransaction>) {
         let hashable_data = HashableBlockData {
             block_id: config.genesis_id,

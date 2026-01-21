@@ -18,8 +18,8 @@ use crate::{
             GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest,
             GetAccountsNoncesResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
             GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
-            GetLastSeenL2BlockAtIndexerRequest, GetProgramIdsRequest, GetProgramIdsResponse,
-            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetLastSeenL2BlockAtIndexerRequest, GetLastSeenL2BlockResponse, GetProgramIdsRequest,
+            GetProgramIdsResponse, GetProofForCommitmentRequest, GetProofForCommitmentResponse,
             GetTransactionByHashRequest, GetTransactionByHashResponse, SendTxRequest,
             SendTxResponse,
         },
@@ -352,7 +352,7 @@ impl SequencerClient {
     /// Get last seen l2 block at indexer
     pub async fn get_last_seen_l2_block_at_indexer(
         &self,
-    ) -> Result<GetLastBlockResponse, SequencerClientError> {
+    ) -> Result<GetLastSeenL2BlockResponse, SequencerClientError> {
         let last_req = GetLastSeenL2BlockAtIndexerRequest {};
 
         let req = serde_json::to_value(last_req).unwrap();

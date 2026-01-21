@@ -15,4 +15,3 @@ borsh.workspace = true
 futures.workspace = true
 url.workspace = true
 nomos-core.workspace = true
-tokio-retry.workspace = true

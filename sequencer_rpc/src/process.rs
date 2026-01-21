@@ -16,8 +16,8 @@ use common::{
             GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
             GetBlockRangeDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
             GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
-            GetLastSeenL2BlockAtIndexerRequest, GetProgramIdsRequest, GetProgramIdsResponse,
-            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetLastSeenL2BlockAtIndexerRequest, GetLastSeenL2BlockResponse, GetProgramIdsRequest,
+            GetProgramIdsResponse, GetProofForCommitmentRequest, GetProofForCommitmentResponse,
             GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse,
             SendTxRequest, SendTxResponse,
         },
@@ -325,13 +325,13 @@ impl JsonHandler {
             if let Some(indexer_state) = &self.indexer_state {
                 let last_seen_block = indexer_state.latest_seen_block.read().await;
 
-                *last_seen_block
+                Some(*last_seen_block)
             } else {
-                0
+                None
             }
         };
 
-        let response = GetLastBlockResponse { last_block };
+        let response = GetLastSeenL2BlockResponse { last_block };
 
         respond(response)
     }
@@ -422,9 +422,9 @@ mod tests {
                 user: "user".to_string(),
                 password: None,
                 indexer_config: IndexerConfig {
-                    resubscribe_interval: 100,
-                    start_delay: 1000,
-                    limit_retry: 10,
+                    resubscribe_interval_millis: 100,
+                    start_delay_millis: 1000,
+                    max_retries: 10,
                 },
             }),
         }

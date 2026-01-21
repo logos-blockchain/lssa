@@ -161,9 +161,9 @@
         "user": "user",
         "password": null,
         "indexer_config": {
-            "resubscribe_interval": 1000,
-            "start_delay": 1000,
-            "limit_retry": 10
+            "resubscribe_interval_millis": 1000,
+            "start_delay_millis": 1000,
+            "max_retries": 10
         }
     }
 }

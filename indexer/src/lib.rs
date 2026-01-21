@@ -3,17 +3,16 @@ use std::sync::Arc;
 use anyhow::Result;
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
 use common::block::HashableBlockData;
-use futures::{StreamExt, TryFutureExt};
-use log::{info, warn};
+use futures::StreamExt;
+use log::info;
 use nomos_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
 use tokio::sync::{RwLock, mpsc::Sender};
-use tokio_retry::Retry;
 use url::Url;
 
-use crate::{config::IndexerConfig, message::IndexerToSequencerMessage, state::IndexerState};
+use crate::{config::IndexerConfig, message::Message, state::IndexerState};
 
 pub mod config;
 pub mod message;
@@ -21,7 +20,7 @@ pub mod state;
 
 pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
-    pub channel_sender: Sender<IndexerToSequencerMessage>,
+    pub channel_sender: Sender<Message>,
     pub config: IndexerConfig,
     pub bedrock_url: Url,
     pub channel_id: ChannelId,
@@ -32,7 +31,7 @@ impl IndexerCore {
     pub fn new(
         addr: &str,
         auth: Option<BasicAuthCredentials>,
-        sender: Sender<IndexerToSequencerMessage>,
+        sender: Sender<Message>,
         config: IndexerConfig,
         channel_id: ChannelId,
     ) -> Result<Self> {
@@ -53,7 +52,6 @@ impl IndexerCore {
         loop {
             let mut stream_pinned = Box::pin(
                 self.bedrock_client
-                    .0
                     .get_lib_stream(self.bedrock_url.clone())
                     .await?,
             );
@@ -65,18 +63,15 @@ impl IndexerCore {
 
                 info!("Observed L1 block at height {}", block_info.height);
 
-                // Simple retry strategy on requests
-                let strategy =
-                    tokio_retry::strategy::FibonacciBackoff::from_millis(self.config.start_delay)
-                        .take(self.config.limit_retry);
-
-                if let Some(l1_block) = Retry::spawn(strategy, || {
-                    self.bedrock_client
-                        .0
-                        .get_block_by_id(self.bedrock_url.clone(), header_id)
-                        .inspect_err(|err| warn!("Block fetching failed with err: {err:#?}"))
-                })
-                .await?
+                if let Some(l1_block) = self
+                    .bedrock_client
+                    .get_block_by_id(
+                        &self.bedrock_url,
+                        header_id,
+                        self.config.start_delay_millis,
+                        self.config.max_retries,
+                    )
+                    .await?
                 {
                     info!("Extracted L1 block at height {}", block_info.height);
 
@@ -93,7 +88,7 @@ impl IndexerCore {
                         }
 
                         // Sending data into sequencer, may need to be expanded.
-                        let message = IndexerToSequencerMessage::BlockObserved {
+                        let message = Message::BlockObserved {
                             l1_block_id: block_info.height,
                             l2_block_height: l2_block.block_id,
                         };
@@ -107,33 +102,29 @@ impl IndexerCore {
 
             // Refetch stream after delay
             tokio::time::sleep(std::time::Duration::from_millis(
-                self.config.resubscribe_interval,
+                self.config.resubscribe_interval_millis,
             ))
             .await;
         }
     }
 }
 
-pub fn parse_blocks(
+fn parse_blocks(
     block_txs: impl Iterator<Item = SignedMantleTx>,
     decoded_channel_id: &ChannelId,
 ) -> Vec<HashableBlockData> {
     block_txs
         .flat_map(|tx| {
-            tx.mantle_tx
-                .ops
-                .iter()
-                .filter_map(|op| match op {
-                    Op::ChannelInscribe(InscriptionOp {
-                        channel_id,
-                        inscription,
-                        ..
-                    }) if channel_id == decoded_channel_id => {
-                        borsh::from_slice::<HashableBlockData>(inscription).ok()
-                    }
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
+            tx.mantle_tx.ops.into_iter().filter_map(|op| match op {
+                Op::ChannelInscribe(InscriptionOp {
+                    channel_id,
+                    inscription,
+                    ..
+                }) if channel_id == *decoded_channel_id => {
+                    borsh::from_slice::<HashableBlockData>(&inscription).ok()
+                }
+                _ => None,
+            })
         })
         .collect()
 }

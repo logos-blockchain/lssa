@@ -956,8 +956,14 @@ name = "bedrock_client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "broadcast-service",
  "common-http-client",
+ "futures",
+ "log",
+ "nomos-core",
  "reqwest",
+ "tokio-retry",
+ "url",
 ]
 
 [[package]]
@@ -2877,7 +2883,6 @@ dependencies = [
  "nomos-core",
  "serde",
  "tokio",
- "tokio-retry",
  "url",
 ]
 
