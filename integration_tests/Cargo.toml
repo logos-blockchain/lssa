@@ -4,41 +4,21 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+nssa_core = { workspace = true, features = ["host"] }
+nssa.workspace = true
+sequencer_core = { workspace = true, features = ["testnet"] }
+sequencer_runner.workspace = true
+wallet.workspace = true
+common.workspace = true
+key_protocol.workspace = true
+
 anyhow.workspace = true
 env_logger.workspace = true
 log.workspace = true
-actix.workspace = true
 actix-web.workspace = true
 base64.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 hex.workspace = true
 tempfile.workspace = true
 borsh.workspace = true
-
-nssa-core = { path = "../nssa/core", features = ["host"] }
-
-proc_macro_test_attribute = { path = "./proc_macro_test_attribute" }
-
-[dependencies.clap]
-features = ["derive", "env"]
-workspace = true
-
-[dependencies.sequencer_core]
-path = "../sequencer_core"
-features = ["testnet"]
-
-[dependencies.sequencer_runner]
-path = "../sequencer_runner"
-
-[dependencies.wallet]
-path = "../wallet"
-
-[dependencies.common]
-path = "../common"
-
-[dependencies.key_protocol]
-path = "../key_protocol"
-
-[dependencies.nssa]
-path = "../nssa"
-features = ["no_docker"]
+futures.workspace = true

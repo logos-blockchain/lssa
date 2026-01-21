@@ -4,6 +4,7 @@ use common::transaction::NSSATransaction;
 use nssa::AccountId;
 
 use crate::{
+    AccDecodeData::Decode,
     WalletCore,
     cli::{SubcommandReturnValue, WalletSubcommand},
     helperfunctions::{AccountPrivacyKind, parse_addr_with_privacy_prefix},
@@ -68,9 +69,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
 
                         println!("Transaction data is {transfer_tx:?}");
 
-                        let path = wallet_core.store_persistent_data().await?;
-
-                        println!("Stored persistent accounts at {path:#?}");
+                        wallet_core.store_persistent_data().await?;
                     }
                     AccountPrivacyKind::Private => {
                         let account_id = account_id.parse()?;
@@ -87,7 +86,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                             .await?;
 
                         if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                            let acc_decode_data = vec![(secret, account_id)];
+                            let acc_decode_data = vec![Decode(secret, account_id)];
 
                             wallet_core.decode_insert_privacy_preserving_transaction_results(
                                 tx,
@@ -95,9 +94,7 @@ impl WalletSubcommand for AuthTransferSubcommand {
                             )?;
                         }
 
-                        let path = wallet_core.store_persistent_data().await?;
-
-                        println!("Stored persistent accounts at {path:#?}");
+                        wallet_core.store_persistent_data().await?;
                     }
                 }
 
@@ -328,7 +325,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let acc_decode_data = vec![(secret_from, from), (secret_to, to)];
+                    let acc_decode_data = vec![Decode(secret_from, from), Decode(secret_to, to)];
 
                     wallet_core.decode_insert_privacy_preserving_transaction_results(
                         tx,
@@ -336,9 +333,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -372,7 +367,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let acc_decode_data = vec![(secret_from, from)];
+                    let acc_decode_data = vec![Decode(secret_from, from)];
 
                     wallet_core.decode_insert_privacy_preserving_transaction_results(
                         tx,
@@ -380,9 +375,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -412,7 +405,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let acc_decode_data = vec![(secret, to)];
+                    let acc_decode_data = vec![Decode(secret, to)];
 
                     wallet_core.decode_insert_privacy_preserving_transaction_results(
                         tx,
@@ -420,9 +413,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -453,9 +444,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
 
                 let tx_hash = res.tx_hash;
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -491,7 +480,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let acc_decode_data = vec![(secret, from)];
+                    let acc_decode_data = vec![Decode(secret, from)];
 
                     wallet_core.decode_insert_privacy_preserving_transaction_results(
                         tx,
@@ -499,9 +488,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
                     )?;
                 }
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
@@ -519,9 +506,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
 
                 println!("Transaction data is {transfer_tx:?}");
 
-                let path = wallet_core.store_persistent_data().await?;
-
-                println!("Stored persistent accounts at {path:#?}");
+                wallet_core.store_persistent_data().await?;
 
                 Ok(SubcommandReturnValue::Empty)
             }

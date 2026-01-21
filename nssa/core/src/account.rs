@@ -15,9 +15,8 @@ pub type Nonce = u128;
 
 /// Account to be used both in public and private contexts
 #[derive(
-    Serialize, Deserialize, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize,
+    Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
 )]
-#[cfg_attr(any(feature = "host", test), derive(Debug))]
 pub struct Account {
     pub program_owner: ProgramId,
     pub balance: u128,
@@ -25,8 +24,7 @@ pub struct Account {
     pub nonce: Nonce,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "host", test), derive(Debug))]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AccountWithMetadata {
     pub account: Account,
     pub is_authorized: bool,
@@ -44,11 +42,20 @@ impl AccountWithMetadata {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(
-    any(feature = "host", test),
-    derive(Debug, Copy, PartialOrd, Ord, Default)
+#[derive(
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    BorshSerialize,
+    BorshDeserialize,
 )]
+#[cfg_attr(any(feature = "host", test), derive(PartialOrd, Ord))]
 pub struct AccountId {
     value: [u8; 32],
 }
@@ -180,5 +187,12 @@ mod tests {
         let base58_str = "11".repeat(33); // 66 chars = 33 bytes
         let result = base58_str.parse::<AccountId>().unwrap_err();
         assert!(matches!(result, AccountIdError::InvalidLength(_)));
+    }
+
+    #[test]
+    fn default_account_id() {
+        let default_account_id = AccountId::default();
+        let expected_account_id = AccountId::new([0; 32]);
+        assert!(default_account_id == expected_account_id);
     }
 }

@@ -20,8 +20,8 @@ impl NativeTokenTransfer<'_> {
                     PrivacyPreservingAccount::Public(from),
                     PrivacyPreservingAccount::PrivateOwned(to),
                 ],
-                &instruction_data,
-                &program,
+                instruction_data,
+                &program.into(),
                 tx_pre_check,
             )
             .await
@@ -52,8 +52,8 @@ impl NativeTokenTransfer<'_> {
                         ipk: to_ipk,
                     },
                 ],
-                &instruction_data,
-                &program,
+                instruction_data,
+                &program.into(),
                 tx_pre_check,
             )
             .await

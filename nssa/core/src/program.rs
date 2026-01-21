@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use risc0_zkvm::{DeserializeOwned, guest::env, serde::Deserializer};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "host")]
-use crate::account::AccountId;
-use crate::account::{Account, AccountWithMetadata};
+use crate::account::{Account, AccountId, AccountWithMetadata};
 
 pub type ProgramId = [u32; 8];
 pub type InstructionData = Vec<u32>;
@@ -22,17 +20,30 @@ pub struct ProgramInput<T> {
 /// Each program can derive up to `2^256` unique account IDs by choosing different
 /// seeds. PDAs allow programs to control namespaced account identifiers without
 /// collisions between programs.
-#[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug))]
 pub struct PdaSeed([u8; 32]);
 
 impl PdaSeed {
-    pub fn new(value: [u8; 32]) -> Self {
+    pub const fn new(value: [u8; 32]) -> Self {
         Self(value)
     }
 }
 
-#[cfg(feature = "host")]
+pub fn compute_authorized_pdas(
+    caller_program_id: Option<ProgramId>,
+    pda_seeds: &[PdaSeed],
+) -> HashSet<AccountId> {
+    caller_program_id
+        .map(|caller_program_id| {
+            pda_seeds
+                .iter()
+                .map(|pda_seed| AccountId::from((&caller_program_id, pda_seed)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 impl From<(&ProgramId, &PdaSeed)> for AccountId {
     fn from(value: (&ProgramId, &PdaSeed)) -> Self {
         use risc0_zkvm::sha::{Impl, Sha256};
@@ -54,8 +65,8 @@ impl From<(&ProgramId, &PdaSeed)> for AccountId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[cfg_attr(any(feature = "host", test), derive(Debug,))]
 pub struct ChainedCall {
     /// The program ID of the program to execute
     pub program_id: ProgramId,
@@ -96,6 +107,13 @@ impl AccountPostState {
         }
     }
 
+    /// Creates a post state that requests ownership of the account
+    /// if the account's program owner is the default program ID.
+    pub fn new_claimed_if_default(account: Account) -> Self {
+        let claim = account.program_owner == DEFAULT_PROGRAM_ID;
+        Self { account, claim }
+    }
+
     /// Returns `true` if this post state requests that the account
     /// be claimed (owned) by the executing program.
     pub fn requires_claim(&self) -> bool {
@@ -110,6 +128,11 @@ impl AccountPostState {
     /// Returns the underlying account
     pub fn account_mut(&mut self) -> &mut Account {
         &mut self.account
+    }
+
+    /// Consumes the post state and returns the underlying account
+    pub fn into_account(self) -> Account {
+        self.account
     }
 }
 

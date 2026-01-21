@@ -4,25 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+common.workspace = true
+sequencer_core = { workspace = true, features = ["testnet"] }
+sequencer_rpc.workspace = true
+
+clap = { workspace = true, features = ["derive", "env"] }
 anyhow.workspace = true
-serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 actix.workspace = true
-
 actix-web.workspace = true
 tokio.workspace = true
-
-[dependencies.clap]
-features = ["derive", "env"]
-workspace = true
-
-[dependencies.sequencer_rpc]
-path = "../sequencer_rpc"
-
-[dependencies.sequencer_core]
-path = "../sequencer_core"
-features = ["testnet"]
-
-[dependencies.common]
-path = "../common"

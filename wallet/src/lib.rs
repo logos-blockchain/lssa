@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chain_storage::WalletChainStore;
 use common::{
@@ -14,17 +14,19 @@ use key_protocol::key_management::key_tree::{chain_index::ChainIndex, traits::Ke
 use log::info;
 use nssa::{
     Account, AccountId, PrivacyPreservingTransaction,
-    privacy_preserving_transaction::message::EncryptedAccountData, program::Program,
+    privacy_preserving_transaction::{
+        circuit::ProgramWithDependencies, message::EncryptedAccountData,
+    },
 };
-use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
+use nssa_core::{
+    Commitment, MembershipProof, SharedSecretKey, account::Data, program::InstructionData,
+};
 pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    config::PersistentStorage,
-    helperfunctions::{
-        fetch_persistent_storage, get_home, produce_data_for_storage, produce_random_nonces,
-    },
+    config::{PersistentStorage, WalletConfigOverrides},
+    helperfunctions::{produce_data_for_storage, produce_random_nonces},
     poller::TxPoller,
 };
 
@@ -38,92 +40,215 @@ pub mod poller;
 mod privacy_preserving_tx;
 pub mod program_facades;
 
+pub enum AccDecodeData {
+    Skip,
+    Decode(nssa_core::SharedSecretKey, AccountId),
+}
+
+const TOKEN_DEFINITION_DATA_SIZE: usize = 55;
+
+const TOKEN_HOLDING_TYPE: u8 = 1;
+const TOKEN_HOLDING_DATA_SIZE: usize = 49;
+const TOKEN_STANDARD_FUNGIBLE_TOKEN: u8 = 0;
+const TOKEN_STANDARD_NONFUNGIBLE: u8 = 2;
+
+struct TokenDefinition {
+    #[allow(unused)]
+    account_type: u8,
+    name: [u8; 6],
+    total_supply: u128,
+    #[allow(unused)]
+    metadata_id: AccountId,
+}
+
+struct TokenHolding {
+    #[allow(unused)]
+    account_type: u8,
+    definition_id: AccountId,
+    balance: u128,
+}
+
+impl TokenDefinition {
+    fn parse(data: &Data) -> Option<Self> {
+        let data = Vec::<u8>::from(data.clone());
+
+        if data.len() != TOKEN_DEFINITION_DATA_SIZE {
+            None
+        } else {
+            let account_type = data[0];
+            let name = data[1..7].try_into().expect("Name must be a 6 bytes");
+            let total_supply = u128::from_le_bytes(
+                data[7..23]
+                    .try_into()
+                    .expect("Total supply must be 16 bytes little-endian"),
+            );
+            let metadata_id = AccountId::new(
+                data[23..TOKEN_DEFINITION_DATA_SIZE]
+                    .try_into()
+                    .expect("Token Program expects valid Account Id for Metadata"),
+            );
+
+            let this = Some(Self {
+                account_type,
+                name,
+                total_supply,
+                metadata_id,
+            });
+
+            match account_type {
+                TOKEN_STANDARD_NONFUNGIBLE if total_supply != 1 => None,
+                TOKEN_STANDARD_FUNGIBLE_TOKEN if metadata_id != AccountId::new([0; 32]) => None,
+                _ => this,
+            }
+        }
+    }
+}
+
+impl TokenHolding {
+    fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
+            None
+        } else {
+            let account_type = data[0];
+            let definition_id = AccountId::new(data[1..33].try_into().unwrap());
+            let balance = u128::from_le_bytes(data[33..].try_into().unwrap());
+            Some(Self {
+                definition_id,
+                balance,
+                account_type,
+            })
+        }
+    }
+}
+
 pub struct WalletCore {
-    pub storage: WalletChainStore,
-    pub poller: TxPoller,
+    config_path: PathBuf,
+    storage: WalletChainStore,
+    storage_path: PathBuf,
+    poller: TxPoller,
+    // TODO: Make all fields private
     pub sequencer_client: Arc<SequencerClient>,
     pub last_synced_block: u64,
 }
 
 impl WalletCore {
-    pub async fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
-        let basic_auth = config
-            .basic_auth
-            .as_ref()
-            .map(|auth| (auth.username.clone(), auth.password.clone()));
-        let client = Arc::new(SequencerClient::new_with_auth(
-            config.sequencer_addr.clone(),
-            basic_auth,
-        )?);
-        let tx_poller = TxPoller::new(config.clone(), client.clone());
+    /// Construct wallet using [`HOME_DIR_ENV_VAR`] env var for paths or user home dir if not set.
+    pub fn from_env() -> Result<Self> {
+        let config_path = helperfunctions::fetch_config_path()?;
+        let storage_path = helperfunctions::fetch_persistent_storage_path()?;
 
+        Self::new_update_chain(config_path, storage_path, None)
+    }
+
+    pub fn new_update_chain(
+        config_path: PathBuf,
+        storage_path: PathBuf,
+        config_overrides: Option<WalletConfigOverrides>,
+    ) -> Result<Self> {
         let PersistentStorage {
             accounts: persistent_accounts,
             last_synced_block,
-        } = fetch_persistent_storage().await?;
+        } = PersistentStorage::from_path(&storage_path)
+            .with_context(|| format!("Failed to read persistent storage at {storage_path:#?}"))?;
 
-        let storage = WalletChainStore::new(config, persistent_accounts)?;
-
-        Ok(Self {
-            storage,
-            poller: tx_poller,
-            sequencer_client: client.clone(),
+        Self::new(
+            config_path,
+            storage_path,
+            config_overrides,
+            |config| WalletChainStore::new(config, persistent_accounts),
             last_synced_block,
-        })
+        )
     }
 
-    pub async fn start_from_config_new_storage(
-        config: WalletConfig,
+    pub fn new_init_storage(
+        config_path: PathBuf,
+        storage_path: PathBuf,
+        config_overrides: Option<WalletConfigOverrides>,
         password: String,
     ) -> Result<Self> {
+        Self::new(
+            config_path,
+            storage_path,
+            config_overrides,
+            |config| WalletChainStore::new_storage(config, password),
+            0,
+        )
+    }
+
+    fn new(
+        config_path: PathBuf,
+        storage_path: PathBuf,
+        config_overrides: Option<WalletConfigOverrides>,
+        storage_ctor: impl FnOnce(WalletConfig) -> Result<WalletChainStore>,
+        last_synced_block: u64,
+    ) -> Result<Self> {
+        let mut config = WalletConfig::from_path_or_initialize_default(&config_path)
+            .with_context(|| format!("Failed to deserialize wallet config at {config_path:#?}"))?;
+        if let Some(config_overrides) = config_overrides {
+            config.apply_overrides(config_overrides);
+        }
+
         let basic_auth = config
             .basic_auth
             .as_ref()
             .map(|auth| (auth.username.clone(), auth.password.clone()));
-        let client = Arc::new(SequencerClient::new_with_auth(
+        let sequencer_client = Arc::new(SequencerClient::new_with_auth(
             config.sequencer_addr.clone(),
             basic_auth,
         )?);
-        let tx_poller = TxPoller::new(config.clone(), client.clone());
+        let tx_poller = TxPoller::new(config.clone(), Arc::clone(&sequencer_client));
 
-        let storage = WalletChainStore::new_storage(config, password)?;
+        let storage = storage_ctor(config)?;
 
         Ok(Self {
+            config_path,
+            storage_path,
             storage,
             poller: tx_poller,
-            sequencer_client: client.clone(),
-            last_synced_block: 0,
+            sequencer_client,
+            last_synced_block,
         })
     }
 
-    /// Store persistent data at home
-    pub async fn store_persistent_data(&self) -> Result<PathBuf> {
-        let home = get_home()?;
-        let storage_path = home.join("storage.json");
+    /// Get configuration with applied overrides
+    pub fn config(&self) -> &WalletConfig {
+        &self.storage.wallet_config
+    }
 
-        let data = produce_data_for_storage(&self.storage.user_data, self.last_synced_block);
-        let storage = serde_json::to_vec_pretty(&data)?;
+    /// Get storage
+    pub fn storage(&self) -> &WalletChainStore {
+        &self.storage
+    }
 
-        let mut storage_file = tokio::fs::File::create(storage_path.as_path()).await?;
-        storage_file.write_all(&storage).await?;
-
-        info!("Stored data at {storage_path:#?}");
-
-        Ok(storage_path)
+    /// Reset storage
+    pub fn reset_storage(&mut self, password: String) -> Result<()> {
+        self.storage = WalletChainStore::new_storage(self.storage.wallet_config.clone(), password)?;
+        Ok(())
     }
 
     /// Store persistent data at home
-    pub async fn store_config_changes(&self) -> Result<PathBuf> {
-        let home = get_home()?;
-        let config_path = home.join("wallet_config.json");
+    pub async fn store_persistent_data(&self) -> Result<()> {
+        let data = produce_data_for_storage(&self.storage.user_data, self.last_synced_block);
+        let storage = serde_json::to_vec_pretty(&data)?;
+
+        let mut storage_file = tokio::fs::File::create(&self.storage_path).await?;
+        storage_file.write_all(&storage).await?;
+
+        println!("Stored persistent accounts at {:#?}", self.storage_path);
+
+        Ok(())
+    }
+
+    /// Store persistent data at home
+    pub async fn store_config_changes(&self) -> Result<()> {
         let config = serde_json::to_vec_pretty(&self.storage.wallet_config)?;
 
-        let mut config_file = tokio::fs::File::create(config_path.as_path()).await?;
+        let mut config_file = tokio::fs::File::create(&self.config_path).await?;
         config_file.write_all(&config).await?;
 
-        info!("Stored data at {config_path:#?}");
+        info!("Stored data at {:#?}", self.config_path);
 
-        Ok(config_path)
+        Ok(())
     }
 
     pub fn create_new_account_public(
@@ -218,36 +343,40 @@ impl WalletCore {
     pub fn decode_insert_privacy_preserving_transaction_results(
         &mut self,
         tx: nssa::privacy_preserving_transaction::PrivacyPreservingTransaction,
-        acc_decode_data: &[(nssa_core::SharedSecretKey, AccountId)],
+        acc_decode_mask: &[AccDecodeData],
     ) -> Result<()> {
-        for (output_index, (secret, acc_account_id)) in acc_decode_data.iter().enumerate() {
-            let acc_ead = tx.message.encrypted_private_post_states[output_index].clone();
-            let acc_comm = tx.message.new_commitments[output_index].clone();
+        for (output_index, acc_decode_data) in acc_decode_mask.iter().enumerate() {
+            match acc_decode_data {
+                AccDecodeData::Decode(secret, acc_account_id) => {
+                    let acc_ead = tx.message.encrypted_private_post_states[output_index].clone();
+                    let acc_comm = tx.message.new_commitments[output_index].clone();
 
-            let res_acc = nssa_core::EncryptionScheme::decrypt(
-                &acc_ead.ciphertext,
-                secret,
-                &acc_comm,
-                output_index as u32,
-            )
-            .unwrap();
+                    let res_acc = nssa_core::EncryptionScheme::decrypt(
+                        &acc_ead.ciphertext,
+                        secret,
+                        &acc_comm,
+                        output_index as u32,
+                    )
+                    .unwrap();
 
-            println!("Received new acc {res_acc:#?}");
+                    println!("Received new acc {res_acc:#?}");
 
-            self.storage
-                .insert_private_account_data(*acc_account_id, res_acc);
+                    self.storage
+                        .insert_private_account_data(*acc_account_id, res_acc);
+                }
+                AccDecodeData::Skip => {}
+            }
         }
 
         println!("Transaction data is {:?}", tx.message);
-
         Ok(())
     }
 
     pub async fn send_privacy_preserving_tx(
         &self,
         accounts: Vec<PrivacyPreservingAccount>,
-        instruction_data: &InstructionData,
-        program: &Program,
+        instruction_data: InstructionData,
+        program: &ProgramWithDependencies,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
         self.send_privacy_preserving_tx_with_pre_check(accounts, instruction_data, program, |_| {
             Ok(())
@@ -258,8 +387,8 @@ impl WalletCore {
     pub async fn send_privacy_preserving_tx_with_pre_check(
         &self,
         accounts: Vec<PrivacyPreservingAccount>,
-        instruction_data: &InstructionData,
-        program: &Program,
+        instruction_data: InstructionData,
+        program: &ProgramWithDependencies,
         tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
         let acc_manager = privacy_preserving_tx::AccountManager::new(self, accounts).await?;
@@ -274,16 +403,17 @@ impl WalletCore {
 
         let private_account_keys = acc_manager.private_account_keys();
         let (output, proof) = nssa::privacy_preserving_transaction::circuit::execute_and_prove(
-            &pre_states,
+            pre_states,
             instruction_data,
-            acc_manager.visibility_mask(),
-            &produce_random_nonces(private_account_keys.len()),
-            &private_account_keys
+            acc_manager.visibility_mask().to_vec(),
+            produce_random_nonces(private_account_keys.len()),
+            private_account_keys
                 .iter()
-                .map(|keys| (keys.npk.clone(), keys.ssk.clone()))
+                .map(|keys| (keys.npk.clone(), keys.ssk))
                 .collect::<Vec<_>>(),
-            &acc_manager.private_account_auth(),
-            &program.to_owned().into(),
+            acc_manager.private_account_auth(),
+            acc_manager.private_account_membership_proofs(),
+            &program.to_owned(),
         )
         .unwrap();
 
@@ -303,7 +433,7 @@ impl WalletCore {
             nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
                 &message,
                 proof,
-                &acc_manager.witness_signing_keys(),
+                &acc_manager.public_account_auth(),
             );
         let tx = PrivacyPreservingTransaction::new(message, witness_set);
 

@@ -1,5 +1,5 @@
 use nssa::{AccountId, program::Program};
-use wallet::{PrivacyPreservingAccount, WalletCore, helperfunctions::fetch_config};
+use wallet::{PrivacyPreservingAccount, WalletCore};
 
 // Before running this example, compile the `hello_world.rs` guest program with:
 //
@@ -22,11 +22,8 @@ use wallet::{PrivacyPreservingAccount, WalletCore, helperfunctions::fetch_config
 
 #[tokio::main]
 async fn main() {
-    // Load wallet config and storage
-    let wallet_config = fetch_config().await.unwrap();
-    let wallet_core = WalletCore::start_from_config_update_chain(wallet_config)
-        .await
-        .unwrap();
+    // Initialize wallet
+    let wallet_core = WalletCore::from_env().unwrap();
 
     // Parse arguments
     // First argument is the path to the program binary
@@ -53,8 +50,8 @@ async fn main() {
     wallet_core
         .send_privacy_preserving_tx(
             accounts,
-            &Program::serialize_instruction(greeting).unwrap(),
-            &program,
+            Program::serialize_instruction(greeting).unwrap(),
+            &program.into(),
         )
         .await
         .unwrap();

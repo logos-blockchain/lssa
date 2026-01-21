@@ -23,11 +23,26 @@ impl Message {
         instruction: T,
     ) -> Result<Self, NssaError> {
         let instruction_data = Program::serialize_instruction(instruction)?;
+
         Ok(Self {
             program_id,
             account_ids,
             nonces,
             instruction_data,
         })
+    }
+
+    pub fn new_preserialized(
+        program_id: ProgramId,
+        account_ids: Vec<AccountId>,
+        nonces: Vec<Nonce>,
+        instruction_data: InstructionData,
+    ) -> Self {
+        Self {
+            program_id,
+            account_ids,
+            nonces,
+            instruction_data,
+        }
     }
 }

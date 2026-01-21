@@ -6,4 +6,5 @@ data/
 .idea/
 .vscode/
 rocksdb
-Cargo.lock
+sequencer_runner/data/
+storage.json

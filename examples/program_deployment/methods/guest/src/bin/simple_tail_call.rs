@@ -9,13 +9,12 @@ use nssa_core::program::{
 // It reads a single account, emits it unchanged, and then triggers a tail call
 // to the Hello World program with a fixed greeting.
 
-
 /// This needs to be set to the ID of the Hello world program.
 /// To get the ID run **from the root directoy of the repository**:
 /// `cargo risczero build --manifest-path examples/program_deployment/methods/guest/Cargo.toml`
 /// This compiles the programs and outputs the IDs in hex that can be used to copy here.
 const HELLO_WORLD_PROGRAM_ID_HEX: &str =
-    "7e99d6e2d158f4dea59597011da5d1c2eef17beed6667657f515b387035b935a";
+    "e9dfc5a5d03c9afa732adae6e0edfce4bbb44c7a2afb9f148f4309917eb2de6f";
 
 fn hello_world_program_id() -> ProgramId {
     let hello_world_program_id_bytes: [u8; 32] = hex::decode(HELLO_WORLD_PROGRAM_ID_HEX)
