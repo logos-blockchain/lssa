@@ -1,7 +1,11 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{HashType, block::Block, transaction::EncodedTransaction};
+use common::{
+    HashType,
+    block::{Block, BlockHash},
+    transaction::EncodedTransaction,
+};
 use storage::RocksDBIO;
 
 pub struct SequencerBlockStore {
@@ -56,6 +60,10 @@ impl SequencerBlockStore {
         Ok(())
     }
 
+    pub fn delete_block_at_id(&mut self, block_id: u64) -> Result<()> {
+        Ok(self.dbio.delete_block(block_id)?)
+    }
+
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
     pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<EncodedTransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
@@ -80,6 +88,10 @@ impl SequencerBlockStore {
 
     pub fn signing_key(&self) -> &nssa::PrivateKey {
         &self.signing_key
+    }
+
+    pub(crate) fn get_pending_blocks(&self) -> impl Iterator<Item = Result<Block>> {
+        self.dbio.get_all_blocks().map(|res| Ok(res?))
     }
 }
 

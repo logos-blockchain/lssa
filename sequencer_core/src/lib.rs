@@ -5,12 +5,13 @@ use anyhow::Result;
 use common::PINATA_BASE58;
 use common::{
     HashType,
-    block::HashableBlockData,
+    block::{BedrockStatus, Block, BlockHash, HashableBlockData},
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::SequencerConfig;
 use log::warn;
 use mempool::{MemPool, MemPoolHandle};
+use nomos_core::mantle::ops::channel::MsgId;
 use serde::{Deserialize, Serialize};
 
 use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerBlockStore};
@@ -149,7 +150,8 @@ impl SequencerCore {
         let block_data = self.produce_new_block_with_mempool_transactions()?;
 
         if let Some(block_settlement) = self.block_settlement_client.as_mut() {
-            block_settlement.post_and_wait(&block_data).await?;
+            let msg_id = block_settlement.post_transaction(&block_data).await?;
+            block_settlement.set_last_message_id(msg_id);
             log::info!("Posted block data to Bedrock");
         }
 
@@ -234,6 +236,27 @@ impl SequencerCore {
 
     pub fn sequencer_config(&self) -> &SequencerConfig {
         &self.sequencer_config
+    }
+
+    pub fn delete_finalized_block_from_db(&mut self, block_id: u64) -> Result<()> {
+        self.block_store.delete_block_at_id(block_id)
+    }
+
+    pub async fn resubmit_pending_blocks(&self) -> Result<()> {
+        for res in self.block_store.get_pending_blocks() {
+            let block = res?;
+            match block.bedrock_status {
+                BedrockStatus::Pending => {
+                    if let Some(block_settlement) = self.block_settlement_client.as_ref() {
+                        let block_data: HashableBlockData = block.into();
+                        block_settlement.post_transaction(&block_data).await?;
+                        log::info!("Posted block data to Bedrock");
+                    }
+                }
+                _ => continue,
+            }
+        }
+        Ok(())
     }
 }
 

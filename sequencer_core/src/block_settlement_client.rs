@@ -33,6 +33,10 @@ impl BlockSettlementClient {
         })
     }
 
+    pub fn set_last_message_id(&mut self, msg_id: MsgId) {
+        self.last_message_id = msg_id;
+    }
+
     /// Create and sign a transaction for inscribing data
     pub fn create_inscribe_tx(&self, data: Vec<u8>) -> (SignedMantleTx, MsgId) {
         let verifying_key_bytes = self.bedrock_signing_key.public_key().to_bytes();
@@ -73,17 +77,15 @@ impl BlockSettlementClient {
         (signed_mantle_tx, inscribe_op_id)
     }
 
-    /// Post a transaction to the node and wait for inclusion
-    pub async fn post_and_wait(&mut self, block_data: &HashableBlockData) -> Result<u64> {
+    /// Post a transaction to the node
+    pub async fn post_transaction(&self, block_data: &HashableBlockData) -> Result<MsgId> {
         let inscription_data = borsh::to_vec(&block_data)?;
         let (tx, new_msg_id) = self.create_inscribe_tx(inscription_data);
 
         // Post the transaction
         self.bedrock_client.post_transaction(tx).await?;
 
-        self.last_message_id = new_msg_id;
-
-        Ok(block_data.block_id)
+        Ok(new_msg_id)
     }
 }
 

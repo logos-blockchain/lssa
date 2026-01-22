@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use common::block::Block;
+use common::block::{Block, BlockHash};
 use error::DbError;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
@@ -361,5 +361,50 @@ impl RocksDBIO {
                 "Snapshot block ID not found".to_string(),
             ))
         }
+    }
+
+    pub fn delete_block(&self, block_id: u64) -> DbResult<()> {
+        let cf_block = self.block_column();
+        let key = borsh::to_vec(&block_id).map_err(|err| {
+            DbError::borsh_cast_message(err, Some("Failed to serialize block id".to_string()))
+        })?;
+
+        if self
+            .db
+            .get_cf(&cf_block, &key)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?
+            .is_none()
+        {
+            return Err(DbError::db_interaction_error(
+                "Block on this id not found".to_string(),
+            ));
+        }
+
+        self.db
+            .delete_cf(&cf_block, key)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        Ok(())
+    }
+
+    pub fn get_all_blocks(&self) -> impl Iterator<Item = DbResult<Block>> {
+        let cf_block = self.block_column();
+        self.db
+            .iterator_cf(&cf_block, rocksdb::IteratorMode::Start)
+            .map(|res| {
+                let (_key, value) = res.map_err(|rerr| {
+                    DbError::rocksdb_cast_message(
+                        rerr,
+                        Some("Failed to get key value pair".to_string()),
+                    )
+                })?;
+
+                borsh::from_slice::<Block>(&value).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to deserialize block data".to_string()),
+                    )
+                })
+            })
     }
 }
