@@ -10,3 +10,7 @@ wallet.workspace = true
 
 tokio = { workspace = true, features = ["macros"] }
 clap.workspace = true
+risc0-zkvm.workspace = true
+hex.workspace = true
+rln = "1.0.0"
+risc0-zkvm-platform = "2.2.1"
