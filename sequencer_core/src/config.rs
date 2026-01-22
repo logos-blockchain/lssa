@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::Result;
-use indexer::config::IndexerConfig;
 use nomos_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 
@@ -63,8 +62,6 @@ pub struct BedrockConfig {
     pub user: String,
     /// Bedrock password(optional)
     pub password: Option<String>,
-    /// Indexer config
-    pub indexer_config: IndexerConfig,
 }
 
 impl SequencerConfig {

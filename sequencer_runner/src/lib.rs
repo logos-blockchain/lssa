@@ -2,11 +2,9 @@ use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 use actix_web::dev::ServerHandle;
 use anyhow::Result;
-use bedrock_client::BasicAuthCredentials;
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
-use indexer::IndexerCore;
-use log::{error, info};
+use log::info;
 use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -22,51 +20,20 @@ struct Args {
 
 pub async fn startup_sequencer(
     app_config: SequencerConfig,
-) -> Result<(
-    ServerHandle,
-    SocketAddr,
-    JoinHandle<Result<()>>,
-    Option<JoinHandle<Result<()>>>,
-)> {
+) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>)> {
     let block_timeout = app_config.block_create_timeout_millis;
     let port = app_config.port;
 
-    // ToDo: Maybe make buffer size configurable.
-    let (indexer_core, receiver) = if let Some(bedrock_config) = app_config.bedrock_config.clone() {
-        let (sender, receiver) = tokio::sync::mpsc::channel(100);
-
-        let indexer_core = IndexerCore::new(
-            &bedrock_config.node_url,
-            Some(BasicAuthCredentials::new(
-                bedrock_config.user.clone(),
-                bedrock_config.password.clone(),
-            )),
-            sender,
-            bedrock_config.indexer_config.clone(),
-            bedrock_config.channel_id,
-        )?;
-
-        info!("Indexer core set up");
-
-        (Some(indexer_core), Some(receiver))
-    } else {
-        info!("Bedrock config not provided, skipping indexer setup");
-
-        (None, None)
-    };
-
-    let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config, receiver);
+    let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config);
 
     info!("Sequencer core set up");
 
-    let indexer_state_wrapped = indexer_core.as_ref().map(|core| core.state.clone());
     let seq_core_wrapped = Arc::new(Mutex::new(sequencer_core));
 
     let (http_server, addr) = new_http_server(
         RpcConfig::with_port(port),
         Arc::clone(&seq_core_wrapped),
         mempool_handle,
-        indexer_state_wrapped,
     )?;
     info!("HTTP server started");
     let http_server_handle = http_server.handle();
@@ -94,23 +61,7 @@ pub async fn startup_sequencer(
         }
     });
 
-    let indexer_loop_handle = indexer_core.map(|indexer_core| {
-        tokio::spawn(async move {
-            match indexer_core.subscribe_parse_block_stream().await {
-                Ok(()) => unreachable!(),
-                Err(err) => error!("Indexer loop failed with error: {err:#?}"),
-            }
-
-            Ok(())
-        })
-    });
-
-    Ok((
-        http_server_handle,
-        addr,
-        main_loop_handle,
-        indexer_loop_handle,
-    ))
+    Ok((http_server_handle, addr, main_loop_handle))
 }
 
 pub async fn main_runner() -> Result<()> {
@@ -130,13 +81,9 @@ pub async fn main_runner() -> Result<()> {
     }
 
     // ToDo: Add restart on failures
-    let (_, _, main_loop_handle, indexer_loop_handle) = startup_sequencer(app_config).await?;
+    let (_, _, main_loop_handle) = startup_sequencer(app_config).await?;
 
     main_loop_handle.await??;
-
-    if let Some(indexer_loop_handle) = indexer_loop_handle {
-        indexer_loop_handle.await??;
-    }
 
     Ok(())
 }

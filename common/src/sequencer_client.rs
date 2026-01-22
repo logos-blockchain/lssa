@@ -18,10 +18,10 @@ use crate::{
             GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest,
             GetAccountsNoncesResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
             GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
-            GetLastSeenL2BlockAtIndexerRequest, GetLastSeenL2BlockResponse, GetProgramIdsRequest,
-            GetProgramIdsResponse, GetProofForCommitmentRequest, GetProofForCommitmentResponse,
-            GetTransactionByHashRequest, GetTransactionByHashResponse, SendTxRequest,
-            SendTxResponse,
+            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse, PostIndexerMessageRequest, PostIndexerMessageResponse,
+            SendTxRequest, SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -350,15 +350,16 @@ impl SequencerClient {
     }
 
     /// Get last seen l2 block at indexer
-    pub async fn get_last_seen_l2_block_at_indexer(
+    pub async fn post_indexer_message(
         &self,
-    ) -> Result<GetLastSeenL2BlockResponse, SequencerClientError> {
-        let last_req = GetLastSeenL2BlockAtIndexerRequest {};
+        message: crate::communication::indexer::Message,
+    ) -> Result<PostIndexerMessageResponse, SequencerClientError> {
+        let last_req = PostIndexerMessageRequest { message };
 
         let req = serde_json::to_value(last_req).unwrap();
 
         let resp = self
-            .call_method_with_payload("get_last_seen_l2_block_at_indexer", req)
+            .call_method_with_payload("post_indexer_message", req)
             .await
             .unwrap();
 

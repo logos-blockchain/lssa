@@ -9,7 +9,6 @@ nssa_core.workspace = true
 common.workspace = true
 storage.workspace = true
 mempool.workspace = true
-indexer.workspace = true
 
 base58.workspace = true
 anyhow.workspace = true

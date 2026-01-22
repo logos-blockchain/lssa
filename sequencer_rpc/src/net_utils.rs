@@ -7,7 +7,6 @@ use common::{
     transaction::EncodedTransaction,
 };
 use futures::{Future, FutureExt};
-use indexer::state::IndexerState;
 use log::info;
 use mempool::MemPoolHandle;
 use sequencer_core::SequencerCore;
@@ -47,7 +46,6 @@ pub fn new_http_server(
     config: RpcConfig,
     seuquencer_core: Arc<Mutex<SequencerCore>>,
     mempool_handle: MemPoolHandle<EncodedTransaction>,
-    indexer_core: Option<IndexerState>,
 ) -> io::Result<(actix_web::dev::Server, SocketAddr)> {
     let RpcConfig {
         addr,
@@ -57,7 +55,6 @@ pub fn new_http_server(
     info!(target:NETWORK, "Starting HTTP server at {addr}");
     let handler = web::Data::new(JsonHandler {
         sequencer_state: seuquencer_core.clone(),
-        indexer_state: indexer_core.clone(),
         mempool_handle,
     });
 

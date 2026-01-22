@@ -9,11 +9,9 @@ use common::{
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::SequencerConfig;
-use indexer::message::Message;
 use log::warn;
 use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::Receiver;
 
 use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerBlockStore};
 
@@ -27,8 +25,6 @@ pub struct SequencerCore {
     mempool: MemPool<EncodedTransaction>,
     sequencer_config: SequencerConfig,
     chain_height: u64,
-    #[expect(unused, reason = "No logic here for now")]
-    receiver: Option<Receiver<Message>>,
     block_settlement_client: Option<BlockSettlementClient>,
 }
 
@@ -48,10 +44,7 @@ impl std::error::Error for TransactionMalformationError {}
 
 impl SequencerCore {
     /// Start Sequencer from configuration and construct transaction sender
-    pub fn start_from_config(
-        config: SequencerConfig,
-        receiver: Option<Receiver<Message>>,
-    ) -> (Self, MemPoolHandle<EncodedTransaction>) {
+    pub fn start_from_config(config: SequencerConfig) -> (Self, MemPoolHandle<EncodedTransaction>) {
         let hashable_data = HashableBlockData {
             block_id: config.genesis_id,
             transactions: vec![],
@@ -107,7 +100,6 @@ impl SequencerCore {
             mempool,
             chain_height: config.genesis_id,
             sequencer_config: config,
-            receiver,
             block_settlement_client: block_settlement,
         };
 
@@ -350,7 +342,7 @@ mod tests {
     async fn common_setup_with_config(
         config: SequencerConfig,
     ) -> (SequencerCore, MemPoolHandle<EncodedTransaction>) {
-        let (mut sequencer, mempool_handle) = SequencerCore::start_from_config(config, None);
+        let (mut sequencer, mempool_handle) = SequencerCore::start_from_config(config);
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
         mempool_handle.push(tx).await.unwrap();
@@ -365,7 +357,7 @@ mod tests {
     #[test]
     fn test_start_from_config() {
         let config = setup_sequencer_config();
-        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone(), None);
+        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone());
 
         assert_eq!(sequencer.chain_height, config.genesis_id);
         assert_eq!(sequencer.sequencer_config.max_num_tx_in_block, 10);
@@ -424,7 +416,7 @@ mod tests {
         let initial_accounts = vec![initial_acc1, initial_acc2];
 
         let config = setup_sequencer_config_variable_initial_accounts(initial_accounts);
-        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone(), None);
+        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone());
 
         let acc1_account_id = config.initial_accounts[0]
             .account_id
@@ -760,8 +752,7 @@ mod tests {
         // from `acc_1` to `acc_2`. The block created with that transaction will be kept stored in
         // the temporary directory for the block storage of this test.
         {
-            let (mut sequencer, mempool_handle) =
-                SequencerCore::start_from_config(config.clone(), None);
+            let (mut sequencer, mempool_handle) = SequencerCore::start_from_config(config.clone());
             let signing_key = PrivateKey::try_new([1; 32]).unwrap();
 
             let tx = common::test_utils::create_transaction_native_token_transfer(
@@ -786,7 +777,7 @@ mod tests {
 
         // Instantiating a new sequencer from the same config. This should load the existing block
         // with the above transaction and update the state to reflect that.
-        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone(), None);
+        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone());
         let balance_acc_1 = sequencer.state.get_account_by_id(&acc1_account_id).balance;
         let balance_acc_2 = sequencer.state.get_account_by_id(&acc2_account_id).balance;
 

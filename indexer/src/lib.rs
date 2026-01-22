@@ -2,45 +2,49 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
-use common::block::HashableBlockData;
+use common::{
+    block::HashableBlockData, communication::indexer::Message,
+    rpc_primitives::requests::PostIndexerMessageResponse, sequencer_client::SequencerClient,
+};
 use futures::StreamExt;
 use log::info;
 use nomos_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
-use tokio::sync::{RwLock, mpsc::Sender};
+use tokio::sync::RwLock;
 use url::Url;
 
-use crate::{config::IndexerConfig, message::Message, state::IndexerState};
+use crate::{config::IndexerConfig, state::IndexerState};
 
 pub mod config;
-pub mod message;
 pub mod state;
 
 pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
-    pub channel_sender: Sender<Message>,
+    pub sequencer_client: SequencerClient,
     pub config: IndexerConfig,
+    // ToDo: Remove this duplication by unifying addr representation in all clients.
     pub bedrock_url: Url,
-    pub channel_id: ChannelId,
     pub state: IndexerState,
 }
 
 impl IndexerCore {
-    pub fn new(
-        addr: &str,
-        auth: Option<BasicAuthCredentials>,
-        sender: Sender<Message>,
-        config: IndexerConfig,
-        channel_id: ChannelId,
-    ) -> Result<Self> {
+    pub fn new(config: IndexerConfig) -> Result<Self> {
         Ok(Self {
-            bedrock_client: BedrockClient::new(auth)?,
-            bedrock_url: Url::parse(addr)?,
-            channel_sender: sender,
+            bedrock_client: BedrockClient::new(
+                config
+                    .bedrock_client_config
+                    .auth
+                    .clone()
+                    .map(|auth| BasicAuthCredentials::new(auth.0, auth.1)),
+            )?,
+            bedrock_url: Url::parse(&config.bedrock_client_config.addr)?,
+            sequencer_client: SequencerClient::new_with_auth(
+                config.sequencer_client_config.addr.clone(),
+                config.sequencer_client_config.auth.clone(),
+            )?,
             config,
-            channel_id,
             // No state setup for now, future task.
             state: IndexerState {
                 latest_seen_block: Arc::new(RwLock::new(0)),
@@ -75,8 +79,10 @@ impl IndexerCore {
                 {
                     info!("Extracted L1 block at height {}", block_info.height);
 
-                    let l2_blocks_parsed =
-                        parse_blocks(l1_block.into_transactions().into_iter(), &self.channel_id);
+                    let l2_blocks_parsed = parse_blocks(
+                        l1_block.into_transactions().into_iter(),
+                        &self.config.channel_id,
+                    );
 
                     for l2_block in l2_blocks_parsed {
                         // State modification, will be updated in future
@@ -88,14 +94,13 @@ impl IndexerCore {
                         }
 
                         // Sending data into sequencer, may need to be expanded.
-                        let message = Message::BlockObserved {
-                            l1_block_id: block_info.height,
+                        let message = Message::L2BlockFinalized {
                             l2_block_height: l2_block.block_id,
                         };
 
-                        self.channel_sender.send(message.clone()).await?;
+                        let status = self.send_message_to_sequencer(message.clone()).await?;
 
-                        info!("Sent message {:#?} to sequencer", message);
+                        info!("Sent message {message:#?} to sequencer; status {status:#?}");
                     }
                 }
             }
@@ -106,6 +111,13 @@ impl IndexerCore {
             ))
             .await;
         }
+    }
+
+    pub async fn send_message_to_sequencer(
+        &self,
+        message: Message,
+    ) -> Result<PostIndexerMessageResponse> {
+        Ok(self.sequencer_client.post_indexer_message(message).await?)
     }
 }
 
