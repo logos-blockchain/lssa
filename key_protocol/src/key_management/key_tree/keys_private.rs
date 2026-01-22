@@ -100,9 +100,7 @@ impl KeyNode for ChildKeysPrivate {
             hasher.update([7u8]);
             hasher.update([0u8; 22]);
 
-            NullifierPublicKey {
-                0: <HashType>::from(hasher.finalize_fixed()),
-            }
+            NullifierPublicKey(<HashType>::from(hasher.finalize_fixed()))
         };
 
         let vpk = ViewingPublicKey::from_scalar(vsk);
