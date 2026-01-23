@@ -7,7 +7,6 @@
 //! for more details.
 
 use amm_core::Instruction;
-use amm_program;
 use nssa_core::program::{
     AccountPostState, ChainedCall, ProgramInput, read_nssa_inputs,
     write_nssa_outputs_with_chained_call,
