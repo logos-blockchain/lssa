@@ -235,16 +235,16 @@ fn build_privacy_transaction() -> PrivacyPreservingTransaction {
         ]],
     );
     let (output, proof) = circuit::execute_and_prove(
-        &[sender_pre, recipient_pre],
-        &Program::serialize_instruction(balance_to_move).unwrap(),
-        &[1, 2],
-        &[0xdeadbeef1, 0xdeadbeef2],
-        &[
+        vec![sender_pre, recipient_pre],
+        Program::serialize_instruction(balance_to_move).unwrap(),
+        vec![1, 2],
+        vec![0xdeadbeef1, 0xdeadbeef2],
+        vec![
             (sender_npk.clone(), sender_ss),
             (recipient_npk.clone(), recipient_ss),
         ],
-        &[sender_nsk],
-        &[Some(proof)],
+        vec![sender_nsk],
+        vec![Some(proof)],
         &program.into(),
     )
     .unwrap();
