@@ -303,6 +303,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "amm_core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "nssa_core",
+ "risc0-zkvm",
+ "serde",
+]
+
+[[package]]
+name = "amm_program"
+version = "0.1.0"
+dependencies = [
+ "amm_core",
+ "nssa_core",
+ "token_core",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2655,6 +2674,7 @@ dependencies = [
 name = "nssa"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
  "borsh",
  "bytemuck",
  "env_logger",
@@ -3051,6 +3071,8 @@ dependencies = [
 name = "programs"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
+ "amm_program",
  "nssa_core",
  "risc0-zkvm",
  "serde",
@@ -4799,6 +4821,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "wallet"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
  "anyhow",
  "async-stream",
  "base58",
