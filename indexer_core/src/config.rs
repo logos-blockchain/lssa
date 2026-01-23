@@ -1,3 +1,6 @@
+use std::{fs::File, io::BufReader, path::Path};
+
+use anyhow::Result;
 use nomos_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 
@@ -17,4 +20,13 @@ pub struct IndexerConfig {
     pub bedrock_client_config: ClientConfig,
     pub sequencer_client_config: ClientConfig,
     pub channel_id: ChannelId,
+}
+
+impl IndexerConfig {
+    pub fn from_path(config_home: &Path) -> Result<IndexerConfig> {
+        let file = File::open(config_home)?;
+        let reader = BufReader::new(file);
+
+        Ok(serde_json::from_reader(reader)?)
+    }
 }

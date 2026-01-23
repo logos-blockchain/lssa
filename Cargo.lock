@@ -2871,7 +2871,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee796ad498c8d9a1d68e477df8f754ed784ef875de1414ebdaf169f70a6a784"
 
 [[package]]
-name = "indexer"
+name = "indexer_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2882,6 +2882,7 @@ dependencies = [
  "log",
  "nomos-core",
  "serde",
+ "serde_json",
  "tokio",
  "url",
 ]
@@ -2944,6 +2945,7 @@ dependencies = [
  "env_logger",
  "futures",
  "hex",
+ "indexer_core",
  "key_protocol",
  "log",
  "nssa",

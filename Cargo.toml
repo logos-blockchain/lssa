@@ -20,7 +20,7 @@ members = [
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
   "bedrock_client",
-  "indexer",
+  "indexer_core",
 ]
 
 [workspace.dependencies]
@@ -36,7 +36,7 @@ sequencer_runner = { path = "sequencer_runner" }
 wallet = { path = "wallet" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
-indexer = { path = "indexer" }
+indexer_core = { path = "indexer_core" }
 
 tokio = { version = "1.28.2", features = [
   "net",

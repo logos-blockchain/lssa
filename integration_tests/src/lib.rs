@@ -10,6 +10,7 @@ use common::{
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use futures::FutureExt as _;
+use indexer_core::{IndexerCore, config::IndexerConfig};
 use log::debug;
 use nssa::PrivacyPreservingTransaction;
 use nssa_core::Commitment;
@@ -38,6 +39,7 @@ static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 pub struct TestContext {
     sequencer_server_handle: ServerHandle,
     sequencer_loop_handle: JoinHandle<Result<()>>,
+    indexer_loop_handle: Option<JoinHandle<Result<()>>>,
     sequencer_client: SequencerClient,
     wallet: WalletCore,
     _temp_sequencer_dir: TempDir,
@@ -68,7 +70,13 @@ impl TestContext {
         let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
             .context("Failed to create sequencer config from file")?;
 
-        Self::new_with_sequencer_config(sequencer_config).await
+        let indexer_config_path =
+            PathBuf::from(manifest_dir).join("configs/indexer/indexer_config.json");
+
+        let indexer_config = IndexerConfig::from_path(&indexer_config_path)
+            .context("Failed to create indexer config from file")?;
+
+        Self::new_with_sequencer_and_indexer_configs(sequencer_config, indexer_config).await
     }
 
     /// Create new test context with custom sequencer config.
@@ -105,6 +113,60 @@ impl TestContext {
         Ok(Self {
             sequencer_server_handle,
             sequencer_loop_handle,
+            indexer_loop_handle: None,
+            sequencer_client,
+            wallet,
+            _temp_sequencer_dir: temp_sequencer_dir,
+            _temp_wallet_dir: temp_wallet_dir,
+        })
+    }
+
+    /// Create new test context with custom sequencer and indexer configs.
+    ///
+    /// `home` and `port` fields of the provided config will be overridden to meet tests parallelism
+    /// requirements.
+    pub async fn new_with_sequencer_and_indexer_configs(
+        sequencer_config: SequencerConfig,
+        mut indexer_config: IndexerConfig,
+    ) -> Result<Self> {
+        // Ensure logger is initialized only once
+        *LOGGER;
+
+        debug!("Test context setup");
+
+        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, temp_sequencer_dir) =
+            Self::setup_sequencer(sequencer_config)
+                .await
+                .context("Failed to setup sequencer")?;
+
+        // Convert 0.0.0.0 to 127.0.0.1 for client connections
+        // When binding to port 0, the server binds to 0.0.0.0:<random_port>
+        // but clients need to connect to 127.0.0.1:<port> to work reliably
+        let sequencer_addr = if sequencer_addr.ip().is_unspecified() {
+            format!("http://127.0.0.1:{}", sequencer_addr.port())
+        } else {
+            format!("http://{sequencer_addr}")
+        };
+
+        let (wallet, temp_wallet_dir) = Self::setup_wallet(sequencer_addr.clone())
+            .await
+            .context("Failed to setup wallet")?;
+
+        let sequencer_client = SequencerClient::new(sequencer_addr.clone())
+            .context("Failed to create sequencer client")?;
+
+        indexer_config.sequencer_client_config.addr = sequencer_addr;
+
+        let indexer_core = IndexerCore::new(indexer_config)?;
+
+        let indexer_loop_handle = Some(tokio::spawn(async move {
+            indexer_core.subscribe_parse_block_stream().await
+        }));
+
+        Ok(Self {
+            sequencer_server_handle,
+            sequencer_loop_handle,
+            indexer_loop_handle,
             sequencer_client,
             wallet,
             _temp_sequencer_dir: temp_sequencer_dir,
@@ -193,6 +255,7 @@ impl Drop for TestContext {
         let Self {
             sequencer_server_handle,
             sequencer_loop_handle,
+            indexer_loop_handle,
             sequencer_client: _,
             wallet: _,
             _temp_sequencer_dir,
@@ -200,6 +263,9 @@ impl Drop for TestContext {
         } = self;
 
         sequencer_loop_handle.abort();
+        if let Some(indexer_loop_handle) = indexer_loop_handle {
+            indexer_loop_handle.abort();
+        }
 
         // Can't wait here as Drop can't be async, but anyway stop signal should be sent
         sequencer_server_handle.stop(true).now_or_never();

@@ -1,0 +1,16 @@
+{
+    "bedrock_client_config": {
+        "addr": "http://127.0.0.1:8080",
+        "auth": [
+            "user",
+            null
+        ]
+    },
+    "channel_id": "0101010101010101010101010101010101010101010101010101010101010101",
+    "max_retries": 10,
+    "resubscribe_interval_millis": 1000,
+    "sequencer_client_config": {
+        "addr": "will_be_replaced_in_runtime"
+    },
+    "start_delay_millis": 100
+}
