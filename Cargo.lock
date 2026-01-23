@@ -1707,6 +1707,7 @@ dependencies = [
  "risc0-zkvm",
  "risc0-zkvm-platform",
  "rln",
+ "rust-poseidon-bn254-pure",
 ]
 
 [[package]]
@@ -4129,6 +4130,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 
 [[package]]
+name = "rust-poseidon-bn254-pure"
+version = "0.0.1"
+source = "git+https://github.com/logos-storage/rust-poseidon-bn254-pure#012ab9f5cc772ddf85f0b1f7b700e6fccd278fd6"
+dependencies = [
+ "unroll",
+]
+
+[[package]]
 name = "rustc-hash"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5292,6 +5301,16 @@ checksum = "fc1de2c688dc15305988b563c3854064043356019f97a4b46276fe734c4f07ea"
 dependencies = [
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "unroll"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ad948c1cb799b1a70f836077721a92a35ac177d4daddf4c20a633786d4cf618"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

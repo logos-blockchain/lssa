@@ -10,6 +10,9 @@ use nssa_core::{
 };
 use rln::hashers::poseidon_hash;
 use rln::utils::{bytes_le_to_fr, fr_to_bytes_le};
+use rust_poseidon_bn254_pure::bn254::bigint::BigInt;
+use rust_poseidon_bn254_pure::bn254::field::Felt;
+use rust_poseidon_bn254_pure::poseidon2::permutation::permute_felt;
 
 /// Select which hash implementation to use
 #[derive(Clone, Copy)]
@@ -20,6 +23,8 @@ enum HashImpl {
     LightPoseidon = 1,
     /// Jellyfish poseidon2 hash (BN254 curve)
     JfPoseidon2 = 2,
+    /// Logos pure Rust poseidon2 hash (BN254 curve)
+    LogosPoseidon2 = 3,
 }
 
 impl HashImpl {
@@ -28,6 +33,7 @@ impl HashImpl {
             0 => Some(HashImpl::Zerokit),
             1 => Some(HashImpl::LightPoseidon),
             2 => Some(HashImpl::JfPoseidon2),
+            3 => Some(HashImpl::LogosPoseidon2),
             _ => None,
         }
     }
@@ -86,6 +92,7 @@ impl Membership {
             HashImpl::Zerokit => self.hash_zerokit_poseidon(),
             HashImpl::LightPoseidon => self.hash_light_poseidon(),
             HashImpl::JfPoseidon2 => self.hash_jf_poseidon2(),
+            HashImpl::LogosPoseidon2 => self.hash_logos_poseidon2(),
         }
     }
 
@@ -151,6 +158,51 @@ impl Membership {
         hash_bytes
     }
 
+    /// Hash using Logos pure Rust poseidon2 (BN254 curve)
+    fn hash_logos_poseidon2(&self) -> [u8; 32] {
+        // Convert 32 bytes to 8 u32s (little-endian)
+        fn bytes_to_u32_array(bytes: &[u8; 32]) -> [u32; 8] {
+            let mut result = [0u32; 8];
+            for i in 0..8 {
+                result[i] = u32::from_le_bytes(
+                    bytes[i * 4..(i + 1) * 4].try_into().unwrap()
+                );
+            }
+            result
+        }
+
+        // Convert 8 u32s back to 32 bytes (little-endian)
+        fn u32_array_to_bytes(arr: &[u32; 8]) -> [u8; 32] {
+            let mut result = [0u8; 32];
+            for i in 0..8 {
+                result[i * 4..(i + 1) * 4].copy_from_slice(&arr[i].to_le_bytes());
+            }
+            result
+        }
+
+        // Convert identity_commitment to Felt
+        let id_commitment_felt = Felt::checked_make(bytes_to_u32_array(&self.identity_commitment));
+
+        // Convert user_message_limit to Felt (as 32-byte little-endian)
+        let mut user_limit_bytes = [0u8; 32];
+        user_limit_bytes[..4].copy_from_slice(&self.user_message_limit.to_le_bytes());
+        let user_limit_felt = Felt::checked_make(bytes_to_u32_array(&user_limit_bytes));
+
+        // Create the input triple: 2 inputs + 1 capacity element (zero)
+        let input: (Felt, Felt, Felt) = (id_commitment_felt, user_limit_felt, Felt::zero());
+
+        // Perform the permutation
+        let output = permute_felt(&input);
+
+        // Extract the first element as the hash result
+        let hash_felt = output.0;
+        let hash_big = Felt::unwrap(hash_felt);
+
+        // Convert back to bytes
+        let hash_limbs: [u32; 8] = BigInt::unwrap(hash_big);
+        u32_array_to_bytes(&hash_limbs)
+    }
+
 }
 
 const USER_MESSAGE_LIMIT_MIN: u32 = 300;
@@ -166,7 +218,7 @@ fn validate_and_store_identity_commitment(
     }
 
     // Instruction layout (after the 1-byte instruction type):
-    // - Byte 0: hash_impl (0=Zerokit, 1=LightPoseidon, 2=JfPoseidon2)
+    // - Byte 0: hash_impl (0=Zerokit, 1=LightPoseidon, 2=JfPoseidon2, 3=LogosPoseidon2)
     // - Bytes 1-2: hash_iterations (u16 little-endian)
     // - Bytes 3-34: identity commitment (32 bytes)
     // - Bytes 35-66: user message limit (32 bytes, only first 4 used as u32)

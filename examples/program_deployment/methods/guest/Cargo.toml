@@ -15,3 +15,4 @@ light-poseidon = "0.2"
 ark-bn254 = "0.4"
 ark-ff = "0.4"
 jf-poseidon2 = { default-features = false, features = ["bn254"], git = "https://github.com/EspressoSystems/jellyfish.git", rev = "dc166cf0f803c3e5067f9dfcc21e3dade986a447" }
+rust-poseidon-bn254-pure = { git = "https://github.com/logos-storage/rust-poseidon-bn254-pure" }

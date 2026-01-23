@@ -21,7 +21,7 @@ use wallet::WalletCore;
 //   cargo run --bin run_rln_memberships -- \
 //       <program_binary> \
 //       [--account-id <account_id>] \
-//       [--hash <zerokit|light|jellyfish>] \
+//       [--hash <zerokit|light|jellyfish|logos>] \
 //       [--iterations <count>] \
 //       [--user-limit <hex>]
 //
@@ -49,6 +49,8 @@ enum HashImplArg {
     Light,
     /// Jellyfish poseidon2 hash (BN254 curve)
     Jellyfish,
+    /// Logos pure Rust poseidon2 hash (BN254 curve)
+    Logos,
 }
 
 impl HashImplArg {
@@ -57,6 +59,7 @@ impl HashImplArg {
             HashImplArg::Zerokit => 0,
             HashImplArg::Light => 1,
             HashImplArg::Jellyfish => 2,
+            HashImplArg::Logos => 3,
         }
     }
 }
