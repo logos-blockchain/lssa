@@ -142,7 +142,7 @@ impl TestContext {
             ..Default::default()
         };
 
-        let wallet = WalletCore::new_init_storage(
+        let (wallet, _mnemonic) = WalletCore::new_init_storage(
             config_path,
             storage_path,
             Some(config_overrides),

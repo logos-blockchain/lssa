@@ -1,6 +1,7 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use anyhow::Result;
+use bip39::Mnemonic;
 use key_protocol::{
     key_management::{
         key_tree::{KeyTreePrivate, KeyTreePublic, chain_index::ChainIndex},
@@ -88,7 +89,7 @@ impl WalletChainStore {
         })
     }
 
-    pub fn new_storage(config: WalletConfig, password: String) -> Result<Self> {
+    pub fn new_storage(config: WalletConfig, password: String) -> Result<(Self, Mnemonic)> {
         let mut public_init_acc_map = HashMap::new();
         let mut private_init_acc_map = HashMap::new();
 
@@ -109,13 +110,42 @@ impl WalletChainStore {
             }
         }
 
-        let public_tree = KeyTreePublic::new(&SeedHolder::new_mnemonic(password.clone()));
-        let private_tree = KeyTreePrivate::new(&SeedHolder::new_mnemonic(password));
+        // TODO: Use password for storage encryption
+        let _ = password;
+        let (seed_holder, mnemonic) = SeedHolder::new_mnemonic("");
+        let public_tree = KeyTreePublic::new(&seed_holder);
+        let private_tree = KeyTreePrivate::new(&seed_holder);
+
+        Ok((
+            Self {
+                user_data: NSSAUserData::new_with_accounts(
+                    public_init_acc_map,
+                    private_init_acc_map,
+                    public_tree,
+                    private_tree,
+                )?,
+                wallet_config: config,
+            },
+            mnemonic,
+        ))
+    }
+
+    /// Restore storage from an existing mnemonic phrase.
+    pub fn restore_storage(
+        config: WalletConfig,
+        mnemonic: &Mnemonic,
+        password: &str,
+    ) -> Result<Self> {
+        // TODO: Use password for storage encryption
+        let _ = password;
+        let seed_holder = SeedHolder::from_mnemonic(mnemonic, "");
+        let public_tree = KeyTreePublic::new(&seed_holder);
+        let private_tree = KeyTreePrivate::new(&seed_holder);
 
         Ok(Self {
             user_data: NSSAUserData::new_with_accounts(
-                public_init_acc_map,
-                private_init_acc_map,
+                HashMap::new(),
+                HashMap::new(),
                 public_tree,
                 private_tree,
             )?,
