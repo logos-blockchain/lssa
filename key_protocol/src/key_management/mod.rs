@@ -64,9 +64,7 @@ impl KeyChain {
         ephemeral_public_key_sender: EphemeralPublicKey,
     ) -> SharedSecretKey {
         SharedSecretKey::new(
-            &self
-                .secret_spending_key
-                .generate_incoming_viewing_secret_key(),
+            &self.secret_spending_key.generate_viewing_secret_key(),
             &ephemeral_public_key_sender,
         )
     }

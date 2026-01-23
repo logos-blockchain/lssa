@@ -1,6 +1,9 @@
+use core::arch;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use risc0_zkvm::sha::{Impl, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, digest::FixedOutput};
 
 use crate::{Commitment, account::AccountId};
 
@@ -27,8 +30,18 @@ impl AsRef<[u8]> for NullifierPublicKey {
 
 impl From<&NullifierSecretKey> for NullifierPublicKey {
     fn from(value: &NullifierSecretKey) -> Self {
+        // let mut bytes = Vec::new();
+        // const PREFIX: &[u8; 9] = b"NSSA_keys";
+        // const SUFFIX_1: &[u8; 1] = &[7];
+        // const SUFFIX_2: &[u8; 22] = &[0; 22];
+        // bytes.extend_from_slice(PREFIX);
+        // bytes.extend_from_slice(value);
+        // bytes.extend_from_slice(SUFFIX_1);
+        // bytes.extend_from_slice(SUFFIX_2);
+        // Self(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
+
         let mut bytes = Vec::new();
-        const PREFIX: &[u8; 9] = b"NSSA_keys";
+        const PREFIX: &[u8; 9] = b"LEE/chain";
         const SUFFIX_1: &[u8; 1] = &[7];
         const SUFFIX_2: &[u8; 22] = &[0; 22];
         bytes.extend_from_slice(PREFIX);

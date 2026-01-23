@@ -18,7 +18,7 @@ pub struct SeedHolder {
     pub(crate) seed: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 /// Secret spending key object. Can produce `PrivateKeyHolder` objects.
 pub struct SecretSpendingKey(pub(crate) [u8; 32]);
 
@@ -31,7 +31,6 @@ pub type OutgoingViewingSecretKey = Scalar;
 pub struct PrivateKeyHolder {
     pub nullifier_secret_key: NullifierSecretKey,
     pub(crate) incoming_viewing_secret_key: IncomingViewingSecretKey,
-    pub outgoing_viewing_secret_key: OutgoingViewingSecretKey,
 }
 
 impl SeedHolder {
@@ -78,21 +77,21 @@ impl SecretSpendingKey {
     pub fn generate_nullifier_secret_key(&self) -> NullifierSecretKey {
         let mut hasher = sha2::Sha256::new();
 
-        hasher.update("NSSA_keys");
+        hasher.update("LEE/keys");
         hasher.update(self.0);
         hasher.update([1u8]);
-        hasher.update([0u8; 22]);
+        hasher.update([0u8; 23]);
 
         <NullifierSecretKey>::from(hasher.finalize_fixed())
     }
 
-    pub fn generate_incoming_viewing_secret_key(&self) -> IncomingViewingSecretKey {
+    pub fn generate_viewing_secret_key(&self) -> IncomingViewingSecretKey {
         let mut hasher = sha2::Sha256::new();
 
-        hasher.update("NSSA_keys");
+        hasher.update("LEE/keys");
         hasher.update(self.0);
         hasher.update([2u8]);
-        hasher.update([0u8; 22]);
+        hasher.update([0u8; 23]);
 
         <HashType>::from(hasher.finalize_fixed())
     }
@@ -111,9 +110,44 @@ impl SecretSpendingKey {
     pub fn produce_private_key_holder(&self) -> PrivateKeyHolder {
         PrivateKeyHolder {
             nullifier_secret_key: self.generate_nullifier_secret_key(),
-            incoming_viewing_secret_key: self.generate_incoming_viewing_secret_key(),
-            outgoing_viewing_secret_key: self.generate_outgoing_viewing_secret_key(),
+            incoming_viewing_secret_key: self.generate_viewing_secret_key(),
         }
+    }
+
+    pub fn generate_child_nullifier_secret_key(&self, cci: u32) -> NullifierSecretKey {
+        let mut key = vec![];
+        key.extend_from_slice(b"LEE/chain");
+
+        let mut input = vec![];
+
+        input.extend_from_slice(&self.0);
+        input.extend_from_slice(&[1u8]);
+        input.extend_from_slice(&cci.to_le_bytes());
+        input.extend_from_slice(&[0u8; 22]);
+
+        let hash_value = hmac_sha512::HMAC::mac(input, key);
+
+        *hash_value
+            .first_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get first 32")
+    }
+
+    pub fn generate_child_viewing_secret_key(&self, cci: u32) -> IncomingViewingSecretKey {
+        let mut key = vec![];
+        key.extend_from_slice(b"LEE/chain");
+
+        let mut input = vec![];
+
+        input.extend_from_slice(&self.0);
+        input.extend_from_slice(&[2u8]);
+        input.extend_from_slice(&cci.to_le_bytes());
+        input.extend_from_slice(&[0u8; 22]);
+
+        let hash_value = hmac_sha512::HMAC::mac(input, key);
+
+        *hash_value
+            .first_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get first 32")
     }
 }
 
@@ -155,7 +189,7 @@ mod tests {
 
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let _ = top_secret_key_holder.generate_incoming_viewing_secret_key();
+        let _ = top_secret_key_holder.generate_viewing_secret_key();
     }
 
     #[test]
