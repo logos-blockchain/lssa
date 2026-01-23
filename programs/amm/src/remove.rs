@@ -1,27 +1,22 @@
-fn remove_liquidity(
-    pre_states: &[AccountWithMetadata],
-    amounts: &[u128],
+use amm_core::{PoolDefinition, compute_liquidity_token_pda_seed, compute_vault_pda_seed};
+use nssa_core::{
+    account::AccountWithMetadata,
+    program::{AccountPostState, ChainedCall},
+};
+
+#[expect(clippy::too_many_arguments, reason = "TODO: Fix later")]
+pub fn remove_liquidity(
+    pool: AccountWithMetadata,
+    vault_a: AccountWithMetadata,
+    vault_b: AccountWithMetadata,
+    pool_definition_lp: AccountWithMetadata,
+    user_holding_a: AccountWithMetadata,
+    user_holding_b: AccountWithMetadata,
+    user_holding_lp: AccountWithMetadata,
+    remove_liquidity_amount: u128,
+    min_amount_to_remove_token_a: u128,
+    min_amount_to_remove_token_b: u128,
 ) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
-    if pre_states.len() != 7 {
-        panic!("Invalid number of input accounts");
-    }
-
-    let pool = &pre_states[0];
-    let vault_a = &pre_states[1];
-    let vault_b = &pre_states[2];
-    let pool_definition_lp = &pre_states[3];
-    let user_holding_a = &pre_states[4];
-    let user_holding_b = &pre_states[5];
-    let user_holding_lp = &pre_states[6];
-
-    if amounts.len() != 3 {
-        panic!("Invalid number of balances");
-    }
-
-    let amount_lp = amounts[0];
-    let amount_min_a = amounts[1];
-    let amount_min_b = amounts[2];
-
     // 1. Fetch Pool state
     let pool_def_data = PoolDefinition::parse(&pool.account.data)
         .expect("Remove liquidity: AMM Program expects a valid Pool Definition Account");
@@ -50,11 +45,11 @@ fn remove_liquidity(
     running_vault_a.is_authorized = true;
     running_vault_b.is_authorized = true;
 
-    if amount_min_a == 0 || amount_min_b == 0 {
+    if min_amount_to_remove_token_a == 0 || min_amount_to_remove_token_b == 0 {
         panic!("Minimum withdraw amount must be nonzero");
     }
 
-    if amount_lp == 0 {
+    if remove_liquidity_amount == 0 {
         panic!("Liquidity amount must be nonzero");
     }
 
@@ -78,21 +73,21 @@ fn remove_liquidity(
     }
 
     let withdraw_amount_a =
-        (pool_def_data.reserve_a * amount_lp) / pool_def_data.liquidity_pool_supply;
+        (pool_def_data.reserve_a * remove_liquidity_amount) / pool_def_data.liquidity_pool_supply;
     let withdraw_amount_b =
-        (pool_def_data.reserve_b * amount_lp) / pool_def_data.liquidity_pool_supply;
+        (pool_def_data.reserve_b * remove_liquidity_amount) / pool_def_data.liquidity_pool_supply;
 
     // 3. Validate and slippage check
-    if withdraw_amount_a < amount_min_a {
+    if withdraw_amount_a < min_amount_to_remove_token_a {
         panic!("Insufficient minimal withdraw amount (Token A) provided for liquidity amount");
     }
-    if withdraw_amount_b < amount_min_b {
+    if withdraw_amount_b < min_amount_to_remove_token_b {
         panic!("Insufficient minimal withdraw amount (Token B) provided for liquidity amount");
     }
 
     // 4. Calculate LP to reduce cap by
-    let delta_lp: u128 =
-        (pool_def_data.liquidity_pool_supply * amount_lp) / pool_def_data.liquidity_pool_supply;
+    let delta_lp: u128 = (pool_def_data.liquidity_pool_supply * remove_liquidity_amount)
+        / pool_def_data.liquidity_pool_supply;
 
     let active: bool = pool_def_data.liquidity_pool_supply - delta_lp != 0;
 
@@ -150,12 +145,12 @@ fn remove_liquidity(
 
     let post_states = vec![
         AccountPostState::new(pool_post.clone()),
-        AccountPostState::new(pre_states[1].account.clone()),
-        AccountPostState::new(pre_states[2].account.clone()),
-        AccountPostState::new(pre_states[3].account.clone()),
-        AccountPostState::new(pre_states[4].account.clone()),
-        AccountPostState::new(pre_states[5].account.clone()),
-        AccountPostState::new(pre_states[6].account.clone()),
+        AccountPostState::new(vault_a.account.clone()),
+        AccountPostState::new(vault_b.account.clone()),
+        AccountPostState::new(pool_definition_lp.account.clone()),
+        AccountPostState::new(user_holding_a.account.clone()),
+        AccountPostState::new(user_holding_b.account.clone()),
+        AccountPostState::new(user_holding_lp.account.clone()),
     ];
 
     (post_states, chained_calls)

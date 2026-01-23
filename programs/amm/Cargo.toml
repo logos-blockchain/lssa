@@ -1,0 +1,9 @@
+[package]
+name = "amm_program"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nssa_core.workspace = true
+token_core.workspace = true
+amm_core.workspace = true

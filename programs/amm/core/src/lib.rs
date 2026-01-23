@@ -1,330 +1,248 @@
-//! This crate contains core data structures and utilities for the Token Program.
+//! This crate contains core data structures and utilities for the AMM Program.
 
-use borsh::{BorshDeserialize, BorshSerialize};
-use nssa_core::account::{AccountId, Data};
+use nssa_core::{
+    account::{AccountId, Data},
+    program::{PdaSeed, ProgramId},
+};
 use serde::{Deserialize, Serialize};
-
-pub const CURRENT_VERSION: u8 = 1;
-
-
-// The AMM program has five functions (four directly accessible via instructions):
-// 1. New AMM definition. Arguments to this function are:
-//      * Seven accounts: [amm_pool, vault_holding_a, vault_holding_b, pool_lp, user_holding_a,
-//        user_holding_b, user_holding_lp]. For new AMM Pool: amm_pool, vault_holding_a,
-//        vault_holding_b, pool_lp and user_holding_lp are default accounts. amm_pool is a default
-//        account that will initiate the amm definition account values vault_holding_a is a token
-//        holding account for token a vault_holding_b is a token holding account for token b pool_lp
-//        is a token holding account for the pool's lp token user_holding_a is a token holding
-//        account for token a user_holding_b is a token holding account for token b user_holding_lp
-//        is a token holding account for lp token
-//      * PDA remark: Accounts amm_pool, vault_holding_a, vault_holding_b and pool_lp are PDA. The
-//        AccountId for these accounts must be computed using: amm_pool AccountId <-
-//        compute_pool_pda vault_holding_a, vault_holding_b <- compute_vault_pda pool_lp
-//        <-compute_liquidity_token_pda
-//      * Requires authorization: user_holding_a, user_holding_b
-//      * An instruction data of 65-bytes, indicating the initial amm reserves' balances and
-//        token_program_id with the following layout: [0x00 || array of balances (little-endian 16
-//        bytes) || AMM_PROGRAM_ID)]
-//      * Internally, calls compute_liquidity_token_pda_seed, compute_vault_pda_seed to authorize
-//        transfers.
-//      * Internally, calls compute_pool_da, compute_vault_pda and compute_vault_pda to check
-//        various AccountIds are correct.
-// 3. Add liquidity Arguments to this function are:
-//      * Seven accounts: [amm_pool, vault_holding_a, vault_holding_b, pool_lp, user_holding_a,
-//        user_holding_a, user_holding_lp].
-//      * Requires authorization: user_holding_a, user_holding_b
-//      * An instruction data byte string of length 49, amounts for minimum amount of liquidity from
-//        add (min_amount_lp),
-//      * max amount added for each token (max_amount_a and max_amount_b); indicate [0x02 || array
-//        of of balances (little-endian 16 bytes)].
-//      * Internally, calls compute_liquidity_token_pda_seed to compute liquidity pool PDA seed.
-// 4. Remove liquidity
-//      * Seven accounts: [amm_pool, vault_holding_a, vault_holding_b, pool_lp, user_holding_a,
-//        user_holding_a, user_holding_lp].
-//      * Requires authorization: user_holding_lp
-//      * An instruction data byte string of length 49, amounts for minimum amount of liquidity to
-//        redeem (balance_lp),
-//      * minimum balance of each token to remove (min_amount_a and min_amount_b); indicate [0x03 ||
-//        array of balances (little-endian 16 bytes)].
-//      * Internally, calls compute_vault_pda_seed to compute vault_a and vault_b's PDA seed.
-
-
 
 /// AMM Program Instruction.
 #[derive(Serialize, Deserialize)]
 pub enum Instruction {
-
-    /// Create a new fungible token definition without metadata.
+    /// Initializes a new Pool (or re-initializes an inactive Pool).
     ///
     /// Required accounts:
-    /// - Token Definition account (uninitialized),
-    /// - Token Holding account (uninitialized).
-    NewDefinition { name: String, total_supply: u128 },
+    /// - AMM Pool
+    /// - Vault Holding Account for Token A
+    /// - Vault Holding Account for Token B
+    /// - Pool Liquidity Token Definition
+    /// - User Holding Account for Token A (authorized)
+    /// - User Holding Account for Token B (authorized)
+    /// - User Holding Account for Pool Liquidity
+    NewDefinition {
+        token_a_amount: u128,
+        token_b_amount: u128,
+        amm_program_id: ProgramId,
+    },
 
-    /// Create a new fungible or non-fungible token definition with metadata.
+    /// Adds liquidity to the Pool
     ///
     /// Required accounts:
-    /// - Token Definition account (uninitialized),
-    /// - Token Holding account (uninitialized),
-    /// - Token Metadata account (uninitialized).
-    NewDefinitionWithMetadata {
-        new_definition: NewTokenDefinition,
-        /// Boxed to avoid large enum variant size
-        metadata: Box<NewTokenMetadata>,
+    /// - AMM Pool (initialized)
+    /// - Vault Holding Account for Token A (initialized)
+    /// - Vault Holding Account for Token B (initialized)
+    /// - Pool Liquidity Token Definition (initialized)
+    /// - User Holding Account for Token A (authorized)
+    /// - User Holding Account for Token B (authorized)
+    /// - User Holding Account for Pool Liquidity
+    AddLiquidity {
+        min_amount_liquidity: u128,
+        max_amount_to_add_token_a: u128,
+        max_amount_to_add_token_b: u128,
     },
 
-
-    
-    /// Initialize a token holding account for a given token definition.
+    /// Removes liquidity from the Pool
     ///
     /// Required accounts:
-    /// - Token Definition account (initialized),
-    /// - Token Holding account (uninitialized),
-    InitializeAccount,
+    /// - AMM Pool (initialized)
+    /// - Vault Holding Account for Token A (initialized)
+    /// - Vault Holding Account for Token B (initialized)
+    /// - Pool Liquidity Token Definition (initialized)
+    /// - User Holding Account for Token A (initialized)
+    /// - User Holding Account for Token B (initialized)
+    /// - User Holding Account for Pool Liquidity (authorized)
+    RemoveLiquidity {
+        remove_liquidity_amount: u128,
+        min_amount_to_remove_token_a: u128,
+        min_amount_to_remove_token_b: u128,
+    },
 
-
-// 2. Swap assets Arguments to this function are:
-//      * Five accounts: [amm_pool, vault_holding_a, vault_holding_b, user_holding_a,
-//        user_holding_b].
-//      * Requires authorization: user holding account associated to TOKEN_DEFINITION_ID (either
-//        user_holding_a or user_holding_b)
-//      * An instruction data byte string of length 65, indicating which token type to swap,
-//        quantity of tokens put into the swap (of type TOKEN_DEFINITION_ID) and min_amount_out.
-//        [0x01 || amount (little-endian 16 bytes) || TOKEN_DEFINITION_ID].
-//      * Internally, calls swap logic.
-//              * Four accounts: [user_deposit, vault_deposit, vault_withdraw, user_withdraw].
-//                user_deposit and vault_deposit define deposit transaction. vault_withdraw and
-//                user_withdraw define withdraw transaction.
-//              * deposit_amount is the amount for user_deposit -> vault_deposit transfer.
-//              * reserve_amounts is the pool's reserves; used to compute the withdraw amount.
-//              * Outputs the token transfers as a Vec<ChainedCall> and the withdraw amount.
-
-
-    ///TODO update description
-    /// Burn tokens from the holder's account.
+    /// Swap some quantity of Tokens (either Token A or Token B)
+    /// while maintaining the Pool constant product.
     ///
     /// Required accounts:
-    /// - Token Definition account (initialized),
-    /// - Token Holding account (authorized).
-    Burn { amount_to_burn: u128 },
-
-
-/*
-fn add_liquidity(
-    pre_states: &[AccountWithMetadata],
-    balances: &[u128],
-) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
-    if pre_states.len() != 7 {
-        panic!("Invalid number of input accounts");
-    }
-
-    let pool = &pre_states[0];
-    let vault_a = &pre_states[1];
-    let vault_b = &pre_states[2];
-    let pool_definition_lp = &pre_states[3];
-    let user_holding_a = &pre_states[4];
-    let user_holding_b = &pre_states[5];
-    let user_holding_lp = &pre_states[6];
-
-        let min_amount_lp = balances[0];
-    let max_amount_a = balances[1];
-    let max_amount_b = balances[2];
-
-*/
-
-    ///TODO: update for add
-    /// Mint new tokens to the holder's account.
-    ///
-    /// Required accounts:
-    /// - Token Definition account (authorized),
-    /// - Token Holding account.
-    AddLiquidity { min_amount_liquidity: u128, max_amount_to_add_token_a: u128, max_amount_to_add_token_b: u128 },
-
-
-    /*
-    fn remove_liquidity(
-    pre_states: &[AccountWithMetadata],
-    amounts: &[u128],
-) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
-    if pre_states.len() != 7 {
-        panic!("Invalid number of input accounts");
-    }
-
-    let pool = &pre_states[0];
-    let vault_a = &pre_states[1];
-    let vault_b = &pre_states[2];
-    let pool_definition_lp = &pre_states[3];
-    let user_holding_a = &pre_states[4];
-    let user_holding_b = &pre_states[5];
-    let user_holding_lp = &pre_states[6];
-
-    if amounts.len() != 3 {
-        panic!("Invalid number of balances");
-    }
-
-    let amount_lp = amounts[0];
-    let amount_min_a = amounts[1];
-    let amount_min_b = amounts[2];
-    
-     */
-    //TODO types
-    RemoveLiquidity { remove_liquidity_amount: u128, min_amount_to_remove_token_a: u128, min_amount_to_remove_token_b: u128 }
-}
-
-/*
-
-#[derive(Serialize, Deserialize)]
-pub enum NewTokenDefinition {
-    Fungible { name: String, total_supply: u128 },
-    NonFungible { name: String, print_balance: u128 },
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub enum TokenDefinition {
-    Fungible {
-        name: String,
-        total_supply: u128,
-        metadata_id: Option<AccountId>,
-    },
-    NonFungible {
-        name: String,
-        metadata_id: AccountId,
+    /// - AMM Pool (initialized)
+    /// - Vault Holding Account for Token A (initialized)
+    /// - Vault Holding Account for Token B (initialized)
+    /// - User Holding Account for Token A
+    /// - User Holding Account for Token B
+    /// Either User Holding Account for Token A or Token B is authorized.
+    Swap {
+        swap_amount_in: u128,
+        min_amount_out: u128,
+        token_definition_id_in: AccountId,
     },
 }
 
-impl TryFrom<&Data> for TokenDefinition {
-    type Error = std::io::Error;
+const POOL_DEFINITION_DATA_SIZE: usize = 225;
 
-    fn try_from(data: &Data) -> Result<Self, Self::Error> {
-        TokenDefinition::try_from_slice(data.as_ref())
-    }
+#[derive(Clone, Default)]
+pub struct PoolDefinition {
+    pub definition_token_a_id: AccountId,
+    pub definition_token_b_id: AccountId,
+    pub vault_a_id: AccountId,
+    pub vault_b_id: AccountId,
+    pub liquidity_pool_id: AccountId,
+    pub liquidity_pool_supply: u128,
+    pub reserve_a: u128,
+    pub reserve_b: u128,
+    /// Fees are currently not used
+    pub fees: u128,
+    /// A pool becomes inactive (active = false)
+    /// once all of its liquidity has been removed (e.g., reserves are emptied and
+    /// liquidity_pool_supply = 0)
+    pub active: bool,
 }
 
-impl From<&TokenDefinition> for Data {
-    fn from(definition: &TokenDefinition) -> Self {
-        // Using size_of_val as size hint for Vec allocation
-        let mut data = Vec::with_capacity(std::mem::size_of_val(definition));
+impl PoolDefinition {
+    pub fn into_data(self) -> Data {
+        let mut bytes = [0; POOL_DEFINITION_DATA_SIZE];
+        bytes[0..32].copy_from_slice(&self.definition_token_a_id.to_bytes());
+        bytes[32..64].copy_from_slice(&self.definition_token_b_id.to_bytes());
+        bytes[64..96].copy_from_slice(&self.vault_a_id.to_bytes());
+        bytes[96..128].copy_from_slice(&self.vault_b_id.to_bytes());
+        bytes[128..160].copy_from_slice(&self.liquidity_pool_id.to_bytes());
+        bytes[160..176].copy_from_slice(&self.liquidity_pool_supply.to_le_bytes());
+        bytes[176..192].copy_from_slice(&self.reserve_a.to_le_bytes());
+        bytes[192..208].copy_from_slice(&self.reserve_b.to_le_bytes());
+        bytes[208..224].copy_from_slice(&self.fees.to_le_bytes());
+        bytes[224] = self.active as u8;
 
-        BorshSerialize::serialize(definition, &mut data)
-            .expect("Serialization to Vec should not fail");
-
-        Data::try_from(data).expect("Token definition encoded data should fit into Data")
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub enum TokenHolding {
-    Fungible {
-        definition_id: AccountId,
-        balance: u128,
-    },
-    NftMaster {
-        definition_id: AccountId,
-        /// The amount of printed copies left - 1 (1 reserved for master copy itself).
-        print_balance: u128,
-    },
-    NftPrintedCopy {
-        definition_id: AccountId,
-        /// Whether nft is owned by the holder.
-        owned: bool,
-    },
-}
-
-impl TokenHolding {
-    pub fn zeroized_clone_from(other: &Self) -> Self {
-        match other {
-            TokenHolding::Fungible { definition_id, .. } => TokenHolding::Fungible {
-                definition_id: *definition_id,
-                balance: 0,
-            },
-            TokenHolding::NftMaster { definition_id, .. } => TokenHolding::NftMaster {
-                definition_id: *definition_id,
-                print_balance: 0,
-            },
-            TokenHolding::NftPrintedCopy { definition_id, .. } => TokenHolding::NftPrintedCopy {
-                definition_id: *definition_id,
-                owned: false,
-            },
-        }
+        bytes
+            .to_vec()
+            .try_into()
+            .expect("225 bytes should fit into Data")
     }
 
-    pub fn zeroized_from_definition(
-        definition_id: AccountId,
-        definition: &TokenDefinition,
-    ) -> Self {
-        match definition {
-            TokenDefinition::Fungible { .. } => TokenHolding::Fungible {
-                definition_id,
-                balance: 0,
-            },
-            TokenDefinition::NonFungible { .. } => TokenHolding::NftPrintedCopy {
-                definition_id,
-                owned: false,
-            },
-        }
-    }
+    pub fn parse(data: &[u8]) -> Option<Self> {
+        if data.len() != POOL_DEFINITION_DATA_SIZE {
+            None
+        } else {
+            let definition_token_a_id = AccountId::new(data[0..32].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token A definition"));
+            let definition_token_b_id = AccountId::new(data[32..64].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault B definition"));
+            let vault_a_id = AccountId::new(data[64..96].try_into().expect(
+                "Parse data: The AMM program must be provided a valid AccountId for Vault A",
+            ));
+            let vault_b_id = AccountId::new(data[96..128].try_into().expect(
+                "Parse data: The AMM program must be provided a valid AccountId for Vault B",
+            ));
+            let liquidity_pool_id = AccountId::new(data[128..160].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token liquidity pool definition"));
+            let liquidity_pool_supply = u128::from_le_bytes(data[160..176].try_into().expect(
+                "Parse data: The AMM program must be provided a valid u128 for liquidity cap",
+            ));
+            let reserve_a = u128::from_le_bytes(data[176..192].try_into().expect(
+                "Parse data: The AMM program must be provided a valid u128 for reserve A balance",
+            ));
+            let reserve_b = u128::from_le_bytes(data[192..208].try_into().expect(
+                "Parse data: The AMM program must be provided a valid u128 for reserve B balance",
+            ));
+            let fees = u128::from_le_bytes(
+                data[208..224]
+                    .try_into()
+                    .expect("Parse data: The AMM program must be provided a valid u128 for fees"),
+            );
 
-    pub fn definition_id(&self) -> AccountId {
-        match self {
-            TokenHolding::Fungible { definition_id, .. } => *definition_id,
-            TokenHolding::NftMaster { definition_id, .. } => *definition_id,
-            TokenHolding::NftPrintedCopy { definition_id, .. } => *definition_id,
+            let active = match data[224] {
+                0 => false,
+                1 => true,
+                _ => panic!("Parse data: The AMM program must be provided a valid bool for active"),
+            };
+
+            Some(Self {
+                definition_token_a_id,
+                definition_token_b_id,
+                vault_a_id,
+                vault_b_id,
+                liquidity_pool_id,
+                liquidity_pool_supply,
+                reserve_a,
+                reserve_b,
+                fees,
+                active,
+            })
         }
     }
 }
 
-impl TryFrom<&Data> for TokenHolding {
-    type Error = std::io::Error;
-
-    fn try_from(data: &Data) -> Result<Self, Self::Error> {
-        TokenHolding::try_from_slice(data.as_ref())
-    }
+pub fn compute_pool_pda(
+    amm_program_id: ProgramId,
+    definition_token_a_id: AccountId,
+    definition_token_b_id: AccountId,
+) -> AccountId {
+    AccountId::from((
+        &amm_program_id,
+        &compute_pool_pda_seed(definition_token_a_id, definition_token_b_id),
+    ))
 }
 
-impl From<&TokenHolding> for Data {
-    fn from(holding: &TokenHolding) -> Self {
-        // Using size_of_val as size hint for Vec allocation
-        let mut data = Vec::with_capacity(std::mem::size_of_val(holding));
+pub fn compute_pool_pda_seed(
+    definition_token_a_id: AccountId,
+    definition_token_b_id: AccountId,
+) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
 
-        BorshSerialize::serialize(holding, &mut data)
-            .expect("Serialization to Vec should not fail");
+    let (token_1, token_2) = match definition_token_a_id
+        .value()
+        .cmp(definition_token_b_id.value())
+    {
+        std::cmp::Ordering::Less => (definition_token_b_id, definition_token_a_id),
+        std::cmp::Ordering::Greater => (definition_token_a_id, definition_token_b_id),
+        std::cmp::Ordering::Equal => panic!("Definitions match"),
+    };
 
-        Data::try_from(data).expect("Token holding encoded data should fit into Data")
-    }
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&token_1.to_bytes());
+    bytes[32..].copy_from_slice(&token_2.to_bytes());
+
+    PdaSeed::new(
+        Impl::hash_bytes(&bytes)
+            .as_bytes()
+            .try_into()
+            .expect("Hash output must be exactly 32 bytes long"),
+    )
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct NewTokenMetadata {
-    pub uri: String,
-    pub creators: String,
+pub fn compute_vault_pda(
+    amm_program_id: ProgramId,
+    pool_id: AccountId,
+    definition_token_id: AccountId,
+) -> AccountId {
+    AccountId::from((
+        &amm_program_id,
+        &compute_vault_pda_seed(pool_id, definition_token_id),
+    ))
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub struct TokenMetadata {
-    pub version: u8,
-    pub definition_id: AccountId,
-    pub uri: String,
-    pub creators: String,
-    /// Block id
-    pub primary_sale_date: u64,
+pub fn compute_vault_pda_seed(pool_id: AccountId, definition_token_id: AccountId) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
+
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&pool_id.to_bytes());
+    bytes[32..].copy_from_slice(&definition_token_id.to_bytes());
+
+    PdaSeed::new(
+        Impl::hash_bytes(&bytes)
+            .as_bytes()
+            .try_into()
+            .expect("Hash output must be exactly 32 bytes long"),
+    )
 }
 
-impl TryFrom<&Data> for TokenMetadata {
-    type Error = std::io::Error;
-
-    fn try_from(data: &Data) -> Result<Self, Self::Error> {
-        TokenMetadata::try_from_slice(data.as_ref())
-    }
+pub fn compute_liquidity_token_pda(amm_program_id: ProgramId, pool_id: AccountId) -> AccountId {
+    AccountId::from((&amm_program_id, &compute_liquidity_token_pda_seed(pool_id)))
 }
 
-impl From<&TokenMetadata> for Data {
-    fn from(metadata: &TokenMetadata) -> Self {
-        // Using size_of_val as size hint for Vec allocation
-        let mut data = Vec::with_capacity(std::mem::size_of_val(metadata));
+pub fn compute_liquidity_token_pda_seed(pool_id: AccountId) -> PdaSeed {
+    use risc0_zkvm::sha::{Impl, Sha256};
 
-        BorshSerialize::serialize(metadata, &mut data)
-            .expect("Serialization to Vec should not fail");
+    let mut bytes = [0; 64];
+    bytes[0..32].copy_from_slice(&pool_id.to_bytes());
+    bytes[32..].copy_from_slice(&[0; 32]);
 
-        Data::try_from(data).expect("Token metadata encoded data should fit into Data")
-    }
-}*/
+    PdaSeed::new(
+        Impl::hash_bytes(&bytes)
+            .as_bytes()
+            .try_into()
+            .expect("Hash output must be exactly 32 bytes long"),
+    )
+}
