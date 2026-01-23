@@ -65,8 +65,8 @@ pub enum Instruction {
     /// - Vault Holding Account for Token A (initialized)
     /// - Vault Holding Account for Token B (initialized)
     /// - User Holding Account for Token A
-    /// - User Holding Account for Token B
-    ///   Either User Holding Account for Token A or Token B is authorized.
+    /// - User Holding Account for Token B Either User Holding Account for Token A or Token B is
+    ///   authorized.
     Swap {
         swap_amount_in: u128,
         min_amount_out: u128,
