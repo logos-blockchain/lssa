@@ -46,4 +46,18 @@ impl WitnessSet {
     pub fn proof(&self) -> &Proof {
         &self.proof
     }
+
+    pub fn into_raw_parts(self) -> (Vec<(Signature, PublicKey)>, Proof) {
+        (self.signatures_and_public_keys, self.proof)
+    }
+
+    pub fn from_raw_parts(
+        signatures_and_public_keys: Vec<(Signature, PublicKey)>,
+        proof: Proof,
+    ) -> Self {
+        Self {
+            signatures_and_public_keys,
+            proof,
+        }
+    }
 }

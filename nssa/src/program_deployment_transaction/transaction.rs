@@ -14,6 +14,10 @@ impl ProgramDeploymentTransaction {
         Self { message }
     }
 
+    pub fn into_message(self) -> Message {
+        self.message
+    }
+
     pub(crate) fn validate_and_produce_public_state_diff(
         &self,
         state: &V02State,

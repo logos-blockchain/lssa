@@ -1,0 +1,40 @@
+use indexer_service_protocol::{Account, AccountId, Block, BlockId, Hash, Transaction};
+use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
+
+#[cfg(all(not(feature = "server"), not(feature = "client")))]
+compile_error!("At least one of `server` or `client` features must be enabled.");
+
+#[cfg_attr(feature = "server", rpc(server))]
+#[cfg_attr(feature = "client", rpc(client))]
+pub trait Rpc {
+    #[method(name = "get_schema")]
+    fn get_schema(&self) -> Result<serde_json::Value, ErrorObjectOwned> {
+        // TODO: Canonical solution would be to provide `describe` method returning OpenRPC spec,
+        // But for now it's painful to implement, although can be done if really needed.
+        // Currently we can wait until we can auto-generated it: https://github.com/paritytech/jsonrpsee/issues/737
+        // and just return JSON schema.
+
+        // Block schema contains all other types used in the protocol, so it's sufficient to return
+        // its schema.
+        let block_schema = schemars::schema_for!(Block);
+        Ok(serde_json::to_value(block_schema).expect("Schema serialization should not fail"))
+    }
+
+    #[subscription(name = "subscribeToBlocks", item = Vec<Block>)]
+    async fn subscribe_to_blocks(&self, from: BlockId) -> SubscriptionResult;
+
+    #[method(name = "getBlockById")]
+    async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned>;
+
+    #[method(name = "getBlockByHash")]
+    async fn get_block_by_hash(&self, block_hash: Hash) -> Result<Block, ErrorObjectOwned>;
+
+    #[method(name = "getLastBlockId")]
+    async fn get_last_block_id(&self) -> Result<BlockId, ErrorObjectOwned>;
+
+    #[method(name = "getAccount")]
+    async fn get_account(&self, account_id: AccountId) -> Result<Account, ErrorObjectOwned>;
+
+    #[method(name = "getTransaction")]
+    async fn get_transaction(&self, tx_hash: Hash) -> Result<Transaction, ErrorObjectOwned>;
+}
