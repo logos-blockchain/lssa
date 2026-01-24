@@ -48,7 +48,8 @@ impl PublicKey {
 
 impl From<&PublicKey> for AccountId {
     fn from(key: &PublicKey) -> Self {
-        const PUBLIC_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.2/AccountId/Public/\x00\x00\x00\x00";
+        const PUBLIC_ACCOUNT_ID_PREFIX: &[u8; 32] =
+            b"/LEE/v0.3/AccountId/Public/\x00\x00\x00\x00\x00";
 
         let mut hasher = Sha256::new();
         hasher.update(PUBLIC_ACCOUNT_ID_PREFIX);
