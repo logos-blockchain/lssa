@@ -9,11 +9,11 @@
     "port": 3040,
     "initial_accounts": [
         {
-            "account_id": "7adggko3qzAB8pSdBxz8FNx6JHTSciV38yA1jqcy2EQV",
+            "account_id": "6iArKUXxhUJqS7kCaPNhwMWt3ro71PDyBj7jwAyE2VQV",
             "balance": 10000
         },
         {
-            "account_id": "9NHac6LD4VSWX4jyoB7Te8dx6qxMpmz2vGbrTNKFVu2J",
+            "account_id": "7wHg9sbJwc6h3NP1S9bekfAzB8CHifEcxKswCKUt3YQo",
             "balance": 20000
         }
     ],
