@@ -4873,7 +4873,6 @@ dependencies = [
  "cbindgen",
  "common",
  "nssa",
- "once_cell",
  "tokio",
  "wallet",
 ]

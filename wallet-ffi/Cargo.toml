@@ -11,7 +11,6 @@ wallet.workspace = true
 nssa.workspace = true
 common.workspace = true
 tokio.workspace = true
-once_cell.workspace = true
 
 [build-dependencies]
 cbindgen = "0.26"
