@@ -99,7 +99,7 @@ jobs:
         run: rustup install
 
       - name: Install nextest
-        run: cargo install cargo-nextest
+        run: cargo install --locked cargo-nextest
 
       - name: Run tests
         env:
