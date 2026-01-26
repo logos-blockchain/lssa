@@ -16,8 +16,8 @@ pub fn new_definition(
     user_holding_a: AccountWithMetadata,
     user_holding_b: AccountWithMetadata,
     user_holding_lp: AccountWithMetadata,
-    token_a_amount: u128,
-    token_b_amount: u128,
+    token_a_amount: NonZeroU128,
+    token_b_amount: NonZeroU128,
     amm_program_id: ProgramId,
 ) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
     // Prevents pool constant coefficient (k) from being 0.
