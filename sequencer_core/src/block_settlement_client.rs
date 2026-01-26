@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use anyhow::{Result, anyhow};
 use bedrock_client::BedrockClient;
-use common::block::HashableBlockData;
+use common::block::{Block, HashableBlockData};
 use logos_blockchain_core::mantle::{
     MantleTx, Op, OpProof, SignedMantleTx, Transaction, TxHash, ledger,
     ops::channel::{ChannelId, MsgId, inscribe::InscriptionOp},
@@ -39,16 +39,22 @@ impl BlockSettlementClient {
         self.last_message_id = msg_id;
     }
 
+
+    pub fn last_message_id(&self) -> MsgId {
+        self.last_message_id
+    }
+
     /// Create and sign a transaction for inscribing data
-    pub fn create_inscribe_tx(&self, data: Vec<u8>) -> (SignedMantleTx, MsgId) {
+    pub fn create_inscribe_tx(&self, block: &Block) -> Result<(SignedMantleTx, MsgId)> {
+        let inscription_data = borsh::to_vec(block)?;
         let verifying_key_bytes = self.bedrock_signing_key.public_key().to_bytes();
         let verifying_key =
             Ed25519PublicKey::from_bytes(&verifying_key_bytes).expect("valid ed25519 public key");
 
         let inscribe_op = InscriptionOp {
             channel_id: self.bedrock_channel_id,
-            inscription: data,
-            parent: self.last_message_id,
+            inscription: inscription_data,
+            parent: block.bedrock_parent_id,
             signer: verifying_key,
         };
         let inscribe_op_id = inscribe_op.id();
@@ -78,13 +84,12 @@ impl BlockSettlementClient {
             ledger_tx_proof: empty_ledger_signature(&tx_hash),
             mantle_tx: inscribe_tx,
         };
-        (signed_mantle_tx, inscribe_op_id)
+        Ok((signed_mantle_tx, inscribe_op_id))
     }
 
     /// Post a transaction to the node
-    pub async fn post_transaction(&self, block_data: &HashableBlockData) -> Result<MsgId> {
-        let inscription_data = borsh::to_vec(&block_data)?;
-        let (tx, new_msg_id) = self.create_inscribe_tx(inscription_data);
+    pub async fn submit_block_to_bedrock(&self, block: &Block) -> Result<MsgId> {
+        let (tx, new_msg_id) = self.create_inscribe_tx(block)?;
 
         // Post the transaction
         self.bedrock_client.post_transaction(tx).await?;

@@ -1319,6 +1319,7 @@ dependencies = [
  "borsh",
  "hex",
  "log",
+ "logos-blockchain-core",
  "nssa",
  "nssa_core",
  "reqwest",

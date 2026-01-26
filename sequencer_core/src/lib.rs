@@ -10,8 +10,8 @@ use common::{
 };
 use config::SequencerConfig;
 use log::warn;
+use logos_blockchain_core::mantle::ops::channel::MsgId;
 use mempool::{MemPool, MemPoolHandle};
-use nomos_core::mantle::ops::channel::MsgId;
 use serde::{Deserialize, Serialize};
 
 use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerBlockStore};
@@ -54,7 +54,8 @@ impl SequencerCore {
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let genesis_block = hashable_data.into_pending_block(&signing_key);
+        let channel_genesis_msg = MsgId::from([0; 32]);
+        let genesis_block = hashable_data.into_pending_block(&signing_key, channel_genesis_msg);
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
@@ -150,7 +151,10 @@ impl SequencerCore {
         let block_data = self.produce_new_block_with_mempool_transactions()?;
 
         if let Some(block_settlement) = self.block_settlement_client.as_mut() {
-            let msg_id = block_settlement.post_transaction(&block_data).await?;
+            let last_message_id = block_settlement.last_message_id();
+            let block =
+                block_data.into_pending_block(self.block_store.signing_key(), last_message_id);
+            let msg_id = block_settlement.submit_block_to_bedrock(&block).await?;
             block_settlement.set_last_message_id(msg_id);
             log::info!("Posted block data to Bedrock");
         }
@@ -196,9 +200,15 @@ impl SequencerCore {
             timestamp: curr_time,
         };
 
+        let bedrock_parent_id = self
+            .block_settlement_client
+            .as_ref()
+            .map(|client| client.last_message_id())
+            .unwrap_or(MsgId::from([0; 32]));
+
         let block = hashable_data
             .clone()
-            .into_pending_block(self.block_store.signing_key());
+            .into_pending_block(self.block_store.signing_key(), bedrock_parent_id);
 
         self.block_store.put_block_at_id(block)?;
 
@@ -248,8 +258,7 @@ impl SequencerCore {
             match block.bedrock_status {
                 BedrockStatus::Pending => {
                     if let Some(block_settlement) = self.block_settlement_client.as_ref() {
-                        let block_data: HashableBlockData = block.into();
-                        block_settlement.post_transaction(&block_data).await?;
+                        block_settlement.submit_block_to_bedrock(&block).await?;
                         log::info!("Posted block data to Bedrock");
                     }
                 }

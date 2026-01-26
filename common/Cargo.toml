@@ -17,3 +17,4 @@ log.workspace = true
 hex.workspace = true
 borsh.workspace = true
 base64.workspace = true
+logos-blockchain-core.workspace = true
