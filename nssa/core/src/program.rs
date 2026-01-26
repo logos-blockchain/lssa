@@ -30,6 +30,20 @@ impl PdaSeed {
     }
 }
 
+pub fn compute_authorized_pdas(
+    caller_program_id: Option<ProgramId>,
+    pda_seeds: &[PdaSeed],
+) -> HashSet<AccountId> {
+    caller_program_id
+        .map(|caller_program_id| {
+            pda_seeds
+                .iter()
+                .map(|pda_seed| AccountId::from((&caller_program_id, pda_seed)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 impl From<(&ProgramId, &PdaSeed)> for AccountId {
     fn from(value: (&ProgramId, &PdaSeed)) -> Self {
         use risc0_zkvm::sha::{Impl, Sha256};
@@ -93,6 +107,13 @@ impl AccountPostState {
         }
     }
 
+    /// Creates a post state that requests ownership of the account
+    /// if the account's program owner is the default program ID.
+    pub fn new_claimed_if_default(account: Account) -> Self {
+        let claim = account.program_owner == DEFAULT_PROGRAM_ID;
+        Self { account, claim }
+    }
+
     /// Returns `true` if this post state requests that the account
     /// be claimed (owned) by the executing program.
     pub fn requires_claim(&self) -> bool {
@@ -107,6 +128,11 @@ impl AccountPostState {
     /// Returns the underlying account
     pub fn account_mut(&mut self) -> &mut Account {
         &mut self.account
+    }
+
+    /// Consumes the post state and returns the underlying account
+    pub fn into_account(self) -> Account {
+        self.account
     }
 }
 

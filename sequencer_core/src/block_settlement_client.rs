@@ -3,10 +3,12 @@ use std::{fs, path::Path};
 use anyhow::{Result, anyhow};
 use bedrock_client::BedrockClient;
 use common::block::HashableBlockData;
-use key_management_system_service::keys::{ED25519_SECRET_KEY_SIZE, Ed25519Key, Ed25519PublicKey};
-use nomos_core::mantle::{
+use logos_blockchain_core::mantle::{
     MantleTx, Op, OpProof, SignedMantleTx, Transaction, TxHash, ledger,
     ops::channel::{ChannelId, MsgId, inscribe::InscriptionOp},
+};
+use logos_blockchain_key_management_system_service::keys::{
+    ED25519_SECRET_KEY_SIZE, Ed25519Key, Ed25519PublicKey,
 };
 
 use crate::config::BedrockConfig;
@@ -63,7 +65,9 @@ impl BlockSettlementClient {
             .sign_payload(tx_hash.as_signing_bytes().as_ref())
             .to_bytes();
         let signature =
-            key_management_system_service::keys::Ed25519Signature::from_bytes(&signature_bytes);
+            logos_blockchain_key_management_system_service::keys::Ed25519Signature::from_bytes(
+                &signature_bytes,
+            );
 
         let signed_mantle_tx = SignedMantleTx {
             ops_proofs: vec![OpProof::Ed25519Sig(signature)],
@@ -103,7 +107,9 @@ fn load_or_create_signing_key(path: &Path) -> Result<Ed25519Key> {
     }
 }
 
-fn empty_ledger_signature(tx_hash: &TxHash) -> key_management_system_service::keys::ZkSignature {
-    key_management_system_service::keys::ZkKey::multi_sign(&[], tx_hash.as_ref())
+fn empty_ledger_signature(
+    tx_hash: &TxHash,
+) -> logos_blockchain_key_management_system_service::keys::ZkSignature {
+    logos_blockchain_key_management_system_service::keys::ZkKey::multi_sign(&[], tx_hash.as_ref())
         .expect("multi-sign with empty key set works")
 }
