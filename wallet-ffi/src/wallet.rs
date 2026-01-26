@@ -1,15 +1,19 @@
 //! Wallet lifecycle management functions.
 
-use std::ffi::{c_char, CStr};
-use std::path::PathBuf;
-use std::ptr;
-use std::sync::Mutex;
+use std::{
+    ffi::{c_char, CStr},
+    path::PathBuf,
+    ptr,
+    sync::Mutex,
+};
 
 use wallet::WalletCore;
 
-use crate::block_on;
-use crate::error::{print_error, WalletFfiError};
-use crate::types::WalletHandle;
+use crate::{
+    block_on,
+    error::{print_error, WalletFfiError},
+    types::WalletHandle,
+};
 
 /// Internal wrapper around WalletCore with mutex for thread safety.
 pub(crate) struct WalletWrapper {
@@ -172,8 +176,8 @@ pub unsafe extern "C" fn wallet_ffi_open(
 /// After calling this function, the handle is invalid and must not be used.
 ///
 /// # Safety
-/// - The handle must be either null or a valid handle from `wallet_ffi_create_new()`
-///   or `wallet_ffi_open()`.
+/// - The handle must be either null or a valid handle from `wallet_ffi_create_new()` or
+///   `wallet_ffi_open()`.
 /// - The handle must not be used after this call.
 #[no_mangle]
 pub unsafe extern "C" fn wallet_ffi_destroy(handle: *mut WalletHandle) {
@@ -229,7 +233,8 @@ pub unsafe extern "C" fn wallet_ffi_save(handle: *mut WalletHandle) -> WalletFfi
 /// - `handle`: Valid wallet handle
 ///
 /// # Returns
-/// - Pointer to null-terminated string on success (caller must free with `wallet_ffi_free_string()`)
+/// - Pointer to null-terminated string on success (caller must free with
+///   `wallet_ffi_free_string()`)
 /// - Null pointer on error
 ///
 /// # Safety

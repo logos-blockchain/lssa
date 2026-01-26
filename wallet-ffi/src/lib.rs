@@ -28,13 +28,12 @@ pub mod transfer;
 pub mod types;
 pub mod wallet;
 
-use tokio::runtime::Handle;
-
-use crate::error::{print_error, WalletFfiError};
-
 // Re-export public types for cbindgen
 pub use error::WalletFfiError as FfiError;
+use tokio::runtime::Handle;
 pub use types::*;
+
+use crate::error::{print_error, WalletFfiError};
 
 /// Get a reference to the global runtime.
 pub(crate) fn get_runtime() -> Result<Handle, WalletFfiError> {

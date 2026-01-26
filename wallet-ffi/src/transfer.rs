@@ -1,16 +1,17 @@
 //! Token transfer functions.
 
-use std::ffi::CString;
-use std::ptr;
+use std::{ffi::CString, ptr};
 
 use common::error::ExecutionFailureKind;
 use nssa::AccountId;
 use wallet::program_facades::native_token_transfer::NativeTokenTransfer;
 
-use crate::block_on;
-use crate::error::{print_error, WalletFfiError};
-use crate::types::{FfiBytes32, FfiTransferResult, WalletHandle};
-use crate::wallet::get_wallet;
+use crate::{
+    block_on,
+    error::{print_error, WalletFfiError},
+    types::{FfiBytes32, FfiTransferResult, WalletHandle},
+    wallet::get_wallet,
+};
 
 /// Send a public token transfer.
 ///

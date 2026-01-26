@@ -1,9 +1,11 @@
 //! Block synchronization functions.
 
-use crate::block_on;
-use crate::error::{print_error, WalletFfiError};
-use crate::types::WalletHandle;
-use crate::wallet::get_wallet;
+use crate::{
+    block_on,
+    error::{print_error, WalletFfiError},
+    types::WalletHandle,
+    wallet::get_wallet,
+};
 
 /// Synchronize private accounts to a specific block.
 ///

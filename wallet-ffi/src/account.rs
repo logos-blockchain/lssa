@@ -4,12 +4,14 @@ use std::ptr;
 
 use nssa::AccountId;
 
-use crate::block_on;
-use crate::error::{print_error, WalletFfiError};
-use crate::types::{
-    FfiAccount, FfiAccountList, FfiAccountListEntry, FfiBytes32, FfiProgramId, WalletHandle,
+use crate::{
+    block_on,
+    error::{print_error, WalletFfiError},
+    types::{
+        FfiAccount, FfiAccountList, FfiAccountListEntry, FfiBytes32, FfiProgramId, WalletHandle,
+    },
+    wallet::get_wallet,
 };
-use crate::wallet::get_wallet;
 
 /// Create a new public account.
 ///

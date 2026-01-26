@@ -4,9 +4,11 @@ use std::ptr;
 
 use nssa::{AccountId, PublicKey};
 
-use crate::error::{print_error, WalletFfiError};
-use crate::types::{FfiBytes32, FfiPrivateAccountKeys, FfiPublicAccountKey, WalletHandle};
-use crate::wallet::get_wallet;
+use crate::{
+    error::{print_error, WalletFfiError},
+    types::{FfiBytes32, FfiPrivateAccountKeys, FfiPublicAccountKey, WalletHandle},
+    wallet::get_wallet,
+};
 
 /// Get the public key for a public account.
 ///
