@@ -15,7 +15,6 @@ use crate::{
             pinata::PinataProgramAgnosticSubcommand, token::TokenProgramAgnosticSubcommand,
         },
     },
-    helperfunctions::{fetch_config, fetch_persistent_storage, merge_auth_config},
 };
 
 pub mod account;
@@ -97,43 +96,22 @@ pub enum SubcommandReturnValue {
     SyncedToBlock(u64),
 }
 
-pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValue> {
-    execute_subcommand_with_auth(command, None).await
-}
-
-pub async fn execute_subcommand_with_auth(
+pub async fn execute_subcommand(
+    wallet_core: &mut WalletCore,
     command: Command,
-    auth: Option<String>,
 ) -> Result<SubcommandReturnValue> {
-    if fetch_persistent_storage().await.is_err() {
-        println!("Persistent storage not found, need to execute setup");
-
-        let password = read_password_from_stdin()?;
-        execute_setup_with_auth(password, auth.clone()).await?;
-    }
-
-    let wallet_config = fetch_config().await?;
-    let wallet_config = merge_auth_config(wallet_config, auth.clone())?;
-    let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
-
     let subcommand_ret = match command {
         Command::AuthTransfer(transfer_subcommand) => {
-            transfer_subcommand
-                .handle_subcommand(&mut wallet_core)
-                .await?
+            transfer_subcommand.handle_subcommand(wallet_core).await?
         }
         Command::ChainInfo(chain_subcommand) => {
-            chain_subcommand.handle_subcommand(&mut wallet_core).await?
+            chain_subcommand.handle_subcommand(wallet_core).await?
         }
         Command::Account(account_subcommand) => {
-            account_subcommand
-                .handle_subcommand(&mut wallet_core)
-                .await?
+            account_subcommand.handle_subcommand(wallet_core).await?
         }
         Command::Pinata(pinata_subcommand) => {
-            pinata_subcommand
-                .handle_subcommand(&mut wallet_core)
-                .await?
+            pinata_subcommand.handle_subcommand(wallet_core).await?
         }
         Command::CheckHealth {} => {
             let remote_program_ids = wallet_core
@@ -165,18 +143,15 @@ pub async fn execute_subcommand_with_auth(
 
             SubcommandReturnValue::Empty
         }
-        Command::Token(token_subcommand) => {
-            token_subcommand.handle_subcommand(&mut wallet_core).await?
-        }
-        Command::AMM(amm_subcommand) => amm_subcommand.handle_subcommand(&mut wallet_core).await?,
+        Command::Token(token_subcommand) => token_subcommand.handle_subcommand(wallet_core).await?,
+        Command::AMM(amm_subcommand) => amm_subcommand.handle_subcommand(wallet_core).await?,
         Command::Config(config_subcommand) => {
-            config_subcommand
-                .handle_subcommand(&mut wallet_core)
-                .await?
+            config_subcommand.handle_subcommand(wallet_core).await?
         }
         Command::RestoreKeys { depth } => {
             let password = read_password_from_stdin()?;
-            execute_keys_restoration_with_auth(password, depth, auth).await?;
+            wallet_core.reset_storage(password)?;
+            execute_keys_restoration(wallet_core, depth).await?;
 
             SubcommandReturnValue::Empty
         }
@@ -200,14 +175,7 @@ pub async fn execute_subcommand_with_auth(
     Ok(subcommand_ret)
 }
 
-pub async fn execute_continuous_run() -> Result<()> {
-    execute_continuous_run_with_auth(None).await
-}
-pub async fn execute_continuous_run_with_auth(auth: Option<String>) -> Result<()> {
-    let config = fetch_config().await?;
-    let config = merge_auth_config(config, auth)?;
-    let mut wallet_core = WalletCore::start_from_config_update_chain(config.clone()).await?;
-
+pub async fn execute_continuous_run(wallet_core: &mut WalletCore) -> Result<()> {
     loop {
         let latest_block_num = wallet_core
             .sequencer_client
@@ -217,7 +185,7 @@ pub async fn execute_continuous_run_with_auth(auth: Option<String>) -> Result<()
         wallet_core.sync_to_block(latest_block_num).await?;
 
         tokio::time::sleep(std::time::Duration::from_millis(
-            config.seq_poll_timeout_millis,
+            wallet_core.config().seq_poll_timeout_millis,
         ))
         .await;
     }
@@ -233,34 +201,7 @@ pub fn read_password_from_stdin() -> Result<String> {
     Ok(password.trim().to_string())
 }
 
-pub async fn execute_setup(password: String) -> Result<()> {
-    execute_setup_with_auth(password, None).await
-}
-
-pub async fn execute_setup_with_auth(password: String, auth: Option<String>) -> Result<()> {
-    let config = fetch_config().await?;
-    let config = merge_auth_config(config, auth)?;
-    let wallet_core = WalletCore::start_from_config_new_storage(config.clone(), password).await?;
-
-    wallet_core.store_persistent_data().await?;
-
-    Ok(())
-}
-
-pub async fn execute_keys_restoration(password: String, depth: u32) -> Result<()> {
-    execute_keys_restoration_with_auth(password, depth, None).await
-}
-
-pub async fn execute_keys_restoration_with_auth(
-    password: String,
-    depth: u32,
-    auth: Option<String>,
-) -> Result<()> {
-    let config = fetch_config().await?;
-    let config = merge_auth_config(config, auth)?;
-    let mut wallet_core =
-        WalletCore::start_from_config_new_storage(config.clone(), password.clone()).await?;
-
+pub async fn execute_keys_restoration(wallet_core: &mut WalletCore, depth: u32) -> Result<()> {
     wallet_core
         .storage
         .user_data

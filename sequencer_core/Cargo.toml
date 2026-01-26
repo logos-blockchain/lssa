@@ -13,9 +13,16 @@ mempool.workspace = true
 base58.workspace = true
 anyhow.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
 chrono.workspace = true
 log.workspace = true
+bedrock_client.workspace = true
+logos-blockchain-key-management-system-service.workspace = true
+logos-blockchain-core.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+borsh.workspace = true
 
 [features]
 default = []

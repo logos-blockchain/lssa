@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use nssa::{PublicTransaction, program::Program, public_transaction};
-use wallet::{PrivacyPreservingAccount, WalletCore, helperfunctions::fetch_config};
+use wallet::{PrivacyPreservingAccount, WalletCore};
 
 // Before running this example, compile the `hello_world_with_move_function.rs` guest program with:
 //
@@ -62,11 +62,8 @@ async fn main() {
     let bytecode: Vec<u8> = std::fs::read(cli.program_path).unwrap();
     let program = Program::new(bytecode).unwrap();
 
-    // Load wallet config and storage
-    let wallet_config = fetch_config().await.unwrap();
-    let wallet_core = WalletCore::start_from_config_update_chain(wallet_config)
-        .await
-        .unwrap();
+    // Initialize wallet
+    let wallet_core = WalletCore::from_env().unwrap();
 
     match cli.command {
         Command::WritePublic {
@@ -104,7 +101,7 @@ async fn main() {
             wallet_core
                 .send_privacy_preserving_tx(
                     accounts,
-                    &Program::serialize_instruction(instruction).unwrap(),
+                    Program::serialize_instruction(instruction).unwrap(),
                     &program.into(),
                 )
                 .await
@@ -145,7 +142,7 @@ async fn main() {
             wallet_core
                 .send_privacy_preserving_tx(
                     accounts,
-                    &Program::serialize_instruction(instruction).unwrap(),
+                    Program::serialize_instruction(instruction).unwrap(),
                     &program.into(),
                 )
                 .await
