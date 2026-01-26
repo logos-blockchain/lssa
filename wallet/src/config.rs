@@ -235,7 +235,7 @@ impl Default for WalletConfig {
                 [
         {
             "Public": {
-                "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+                "account_id": "6iArKUXxhUJqS7kCaPNhwMWt3ro71PDyBj7jwAyE2VQV",
                 "pub_sign_key": [
                     16,
                     162,
@@ -274,7 +274,7 @@ impl Default for WalletConfig {
         },
         {
             "Public": {
-                "account_id": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+                "account_id": "7wHg9sbJwc6h3NP1S9bekfAzB8CHifEcxKswCKUt3YQo",
                 "pub_sign_key": [
                     113,
                     121,
