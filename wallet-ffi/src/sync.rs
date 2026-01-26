@@ -1,7 +1,7 @@
 //! Block synchronization functions.
 
 use crate::block_on;
-use crate::error::{set_last_error, WalletFfiError};
+use crate::error::{print_error, WalletFfiError};
 use crate::types::WalletHandle;
 use crate::wallet::get_wallet;
 
@@ -22,8 +22,11 @@ use crate::wallet::get_wallet;
 /// # Note
 /// This operation can take a while for large block ranges. The wallet
 /// internally uses a progress bar which may output to stdout.
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
 #[no_mangle]
-pub extern "C" fn wallet_ffi_sync_to_block(
+pub unsafe extern "C" fn wallet_ffi_sync_to_block(
     handle: *mut WalletHandle,
     block_id: u64,
 ) -> WalletFfiError {
@@ -35,7 +38,7 @@ pub extern "C" fn wallet_ffi_sync_to_block(
     let mut wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -43,7 +46,7 @@ pub extern "C" fn wallet_ffi_sync_to_block(
     match block_on(wallet.sync_to_block(block_id)) {
         Ok(Ok(())) => WalletFfiError::Success,
         Ok(Err(e)) => {
-            set_last_error(format!("Sync failed: {}", e));
+            print_error(format!("Sync failed: {}", e));
             WalletFfiError::SyncError
         }
         Err(e) => e,
@@ -59,8 +62,12 @@ pub extern "C" fn wallet_ffi_sync_to_block(
 /// # Returns
 /// - `Success` on success
 /// - Error code on failure
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `out_block_id` must be a valid pointer to a `u64`
 #[no_mangle]
-pub extern "C" fn wallet_ffi_get_last_synced_block(
+pub unsafe extern "C" fn wallet_ffi_get_last_synced_block(
     handle: *mut WalletHandle,
     out_block_id: *mut u64,
 ) -> WalletFfiError {
@@ -70,14 +77,14 @@ pub extern "C" fn wallet_ffi_get_last_synced_block(
     };
 
     if out_block_id.is_null() {
-        set_last_error("Null output pointer");
+        print_error("Null output pointer");
         return WalletFfiError::NullPointer;
     }
 
     let wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -99,8 +106,12 @@ pub extern "C" fn wallet_ffi_get_last_synced_block(
 /// - `Success` on success
 /// - `NetworkError` if the sequencer is unreachable
 /// - Error code on other failures
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `out_block_height` must be a valid pointer to a `u64`
 #[no_mangle]
-pub extern "C" fn wallet_ffi_get_current_block_height(
+pub unsafe extern "C" fn wallet_ffi_get_current_block_height(
     handle: *mut WalletHandle,
     out_block_height: *mut u64,
 ) -> WalletFfiError {
@@ -110,14 +121,14 @@ pub extern "C" fn wallet_ffi_get_current_block_height(
     };
 
     if out_block_height.is_null() {
-        set_last_error("Null output pointer");
+        print_error("Null output pointer");
         return WalletFfiError::NullPointer;
     }
 
     let wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -130,7 +141,7 @@ pub extern "C" fn wallet_ffi_get_current_block_height(
             WalletFfiError::Success
         }
         Ok(Err(e)) => {
-            set_last_error(format!("Failed to get block height: {:?}", e));
+            print_error(format!("Failed to get block height: {:?}", e));
             WalletFfiError::NetworkError
         }
         Err(e) => e,

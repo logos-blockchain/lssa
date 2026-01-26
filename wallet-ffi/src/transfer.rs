@@ -8,7 +8,7 @@ use nssa::AccountId;
 use wallet::program_facades::native_token_transfer::NativeTokenTransfer;
 
 use crate::block_on;
-use crate::error::{set_last_error, WalletFfiError};
+use crate::error::{print_error, WalletFfiError};
 use crate::types::{FfiBytes32, FfiTransferResult, WalletHandle};
 use crate::wallet::get_wallet;
 
@@ -31,8 +31,15 @@ use crate::wallet::get_wallet;
 ///
 /// # Memory
 /// The result must be freed with `wallet_ffi_free_transfer_result()`.
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `from` must be a valid pointer to a `FfiBytes32` struct
+/// - `to` must be a valid pointer to a `FfiBytes32` struct
+/// - `amount` must be a valid pointer to a `[u8; 16]` array
+/// - `out_result` must be a valid pointer to a `FfiTransferResult` struct
 #[no_mangle]
-pub extern "C" fn wallet_ffi_transfer_public(
+pub unsafe extern "C" fn wallet_ffi_transfer_public(
     handle: *mut WalletHandle,
     from: *const FfiBytes32,
     to: *const FfiBytes32,
@@ -45,14 +52,14 @@ pub extern "C" fn wallet_ffi_transfer_public(
     };
 
     if from.is_null() || to.is_null() || amount.is_null() || out_result.is_null() {
-        set_last_error("Null pointer argument");
+        print_error("Null pointer argument");
         return WalletFfiError::NullPointer;
     }
 
     let wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -76,7 +83,7 @@ pub extern "C" fn wallet_ffi_transfer_public(
             WalletFfiError::Success
         }
         Ok(Err(e)) => {
-            set_last_error(format!("Transfer failed: {:?}", e));
+            print_error(format!("Transfer failed: {:?}", e));
             unsafe {
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
@@ -109,8 +116,13 @@ pub extern "C" fn wallet_ffi_transfer_public(
 ///
 /// # Memory
 /// The result must be freed with `wallet_ffi_free_transfer_result()`.
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `account_id` must be a valid pointer to a `FfiBytes32` struct
+/// - `out_result` must be a valid pointer to a `FfiTransferResult` struct
 #[no_mangle]
-pub extern "C" fn wallet_ffi_register_public_account(
+pub unsafe extern "C" fn wallet_ffi_register_public_account(
     handle: *mut WalletHandle,
     account_id: *const FfiBytes32,
     out_result: *mut FfiTransferResult,
@@ -121,14 +133,14 @@ pub extern "C" fn wallet_ffi_register_public_account(
     };
 
     if account_id.is_null() || out_result.is_null() {
-        set_last_error("Null pointer argument");
+        print_error("Null pointer argument");
         return WalletFfiError::NullPointer;
     }
 
     let wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -150,7 +162,7 @@ pub extern "C" fn wallet_ffi_register_public_account(
             WalletFfiError::Success
         }
         Ok(Err(e)) => {
-            set_last_error(format!("Registration failed: {:?}", e));
+            print_error(format!("Registration failed: {:?}", e));
             unsafe {
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
@@ -172,7 +184,7 @@ pub extern "C" fn wallet_ffi_register_public_account(
 /// # Safety
 /// The result must be either null or a valid result from a transfer function.
 #[no_mangle]
-pub extern "C" fn wallet_ffi_free_transfer_result(result: *mut FfiTransferResult) {
+pub unsafe extern "C" fn wallet_ffi_free_transfer_result(result: *mut FfiTransferResult) {
     if result.is_null() {
         return;
     }

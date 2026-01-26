@@ -5,7 +5,7 @@ use std::ptr;
 use nssa::AccountId;
 
 use crate::block_on;
-use crate::error::{set_last_error, WalletFfiError};
+use crate::error::{print_error, WalletFfiError};
 use crate::types::{
     FfiAccount, FfiAccountList, FfiAccountListEntry, FfiBytes32, FfiProgramId, WalletHandle,
 };
@@ -23,8 +23,12 @@ use crate::wallet::get_wallet;
 /// # Returns
 /// - `Success` on successful creation
 /// - Error code on failure
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `out_account_id` must be a valid pointer to a `FfiBytes32` struct
 #[no_mangle]
-pub extern "C" fn wallet_ffi_create_account_public(
+pub unsafe extern "C" fn wallet_ffi_create_account_public(
     handle: *mut WalletHandle,
     out_account_id: *mut FfiBytes32,
 ) -> WalletFfiError {
@@ -34,14 +38,14 @@ pub extern "C" fn wallet_ffi_create_account_public(
     };
 
     if out_account_id.is_null() {
-        set_last_error("Null output pointer for account_id");
+        print_error("Null output pointer for account_id");
         return WalletFfiError::NullPointer;
     }
 
     let mut wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -67,8 +71,12 @@ pub extern "C" fn wallet_ffi_create_account_public(
 /// # Returns
 /// - `Success` on successful creation
 /// - Error code on failure
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `out_account_id` must be a valid pointer to a `FfiBytes32` struct
 #[no_mangle]
-pub extern "C" fn wallet_ffi_create_account_private(
+pub unsafe extern "C" fn wallet_ffi_create_account_private(
     handle: *mut WalletHandle,
     out_account_id: *mut FfiBytes32,
 ) -> WalletFfiError {
@@ -78,14 +86,14 @@ pub extern "C" fn wallet_ffi_create_account_private(
     };
 
     if out_account_id.is_null() {
-        set_last_error("Null output pointer for account_id");
+        print_error("Null output pointer for account_id");
         return WalletFfiError::NullPointer;
     }
 
     let mut wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -113,8 +121,12 @@ pub extern "C" fn wallet_ffi_create_account_private(
 ///
 /// # Memory
 /// The returned list must be freed with `wallet_ffi_free_account_list()`.
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `out_list` must be a valid pointer to a `FfiAccountList` struct
 #[no_mangle]
-pub extern "C" fn wallet_ffi_list_accounts(
+pub unsafe extern "C" fn wallet_ffi_list_accounts(
     handle: *mut WalletHandle,
     out_list: *mut FfiAccountList,
 ) -> WalletFfiError {
@@ -124,14 +136,14 @@ pub extern "C" fn wallet_ffi_list_accounts(
     };
 
     if out_list.is_null() {
-        set_last_error("Null output pointer for account list");
+        print_error("Null output pointer for account list");
         return WalletFfiError::NullPointer;
     }
 
     let wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -196,7 +208,7 @@ pub extern "C" fn wallet_ffi_list_accounts(
 /// # Safety
 /// The list must be either null or a valid list returned by `wallet_ffi_list_accounts`.
 #[no_mangle]
-pub extern "C" fn wallet_ffi_free_account_list(list: *mut FfiAccountList) {
+pub unsafe extern "C" fn wallet_ffi_free_account_list(list: *mut FfiAccountList) {
     if list.is_null() {
         return;
     }
@@ -224,8 +236,13 @@ pub extern "C" fn wallet_ffi_free_account_list(list: *mut FfiAccountList) {
 /// # Returns
 /// - `Success` on successful query
 /// - Error code on failure
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `account_id` must be a valid pointer to a `FfiBytes32` struct
+/// - `out_balance` must be a valid pointer to a `[u8; 16]` array
 #[no_mangle]
-pub extern "C" fn wallet_ffi_get_balance(
+pub unsafe extern "C" fn wallet_ffi_get_balance(
     handle: *mut WalletHandle,
     account_id: *const FfiBytes32,
     is_public: bool,
@@ -237,14 +254,14 @@ pub extern "C" fn wallet_ffi_get_balance(
     };
 
     if account_id.is_null() || out_balance.is_null() {
-        set_last_error("Null pointer argument");
+        print_error("Null pointer argument");
         return WalletFfiError::NullPointer;
     }
 
     let wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -255,7 +272,7 @@ pub extern "C" fn wallet_ffi_get_balance(
         match block_on(wallet.get_account_balance(account_id)) {
             Ok(Ok(b)) => b,
             Ok(Err(e)) => {
-                set_last_error(format!("Failed to get balance: {}", e));
+                print_error(format!("Failed to get balance: {}", e));
                 return WalletFfiError::NetworkError;
             }
             Err(e) => return e,
@@ -264,7 +281,7 @@ pub extern "C" fn wallet_ffi_get_balance(
         match wallet.get_account_private(&account_id) {
             Some(account) => account.balance,
             None => {
-                set_last_error("Private account not found");
+                print_error("Private account not found");
                 return WalletFfiError::AccountNotFound;
             }
         }
@@ -290,8 +307,13 @@ pub extern "C" fn wallet_ffi_get_balance(
 ///
 /// # Memory
 /// The account data must be freed with `wallet_ffi_free_account_data()`.
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `account_id` must be a valid pointer to a `FfiBytes32` struct
+/// - `out_account` must be a valid pointer to a `FfiAccount` struct
 #[no_mangle]
-pub extern "C" fn wallet_ffi_get_account_public(
+pub unsafe extern "C" fn wallet_ffi_get_account_public(
     handle: *mut WalletHandle,
     account_id: *const FfiBytes32,
     out_account: *mut FfiAccount,
@@ -302,14 +324,14 @@ pub extern "C" fn wallet_ffi_get_account_public(
     };
 
     if account_id.is_null() || out_account.is_null() {
-        set_last_error("Null pointer argument");
+        print_error("Null pointer argument");
         return WalletFfiError::NullPointer;
     }
 
     let wallet = match wrapper.core.lock() {
         Ok(w) => w,
         Err(e) => {
-            set_last_error(format!("Failed to lock wallet: {}", e));
+            print_error(format!("Failed to lock wallet: {}", e));
             return WalletFfiError::InternalError;
         }
     };
@@ -319,7 +341,7 @@ pub extern "C" fn wallet_ffi_get_account_public(
     let account = match block_on(wallet.get_account_public(account_id)) {
         Ok(Ok(a)) => a,
         Ok(Err(e)) => {
-            set_last_error(format!("Failed to get account: {}", e));
+            print_error(format!("Failed to get account: {}", e));
             return WalletFfiError::NetworkError;
         }
         Err(e) => return e,
@@ -356,7 +378,7 @@ pub extern "C" fn wallet_ffi_get_account_public(
 /// The account must be either null or a valid account returned by
 /// `wallet_ffi_get_account_public`.
 #[no_mangle]
-pub extern "C" fn wallet_ffi_free_account_data(account: *mut FfiAccount) {
+pub unsafe extern "C" fn wallet_ffi_free_account_data(account: *mut FfiAccount) {
     if account.is_null() {
         return;
     }

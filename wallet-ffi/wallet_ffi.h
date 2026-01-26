@@ -240,6 +240,10 @@ bool wallet_ffi_runtime_initialized(void);
  * # Returns
  * - `Success` on successful creation
  * - Error code on failure
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `out_account_id` must be a valid pointer to a `FfiBytes32` struct
  */
 enum WalletFfiError wallet_ffi_create_account_public(struct WalletHandle *handle,
                                                      struct FfiBytes32 *out_account_id);
@@ -257,6 +261,10 @@ enum WalletFfiError wallet_ffi_create_account_public(struct WalletHandle *handle
  * # Returns
  * - `Success` on successful creation
  * - Error code on failure
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `out_account_id` must be a valid pointer to a `FfiBytes32` struct
  */
 enum WalletFfiError wallet_ffi_create_account_private(struct WalletHandle *handle,
                                                       struct FfiBytes32 *out_account_id);
@@ -276,6 +284,10 @@ enum WalletFfiError wallet_ffi_create_account_private(struct WalletHandle *handl
  *
  * # Memory
  * The returned list must be freed with `wallet_ffi_free_account_list()`.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `out_list` must be a valid pointer to a `FfiAccountList` struct
  */
 enum WalletFfiError wallet_ffi_list_accounts(struct WalletHandle *handle,
                                              struct FfiAccountList *out_list);
@@ -303,6 +315,11 @@ void wallet_ffi_free_account_list(struct FfiAccountList *list);
  * # Returns
  * - `Success` on successful query
  * - Error code on failure
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `account_id` must be a valid pointer to a `FfiBytes32` struct
+ * - `out_balance` must be a valid pointer to a `[u8; 16]` array
  */
 enum WalletFfiError wallet_ffi_get_balance(struct WalletHandle *handle,
                                            const struct FfiBytes32 *account_id,
@@ -323,6 +340,11 @@ enum WalletFfiError wallet_ffi_get_balance(struct WalletHandle *handle,
  *
  * # Memory
  * The account data must be freed with `wallet_ffi_free_account_data()`.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `account_id` must be a valid pointer to a `FfiBytes32` struct
+ * - `out_account` must be a valid pointer to a `FfiAccount` struct
  */
 enum WalletFfiError wallet_ffi_get_account_public(struct WalletHandle *handle,
                                                   const struct FfiBytes32 *account_id,
@@ -338,24 +360,6 @@ enum WalletFfiError wallet_ffi_get_account_public(struct WalletHandle *handle,
 void wallet_ffi_free_account_data(struct FfiAccount *account);
 
 /**
- * Get the last error message.
- *
- * Returns a pointer to a null-terminated string, or null if no error is set.
- * The caller owns the returned string and must free it with
- * `wallet_ffi_free_error_string`.
- */
-char *wallet_ffi_get_last_error(void);
-
-/**
- * Free an error string returned by `wallet_ffi_get_last_error`.
- *
- * # Safety
- * The pointer must be either null or a valid pointer returned by
- * `wallet_ffi_get_last_error`.
- */
-void wallet_ffi_free_error_string(char *ptr);
-
-/**
  * Get the public key for a public account.
  *
  * This returns the public key derived from the account's signing key.
@@ -369,6 +373,11 @@ void wallet_ffi_free_error_string(char *ptr);
  * - `Success` on successful retrieval
  * - `KeyNotFound` if the account's key is not in this wallet
  * - Error code on other failures
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `account_id` must be a valid pointer to a `FfiBytes32` struct
+ * - `out_public_key` must be a valid pointer to a `FfiPublicAccountKey` struct
  */
 enum WalletFfiError wallet_ffi_get_public_account_key(struct WalletHandle *handle,
                                                       const struct FfiBytes32 *account_id,
@@ -392,6 +401,11 @@ enum WalletFfiError wallet_ffi_get_public_account_key(struct WalletHandle *handl
  *
  * # Memory
  * The keys structure must be freed with `wallet_ffi_free_private_account_keys()`.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `account_id` must be a valid pointer to a `FfiBytes32` struct
+ * - `out_keys` must be a valid pointer to a `FfiPrivateAccountKeys` struct
  */
 enum WalletFfiError wallet_ffi_get_private_account_keys(struct WalletHandle *handle,
                                                         const struct FfiBytes32 *account_id,
@@ -418,6 +432,9 @@ void wallet_ffi_free_private_account_keys(struct FfiPrivateAccountKeys *keys);
  *
  * # Memory
  * The returned string must be freed with `wallet_ffi_free_string()`.
+ *
+ * # Safety
+ * - `account_id` must be a valid pointer to a `FfiBytes32` struct
  */
 char *wallet_ffi_account_id_to_base58(const struct FfiBytes32 *account_id);
 
@@ -432,6 +449,10 @@ char *wallet_ffi_account_id_to_base58(const struct FfiBytes32 *account_id);
  * - `Success` on successful parsing
  * - `InvalidAccountId` if the string is not valid Base58
  * - Error code on other failures
+ *
+ * # Safety
+ * - `base58_str` must be a valid pointer to a null-terminated C string
+ * - `out_account_id` must be a valid pointer to a `FfiBytes32` struct
  */
 enum WalletFfiError wallet_ffi_account_id_from_base58(const char *base58_str,
                                                       struct FfiBytes32 *out_account_id);
@@ -454,6 +475,9 @@ enum WalletFfiError wallet_ffi_account_id_from_base58(const char *base58_str,
  * # Note
  * This operation can take a while for large block ranges. The wallet
  * internally uses a progress bar which may output to stdout.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
  */
 enum WalletFfiError wallet_ffi_sync_to_block(struct WalletHandle *handle, uint64_t block_id);
 
@@ -467,6 +491,10 @@ enum WalletFfiError wallet_ffi_sync_to_block(struct WalletHandle *handle, uint64
  * # Returns
  * - `Success` on success
  * - Error code on failure
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `out_block_id` must be a valid pointer to a `u64`
  */
 enum WalletFfiError wallet_ffi_get_last_synced_block(struct WalletHandle *handle,
                                                      uint64_t *out_block_id);
@@ -482,6 +510,10 @@ enum WalletFfiError wallet_ffi_get_last_synced_block(struct WalletHandle *handle
  * - `Success` on success
  * - `NetworkError` if the sequencer is unreachable
  * - Error code on other failures
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `out_block_height` must be a valid pointer to a `u64`
  */
 enum WalletFfiError wallet_ffi_get_current_block_height(struct WalletHandle *handle,
                                                         uint64_t *out_block_height);
@@ -506,6 +538,13 @@ enum WalletFfiError wallet_ffi_get_current_block_height(struct WalletHandle *han
  *
  * # Memory
  * The result must be freed with `wallet_ffi_free_transfer_result()`.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `from` must be a valid pointer to a `FfiBytes32` struct
+ * - `to` must be a valid pointer to a `FfiBytes32` struct
+ * - `amount` must be a valid pointer to a `[u8; 16]` array
+ * - `out_result` must be a valid pointer to a `FfiTransferResult` struct
  */
 enum WalletFfiError wallet_ffi_transfer_public(struct WalletHandle *handle,
                                                const struct FfiBytes32 *from,
@@ -530,6 +569,11 @@ enum WalletFfiError wallet_ffi_transfer_public(struct WalletHandle *handle,
  *
  * # Memory
  * The result must be freed with `wallet_ffi_free_transfer_result()`.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `account_id` must be a valid pointer to a `FfiBytes32` struct
+ * - `out_result` must be a valid pointer to a `FfiTransferResult` struct
  */
 enum WalletFfiError wallet_ffi_register_public_account(struct WalletHandle *handle,
                                                        const struct FfiBytes32 *account_id,
@@ -608,6 +652,9 @@ void wallet_ffi_destroy(struct WalletHandle *handle);
  * # Returns
  * - `Success` on successful save
  * - Error code on failure
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
  */
 enum WalletFfiError wallet_ffi_save(struct WalletHandle *handle);
 
@@ -620,6 +667,9 @@ enum WalletFfiError wallet_ffi_save(struct WalletHandle *handle);
  * # Returns
  * - Pointer to null-terminated string on success (caller must free with `wallet_ffi_free_string()`)
  * - Null pointer on error
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
  */
 char *wallet_ffi_get_sequencer_addr(struct WalletHandle *handle);
 

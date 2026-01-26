@@ -32,7 +32,7 @@ use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use crate::error::{set_last_error, WalletFfiError};
+use crate::error::{print_error, WalletFfiError};
 
 // Re-export public types for cbindgen
 pub use error::WalletFfiError as FfiError;
@@ -44,7 +44,7 @@ static RUNTIME: OnceCell<Arc<Runtime>> = OnceCell::new();
 /// Get a reference to the global runtime.
 pub(crate) fn get_runtime() -> Result<&'static Arc<Runtime>, WalletFfiError> {
     RUNTIME.get().ok_or_else(|| {
-        set_last_error("Runtime not initialized. Call wallet_ffi_init_runtime() first.");
+        print_error("Runtime not initialized. Call wallet_ffi_init_runtime() first.");
         WalletFfiError::RuntimeError
     })
 }
@@ -75,7 +75,7 @@ pub extern "C" fn wallet_ffi_init_runtime() -> WalletFfiError {
     match result {
         Ok(_) => WalletFfiError::Success,
         Err(e) => {
-            set_last_error(format!("Failed to initialize runtime: {}", e));
+            print_error(format!("Failed to initialize runtime: {}", e));
             WalletFfiError::RuntimeError
         }
     }
