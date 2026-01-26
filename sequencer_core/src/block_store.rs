@@ -46,7 +46,7 @@ impl SequencerBlockStore {
     }
 
     pub fn get_block_at_id(&self, id: u64) -> Result<Block> {
-        Ok(self.dbio.get_block(id)?.into_block(&self.signing_key))
+        Ok(self.dbio.get_block(id)?)
     }
 
     pub fn put_block_at_id(&mut self, block: Block) -> Result<()> {
@@ -113,7 +113,7 @@ mod tests {
             transactions: vec![],
         };
 
-        let genesis_block = genesis_block_hashable_data.into_block(&signing_key);
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key);
         // Start an empty node store
         let mut node_store =
             SequencerBlockStore::open_db_with_genesis(path, Some(genesis_block), signing_key)

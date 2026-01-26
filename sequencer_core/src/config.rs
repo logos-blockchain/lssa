@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -47,6 +48,16 @@ pub struct SequencerConfig {
     pub initial_commitments: Vec<CommitmentsInitialData>,
     /// Sequencer own signing key
     pub signing_key: [u8; 32],
+    /// Bedrock configuration options
+    pub bedrock_config: Option<BedrockConfig>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BedrockConfig {
+    /// Bedrock channel ID
+    pub channel_id: [u8; 32],
+    /// Bedrock Url
+    pub node_url: Url,
 }
 
 impl SequencerConfig {

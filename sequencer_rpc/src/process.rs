@@ -388,6 +388,7 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
+            bedrock_config: None,
         }
     }
 
