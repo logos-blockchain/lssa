@@ -23,9 +23,9 @@ pub struct BlockSettlementClient {
 
 impl BlockSettlementClient {
     pub fn try_new(home: &Path, config: &BedrockConfig) -> Result<Self> {
-        let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key"))?;
+        let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key")).context("Failed to load or create signing key")?;
         let bedrock_channel_id = ChannelId::from(config.channel_id);
-        let bedrock_client = BedrockClient::new(None, config.node_url.clone())?;
+        let bedrock_client = BedrockClient::new(None, config.node_url.clone()).context("Failed to initialize bedrock client")?;
         let channel_genesis_msg = MsgId::from([0; 32]);
         Ok(Self {
             bedrock_client,
