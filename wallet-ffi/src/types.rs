@@ -27,35 +27,29 @@ pub struct FfiProgramId {
 
 /// Account data structure - C-compatible version of nssa Account.
 ///
-/// Note: `balance` and `nonce` are u128 values split into lo/hi u64 parts
-/// since C doesn't have native u128 support.
+/// Note: `balance` and `nonce` are u128 values represented as little-endian
+/// byte arrays since C doesn't have native u128 support.
 #[repr(C)]
 pub struct FfiAccount {
     pub program_owner: FfiProgramId,
-    /// Lower 64 bits of balance (u128)
-    pub balance_lo: u64,
-    /// Upper 64 bits of balance (u128)
-    pub balance_hi: u64,
+    /// Balance as little-endian [u8; 16]
+    pub balance: [u8; 16],
     /// Pointer to account data bytes
     pub data: *const u8,
     /// Length of account data
     pub data_len: usize,
-    /// Lower 64 bits of nonce (u128)
-    pub nonce_lo: u64,
-    /// Upper 64 bits of nonce (u128)
-    pub nonce_hi: u64,
+    /// Nonce as little-endian [u8; 16]
+    pub nonce: [u8; 16],
 }
 
 impl Default for FfiAccount {
     fn default() -> Self {
         Self {
             program_owner: FfiProgramId::default(),
-            balance_lo: 0,
-            balance_hi: 0,
+            balance: [0u8; 16],
             data: std::ptr::null(),
             data_len: 0,
-            nonce_lo: 0,
-            nonce_hi: 0,
+            nonce: [0u8; 16],
         }
     }
 }
@@ -156,12 +150,3 @@ impl From<FfiBytes32> for nssa::AccountId {
     }
 }
 
-/// Helper to split a u128 into lo/hi u64 parts.
-pub fn split_u128(value: u128) -> (u64, u64) {
-    (value as u64, (value >> 64) as u64)
-}
-
-/// Helper to combine lo/hi u64 parts into a u128.
-pub fn combine_u128(lo: u64, hi: u64) -> u128 {
-    (hi as u128) << 64 | (lo as u128)
-}

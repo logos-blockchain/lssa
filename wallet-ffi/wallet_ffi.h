@@ -144,19 +144,15 @@ typedef struct FfiProgramId {
 /**
  * Account data structure - C-compatible version of nssa Account.
  *
- * Note: `balance` and `nonce` are u128 values split into lo/hi u64 parts
- * since C doesn't have native u128 support.
+ * Note: `balance` and `nonce` are u128 values represented as little-endian
+ * byte arrays since C doesn't have native u128 support.
  */
 typedef struct FfiAccount {
   struct FfiProgramId program_owner;
   /**
-   * Lower 64 bits of balance (u128)
+   * Balance as little-endian [u8; 16]
    */
-  uint64_t balance_lo;
-  /**
-   * Upper 64 bits of balance (u128)
-   */
-  uint64_t balance_hi;
+  uint8_t balance[16];
   /**
    * Pointer to account data bytes
    */
@@ -166,13 +162,9 @@ typedef struct FfiAccount {
    */
   uintptr_t data_len;
   /**
-   * Lower 64 bits of nonce (u128)
+   * Nonce as little-endian [u8; 16]
    */
-  uint64_t nonce_lo;
-  /**
-   * Upper 64 bits of nonce (u128)
-   */
-  uint64_t nonce_hi;
+  uint8_t nonce[16];
 } FfiAccount;
 
 /**
@@ -306,8 +298,7 @@ void wallet_ffi_free_account_list(struct FfiAccountList *list);
  * - `handle`: Valid wallet handle
  * - `account_id`: The account ID (32 bytes)
  * - `is_public`: Whether this is a public account
- * - `out_balance_lo`: Output for lower 64 bits of balance
- * - `out_balance_hi`: Output for upper 64 bits of balance
+ * - `out_balance`: Output for balance as little-endian [u8; 16]
  *
  * # Returns
  * - `Success` on successful query
@@ -316,8 +307,7 @@ void wallet_ffi_free_account_list(struct FfiAccountList *list);
 enum WalletFfiError wallet_ffi_get_balance(struct WalletHandle *handle,
                                            const struct FfiBytes32 *account_id,
                                            bool is_public,
-                                           uint64_t *out_balance_lo,
-                                           uint64_t *out_balance_hi);
+                                           uint8_t (*out_balance)[16]);
 
 /**
  * Get full public account data from the network.
@@ -505,8 +495,7 @@ enum WalletFfiError wallet_ffi_get_current_block_height(struct WalletHandle *han
  * - `handle`: Valid wallet handle
  * - `from`: Source account ID (must be owned by this wallet)
  * - `to`: Destination account ID
- * - `amount_lo`: Lower 64 bits of amount to transfer
- * - `amount_hi`: Upper 64 bits of amount to transfer
+ * - `amount`: Amount to transfer as little-endian [u8; 16]
  * - `out_result`: Output pointer for transfer result
  *
  * # Returns
@@ -521,8 +510,7 @@ enum WalletFfiError wallet_ffi_get_current_block_height(struct WalletHandle *han
 enum WalletFfiError wallet_ffi_transfer_public(struct WalletHandle *handle,
                                                const struct FfiBytes32 *from,
                                                const struct FfiBytes32 *to,
-                                               uint64_t amount_lo,
-                                               uint64_t amount_hi,
+                                               const uint8_t (*amount)[16],
                                                struct FfiTransferResult *out_result);
 
 /**

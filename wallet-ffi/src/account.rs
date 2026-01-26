@@ -7,8 +7,7 @@ use nssa::AccountId;
 use crate::block_on;
 use crate::error::{set_last_error, WalletFfiError};
 use crate::types::{
-    split_u128, FfiAccount, FfiAccountList, FfiAccountListEntry, FfiBytes32, FfiProgramId,
-    WalletHandle,
+    FfiAccount, FfiAccountList, FfiAccountListEntry, FfiBytes32, FfiProgramId, WalletHandle,
 };
 use crate::wallet::get_wallet;
 
@@ -220,8 +219,7 @@ pub extern "C" fn wallet_ffi_free_account_list(list: *mut FfiAccountList) {
 /// - `handle`: Valid wallet handle
 /// - `account_id`: The account ID (32 bytes)
 /// - `is_public`: Whether this is a public account
-/// - `out_balance_lo`: Output for lower 64 bits of balance
-/// - `out_balance_hi`: Output for upper 64 bits of balance
+/// - `out_balance`: Output for balance as little-endian [u8; 16]
 ///
 /// # Returns
 /// - `Success` on successful query
@@ -231,15 +229,14 @@ pub extern "C" fn wallet_ffi_get_balance(
     handle: *mut WalletHandle,
     account_id: *const FfiBytes32,
     is_public: bool,
-    out_balance_lo: *mut u64,
-    out_balance_hi: *mut u64,
+    out_balance: *mut [u8; 16],
 ) -> WalletFfiError {
     let wrapper = match get_wallet(handle) {
         Ok(w) => w,
         Err(e) => return e,
     };
 
-    if account_id.is_null() || out_balance_lo.is_null() || out_balance_hi.is_null() {
+    if account_id.is_null() || out_balance.is_null() {
         set_last_error("Null pointer argument");
         return WalletFfiError::NullPointer;
     }
@@ -273,10 +270,8 @@ pub extern "C" fn wallet_ffi_get_balance(
         }
     };
 
-    let (lo, hi) = split_u128(balance);
     unsafe {
-        *out_balance_lo = lo;
-        *out_balance_hi = hi;
+        *out_balance = balance.to_le_bytes();
     }
 
     WalletFfiError::Success
@@ -340,19 +335,14 @@ pub extern "C" fn wallet_ffi_get_account_public(
         ptr::null()
     };
 
-    let (balance_lo, balance_hi) = split_u128(account.balance);
-    let (nonce_lo, nonce_hi) = split_u128(account.nonce);
-
     let program_owner = FfiProgramId {
         data: account.program_owner,
     };
 
     unsafe {
         (*out_account).program_owner = program_owner;
-        (*out_account).balance_lo = balance_lo;
-        (*out_account).balance_hi = balance_hi;
-        (*out_account).nonce_lo = nonce_lo;
-        (*out_account).nonce_hi = nonce_hi;
+        (*out_account).balance = account.balance.to_le_bytes();
+        (*out_account).nonce = account.nonce.to_le_bytes();
         (*out_account).data = data_ptr;
         (*out_account).data_len = data_len;
     }

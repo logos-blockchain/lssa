@@ -1,6 +1,6 @@
 //! Token transfer functions.
 
-use std::ffi::{c_ulonglong, CString};
+use std::ffi::CString;
 use std::ptr;
 
 use common::error::ExecutionFailureKind;
@@ -9,7 +9,7 @@ use wallet::program_facades::native_token_transfer::NativeTokenTransfer;
 
 use crate::block_on;
 use crate::error::{set_last_error, WalletFfiError};
-use crate::types::{combine_u128, FfiBytes32, FfiTransferResult, WalletHandle};
+use crate::types::{FfiBytes32, FfiTransferResult, WalletHandle};
 use crate::wallet::get_wallet;
 
 /// Send a public token transfer.
@@ -20,8 +20,7 @@ use crate::wallet::get_wallet;
 /// - `handle`: Valid wallet handle
 /// - `from`: Source account ID (must be owned by this wallet)
 /// - `to`: Destination account ID
-/// - `amount_lo`: Lower 64 bits of amount to transfer
-/// - `amount_hi`: Upper 64 bits of amount to transfer
+/// - `amount`: Amount to transfer as little-endian [u8; 16]
 /// - `out_result`: Output pointer for transfer result
 ///
 /// # Returns
@@ -37,8 +36,7 @@ pub extern "C" fn wallet_ffi_transfer_public(
     handle: *mut WalletHandle,
     from: *const FfiBytes32,
     to: *const FfiBytes32,
-    amount_lo: u64,
-    amount_hi: u64,
+    amount: *const [u8; 16],
     out_result: *mut FfiTransferResult,
 ) -> WalletFfiError {
     let wrapper = match get_wallet(handle) {
@@ -46,7 +44,7 @@ pub extern "C" fn wallet_ffi_transfer_public(
         Err(e) => return e,
     };
 
-    if from.is_null() || to.is_null() || out_result.is_null() {
+    if from.is_null() || to.is_null() || amount.is_null() || out_result.is_null() {
         set_last_error("Null pointer argument");
         return WalletFfiError::NullPointer;
     }
@@ -61,7 +59,7 @@ pub extern "C" fn wallet_ffi_transfer_public(
 
     let from_id = AccountId::new(unsafe { (*from).data });
     let to_id = AccountId::new(unsafe { (*to).data });
-    let amount = combine_u128(amount_lo, amount_hi);
+    let amount = u128::from_le_bytes(unsafe { *amount });
 
     let transfer = NativeTokenTransfer(&wallet);
 
