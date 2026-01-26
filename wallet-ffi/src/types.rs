@@ -149,4 +149,3 @@ impl From<FfiBytes32> for nssa::AccountId {
         nssa::AccountId::new(bytes.data)
     }
 }
-

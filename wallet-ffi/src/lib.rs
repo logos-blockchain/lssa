@@ -28,7 +28,7 @@ pub mod transfer;
 pub mod types;
 pub mod wallet;
 
-use tokio::runtime::{Handle};
+use tokio::runtime::Handle;
 
 use crate::error::{print_error, WalletFfiError};
 
