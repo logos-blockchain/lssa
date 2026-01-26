@@ -219,15 +219,6 @@ typedef struct FfiTransferResult {
 enum WalletFfiError wallet_ffi_init_runtime(void);
 
 /**
- * Check if the runtime is initialized.
- *
- * # Returns
- * - `true` if the runtime is ready
- * - `false` if `wallet_ffi_init_runtime()` hasn't been called yet
- */
-bool wallet_ffi_runtime_initialized(void);
-
-/**
  * Create a new public account.
  *
  * Public accounts use standard transaction signing and are suitable for

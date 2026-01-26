@@ -28,9 +28,7 @@ pub mod transfer;
 pub mod types;
 pub mod wallet;
 
-use once_cell::sync::OnceCell;
-use std::sync::Arc;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle};
 
 use crate::error::{print_error, WalletFfiError};
 
@@ -38,15 +36,9 @@ use crate::error::{print_error, WalletFfiError};
 pub use error::WalletFfiError as FfiError;
 pub use types::*;
 
-// Global Tokio runtime - initialized once
-static RUNTIME: OnceCell<Arc<Runtime>> = OnceCell::new();
-
 /// Get a reference to the global runtime.
-pub(crate) fn get_runtime() -> Result<&'static Arc<Runtime>, WalletFfiError> {
-    RUNTIME.get().ok_or_else(|| {
-        print_error("Runtime not initialized. Call wallet_ffi_init_runtime() first.");
-        WalletFfiError::RuntimeError
-    })
+pub(crate) fn get_runtime() -> Result<Handle, WalletFfiError> {
+    Handle::try_current().map_err(|_| WalletFfiError::RuntimeError)
 }
 
 /// Run an async future on the global runtime, blocking until completion.
@@ -65,12 +57,9 @@ pub(crate) fn block_on<F: std::future::Future>(future: F) -> Result<F::Output, W
 /// - `RuntimeError` if runtime creation failed
 #[no_mangle]
 pub extern "C" fn wallet_ffi_init_runtime() -> WalletFfiError {
-    let result = RUNTIME.get_or_try_init(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .map(Arc::new)
-    });
+    let result = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build();
 
     match result {
         Ok(_) => WalletFfiError::Success,
@@ -79,14 +68,4 @@ pub extern "C" fn wallet_ffi_init_runtime() -> WalletFfiError {
             WalletFfiError::RuntimeError
         }
     }
-}
-
-/// Check if the runtime is initialized.
-///
-/// # Returns
-/// - `true` if the runtime is ready
-/// - `false` if `wallet_ffi_init_runtime()` hasn't been called yet
-#[no_mangle]
-pub extern "C" fn wallet_ffi_runtime_initialized() -> bool {
-    RUNTIME.get().is_some()
 }
