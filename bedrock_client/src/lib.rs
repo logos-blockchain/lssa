@@ -1,7 +1,6 @@
 use anyhow::Result;
-use common_http_client::CommonHttpClient;
-pub use common_http_client::{BasicAuthCredentials, Error};
-use nomos_core::mantle::SignedMantleTx;
+pub use logos_blockchain_common_http_client::{BasicAuthCredentials, CommonHttpClient, Error};
+use logos_blockchain_core::mantle::SignedMantleTx;
 use reqwest::{Client, Url};
 
 // Simple wrapper
@@ -14,7 +13,7 @@ pub struct BedrockClient {
 impl BedrockClient {
     pub fn new(auth: Option<BasicAuthCredentials>, node_url: Url) -> Result<Self> {
         let client = Client::builder()
-                //Add more fiedls if needed
+                //Add more fields if needed
                 .timeout(std::time::Duration::from_secs(60))
                 .build()?;
 

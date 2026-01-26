@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use log::debug;
 use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata},
-    program::{ChainedCall, DEFAULT_PROGRAM_ID, PdaSeed, ProgramId, validate_execution},
+    program::{ChainedCall, DEFAULT_PROGRAM_ID, validate_execution},
 };
 use sha2::{Digest, digest::FixedOutput};
 
@@ -119,7 +119,7 @@ impl PublicTransaction {
                 return Err(NssaError::MaxChainedCallsDepthExceeded);
             }
 
-            // Check the `program_id` corresponds to a deployed program
+            // Check that the `program_id` corresponds to a deployed program
             let Some(program) = state.programs().get(&chained_call.program_id) else {
                 return Err(NssaError::InvalidInput("Unknown program".into()));
             };
@@ -135,12 +135,14 @@ impl PublicTransaction {
                 chained_call.program_id, program_output
             );
 
-            let authorized_pdas =
-                self.compute_authorized_pdas(&caller_program_id, &chained_call.pda_seeds);
+            let authorized_pdas = nssa_core::program::compute_authorized_pdas(
+                caller_program_id,
+                &chained_call.pda_seeds,
+            );
 
             for pre in &program_output.pre_states {
                 let account_id = pre.account_id;
-                // Check that the program output pre_states coinicide with the values in the public
+                // Check that the program output pre_states coincide with the values in the public
                 // state or with any modifications to those values during the chain of calls.
                 let expected_pre = state_diff
                     .get(&account_id)
@@ -198,22 +200,23 @@ impl PublicTransaction {
             chain_calls_counter += 1;
         }
 
-        Ok(state_diff)
-    }
-
-    fn compute_authorized_pdas(
-        &self,
-        caller_program_id: &Option<ProgramId>,
-        pda_seeds: &[PdaSeed],
-    ) -> HashSet<AccountId> {
-        if let Some(caller_program_id) = caller_program_id {
-            pda_seeds
-                .iter()
-                .map(|pda_seed| AccountId::from((caller_program_id, pda_seed)))
-                .collect()
-        } else {
-            HashSet::new()
+        // Check that all modified uninitialized accounts where claimed
+        for post in state_diff.iter().filter_map(|(account_id, post)| {
+            let pre = state.get_account_by_id(account_id);
+            if pre.program_owner != DEFAULT_PROGRAM_ID {
+                return None;
+            }
+            if pre == *post {
+                return None;
+            }
+            Some(post)
+        }) {
+            if post.program_owner == DEFAULT_PROGRAM_ID {
+                return Err(NssaError::InvalidProgramBehavior);
+            }
         }
+
+        Ok(state_diff)
     }
 }
 
