@@ -1,25 +1,25 @@
 [workspace]
 resolver = "3"
 members = [
-  "integration_tests",
-  "sequencer_runner",
-  "storage",
-  "key_protocol",
-  "sequencer_rpc",
-  "mempool",
-  "wallet",
-  "wallet-ffi",
-  "sequencer_core",
-  "common",
-  "nssa",
-  "nssa/core",
-  "program_methods",
-  "program_methods/guest",
-  "test_program_methods",
-  "test_program_methods/guest",
-  "examples/program_deployment",
-  "examples/program_deployment/methods",
-  "examples/program_deployment/methods/guest",
+    "integration_tests",
+    "sequencer_runner",
+    "storage",
+    "key_protocol",
+    "sequencer_rpc",
+    "mempool",
+    "wallet",
+    "wallet-ffi",
+    "sequencer_core",
+    "common",
+    "nssa",
+    "nssa/core",
+    "program_methods",
+    "program_methods/guest",
+    "test_program_methods",
+    "test_program_methods/guest",
+    "examples/program_deployment",
+    "examples/program_deployment/methods",
+    "examples/program_deployment/methods/guest",
 ]
 
 [workspace.dependencies]
@@ -35,14 +35,11 @@ sequencer_runner = { path = "sequencer_runner" }
 wallet = { path = "wallet" }
 wallet-ffi = { path = "wallet-ffi" }
 test_program_methods = { path = "test_program_methods" }
-
-once_cell = "1.19"
-
 tokio = { version = "1.28.2", features = [
-  "net",
-  "rt-multi-thread",
-  "sync",
-  "fs",
+    "net",
+    "rt-multi-thread",
+    "sync",
+    "fs",
 ] }
 risc0-zkvm = { version = "3.0.3", features = ['std'] }
 risc0-build = "3.0.3"
@@ -81,20 +78,20 @@ base58 = "0.2.0"
 itertools = "0.14.0"
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
-  "snappy",
-  "bindgen-runtime",
+    "snappy",
+    "bindgen-runtime",
 ] }
 rand = { version = "0.8.5", features = ["std", "std_rng", "getrandom"] }
 k256 = { version = "0.13.3", features = [
-  "ecdsa-core",
-  "arithmetic",
-  "expose-field",
-  "serde",
-  "pem",
+    "ecdsa-core",
+    "arithmetic",
+    "expose-field",
+    "serde",
+    "pem",
 ] }
 elliptic-curve = { version = "0.13.8", features = ["arithmetic"] }
 actix-web = { version = "=4.1.0", default-features = false, features = [
-  "macros",
+    "macros",
 ] }
 clap = { version = "4.5.42", features = ["derive", "env"] }
 reqwest = { version = "0.11.16", features = ["json"] }

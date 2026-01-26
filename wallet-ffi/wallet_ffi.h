@@ -625,8 +625,8 @@ struct WalletHandle *wallet_ffi_open(const char *config_path, const char *storag
  * After calling this function, the handle is invalid and must not be used.
  *
  * # Safety
- * - The handle must be either null or a valid handle from `wallet_ffi_create_new()`
- *   or `wallet_ffi_open()`.
+ * - The handle must be either null or a valid handle from `wallet_ffi_create_new()` or
+ *   `wallet_ffi_open()`.
  * - The handle must not be used after this call.
  */
 void wallet_ffi_destroy(struct WalletHandle *handle);
@@ -656,7 +656,8 @@ enum WalletFfiError wallet_ffi_save(struct WalletHandle *handle);
  * - `handle`: Valid wallet handle
  *
  * # Returns
- * - Pointer to null-terminated string on success (caller must free with `wallet_ffi_free_string()`)
+ * - Pointer to null-terminated string on success (caller must free with
+ *   `wallet_ffi_free_string()`)
  * - Null pointer on error
  *
  * # Safety
