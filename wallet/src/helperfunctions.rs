@@ -7,23 +7,22 @@ use nssa::Account;
 use nssa_core::account::Nonce;
 use rand::{RngCore, rngs::OsRng};
 use serde::Serialize;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     HOME_DIR_ENV_VAR,
     config::{
-        BasicAuth, InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic,
-        PersistentAccountDataPrivate, PersistentAccountDataPublic, PersistentStorage, WalletConfig,
+        InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic,
+        PersistentAccountDataPrivate, PersistentAccountDataPublic, PersistentStorage,
     },
 };
 
 /// Get home dir for wallet. Env var `NSSA_WALLET_HOME_DIR` must be set before execution to succeed.
-pub fn get_home_nssa_var() -> Result<PathBuf> {
+fn get_home_nssa_var() -> Result<PathBuf> {
     Ok(PathBuf::from_str(&std::env::var(HOME_DIR_ENV_VAR)?)?)
 }
 
 /// Get home dir for wallet. Env var `HOME` must be set before execution to succeed.
-pub fn get_home_default_path() -> Result<PathBuf> {
+fn get_home_default_path() -> Result<PathBuf> {
     std::env::home_dir()
         .map(|path| path.join(".nssa").join("wallet"))
         .ok_or(anyhow::anyhow!("Failed to get HOME"))
@@ -38,96 +37,20 @@ pub fn get_home() -> Result<PathBuf> {
     }
 }
 
-/// Fetch config from default home
-pub async fn fetch_config() -> Result<WalletConfig> {
-    let config_home = get_home()?;
-    let mut config_needs_setup = false;
-
-    let config = match tokio::fs::OpenOptions::new()
-        .read(true)
-        .open(config_home.join("wallet_config.json"))
-        .await
-    {
-        Ok(mut file) => {
-            let mut config_contents = vec![];
-            file.read_to_end(&mut config_contents).await?;
-
-            serde_json::from_slice(&config_contents)?
-        }
-        Err(err) => match err.kind() {
-            std::io::ErrorKind::NotFound => {
-                config_needs_setup = true;
-
-                println!("Config not found, setting up default config");
-
-                WalletConfig::default()
-            }
-            _ => anyhow::bail!("IO error {err:#?}"),
-        },
-    };
-
-    if config_needs_setup {
-        tokio::fs::create_dir_all(&config_home).await?;
-
-        println!("Created configs dir at path {config_home:#?}");
-
-        let mut file = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(config_home.join("wallet_config.json"))
-            .await?;
-
-        let default_config_serialized =
-            serde_json::to_vec_pretty(&WalletConfig::default()).unwrap();
-
-        file.write_all(&default_config_serialized).await?;
-
-        println!("Configs setted up");
-    }
-
-    Ok(config)
+/// Fetch config path from default home
+pub fn fetch_config_path() -> Result<PathBuf> {
+    let home = get_home()?;
+    let config_path = home.join("wallet_config.json");
+    Ok(config_path)
 }
 
-/// Parse CLI auth string and merge with config auth, prioritizing CLI
-pub fn merge_auth_config(
-    mut config: WalletConfig,
-    cli_auth: Option<String>,
-) -> Result<WalletConfig> {
-    if let Some(auth_str) = cli_auth {
-        let cli_auth_config: BasicAuth = auth_str.parse()?;
-
-        if config.basic_auth.is_some() {
-            println!("Warning: CLI auth argument takes precedence over config basic-auth");
-        }
-
-        config.basic_auth = Some(cli_auth_config);
-    }
-    Ok(config)
-}
-
-/// Fetch data stored at home
+/// Fetch path to data storage from default home
 ///
 /// File must be created through setup beforehand.
-pub async fn fetch_persistent_storage() -> Result<PersistentStorage> {
+pub fn fetch_persistent_storage_path() -> Result<PathBuf> {
     let home = get_home()?;
     let accs_path = home.join("storage.json");
-    let mut storage_content = vec![];
-
-    match tokio::fs::File::open(accs_path).await {
-        Ok(mut file) => {
-            file.read_to_end(&mut storage_content).await?;
-            Ok(serde_json::from_slice(&storage_content)?)
-        }
-        Err(err) => match err.kind() {
-            std::io::ErrorKind::NotFound => {
-                anyhow::bail!("Not found, please setup roots from config command beforehand");
-            }
-            _ => {
-                anyhow::bail!("IO error {err:#?}");
-            }
-        },
-    }
+    Ok(accs_path)
 }
 
 /// Produces data for storage

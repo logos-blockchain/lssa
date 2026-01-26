@@ -13,8 +13,9 @@ use log::warn;
 use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
 
-use crate::block_store::SequencerBlockStore;
+use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerBlockStore};
 
+mod block_settlement_client;
 pub mod block_store;
 pub mod config;
 
@@ -24,6 +25,7 @@ pub struct SequencerCore {
     mempool: MemPool<EncodedTransaction>,
     sequencer_config: SequencerConfig,
     chain_height: u64,
+    block_settlement_client: Option<BlockSettlementClient>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -51,7 +53,7 @@ impl SequencerCore {
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let genesis_block = hashable_data.into_block(&signing_key);
+        let genesis_block = hashable_data.into_pending_block(&signing_key);
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
@@ -87,12 +89,18 @@ impl SequencerCore {
         state.add_pinata_program(PINATA_BASE58.parse().unwrap());
 
         let (mempool, mempool_handle) = MemPool::new(config.mempool_max_size);
+        let block_settlement_client = config.bedrock_config.as_ref().map(|bedrock_config| {
+            BlockSettlementClient::try_new(&config.home, bedrock_config)
+                .expect("Block settlement client should be constructible")
+        });
+
         let mut this = Self {
             state,
             block_store,
             mempool,
             chain_height: config.genesis_id,
             sequencer_config: config,
+            block_settlement_client,
         };
 
         this.sync_state_with_stored_blocks();
@@ -137,9 +145,21 @@ impl SequencerCore {
         Ok(tx)
     }
 
+    pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
+        let block_data = self.produce_new_block_with_mempool_transactions()?;
+
+        if let Some(block_settlement) = self.block_settlement_client.as_mut() {
+            block_settlement.post_and_wait(&block_data).await?;
+            log::info!("Posted block data to Bedrock");
+        }
+
+        Ok(self.chain_height)
+    }
+
     /// Produces new block from transactions in mempool
-    pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<u64> {
+    pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<HashableBlockData> {
         let now = Instant::now();
+
         let new_block_height = self.chain_height + 1;
 
         let mut valid_transactions = vec![];
@@ -167,8 +187,6 @@ impl SequencerCore {
 
         let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
-        let num_txs_in_block = valid_transactions.len();
-
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
             transactions: valid_transactions,
@@ -176,7 +194,9 @@ impl SequencerCore {
             timestamp: curr_time,
         };
 
-        let block = hashable_data.into_block(self.block_store.signing_key());
+        let block = hashable_data
+            .clone()
+            .into_pending_block(self.block_store.signing_key());
 
         self.block_store.put_block_at_id(block)?;
 
@@ -194,11 +214,10 @@ impl SequencerCore {
         // ```
         log::info!(
             "Created block with {} transactions in {} seconds",
-            num_txs_in_block,
+            hashable_data.transactions.len(),
             now.elapsed().as_secs()
         );
-
-        Ok(self.chain_height)
+        Ok(hashable_data)
     }
 
     pub fn state(&self) -> &nssa::V02State {
@@ -277,6 +296,7 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
+            bedrock_config: None,
         }
     }
 
@@ -618,9 +638,9 @@ mod tests {
         let tx = common::test_utils::produce_dummy_empty_transaction();
         mempool_handle.push(tx).await.unwrap();
 
-        let block_id = sequencer.produce_new_block_with_mempool_transactions();
-        assert!(block_id.is_ok());
-        assert_eq!(block_id.unwrap(), genesis_height + 1);
+        let block = sequencer.produce_new_block_with_mempool_transactions();
+        assert!(block.is_ok());
+        assert_eq!(block.unwrap().block_id, genesis_height + 1);
     }
 
     #[tokio::test]
@@ -657,7 +677,8 @@ mod tests {
         // Create block
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
-            .unwrap();
+            .unwrap()
+            .block_id;
         let block = sequencer
             .block_store
             .get_block_at_id(current_height)
@@ -696,7 +717,8 @@ mod tests {
         mempool_handle.push(tx.clone()).await.unwrap();
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
-            .unwrap();
+            .unwrap()
+            .block_id;
         let block = sequencer
             .block_store
             .get_block_at_id(current_height)
@@ -707,7 +729,8 @@ mod tests {
         mempool_handle.push(tx.clone()).await.unwrap();
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
-            .unwrap();
+            .unwrap()
+            .block_id;
         let block = sequencer
             .block_store
             .get_block_at_id(current_height)
@@ -742,7 +765,8 @@ mod tests {
             mempool_handle.push(tx.clone()).await.unwrap();
             let current_height = sequencer
                 .produce_new_block_with_mempool_transactions()
-                .unwrap();
+                .unwrap()
+                .block_id;
             let block = sequencer
                 .block_store
                 .get_block_at_id(current_height)

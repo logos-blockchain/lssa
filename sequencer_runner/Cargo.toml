@@ -10,7 +10,6 @@ sequencer_rpc.workspace = true
 
 clap = { workspace = true, features = ["derive", "env"] }
 anyhow.workspace = true
-serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 actix.workspace = true

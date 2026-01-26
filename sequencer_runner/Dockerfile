@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libclang-dev \
     clang \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /sequencer_runner
@@ -31,6 +32,14 @@ RUN cargo build --release --bin sequencer_runner
 # Strip debug symbols to reduce binary size
 RUN strip /sequencer_runner/target/release/sequencer_runner
 
+# Install r0vm
+RUN curl -L https://risczero.com/install | bash
+ENV PATH="/root/.cargo/bin:/root/.risc0/bin:${PATH}"
+RUN rzup install
+RUN cp "$(which r0vm)" /usr/local/bin/r0vm
+RUN test -x /usr/local/bin/r0vm
+RUN r0vm --version
+
 # Runtime stage - minimal image
 FROM debian:trixie-slim
 
@@ -46,6 +55,9 @@ RUN useradd -m -u 1000 -s /bin/bash sequencer_user && \
 
 # Copy binary from builder
 COPY --from=builder --chown=sequencer_user:sequencer_user /sequencer_runner/target/release/sequencer_runner /usr/local/bin/sequencer_runner
+
+# Copy r0vm binary from builder
+COPY --from=builder --chown=sequencer_user:sequencer_user /usr/local/bin/r0vm /usr/local/bin/r0vm
 
 # Copy entrypoint script
 COPY sequencer_runner/docker-entrypoint.sh /docker-entrypoint.sh
@@ -70,6 +82,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Run the application
 ENV RUST_LOG=info
+
+# Set explicit location for r0vm binary
+ENV RISC0_SERVER_PATH=/usr/local/bin/r0vm
 
 USER root
 

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 use actix_web::dev::ServerHandle;
 use anyhow::Result;
@@ -8,8 +8,6 @@ use log::info;
 use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
-
-pub mod config;
 
 pub const RUST_LOG: &str = "RUST_LOG";
 
@@ -22,7 +20,7 @@ struct Args {
 
 pub async fn startup_sequencer(
     app_config: SequencerConfig,
-) -> Result<(ServerHandle, JoinHandle<Result<()>>)> {
+) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>)> {
     let block_timeout = app_config.block_create_timeout_millis;
     let port = app_config.port;
 
@@ -32,7 +30,7 @@ pub async fn startup_sequencer(
 
     let seq_core_wrapped = Arc::new(Mutex::new(sequencer_core));
 
-    let http_server = new_http_server(
+    let (http_server, addr) = new_http_server(
         RpcConfig::with_port(port),
         Arc::clone(&seq_core_wrapped),
         mempool_handle,
@@ -52,7 +50,9 @@ pub async fn startup_sequencer(
             let id = {
                 let mut state = seq_core_wrapped.lock().await;
 
-                state.produce_new_block_with_mempool_transactions()?
+                state
+                    .produce_new_block_and_post_to_settlement_layer()
+                    .await?
             };
 
             info!("Block with id {id} created");
@@ -61,7 +61,7 @@ pub async fn startup_sequencer(
         }
     });
 
-    Ok((http_server_handle, main_loop_handle))
+    Ok((http_server_handle, addr, main_loop_handle))
 }
 
 pub async fn main_runner() -> Result<()> {
@@ -70,7 +70,7 @@ pub async fn main_runner() -> Result<()> {
     let args = Args::parse();
     let Args { home_dir } = args;
 
-    let app_config = config::from_file(home_dir.join("sequencer_config.json"))?;
+    let app_config = SequencerConfig::from_path(&home_dir.join("sequencer_config.json"))?;
 
     if let Some(ref rust_log) = app_config.override_rust_log {
         info!("RUST_LOG env var set to {rust_log:?}");
@@ -81,7 +81,7 @@ pub async fn main_runner() -> Result<()> {
     }
 
     // ToDo: Add restart on failures
-    let (_, main_loop_handle) = startup_sequencer(app_config).await?;
+    let (_, _, main_loop_handle) = startup_sequencer(app_config).await?;
 
     main_loop_handle.await??;
 

@@ -11,16 +11,14 @@ sequencer_runner.workspace = true
 wallet.workspace = true
 common.workspace = true
 key_protocol.workspace = true
-proc_macro_test_attribute = { path = "./proc_macro_test_attribute" }
 
-clap = { workspace = true, features = ["derive", "env"] }
 anyhow.workspace = true
 env_logger.workspace = true
 log.workspace = true
-actix.workspace = true
 actix-web.workspace = true
 base64.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 hex.workspace = true
 tempfile.workspace = true
 borsh.workspace = true
+futures.workspace = true

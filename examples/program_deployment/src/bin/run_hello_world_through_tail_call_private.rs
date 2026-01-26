@@ -4,7 +4,7 @@ use nssa::{
     AccountId, ProgramId, privacy_preserving_transaction::circuit::ProgramWithDependencies,
     program::Program,
 };
-use wallet::{PrivacyPreservingAccount, WalletCore, helperfunctions::fetch_config};
+use wallet::{PrivacyPreservingAccount, WalletCore};
 
 // Before running this example, compile the `simple_tail_call.rs` guest program with:
 //
@@ -25,11 +25,8 @@ use wallet::{PrivacyPreservingAccount, WalletCore, helperfunctions::fetch_config
 
 #[tokio::main]
 async fn main() {
-    // Load wallet config and storage
-    let wallet_config = fetch_config().await.unwrap();
-    let wallet_core = WalletCore::start_from_config_update_chain(wallet_config)
-        .await
-        .unwrap();
+    // Initialize wallet
+    let wallet_core = WalletCore::from_env().unwrap();
 
     // Parse arguments
     // First argument is the path to the simple_tail_call program binary
@@ -61,7 +58,7 @@ async fn main() {
     wallet_core
         .send_privacy_preserving_tx(
             accounts,
-            &Program::serialize_instruction(instruction).unwrap(),
+            Program::serialize_instruction(instruction).unwrap(),
             &program_with_dependencies,
         )
         .await
