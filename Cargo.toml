@@ -19,6 +19,7 @@ members = [
   "examples/program_deployment",
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
+  "bedrock_client",
 ]
 
 [workspace.dependencies]
@@ -75,6 +76,9 @@ chrono = "0.4.41"
 borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
+url = "2.5.4"
+
+common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",
@@ -93,4 +97,4 @@ actix-web = { version = "=4.1.0", default-features = false, features = [
   "macros",
 ] }
 clap = { version = "4.5.42", features = ["derive", "env"] }
-reqwest = { version = "0.11.16", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }

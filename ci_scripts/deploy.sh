@@ -52,7 +52,7 @@ if [ -d ".git" ]; then
   git reset --hard origin/main
 else
   echo "Cloning repository..."
-  git clone https://github.com/vacp2p/nescience-testnet.git .
+  git clone https://github.com/logos-blockchain/lssa.git .
   git checkout main
 fi
 
