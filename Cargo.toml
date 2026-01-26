@@ -34,6 +34,7 @@ sequencer_rpc = { path = "sequencer_rpc" }
 sequencer_runner = { path = "sequencer_runner" }
 wallet = { path = "wallet" }
 test_program_methods = { path = "test_program_methods" }
+bedrock_client = { path = "bedrock_client" }
 
 tokio = { version = "1.28.2", features = [
   "net",
@@ -78,7 +79,9 @@ base58 = "0.2.0"
 itertools = "0.14.0"
 url = "2.5.4"
 
-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",
