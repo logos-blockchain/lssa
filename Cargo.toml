@@ -82,10 +82,9 @@ itertools = "0.14.0"
 url = "2.5.4"
 tokio-retry = "0.3.0"
 
-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
-nomos-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
-broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",

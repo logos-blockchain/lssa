@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use nomos_core::mantle::ops::channel::ChannelId;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -57,11 +57,7 @@ pub struct BedrockConfig {
     /// Bedrock channel ID
     pub channel_id: ChannelId,
     /// Bedrock Url
-    pub node_url: String,
-    /// Bedrock user
-    pub user: String,
-    /// Bedrock password(optional)
-    pub password: Option<String>,
+    pub node_url: Url,
 }
 
 impl SequencerConfig {

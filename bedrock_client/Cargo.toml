@@ -6,10 +6,5 @@ edition = "2024"
 [dependencies]
 reqwest.workspace = true
 anyhow.workspace = true
-common-http-client.workspace = true
-nomos-core.workspace = true
-broadcast-service.workspace = true
-url.workspace = true
-futures.workspace = true
-tokio-retry.workspace = true
-log.workspace = true
+logos-blockchain-common-http-client.workspace = true
+logos-blockchain-core.workspace = true
