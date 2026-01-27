@@ -7,3 +7,4 @@ edition = "2024"
 nssa_core.workspace = true
 serde.workspace = true
 risc0-zkvm.workspace = true
+borsh.workspace = true

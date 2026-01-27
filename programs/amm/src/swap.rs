@@ -1,6 +1,6 @@
 pub use amm_core::{PoolDefinition, compute_liquidity_token_pda_seed, compute_vault_pda_seed};
 use nssa_core::{
-    account::{AccountId, AccountWithMetadata},
+    account::{AccountId, AccountWithMetadata, Data},
     program::{AccountPostState, ChainedCall},
 };
 
@@ -16,20 +16,18 @@ pub fn swap(
     token_in_id: AccountId,
 ) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
     // Verify vaults are in fact vaults
-    let pool_def_data = PoolDefinition::parse(&pool.account.data)
+    let pool_def_data = PoolDefinition::try_from(&pool.account.data)
         .expect("Swap: AMM Program expects a valid Pool Definition Account");
 
-    if !pool_def_data.active {
-        panic!("Pool is inactive");
-    }
-
-    if vault_a.account_id != pool_def_data.vault_a_id {
-        panic!("Vault A was not provided");
-    }
-
-    if vault_b.account_id != pool_def_data.vault_b_id {
-        panic!("Vault B was not provided");
-    }
+    assert!(pool_def_data.active, "Pool is inactive");
+    assert_eq!(
+        vault_a.account_id, pool_def_data.vault_a_id,
+        "Vault A was not provided"
+    );
+    assert_eq!(
+        vault_b.account_id, pool_def_data.vault_b_id,
+        "Vault B was not provided"
+    );
 
     // fetch pool reserves
     // validates reserves is at least the vaults' balances
@@ -42,9 +40,11 @@ pub fn swap(
     else {
         panic!("Swap: AMM Program expects a valid Fungible Token Holding Account for Vault A");
     };
-    if vault_a_balance < pool_def_data.reserve_a {
-        panic!("Reserve for Token A exceeds vault balance");
-    }
+
+    assert!(
+        vault_a_balance >= pool_def_data.reserve_a,
+        "Reserve for Token A exceeds vault balance"
+    );
 
     let vault_b_token_holding = token_core::TokenHolding::try_from(&vault_b.account.data)
         .expect("Swap: AMM Program expects a valid Token Holding Account for Vault B");
@@ -56,9 +56,10 @@ pub fn swap(
         panic!("Swap: AMM Program expects a valid Fungible Token Holding Account for Vault B");
     };
 
-    if vault_b_balance < pool_def_data.reserve_b {
-        panic!("Reserve for Token B exceeds vault balance");
-    }
+    assert!(
+        vault_b_balance >= pool_def_data.reserve_b,
+        "Reserve for Token B exceeds vault balance"
+    );
 
     let (chained_calls, [deposit_a, withdraw_a], [deposit_b, withdraw_b]) =
         if token_in_id == pool_def_data.definition_token_a_id {
@@ -69,7 +70,8 @@ pub fn swap(
                 user_holding_b.clone(),
                 swap_amount_in,
                 min_amount_out,
-                &[pool_def_data.reserve_a, pool_def_data.reserve_b],
+                pool_def_data.reserve_a,
+                pool_def_data.reserve_b,
                 pool.account_id,
             );
 
@@ -82,7 +84,8 @@ pub fn swap(
                 user_holding_a.clone(),
                 swap_amount_in,
                 min_amount_out,
-                &[pool_def_data.reserve_b, pool_def_data.reserve_a],
+                pool_def_data.reserve_b,
+                pool_def_data.reserve_a,
                 pool.account_id,
             );
 
@@ -99,7 +102,7 @@ pub fn swap(
         ..pool_def_data
     };
 
-    pool_post.data = pool_post_definition.into_data();
+    pool_post.data = Data::from(&pool_post_definition);
 
     let post_states = vec![
         AccountPostState::new(pool_post.clone()),
@@ -120,12 +123,10 @@ fn swap_logic(
     user_withdraw: AccountWithMetadata,
     swap_amount_in: u128,
     min_amount_out: u128,
-    reserve_amounts: &[u128],
+    reserve_deposit_vault_amount: u128,
+    reserve_withdraw_vault_amount: u128,
     pool_id: AccountId,
 ) -> (Vec<ChainedCall>, u128, u128) {
-    let reserve_deposit_vault_amount = reserve_amounts[0];
-    let reserve_withdraw_vault_amount = reserve_amounts[1];
-
     // Compute withdraw amount
     // Maintains pool constant product
     // k = pool_def_data.reserve_a * pool_def_data.reserve_b;
@@ -133,13 +134,11 @@ fn swap_logic(
         / (reserve_deposit_vault_amount + swap_amount_in);
 
     // Slippage check
-    if min_amount_out > withdraw_amount {
-        panic!("Withdraw amount is less than minimal amount out");
-    }
-
-    if withdraw_amount == 0 {
-        panic!("Withdraw amount should be nonzero");
-    }
+    assert!(
+        min_amount_out <= withdraw_amount,
+        "Withdraw amount is less than minimal amount out"
+    );
+    assert!(withdraw_amount != 0, "Withdraw amount should be nonzero");
 
     let token_program_id = user_deposit.account.program_owner;
 

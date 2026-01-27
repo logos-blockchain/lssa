@@ -1,6 +1,8 @@
+use std::num::NonZeroU128;
+
 use amm_core::{PoolDefinition, compute_liquidity_token_pda_seed, compute_vault_pda_seed};
 use nssa_core::{
-    account::AccountWithMetadata,
+    account::{AccountWithMetadata, Data},
     program::{AccountPostState, ChainedCall},
 };
 
@@ -13,29 +15,29 @@ pub fn remove_liquidity(
     user_holding_a: AccountWithMetadata,
     user_holding_b: AccountWithMetadata,
     user_holding_lp: AccountWithMetadata,
-    remove_liquidity_amount: u128,
+    remove_liquidity_amount: NonZeroU128,
     min_amount_to_remove_token_a: u128,
     min_amount_to_remove_token_b: u128,
 ) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
+    let remove_liquidity_amount: u128 = remove_liquidity_amount.into();
+
     // 1. Fetch Pool state
-    let pool_def_data = PoolDefinition::parse(&pool.account.data)
+    let pool_def_data = PoolDefinition::try_from(&pool.account.data)
         .expect("Remove liquidity: AMM Program expects a valid Pool Definition Account");
 
-    if !pool_def_data.active {
-        panic!("Pool is inactive");
-    }
-
-    if pool_def_data.liquidity_pool_id != pool_definition_lp.account_id {
-        panic!("LP definition mismatch");
-    }
-
-    if vault_a.account_id != pool_def_data.vault_a_id {
-        panic!("Vault A was not provided");
-    }
-
-    if vault_b.account_id != pool_def_data.vault_b_id {
-        panic!("Vault B was not provided");
-    }
+    assert!(pool_def_data.active, "Pool is inactive");
+    assert_eq!(
+        pool_def_data.liquidity_pool_id, pool_definition_lp.account_id,
+        "LP definition mismatch"
+    );
+    assert_eq!(
+        vault_a.account_id, pool_def_data.vault_a_id,
+        "Vault A was not provided"
+    );
+    assert_eq!(
+        vault_b.account_id, pool_def_data.vault_b_id,
+        "Vault B was not provided"
+    );
 
     // Vault addresses do not need to be checked with PDA
     // calculation for setting authorization since stored
@@ -45,13 +47,14 @@ pub fn remove_liquidity(
     running_vault_a.is_authorized = true;
     running_vault_b.is_authorized = true;
 
-    if min_amount_to_remove_token_a == 0 || min_amount_to_remove_token_b == 0 {
-        panic!("Minimum withdraw amount must be nonzero");
-    }
-
-    if remove_liquidity_amount == 0 {
-        panic!("Liquidity amount must be nonzero");
-    }
+    assert!(
+        min_amount_to_remove_token_a != 0,
+        "Minimum withdraw amount must be nonzero"
+    );
+    assert!(
+        min_amount_to_remove_token_b != 0,
+        "Minimum withdraw amount must be nonzero"
+    );
 
     // 2. Compute withdrawal amounts
     let user_holding_lp_data = token_core::TokenHolding::try_from(&user_holding_lp.account.data)
@@ -66,11 +69,15 @@ pub fn remove_liquidity(
         );
     };
 
-    if user_lp_balance > pool_def_data.liquidity_pool_supply
-        || user_holding_lp_data.definition_id() != pool_def_data.liquidity_pool_id
-    {
-        panic!("Invalid liquidity account provided");
-    }
+    assert!(
+        user_lp_balance <= pool_def_data.liquidity_pool_supply,
+        "Invalid liquidity account provided"
+    );
+    assert_eq!(
+        user_holding_lp_data.definition_id(),
+        pool_def_data.liquidity_pool_id,
+        "Invalid liquidity account provided"
+    );
 
     let withdraw_amount_a =
         (pool_def_data.reserve_a * remove_liquidity_amount) / pool_def_data.liquidity_pool_supply;
@@ -78,12 +85,14 @@ pub fn remove_liquidity(
         (pool_def_data.reserve_b * remove_liquidity_amount) / pool_def_data.liquidity_pool_supply;
 
     // 3. Validate and slippage check
-    if withdraw_amount_a < min_amount_to_remove_token_a {
-        panic!("Insufficient minimal withdraw amount (Token A) provided for liquidity amount");
-    }
-    if withdraw_amount_b < min_amount_to_remove_token_b {
-        panic!("Insufficient minimal withdraw amount (Token B) provided for liquidity amount");
-    }
+    assert!(
+        withdraw_amount_a >= min_amount_to_remove_token_a,
+        "Insufficient minimal withdraw amount (Token A) provided for liquidity amount"
+    );
+    assert!(
+        withdraw_amount_b >= min_amount_to_remove_token_b,
+        "Insufficient minimal withdraw amount (Token B) provided for liquidity amount"
+    );
 
     // 4. Calculate LP to reduce cap by
     let delta_lp: u128 = (pool_def_data.liquidity_pool_supply * remove_liquidity_amount)
@@ -101,7 +110,7 @@ pub fn remove_liquidity(
         ..pool_def_data.clone()
     };
 
-    pool_post.data = pool_post_definition.into_data();
+    pool_post.data = Data::from(&pool_post_definition);
 
     let token_program_id = user_holding_a.account.program_owner;
 

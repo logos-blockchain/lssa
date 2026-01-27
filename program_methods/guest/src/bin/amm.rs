@@ -6,11 +6,10 @@
 //! AMM program accepts [`Instruction`] as input, refer to the corresponding documentation
 //! for more details.
 
+use std::num::NonZero;
+
 use amm_core::Instruction;
-use nssa_core::program::{
-    AccountPostState, ChainedCall, ProgramInput, read_nssa_inputs,
-    write_nssa_outputs_with_chained_call,
-};
+use nssa_core::program::{ProgramInput, read_nssa_inputs, write_nssa_outputs_with_chained_call};
 
 fn main() {
     let (
@@ -23,8 +22,7 @@ fn main() {
 
     let pre_states_clone = pre_states.clone();
 
-    let (post_states, chained_calls): (Vec<AccountPostState>, Vec<ChainedCall>) = match instruction
-    {
+    let (post_states, chained_calls) = match instruction {
         Instruction::NewDefinition {
             token_a_amount,
             token_b_amount,
@@ -49,8 +47,8 @@ fn main() {
                 user_holding_a,
                 user_holding_b,
                 user_holding_lp,
-                token_a_amount,
-                token_b_amount,
+                NonZero::new(token_a_amount).expect("Token A should have a nonzero amount"),
+                NonZero::new(token_b_amount).expect("Token B should have a nonzero amount"),
                 amm_program_id,
             )
         }
@@ -78,7 +76,8 @@ fn main() {
                 user_holding_a,
                 user_holding_b,
                 user_holding_lp,
-                min_amount_liquidity,
+                NonZero::new(min_amount_liquidity)
+                    .expect("Min amount of liquidity should be nonzero"),
                 max_amount_to_add_token_a,
                 max_amount_to_add_token_b,
             )
@@ -107,7 +106,8 @@ fn main() {
                 user_holding_a,
                 user_holding_b,
                 user_holding_lp,
-                remove_liquidity_amount,
+                NonZero::new(remove_liquidity_amount)
+                    .expect("Remove liquidity amount must be nonzero"),
                 min_amount_to_remove_token_a,
                 min_amount_to_remove_token_b,
             )

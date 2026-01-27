@@ -1,5 +1,6 @@
 //! This crate contains core data structures and utilities for the AMM Program.
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     account::{AccountId, Data},
     program::{PdaSeed, ProgramId},
@@ -74,9 +75,7 @@ pub enum Instruction {
     },
 }
 
-const POOL_DEFINITION_DATA_SIZE: usize = 225;
-
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct PoolDefinition {
     pub definition_token_a_id: AccountId,
     pub definition_token_b_id: AccountId,
@@ -94,73 +93,23 @@ pub struct PoolDefinition {
     pub active: bool,
 }
 
-impl PoolDefinition {
-    pub fn into_data(self) -> Data {
-        let mut bytes = [0; POOL_DEFINITION_DATA_SIZE];
-        bytes[0..32].copy_from_slice(&self.definition_token_a_id.to_bytes());
-        bytes[32..64].copy_from_slice(&self.definition_token_b_id.to_bytes());
-        bytes[64..96].copy_from_slice(&self.vault_a_id.to_bytes());
-        bytes[96..128].copy_from_slice(&self.vault_b_id.to_bytes());
-        bytes[128..160].copy_from_slice(&self.liquidity_pool_id.to_bytes());
-        bytes[160..176].copy_from_slice(&self.liquidity_pool_supply.to_le_bytes());
-        bytes[176..192].copy_from_slice(&self.reserve_a.to_le_bytes());
-        bytes[192..208].copy_from_slice(&self.reserve_b.to_le_bytes());
-        bytes[208..224].copy_from_slice(&self.fees.to_le_bytes());
-        bytes[224] = self.active as u8;
+impl TryFrom<&Data> for PoolDefinition {
+    type Error = std::io::Error;
 
-        bytes
-            .to_vec()
-            .try_into()
-            .expect("225 bytes should fit into Data")
+    fn try_from(data: &Data) -> Result<Self, Self::Error> {
+        PoolDefinition::try_from_slice(data.as_ref())
     }
+}
 
-    pub fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != POOL_DEFINITION_DATA_SIZE {
-            None
-        } else {
-            let definition_token_a_id = AccountId::new(data[0..32].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token A definition"));
-            let definition_token_b_id = AccountId::new(data[32..64].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Vault B definition"));
-            let vault_a_id = AccountId::new(data[64..96].try_into().expect(
-                "Parse data: The AMM program must be provided a valid AccountId for Vault A",
-            ));
-            let vault_b_id = AccountId::new(data[96..128].try_into().expect(
-                "Parse data: The AMM program must be provided a valid AccountId for Vault B",
-            ));
-            let liquidity_pool_id = AccountId::new(data[128..160].try_into().expect("Parse data: The AMM program must be provided a valid AccountId for Token liquidity pool definition"));
-            let liquidity_pool_supply = u128::from_le_bytes(data[160..176].try_into().expect(
-                "Parse data: The AMM program must be provided a valid u128 for liquidity cap",
-            ));
-            let reserve_a = u128::from_le_bytes(data[176..192].try_into().expect(
-                "Parse data: The AMM program must be provided a valid u128 for reserve A balance",
-            ));
-            let reserve_b = u128::from_le_bytes(data[192..208].try_into().expect(
-                "Parse data: The AMM program must be provided a valid u128 for reserve B balance",
-            ));
-            let fees = u128::from_le_bytes(
-                data[208..224]
-                    .try_into()
-                    .expect("Parse data: The AMM program must be provided a valid u128 for fees"),
-            );
+impl From<&PoolDefinition> for Data {
+    fn from(definition: &PoolDefinition) -> Self {
+        // Using size_of_val as size hint for Vec allocation
+        let mut data = Vec::with_capacity(std::mem::size_of_val(definition));
 
-            let active = match data[224] {
-                0 => false,
-                1 => true,
-                _ => panic!("Parse data: The AMM program must be provided a valid bool for active"),
-            };
+        BorshSerialize::serialize(definition, &mut data)
+            .expect("Serialization to Vec should not fail");
 
-            Some(Self {
-                definition_token_a_id,
-                definition_token_b_id,
-                vault_a_id,
-                vault_b_id,
-                liquidity_pool_id,
-                liquidity_pool_supply,
-                reserve_a,
-                reserve_b,
-                fees,
-                active,
-            })
-        }
+        Data::try_from(data).expect("Token definition encoded data should fit into Data")
     }
 }
 

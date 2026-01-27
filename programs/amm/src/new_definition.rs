@@ -1,9 +1,11 @@
+use std::num::NonZeroU128;
+
 use amm_core::{
     PoolDefinition, compute_liquidity_token_pda, compute_liquidity_token_pda_seed,
     compute_pool_pda, compute_vault_pda,
 };
 use nssa_core::{
-    account::{Account, AccountWithMetadata},
+    account::{Account, AccountWithMetadata, Data},
     program::{AccountPostState, ChainedCall, ProgramId},
 };
 
@@ -20,11 +22,6 @@ pub fn new_definition(
     token_b_amount: NonZeroU128,
     amm_program_id: ProgramId,
 ) -> (Vec<AccountPostState>, Vec<ChainedCall>) {
-    // Prevents pool constant coefficient (k) from being 0.
-    if token_a_amount == 0 || token_b_amount == 0 {
-        panic!("Balances must be nonzero")
-    }
-
     // Verify token_a and token_b are different
     let definition_token_a_id = token_core::TokenHolding::try_from(&user_holding_a.account.data)
         .expect("New definition: AMM Program expects valid Token Holding account for Token A")
@@ -36,43 +33,48 @@ pub fn new_definition(
     // both instances of the same token program
     let token_program = user_holding_a.account.program_owner;
 
-    if user_holding_b.account.program_owner != token_program {
-        panic!("User Token holdings must use the same Token Program");
-    }
+    assert_eq!(
+        user_holding_b.account.program_owner, token_program,
+        "User Token holdings must use the same Token Program"
+    );
+    assert!(
+        definition_token_a_id != definition_token_b_id,
+        "Cannot set up a swap for a token with itself"
+    );
+    assert_eq!(
+        pool.account_id,
+        compute_pool_pda(amm_program_id, definition_token_a_id, definition_token_b_id),
+        "Pool Definition Account ID does not match PDA"
+    );
+    assert_eq!(
+        vault_a.account_id,
+        compute_vault_pda(amm_program_id, pool.account_id, definition_token_a_id),
+        "Vault ID does not match PDA"
+    );
+    assert_eq!(
+        vault_b.account_id,
+        compute_vault_pda(amm_program_id, pool.account_id, definition_token_b_id),
+        "Vault ID does not match PDA"
+    );
+    assert_eq!(
+        pool_definition_lp.account_id,
+        compute_liquidity_token_pda(amm_program_id, pool.account_id),
+        "Liquidity pool Token Definition Account ID does not match PDA"
+    );
 
-    if definition_token_a_id == definition_token_b_id {
-        panic!("Cannot set up a swap for a token with itself")
-    }
-
-    if pool.account_id
-        != compute_pool_pda(amm_program_id, definition_token_a_id, definition_token_b_id)
-    {
-        panic!("Pool Definition Account ID does not match PDA");
-    }
-
-    if vault_a.account_id
-        != compute_vault_pda(amm_program_id, pool.account_id, definition_token_a_id)
-        || vault_b.account_id
-            != compute_vault_pda(amm_program_id, pool.account_id, definition_token_b_id)
-    {
-        panic!("Vault ID does not match PDA");
-    }
-
-    if pool_definition_lp.account_id != compute_liquidity_token_pda(amm_program_id, pool.account_id)
-    {
-        panic!("Liquidity pool Token Definition Account ID does not match PDA");
-    }
-
+    // TODO: return here
     // Verify that Pool Account is not active
     let pool_account_data = if pool.account == Account::default() {
         PoolDefinition::default()
     } else {
-        PoolDefinition::parse(&pool.account.data).expect("AMM program expects a valid Pool account")
+        PoolDefinition::try_from(&pool.account.data)
+            .expect("AMM program expects a valid Pool account")
     };
 
-    if pool_account_data.active {
-        panic!("Cannot initialize an active Pool Definition")
-    }
+    assert!(
+        !pool_account_data.active,
+        "Cannot initialize an active Pool Definition"
+    );
 
     // LP Token minting calculation
     // We assume LP is based on the initial deposit amount for Token_A.
@@ -85,14 +87,14 @@ pub fn new_definition(
         vault_a_id: vault_a.account_id,
         vault_b_id: vault_b.account_id,
         liquidity_pool_id: pool_definition_lp.account_id,
-        liquidity_pool_supply: token_a_amount,
-        reserve_a: token_a_amount,
-        reserve_b: token_b_amount,
+        liquidity_pool_supply: token_a_amount.into(),
+        reserve_a: token_a_amount.into(),
+        reserve_b: token_b_amount.into(),
         fees: 0u128, // TODO: we assume all fees are 0 for now.
         active: true,
     };
 
-    pool_post.data = pool_post_definition.into_data();
+    pool_post.data = Data::from(&pool_post_definition);
     let pool_post: AccountPostState = if pool.account == Account::default() {
         AccountPostState::new_claimed(pool_post.clone())
     } else {
@@ -106,7 +108,7 @@ pub fn new_definition(
         token_program_id,
         vec![user_holding_a.clone(), vault_a.clone()],
         &token_core::Instruction::Transfer {
-            amount_to_transfer: token_a_amount,
+            amount_to_transfer: token_a_amount.into(),
         },
     );
     // Chain call for Token B (user_holding_b -> Vault_B)
@@ -114,7 +116,7 @@ pub fn new_definition(
         token_program_id,
         vec![user_holding_b.clone(), vault_b.clone()],
         &token_core::Instruction::Transfer {
-            amount_to_transfer: token_b_amount,
+            amount_to_transfer: token_b_amount.into(),
         },
     );
 
@@ -122,11 +124,11 @@ pub fn new_definition(
     let instruction = if pool.account == Account::default() {
         token_core::Instruction::NewFungibleDefinition {
             name: String::from("LP Token"),
-            total_supply: token_a_amount,
+            total_supply: token_a_amount.into(),
         }
     } else {
         token_core::Instruction::Mint {
-            amount_to_mint: token_a_amount,
+            amount_to_mint: token_a_amount.into(),
         }
     };
 

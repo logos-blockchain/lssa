@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+use std::num::NonZero;
+
 use amm_core::{
     PoolDefinition, compute_liquidity_token_pda, compute_liquidity_token_pda_seed,
     compute_pool_pda, compute_vault_pda, compute_vault_pda_seed,
@@ -630,7 +632,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -654,7 +656,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -678,7 +680,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -702,7 +704,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -726,7 +728,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -750,7 +752,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -774,7 +776,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -798,7 +800,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -822,7 +824,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -846,7 +848,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -870,7 +872,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -894,7 +896,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -950,7 +952,7 @@ impl AccountForTests {
             account: Account {
                 program_owner: ProgramId::default(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -996,7 +998,7 @@ fn test_call_add_liquidity_vault_a_omitted() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a(),
         BalanceForTests::add_max_amount_b(),
     );
@@ -1013,7 +1015,7 @@ fn test_call_add_liquidity_vault_b_omitted() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a(),
         BalanceForTests::add_max_amount_b(),
     );
@@ -1030,7 +1032,7 @@ fn test_call_add_liquidity_lp_definition_mismatch() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a(),
         BalanceForTests::add_max_amount_b(),
     );
@@ -1047,7 +1049,7 @@ fn test_call_add_liquidity_zero_balance_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         0,
         BalanceForTests::add_max_amount_b(),
     );
@@ -1064,26 +1066,9 @@ fn test_call_add_liquidity_zero_balance_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         0,
         BalanceForTests::add_max_amount_a(),
-    );
-}
-
-#[should_panic(expected = "Min-lp must be nonzero")]
-#[test]
-fn test_call_add_liquidity_zero_min_lp() {
-    let _post_states = add_liquidity(
-        AccountForTests::pool_definition_init(),
-        AccountForTests::vault_a_init(),
-        AccountForTests::vault_b_init(),
-        AccountForTests::pool_lp_init(),
-        AccountForTests::user_holding_a(),
-        AccountForTests::user_holding_b(),
-        AccountForTests::user_holding_lp_init(),
-        0,
-        BalanceForTests::add_max_amount_a(),
-        BalanceForTests::add_max_amount_b(),
     );
 }
 
@@ -1098,7 +1083,7 @@ fn test_call_add_liquidity_vault_insufficient_balance_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_max_amount_a(),
+        NonZero::new(BalanceForTests::add_max_amount_a()).unwrap(),
         BalanceForTests::add_max_amount_b(),
         BalanceForTests::add_min_amount_lp(),
     );
@@ -1115,7 +1100,7 @@ fn test_call_add_liquidity_vault_insufficient_balance_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_max_amount_a(),
+        NonZero::new(BalanceForTests::add_max_amount_a()).unwrap(),
         BalanceForTests::add_max_amount_b(),
         BalanceForTests::add_min_amount_lp(),
     );
@@ -1132,7 +1117,7 @@ fn test_call_add_liquidity_actual_amount_zero_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a(),
         BalanceForTests::add_max_amount_b(),
     );
@@ -1149,7 +1134,7 @@ fn test_call_add_liquidity_actual_amount_zero_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a_low(),
         BalanceForTests::add_max_amount_b_low(),
     );
@@ -1166,7 +1151,7 @@ fn test_call_add_liquidity_reserves_zero_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a(),
         BalanceForTests::add_max_amount_b(),
     );
@@ -1183,7 +1168,7 @@ fn test_call_add_liquidity_reserves_zero_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a(),
         BalanceForTests::add_max_amount_b(),
     );
@@ -1200,7 +1185,7 @@ fn test_call_add_liquidity_payable_lp_zero() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a_low(),
         BalanceForTests::add_max_amount_b_low(),
     );
@@ -1216,7 +1201,7 @@ fn test_call_add_liquidity_chained_call_successsful() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::add_min_amount_lp(),
+        NonZero::new(BalanceForTests::add_min_amount_lp()).unwrap(),
         BalanceForTests::add_max_amount_a(),
         BalanceForTests::add_max_amount_b(),
     );
@@ -1245,7 +1230,7 @@ fn test_call_remove_liquidity_vault_a_omitted() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         BalanceForTests::remove_min_amount_b(),
     );
@@ -1262,7 +1247,7 @@ fn test_call_remove_liquidity_vault_b_omitted() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         BalanceForTests::remove_min_amount_b(),
     );
@@ -1279,7 +1264,7 @@ fn test_call_remove_liquidity_lp_def_mismatch() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         BalanceForTests::remove_min_amount_b(),
     );
@@ -1297,7 +1282,7 @@ fn test_call_remove_liquidity_insufficient_liquidity_amount() {
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_a(), /* different token account than lp to create desired
                                             * error */
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         BalanceForTests::remove_min_amount_b(),
     );
@@ -1316,7 +1301,7 @@ fn test_call_remove_liquidity_insufficient_balance_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp_1(),
+        NonZero::new(BalanceForTests::remove_amount_lp_1()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         BalanceForTests::remove_min_amount_b(),
     );
@@ -1335,7 +1320,7 @@ fn test_call_remove_liquidity_insufficient_balance_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         BalanceForTests::remove_min_amount_b(),
     );
@@ -1352,7 +1337,7 @@ fn test_call_remove_liquidity_min_bal_zero_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         0,
         BalanceForTests::remove_min_amount_b(),
     );
@@ -1369,26 +1354,9 @@ fn test_call_remove_liquidity_min_bal_zero_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         0,
-    );
-}
-
-#[should_panic(expected = "Liquidity amount must be nonzero")]
-#[test]
-fn test_call_remove_liquidity_lp_bal_zero() {
-    let _post_states = remove_liquidity(
-        AccountForTests::pool_definition_init(),
-        AccountForTests::vault_a_init(),
-        AccountForTests::vault_b_init(),
-        AccountForTests::pool_lp_init(),
-        AccountForTests::user_holding_a(),
-        AccountForTests::user_holding_b(),
-        AccountForTests::user_holding_lp_init(),
-        0,
-        BalanceForTests::remove_min_amount_a(),
-        BalanceForTests::remove_min_amount_b(),
     );
 }
 
@@ -1402,7 +1370,7 @@ fn test_call_remove_liquidity_chained_call_successful() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_init(),
-        BalanceForTests::remove_amount_lp(),
+        NonZero::new(BalanceForTests::remove_amount_lp()).unwrap(),
         BalanceForTests::remove_min_amount_a(),
         BalanceForTests::remove_min_amount_b_low(),
     );
@@ -1431,8 +1399,8 @@ fn test_call_new_definition_with_zero_balance_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        0,
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(0).expect("Balances must be nonzero"),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 }
@@ -1448,8 +1416,8 @@ fn test_call_new_definition_with_zero_balance_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        0,
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(0).expect("Balances must be nonzero"),
         AMM_PROGRAM_ID,
     );
 }
@@ -1465,8 +1433,8 @@ fn test_call_new_definition_same_token_definition() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 }
@@ -1482,8 +1450,8 @@ fn test_call_new_definition_wrong_liquidity_id() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 }
@@ -1499,8 +1467,8 @@ fn test_call_new_definition_wrong_pool_id() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 }
@@ -1516,8 +1484,8 @@ fn test_call_new_definition_wrong_vault_id_1() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 }
@@ -1533,8 +1501,8 @@ fn test_call_new_definition_wrong_vault_id_2() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 }
@@ -1550,8 +1518,8 @@ fn test_call_new_definition_cannot_initialize_active_pool() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 }
@@ -1567,8 +1535,8 @@ fn test_call_new_definition_chained_call_successful() {
         AccountForTests::user_holding_a(),
         AccountForTests::user_holding_b(),
         AccountForTests::user_holding_lp_uninit(),
-        BalanceForTests::vault_a_reserve_init(),
-        BalanceForTests::vault_b_reserve_init(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
         AMM_PROGRAM_ID,
     );
 
