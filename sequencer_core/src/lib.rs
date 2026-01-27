@@ -53,7 +53,7 @@ impl SequencerCore {
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let genesis_block = hashable_data.into_block(&signing_key);
+        let genesis_block = hashable_data.into_pending_block(&signing_key);
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
@@ -89,10 +89,10 @@ impl SequencerCore {
         state.add_pinata_program(PINATA_BASE58.parse().unwrap());
 
         let (mempool, mempool_handle) = MemPool::new(config.mempool_max_size);
-        let block_settlement = config
-            .bedrock_config
-            .as_ref()
-            .map(|bedrock_config| BlockSettlementClient::new(&config.home, bedrock_config));
+        let block_settlement_client = config.bedrock_config.as_ref().map(|bedrock_config| {
+            BlockSettlementClient::try_new(&config.home, bedrock_config)
+                .expect("Block settlement client should be constructible")
+        });
 
         let mut this = Self {
             state,
@@ -100,7 +100,7 @@ impl SequencerCore {
             mempool,
             chain_height: config.genesis_id,
             sequencer_config: config,
-            block_settlement_client: block_settlement,
+            block_settlement_client,
         };
 
         this.sync_state_with_stored_blocks();
@@ -196,14 +196,14 @@ impl SequencerCore {
 
         let block = hashable_data
             .clone()
-            .into_block(self.block_store.signing_key());
+            .into_pending_block(self.block_store.signing_key());
 
         self.block_store.put_block_at_id(block)?;
 
         self.chain_height = new_block_height;
 
         // TODO: Consider switching to `tracing` crate to have more structured and consistent logs
-        // // e.g.
+        // e.g.
         //
         // ```
         // info!(

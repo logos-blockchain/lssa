@@ -3,7 +3,7 @@
 use std::{net::SocketAddr, path::PathBuf, sync::LazyLock};
 
 use actix_web::dev::ServerHandle;
-use anyhow::{Context as _, Result};
+use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use common::{
     sequencer_client::SequencerClient,
@@ -17,6 +17,7 @@ use nssa_core::Commitment;
 use sequencer_core::config::SequencerConfig;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
+use url::Url;
 use wallet::{WalletCore, config::WalletConfigOverrides};
 
 // TODO: Remove this and control time from tests
@@ -57,7 +58,7 @@ impl TestContext {
         let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
             .context("Failed to create sequencer config from file")?;
 
-        Self::new_with_sequencer_config(sequencer_config).await
+        Self::new_with_sequencer_and_maybe_indexer_configs(sequencer_config, None).await
     }
 
     /// Create new test context in local bedrock node attached mode.
@@ -76,58 +77,17 @@ impl TestContext {
         let indexer_config = IndexerConfig::from_path(&indexer_config_path)
             .context("Failed to create indexer config from file")?;
 
-        Self::new_with_sequencer_and_indexer_configs(sequencer_config, indexer_config).await
-    }
-
-    /// Create new test context with custom sequencer config.
-    ///
-    /// `home` and `port` fields of the provided config will be overridden to meet tests parallelism
-    /// requirements.
-    pub async fn new_with_sequencer_config(sequencer_config: SequencerConfig) -> Result<Self> {
-        // Ensure logger is initialized only once
-        *LOGGER;
-
-        debug!("Test context setup");
-
-        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, temp_sequencer_dir) =
-            Self::setup_sequencer(sequencer_config)
-                .await
-                .context("Failed to setup sequencer")?;
-
-        // Convert 0.0.0.0 to 127.0.0.1 for client connections
-        // When binding to port 0, the server binds to 0.0.0.0:<random_port>
-        // but clients need to connect to 127.0.0.1:<port> to work reliably
-        let sequencer_addr = if sequencer_addr.ip().is_unspecified() {
-            format!("http://127.0.0.1:{}", sequencer_addr.port())
-        } else {
-            format!("http://{sequencer_addr}")
-        };
-
-        let (wallet, temp_wallet_dir) = Self::setup_wallet(sequencer_addr.clone())
+        Self::new_with_sequencer_and_maybe_indexer_configs(sequencer_config, Some(indexer_config))
             .await
-            .context("Failed to setup wallet")?;
-
-        let sequencer_client =
-            SequencerClient::new(sequencer_addr).context("Failed to create sequencer client")?;
-
-        Ok(Self {
-            sequencer_server_handle,
-            sequencer_loop_handle,
-            indexer_loop_handle: None,
-            sequencer_client,
-            wallet,
-            _temp_sequencer_dir: temp_sequencer_dir,
-            _temp_wallet_dir: temp_wallet_dir,
-        })
     }
 
-    /// Create new test context with custom sequencer and indexer configs.
+    /// Create new test context with custom sequencer config and maybe indexer config.
     ///
     /// `home` and `port` fields of the provided config will be overridden to meet tests parallelism
     /// requirements.
-    pub async fn new_with_sequencer_and_indexer_configs(
+    pub async fn new_with_sequencer_and_maybe_indexer_configs(
         sequencer_config: SequencerConfig,
-        mut indexer_config: IndexerConfig,
+        indexer_config: Option<IndexerConfig>,
     ) -> Result<Self> {
         // Ensure logger is initialized only once
         *LOGGER;
@@ -152,26 +112,41 @@ impl TestContext {
             .await
             .context("Failed to setup wallet")?;
 
-        let sequencer_client = SequencerClient::new(sequencer_addr.clone())
-            .context("Failed to create sequencer client")?;
+        let sequencer_client = SequencerClient::new(
+            Url::parse(&sequencer_addr).context("Failed to parse sequencer addr")?,
+        )
+        .context("Failed to create sequencer client")?;
 
-        indexer_config.sequencer_client_config.addr = sequencer_addr;
+        if let Some(mut indexer_config) = indexer_config {
+            indexer_config.sequencer_client_config.addr =
+                Url::parse(&sequencer_addr).context("Failed to parse sequencer addr")?;
 
-        let indexer_core = IndexerCore::new(indexer_config)?;
+            let indexer_core = IndexerCore::new(indexer_config)?;
 
-        let indexer_loop_handle = Some(tokio::spawn(async move {
-            indexer_core.subscribe_parse_block_stream().await
-        }));
+            let indexer_loop_handle = Some(tokio::spawn(async move {
+                indexer_core.subscribe_parse_block_stream().await
+            }));
 
-        Ok(Self {
-            sequencer_server_handle,
-            sequencer_loop_handle,
-            indexer_loop_handle,
-            sequencer_client,
-            wallet,
-            _temp_sequencer_dir: temp_sequencer_dir,
-            _temp_wallet_dir: temp_wallet_dir,
-        })
+            Ok(Self {
+                sequencer_server_handle,
+                sequencer_loop_handle,
+                indexer_loop_handle,
+                sequencer_client,
+                wallet,
+                _temp_sequencer_dir: temp_sequencer_dir,
+                _temp_wallet_dir: temp_wallet_dir,
+            })
+        } else {
+            Ok(Self {
+                sequencer_server_handle,
+                sequencer_loop_handle,
+                indexer_loop_handle: None,
+                sequencer_client,
+                wallet,
+                _temp_sequencer_dir: temp_sequencer_dir,
+                _temp_wallet_dir: temp_wallet_dir,
+            })
+        }
     }
 
     async fn setup_sequencer(

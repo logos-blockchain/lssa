@@ -30,7 +30,7 @@ pub fn produce_dummy_block(
         transactions,
     };
 
-    block_data.into_block(&sequencer_sign_key_for_testing())
+    block_data.into_pending_block(&sequencer_sign_key_for_testing())
 }
 
 pub fn produce_dummy_empty_transaction() -> EncodedTransaction {

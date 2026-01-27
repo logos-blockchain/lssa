@@ -1,19 +1,18 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use bedrock_client::{BasicAuthCredentials, BedrockClient};
+use bedrock_client::BedrockClient;
 use common::{
     block::HashableBlockData, communication::indexer::Message,
     rpc_primitives::requests::PostIndexerMessageResponse, sequencer_client::SequencerClient,
 };
 use futures::StreamExt;
 use log::info;
-use nomos_core::mantle::{
+use logos_blockchain_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
 use tokio::sync::RwLock;
-use url::Url;
 
 use crate::{config::IndexerConfig, state::IndexerState};
 
@@ -24,8 +23,6 @@ pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
     pub sequencer_client: SequencerClient,
     pub config: IndexerConfig,
-    // ToDo: Remove this duplication by unifying addr representation in all clients.
-    pub bedrock_url: Url,
     pub state: IndexerState,
 }
 
@@ -33,13 +30,9 @@ impl IndexerCore {
     pub fn new(config: IndexerConfig) -> Result<Self> {
         Ok(Self {
             bedrock_client: BedrockClient::new(
-                config
-                    .bedrock_client_config
-                    .auth
-                    .clone()
-                    .map(|auth| BasicAuthCredentials::new(auth.0, auth.1)),
+                config.bedrock_client_config.auth.clone().map(Into::into),
+                config.bedrock_client_config.addr.clone(),
             )?,
-            bedrock_url: Url::parse(&config.bedrock_client_config.addr)?,
             sequencer_client: SequencerClient::new_with_auth(
                 config.sequencer_client_config.addr.clone(),
                 config.sequencer_client_config.auth.clone(),
@@ -54,11 +47,7 @@ impl IndexerCore {
 
     pub async fn subscribe_parse_block_stream(&self) -> Result<()> {
         loop {
-            let mut stream_pinned = Box::pin(
-                self.bedrock_client
-                    .get_lib_stream(self.bedrock_url.clone())
-                    .await?,
-            );
+            let mut stream_pinned = Box::pin(self.bedrock_client.get_lib_stream().await?);
 
             info!("Block stream joined");
 
@@ -69,12 +58,7 @@ impl IndexerCore {
 
                 if let Some(l1_block) = self
                     .bedrock_client
-                    .get_block_by_id(
-                        &self.bedrock_url,
-                        header_id,
-                        self.config.start_delay_millis,
-                        self.config.max_retries,
-                    )
+                    .get_block_by_id(header_id, &self.config.backoff)
                     .await?
                 {
                     info!("Extracted L1 block at height {}", block_info.height);
@@ -124,19 +108,17 @@ impl IndexerCore {
 fn parse_blocks(
     block_txs: impl Iterator<Item = SignedMantleTx>,
     decoded_channel_id: &ChannelId,
-) -> Vec<HashableBlockData> {
-    block_txs
-        .flat_map(|tx| {
-            tx.mantle_tx.ops.into_iter().filter_map(|op| match op {
-                Op::ChannelInscribe(InscriptionOp {
-                    channel_id,
-                    inscription,
-                    ..
-                }) if channel_id == *decoded_channel_id => {
-                    borsh::from_slice::<HashableBlockData>(&inscription).ok()
-                }
-                _ => None,
-            })
+) -> impl Iterator<Item = HashableBlockData> {
+    block_txs.flat_map(|tx| {
+        tx.mantle_tx.ops.into_iter().filter_map(|op| match op {
+            Op::ChannelInscribe(InscriptionOp {
+                channel_id,
+                inscription,
+                ..
+            }) if channel_id == *decoded_channel_id => {
+                borsh::from_slice::<HashableBlockData>(&inscription).ok()
+            }
+            _ => None,
         })
-        .collect()
+    })
 }
