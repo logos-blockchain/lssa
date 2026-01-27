@@ -2554,7 +2554,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -2673,7 +2673,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -2741,7 +2741,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -2809,7 +2809,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -2902,7 +2902,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -3008,7 +3008,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -3077,7 +3077,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
