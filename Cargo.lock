@@ -303,6 +303,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "amm_core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "nssa_core",
+ "risc0-zkvm",
+ "serde",
+]
+
+[[package]]
+name = "amm_program"
+version = "0.1.0"
+dependencies = [
+ "amm_core",
+ "nssa_core",
+ "token_core",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2876,6 +2895,7 @@ dependencies = [
  "sequencer_core",
  "sequencer_runner",
  "tempfile",
+ "token_core",
  "tokio",
  "wallet",
 ]
@@ -4100,6 +4120,7 @@ checksum = "38bf9645c8b145698bb0b18a4637dcacbc421ea49bef2317e4fd8065a387cf21"
 name = "nssa"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
  "borsh",
  "bytemuck",
  "env_logger",
@@ -4116,6 +4137,7 @@ dependencies = [
  "sha2",
  "test-case",
  "test_program_methods",
+ "token_core",
  "thiserror 2.0.17",
 ]
 
@@ -4570,9 +4592,13 @@ dependencies = [
 name = "programs"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
+ "amm_program",
  "nssa_core",
  "risc0-zkvm",
  "serde",
+ "token_core",
+ "token_program",
 ]
 
 [[package]]
@@ -6160,6 +6186,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "token_core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "nssa_core",
+ "serde",
+]
+
+[[package]]
+name = "token_program"
+version = "0.1.0"
+dependencies = [
+ "nssa_core",
+ "token_core",
+]
+
+[[package]]
 name = "tokio"
 version = "1.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6570,6 +6613,7 @@ dependencies = [
 name = "wallet"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
  "anyhow",
  "async-stream",
  "base58",
@@ -6593,6 +6637,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "token_core",
  "tokio",
 ]
 

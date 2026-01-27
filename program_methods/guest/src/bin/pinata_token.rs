@@ -5,10 +5,7 @@ use nssa_core::{
         write_nssa_outputs_with_chained_call,
     },
 };
-use risc0_zkvm::{
-    serde::to_vec,
-    sha::{Impl, Sha256},
-};
+use risc0_zkvm::sha::{Impl, Sha256};
 
 const PRIZE: u128 = 150;
 
@@ -82,23 +79,21 @@ fn main() {
     let winner_token_holding_post = winner_token_holding.account.clone();
     pinata_definition_post.data = data.next_data();
 
-    let mut instruction_data = vec![0; 23];
-    instruction_data[0] = 1;
-    instruction_data[1..17].copy_from_slice(&PRIZE.to_le_bytes());
-
     // Flip authorization to true for chained call
     let mut pinata_token_holding_for_chain_call = pinata_token_holding.clone();
     pinata_token_holding_for_chain_call.is_authorized = true;
 
-    let chained_calls = vec![ChainedCall {
-        program_id: pinata_token_holding_post.program_owner,
-        instruction_data: to_vec(&instruction_data).unwrap(),
-        pre_states: vec![
+    let chained_call = ChainedCall::new(
+        pinata_token_holding_post.program_owner,
+        vec![
             pinata_token_holding_for_chain_call,
             winner_token_holding.clone(),
         ],
-        pda_seeds: vec![PdaSeed::new([0; 32])],
-    }];
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: PRIZE,
+        },
+    )
+    .with_pda_seeds(vec![PdaSeed::new([0; 32])]);
 
     write_nssa_outputs_with_chained_call(
         instruction_words,
@@ -112,6 +107,6 @@ fn main() {
             AccountPostState::new(pinata_token_holding_post),
             AccountPostState::new(winner_token_holding_post),
         ],
-        chained_calls,
+        vec![chained_call],
     );
 }
