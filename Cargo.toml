@@ -79,7 +79,7 @@ chrono = "0.4.41"
 borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
-url = "2.5.4"
+url = { version = "2.5.4", features = ["serde"] }
 tokio-retry = "0.3.0"
 
 logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }

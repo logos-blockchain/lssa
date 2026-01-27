@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
-use bedrock_client::{BasicAuthCredentials, BedrockClient};
+use anyhow::Result;
+use bedrock_client::BedrockClient;
 use common::{
     block::HashableBlockData, communication::indexer::Message,
     rpc_primitives::requests::PostIndexerMessageResponse, sequencer_client::SequencerClient,
@@ -13,7 +13,6 @@ use logos_blockchain_core::mantle::{
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
 use tokio::sync::RwLock;
-use url::Url;
 
 use crate::{config::IndexerConfig, state::IndexerState};
 
@@ -31,13 +30,8 @@ impl IndexerCore {
     pub fn new(config: IndexerConfig) -> Result<Self> {
         Ok(Self {
             bedrock_client: BedrockClient::new(
-                config
-                    .bedrock_client_config
-                    .auth
-                    .clone()
-                    .map(|auth| BasicAuthCredentials::new(auth.0, auth.1)),
-                Url::parse(&config.bedrock_client_config.addr)
-                    .context("Bedrock node addr is not a valid url")?,
+                config.bedrock_client_config.auth.clone().map(Into::into),
+                config.bedrock_client_config.addr.clone(),
             )?,
             sequencer_client: SequencerClient::new_with_auth(
                 config.sequencer_client_config.addr.clone(),
@@ -64,11 +58,7 @@ impl IndexerCore {
 
                 if let Some(l1_block) = self
                     .bedrock_client
-                    .get_block_by_id(
-                        header_id,
-                        self.config.start_delay_millis,
-                        self.config.max_retries,
-                    )
+                    .get_block_by_id(header_id, &self.config.backoff)
                     .await?
                 {
                     info!("Extracted L1 block at height {}", block_info.height);
@@ -118,19 +108,17 @@ impl IndexerCore {
 fn parse_blocks(
     block_txs: impl Iterator<Item = SignedMantleTx>,
     decoded_channel_id: &ChannelId,
-) -> Vec<HashableBlockData> {
-    block_txs
-        .flat_map(|tx| {
-            tx.mantle_tx.ops.into_iter().filter_map(|op| match op {
-                Op::ChannelInscribe(InscriptionOp {
-                    channel_id,
-                    inscription,
-                    ..
-                }) if channel_id == *decoded_channel_id => {
-                    borsh::from_slice::<HashableBlockData>(&inscription).ok()
-                }
-                _ => None,
-            })
+) -> impl Iterator<Item = HashableBlockData> {
+    block_txs.flat_map(|tx| {
+        tx.mantle_tx.ops.into_iter().filter_map(|op| match op {
+            Op::ChannelInscribe(InscriptionOp {
+                channel_id,
+                inscription,
+                ..
+            }) if channel_id == *decoded_channel_id => {
+                borsh::from_slice::<HashableBlockData>(&inscription).ok()
+            }
+            _ => None,
         })
-        .collect()
+    })
 }

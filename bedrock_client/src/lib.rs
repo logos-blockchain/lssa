@@ -1,11 +1,19 @@
 use anyhow::Result;
 use futures::{Stream, TryFutureExt};
 use log::warn;
-use logos_blockchain_chain_broadcast_service::BlockInfo;
+pub use logos_blockchain_chain_broadcast_service::BlockInfo;
 pub use logos_blockchain_common_http_client::{BasicAuthCredentials, CommonHttpClient, Error};
-use logos_blockchain_core::{block::Block, header::HeaderId, mantle::SignedMantleTx};
+pub use logos_blockchain_core::{block::Block, header::HeaderId, mantle::SignedMantleTx};
 use reqwest::{Client, Url};
+use serde::{Deserialize, Serialize};
 use tokio_retry::Retry;
+
+/// Fibonacci backoff retry strategy configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackoffConfig {
+    pub start_delay_millis: u64,
+    pub max_retries: usize,
+}
 
 // Simple wrapper
 // maybe extend in the future for our purposes
@@ -41,11 +49,11 @@ impl BedrockClient {
     pub async fn get_block_by_id(
         &self,
         header_id: HeaderId,
-        start_delay_millis: u64,
-        max_retries: usize,
+        backoff: &BackoffConfig,
     ) -> Result<Option<Block<SignedMantleTx>>, Error> {
-        let strategy = tokio_retry::strategy::FibonacciBackoff::from_millis(start_delay_millis)
-            .take(max_retries);
+        let strategy =
+            tokio_retry::strategy::FibonacciBackoff::from_millis(backoff.start_delay_millis)
+                .take(backoff.max_retries);
 
         Retry::spawn(strategy, || {
             self.http_client

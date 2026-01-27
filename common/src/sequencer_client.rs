@@ -1,10 +1,12 @@
-use std::{collections::HashMap, ops::RangeInclusive};
+use std::{collections::HashMap, ops::RangeInclusive, str::FromStr};
 
 use anyhow::Result;
+use logos_blockchain_common_http_client::BasicAuthCredentials;
 use nssa_core::program::ProgramId;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use url::Url;
 
 use super::rpc_primitives::requests::{
     GetAccountBalanceRequest, GetAccountBalanceResponse, GetBlockDataRequest, GetBlockDataResponse,
@@ -27,22 +29,68 @@ use crate::{
     transaction::{EncodedTransaction, NSSATransaction},
 };
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BasicAuth {
+    pub username: String,
+    pub password: Option<String>,
+}
+
+impl std::fmt::Display for BasicAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.username)?;
+        if let Some(password) = &self.password {
+            write!(f, ":{password}")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl FromStr for BasicAuth {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse = || {
+            let mut parts = s.splitn(2, ':');
+            let username = parts.next()?;
+            let password = parts.next().filter(|p| !p.is_empty());
+            if parts.next().is_some() {
+                return None;
+            }
+
+            Some((username, password))
+        };
+
+        let (username, password) = parse().ok_or_else(|| {
+            anyhow::anyhow!("Invalid auth format. Expected 'user' or 'user:password'")
+        })?;
+
+        Ok(Self {
+            username: username.to_string(),
+            password: password.map(|p| p.to_string()),
+        })
+    }
+}
+
+impl From<BasicAuth> for BasicAuthCredentials {
+    fn from(value: BasicAuth) -> Self {
+        BasicAuthCredentials::new(value.username, value.password)
+    }
+}
+
 #[derive(Clone)]
 pub struct SequencerClient {
     pub client: reqwest::Client,
-    pub sequencer_addr: String,
-    pub basic_auth: Option<(String, Option<String>)>,
+    pub sequencer_addr: Url,
+    pub basic_auth: Option<BasicAuth>,
 }
 
 impl SequencerClient {
-    pub fn new(sequencer_addr: String) -> Result<Self> {
+    pub fn new(sequencer_addr: Url) -> Result<Self> {
         Self::new_with_auth(sequencer_addr, None)
     }
 
-    pub fn new_with_auth(
-        sequencer_addr: String,
-        basic_auth: Option<(String, Option<String>)>,
-    ) -> Result<Self> {
+    pub fn new_with_auth(sequencer_addr: Url, basic_auth: Option<BasicAuth>) -> Result<Self> {
         Ok(Self {
             client: Client::builder()
                 // Add more fields if needed
@@ -67,9 +115,9 @@ impl SequencerClient {
             "Calling method {method} with payload {request:?} to sequencer at {}",
             self.sequencer_addr
         );
-        let mut call_builder = self.client.post(&self.sequencer_addr);
+        let mut call_builder = self.client.post(self.sequencer_addr.clone());
 
-        if let Some((username, password)) = &self.basic_auth {
+        if let Some(BasicAuth { username, password }) = &self.basic_auth {
             call_builder = call_builder.basic_auth(username, password.as_deref());
         }
 
@@ -349,7 +397,7 @@ impl SequencerClient {
         Ok(resp_deser)
     }
 
-    /// Get last seen l2 block at indexer
+    /// Post indexer into sequencer
     pub async fn post_indexer_message(
         &self,
         message: crate::communication::indexer::Message,

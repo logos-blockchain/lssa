@@ -933,6 +933,7 @@ dependencies = [
  "logos-blockchain-common-http-client",
  "logos-blockchain-core",
  "reqwest",
+ "serde",
  "tokio-retry",
 ]
 
@@ -1323,6 +1324,7 @@ dependencies = [
  "borsh",
  "hex",
  "log",
+ "logos-blockchain-common-http-client",
  "nssa",
  "nssa_core",
  "reqwest",
@@ -1330,6 +1332,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.17",
+ "url",
 ]
 
 [[package]]
@@ -2783,6 +2786,7 @@ dependencies = [
  "sequencer_runner",
  "tempfile",
  "tokio",
+ "url",
  "wallet",
 ]
 
@@ -6127,6 +6131,7 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -6187,6 +6192,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "url",
 ]
 
 [[package]]

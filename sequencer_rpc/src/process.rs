@@ -354,7 +354,10 @@ mod tests {
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
-    use common::{test_utils::sequencer_sign_key_for_testing, transaction::EncodedTransaction};
+    use common::{
+        sequencer_client::BasicAuth, test_utils::sequencer_sign_key_for_testing,
+        transaction::EncodedTransaction,
+    };
     use sequencer_core::{
         SequencerCore,
         config::{AccountInitialData, BedrockConfig, SequencerConfig},
@@ -405,8 +408,10 @@ mod tests {
             bedrock_config: Some(BedrockConfig {
                 channel_id: [42; 32].into(),
                 node_url: "http://localhost:8080".to_string(),
-                user: "user".to_string(),
-                password: None,
+                auth: Some(BasicAuth {
+                    username: "user".to_string(),
+                    password: None,
+                }),
             }),
         }
     }

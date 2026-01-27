@@ -12,6 +12,7 @@ wallet.workspace = true
 common.workspace = true
 key_protocol.workspace = true
 indexer_core.workspace = true
+url.workspace = true
 
 anyhow.workspace = true
 env_logger.workspace = true

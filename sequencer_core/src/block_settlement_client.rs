@@ -26,7 +26,6 @@ impl BlockSettlementClient {
     pub fn try_new(home: &Path, config: &BedrockConfig) -> Result<Self> {
         let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key"))
             .context("Failed to load or create signing key")?;
-        let bedrock_channel_id = ChannelId::from(config.channel_id);
         let bedrock_url = Url::from_str(config.node_url.as_ref())
             .context("Bedrock node address is not a valid url")?;
         let bedrock_client =
@@ -35,7 +34,7 @@ impl BlockSettlementClient {
         Ok(Self {
             bedrock_client,
             bedrock_signing_key,
-            bedrock_channel_id,
+            bedrock_channel_id: config.channel_id,
             last_message_id: channel_genesis_msg,
         })
     }
