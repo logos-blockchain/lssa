@@ -927,11 +927,13 @@ name = "bedrock_client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "futures",
+ "log",
+ "logos-blockchain-chain-broadcast-service",
  "logos-blockchain-common-http-client",
  "logos-blockchain-core",
  "reqwest",
  "tokio-retry",
- "url",
 ]
 
 [[package]]
@@ -2707,7 +2709,7 @@ dependencies = [
  "common",
  "futures",
  "log",
- "nomos-core",
+ "logos-blockchain-core",
  "serde",
  "serde_json",
  "tokio",
@@ -3362,7 +3364,7 @@ source = "git+https://github.com/logos-blockchain/logos-blockchain.git#451df112f
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.111",
+ "syn 2.0.114",
 ]
 
 [[package]]
@@ -6729,3 +6731,9 @@ dependencies = [
  "quote",
  "syn 2.0.114",
 ]
+
+[[package]]
+name = "zmij"
+version = "1.0.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfcd145825aace48cff44a8844de64bf75feec3080e0aa5cdbde72961ae51a65"

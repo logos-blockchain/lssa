@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bedrock_client::{BasicAuthCredentials, BedrockClient};
 use common::{
     block::HashableBlockData, communication::indexer::Message,
@@ -8,7 +8,7 @@ use common::{
 };
 use futures::StreamExt;
 use log::info;
-use nomos_core::mantle::{
+use logos_blockchain_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
@@ -24,8 +24,6 @@ pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
     pub sequencer_client: SequencerClient,
     pub config: IndexerConfig,
-    // ToDo: Remove this duplication by unifying addr representation in all clients.
-    pub bedrock_url: Url,
     pub state: IndexerState,
 }
 
@@ -38,8 +36,9 @@ impl IndexerCore {
                     .auth
                     .clone()
                     .map(|auth| BasicAuthCredentials::new(auth.0, auth.1)),
+                Url::parse(&config.bedrock_client_config.addr)
+                    .context("Bedrock node addr is not a valid url")?,
             )?,
-            bedrock_url: Url::parse(&config.bedrock_client_config.addr)?,
             sequencer_client: SequencerClient::new_with_auth(
                 config.sequencer_client_config.addr.clone(),
                 config.sequencer_client_config.auth.clone(),
@@ -54,11 +53,7 @@ impl IndexerCore {
 
     pub async fn subscribe_parse_block_stream(&self) -> Result<()> {
         loop {
-            let mut stream_pinned = Box::pin(
-                self.bedrock_client
-                    .get_lib_stream(self.bedrock_url.clone())
-                    .await?,
-            );
+            let mut stream_pinned = Box::pin(self.bedrock_client.get_lib_stream().await?);
 
             info!("Block stream joined");
 
@@ -70,7 +65,6 @@ impl IndexerCore {
                 if let Some(l1_block) = self
                     .bedrock_client
                     .get_block_by_id(
-                        &self.bedrock_url,
                         header_id,
                         self.config.start_delay_millis,
                         self.config.max_retries,

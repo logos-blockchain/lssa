@@ -14,5 +14,5 @@ tokio.workspace = true
 borsh.workspace = true
 futures.workspace = true
 url.workspace = true
-nomos-core.workspace = true
+logos-blockchain-core.workspace = true
 serde_json.workspace = true

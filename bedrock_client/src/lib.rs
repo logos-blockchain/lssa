@@ -1,7 +1,11 @@
 use anyhow::Result;
+use futures::{Stream, TryFutureExt};
+use log::warn;
+use logos_blockchain_chain_broadcast_service::BlockInfo;
 pub use logos_blockchain_common_http_client::{BasicAuthCredentials, CommonHttpClient, Error};
-use logos_blockchain_core::mantle::SignedMantleTx;
+use logos_blockchain_core::{block::Block, header::HeaderId, mantle::SignedMantleTx};
 use reqwest::{Client, Url};
+use tokio_retry::Retry;
 
 // Simple wrapper
 // maybe extend in the future for our purposes
@@ -30,13 +34,12 @@ impl BedrockClient {
             .await
     }
 
-    pub async fn get_lib_stream(&self, url: Url) -> Result<impl Stream<Item = BlockInfo>, Error> {
-        self.0.get_lib_stream(url).await
+    pub async fn get_lib_stream(&self) -> Result<impl Stream<Item = BlockInfo>, Error> {
+        self.http_client.get_lib_stream(self.node_url.clone()).await
     }
 
     pub async fn get_block_by_id(
         &self,
-        url: &Url,
         header_id: HeaderId,
         start_delay_millis: u64,
         max_retries: usize,
@@ -45,8 +48,8 @@ impl BedrockClient {
             .take(max_retries);
 
         Retry::spawn(strategy, || {
-            self.0
-                .get_block_by_id(url.clone(), header_id)
+            self.http_client
+                .get_block_by_id(self.node_url.clone(), header_id)
                 .inspect_err(|err| warn!("Block fetching failed with err: {err:#?}"))
         })
         .await

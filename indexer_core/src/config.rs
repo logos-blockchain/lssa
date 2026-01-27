@@ -1,7 +1,7 @@
 use std::{fs::File, io::BufReader, path::Path};
 
 use anyhow::Result;
-use nomos_core::mantle::ops::channel::ChannelId;
+use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
