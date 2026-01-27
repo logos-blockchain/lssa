@@ -113,7 +113,7 @@ impl TestContext {
         // Setting port to 0 lets the OS choose a free port for us
         config.port = 0;
 
-        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle) =
+        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, _) =
             sequencer_runner::startup_sequencer(config).await?;
 
         Ok((

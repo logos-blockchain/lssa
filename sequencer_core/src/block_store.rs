@@ -80,7 +80,7 @@ impl SequencerStore {
         &self.signing_key
     }
 
-    pub(crate) fn get_pending_blocks(&self) -> impl Iterator<Item = Result<Block>> {
+    pub fn get_pending_blocks(&self) -> impl Iterator<Item = Result<Block>> {
         self.dbio.get_all_blocks().map(|res| Ok(res?))
     }
 

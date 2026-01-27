@@ -27,6 +27,7 @@ pub struct SequencerCore {
     sequencer_config: SequencerConfig,
     chain_height: u64,
     block_settlement_client: Option<BlockSettlementClient>,
+    last_bedrock_msg_id: MsgId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -96,6 +97,7 @@ impl SequencerCore {
                 .expect("Block settlement client should be constructible")
         });
 
+        let channel_genesis_msg_id = MsgId::from([0; 32]);
         let mut this = Self {
             state,
             store: block_store,
@@ -103,6 +105,7 @@ impl SequencerCore {
             chain_height: config.genesis_id,
             sequencer_config: config,
             block_settlement_client,
+            last_bedrock_msg_id: channel_genesis_msg_id,
         };
 
         this.sync_state_with_stored_blocks();
@@ -151,10 +154,10 @@ impl SequencerCore {
         let block_data = self.produce_new_block_with_mempool_transactions()?;
 
         if let Some(client) = self.block_settlement_client.as_mut() {
-            let last_message_id = client.last_message_id();
-            let block = block_data.into_pending_block(self.store.signing_key(), last_message_id);
+            let block =
+                block_data.into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
             let msg_id = client.submit_block_to_bedrock(&block).await?;
-            client.set_last_message_id(msg_id);
+            self.last_bedrock_msg_id = msg_id;
             log::info!("Posted block data to Bedrock");
         }
 
@@ -195,15 +198,9 @@ impl SequencerCore {
             timestamp: curr_time,
         };
 
-        let bedrock_parent_id = self
-            .block_settlement_client
-            .as_ref()
-            .map(|client| client.last_message_id())
-            .unwrap_or(MsgId::from([0; 32]));
-
         let block = hashable_data
             .clone()
-            .into_pending_block(self.store.signing_key(), bedrock_parent_id);
+            .into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
 
         self.store.update(block, &self.state)?;
 
@@ -249,20 +246,16 @@ impl SequencerCore {
             .try_for_each(|&id| self.store.delete_block_at_id(id))
     }
 
-    pub async fn resubmit_pending_blocks(&self) -> Result<()> {
-        for res in self.store.get_pending_blocks() {
-            let block = res?;
-            match block.bedrock_status {
-                BedrockStatus::Pending => {
-                    if let Some(client) = self.block_settlement_client.as_ref() {
-                        client.submit_block_to_bedrock(&block).await?;
-                        log::info!("Posted block data to Bedrock");
-                    }
-                }
-                _ => continue,
-            }
-        }
-        Ok(())
+    pub fn get_pending_blocks(&self) -> Vec<Block> {
+        self.store
+            .get_pending_blocks()
+            .flatten()
+            .filter(|block| matches!(block.bedrock_status, BedrockStatus::Pending))
+            .collect()
+    }
+
+    pub fn block_settlement_client(&self) -> Option<BlockSettlementClient> {
+        self.block_settlement_client.clone()
     }
 }
 
@@ -326,6 +319,7 @@ mod tests {
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
             bedrock_config: None,
+            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
         }
     }
 

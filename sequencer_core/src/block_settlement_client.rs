@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use anyhow::{Result, anyhow};
 use bedrock_client::BedrockClient;
-use common::block::{Block, HashableBlockData};
+use common::block::{BedrockStatus, Block, HashableBlockData};
 use logos_blockchain_core::mantle::{
     MantleTx, Op, OpProof, SignedMantleTx, Transaction, TxHash, ledger,
     ops::channel::{ChannelId, MsgId, inscribe::InscriptionOp},
@@ -14,11 +14,11 @@ use logos_blockchain_key_management_system_service::keys::{
 use crate::config::BedrockConfig;
 
 /// A component that posts block data to logos blockchain
+#[derive(Clone)]
 pub struct BlockSettlementClient {
     bedrock_client: BedrockClient,
     bedrock_signing_key: Ed25519Key,
     bedrock_channel_id: ChannelId,
-    last_message_id: MsgId,
 }
 
 impl BlockSettlementClient {
@@ -26,21 +26,11 @@ impl BlockSettlementClient {
         let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key"))?;
         let bedrock_channel_id = ChannelId::from(config.channel_id);
         let bedrock_client = BedrockClient::new(None, config.node_url.clone())?;
-        let channel_genesis_msg = MsgId::from([0; 32]);
         Ok(Self {
             bedrock_client,
             bedrock_signing_key,
             bedrock_channel_id,
-            last_message_id: channel_genesis_msg,
         })
-    }
-
-    pub fn set_last_message_id(&mut self, msg_id: MsgId) {
-        self.last_message_id = msg_id;
-    }
-
-    pub fn last_message_id(&self) -> MsgId {
-        self.last_message_id
     }
 
     /// Create and sign a transaction for inscribing data

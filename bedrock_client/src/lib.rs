@@ -5,6 +5,7 @@ use reqwest::{Client, Url};
 
 // Simple wrapper
 // maybe extend in the future for our purposes
+#[derive(Clone)]
 pub struct BedrockClient {
     http_client: CommonHttpClient,
     node_url: Url,
