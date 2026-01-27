@@ -39,7 +39,6 @@ impl BlockSettlementClient {
         self.last_message_id = msg_id;
     }
 
-
     pub fn last_message_id(&self) -> MsgId {
         self.last_message_id
     }

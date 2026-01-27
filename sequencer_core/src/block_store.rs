@@ -1,15 +1,11 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{
-    HashType,
-    block::{Block, BlockHash},
-    transaction::EncodedTransaction,
-};
+use common::{HashType, block::Block, transaction::EncodedTransaction};
 use nssa::V02State;
 use storage::RocksDBIO;
 
-pub struct SequencerBlockStore {
+pub struct SequencerStore {
     dbio: RocksDBIO,
     // TODO: Consider adding the hashmap to the database for faster recovery.
     tx_hash_to_block_map: HashMap<HashType, u64>,
@@ -17,7 +13,7 @@ pub struct SequencerBlockStore {
     signing_key: nssa::PrivateKey,
 }
 
-impl SequencerBlockStore {
+impl SequencerStore {
     /// Starting database at the start of new chain.
     /// Creates files if necessary.
     ///
@@ -47,7 +43,7 @@ impl SequencerBlockStore {
 
     /// Reopening existing database
     pub fn open_db_restart(location: &Path, signing_key: nssa::PrivateKey) -> Result<Self> {
-        SequencerBlockStore::open_db_with_genesis(location, None, signing_key)
+        SequencerStore::open_db_with_genesis(location, None, signing_key)
     }
 
     pub fn get_block_at_id(&self, id: u64) -> Result<Block> {
@@ -88,8 +84,11 @@ impl SequencerBlockStore {
         self.dbio.get_all_blocks().map(|res| Ok(res?))
     }
 
-    pub(crate) fn update(&self, block: Block, state: &V02State) -> Result<()> {
-        Ok(self.dbio.atomic_update(block, state)?)
+    pub(crate) fn update(&mut self, block: Block, state: &V02State) -> Result<()> {
+        let new_transactions_map = block_to_transactions_map(&block);
+        self.dbio.atomic_update(block, state)?;
+        self.tx_hash_to_block_map.extend(new_transactions_map);
+        Ok(())
     }
 }
 
@@ -128,8 +127,7 @@ mod tests {
             genesis_block_hashable_data.into_pending_block(&signing_key, MsgId::from([0; 32]));
         // Start an empty node store
         let mut node_store =
-            SequencerBlockStore::open_db_with_genesis(path, Some(genesis_block), signing_key)
-                .unwrap();
+            SequencerStore::open_db_with_genesis(path, Some(genesis_block), signing_key).unwrap();
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
         let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);

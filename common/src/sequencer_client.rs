@@ -15,13 +15,12 @@ use crate::{
     rpc_primitives::{
         self,
         requests::{
-            DeleteFinalizedBlockRequest, GetAccountRequest, GetAccountResponse,
-            GetAccountsNoncesRequest, GetAccountsNoncesResponse, GetBlockRangeDataRequest,
-            GetBlockRangeDataResponse, GetInitialTestnetAccountsResponse, GetLastBlockRequest,
-            GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
-            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
-            GetTransactionByHashRequest, GetTransactionByHashResponse, SendTxRequest,
-            SendTxResponse,
+            GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest,
+            GetAccountsNoncesResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
+            GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
+            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse, SendTxRequest, SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -339,26 +338,6 @@ impl SequencerClient {
 
         let resp = self
             .call_method_with_payload("get_program_ids", req)
-            .await
-            .unwrap();
-
-        let resp_deser = serde_json::from_value::<GetProgramIdsResponse>(resp)
-            .unwrap()
-            .program_ids;
-
-        Ok(resp_deser)
-    }
-
-    pub async fn delete_finalized_block(
-        &self,
-        block_id: u64,
-    ) -> Result<HashMap<String, ProgramId>, SequencerClientError> {
-        let acc_req = DeleteFinalizedBlockRequest { block_id };
-
-        let req = serde_json::to_value(acc_req).unwrap();
-
-        let resp = self
-            .call_method_with_payload("delete_finalized_block", req)
             .await
             .unwrap();
 

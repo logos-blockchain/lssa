@@ -14,7 +14,7 @@ use logos_blockchain_core::mantle::ops::channel::MsgId;
 use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
 
-use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerBlockStore};
+use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerStore};
 
 mod block_settlement_client;
 pub mod block_store;
@@ -22,7 +22,7 @@ pub mod config;
 
 pub struct SequencerCore {
     state: nssa::V02State,
-    block_store: SequencerBlockStore,
+    store: SequencerStore,
     mempool: MemPool<EncodedTransaction>,
     sequencer_config: SequencerConfig,
     chain_height: u64,
@@ -59,7 +59,7 @@ impl SequencerCore {
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
-        let block_store = SequencerBlockStore::open_db_with_genesis(
+        let block_store = SequencerStore::open_db_with_genesis(
             &config.home.join("rocksdb"),
             Some(genesis_block),
             signing_key,
@@ -98,7 +98,7 @@ impl SequencerCore {
 
         let mut this = Self {
             state,
-            block_store,
+            store: block_store,
             mempool,
             chain_height: config.genesis_id,
             sequencer_config: config,
@@ -115,14 +115,14 @@ impl SequencerCore {
     /// accordingly.
     fn sync_state_with_stored_blocks(&mut self) {
         let mut next_block_id = self.sequencer_config.genesis_id + 1;
-        while let Ok(block) = self.block_store.get_block_at_id(next_block_id) {
+        while let Ok(block) = self.store.get_block_at_id(next_block_id) {
             for encoded_transaction in block.body.transactions {
                 let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
                 // Process transaction and update state
                 self.execute_check_transaction_on_state(transaction)
                     .unwrap();
                 // Update the tx hash to block id map.
-                self.block_store.insert(&encoded_transaction, next_block_id);
+                self.store.insert(&encoded_transaction, next_block_id);
             }
             self.chain_height = next_block_id;
             next_block_id += 1;
@@ -150,12 +150,11 @@ impl SequencerCore {
     pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
         let block_data = self.produce_new_block_with_mempool_transactions()?;
 
-        if let Some(block_settlement) = self.block_settlement_client.as_mut() {
-            let last_message_id = block_settlement.last_message_id();
-            let block =
-                block_data.into_pending_block(self.block_store.signing_key(), last_message_id);
-            let msg_id = block_settlement.submit_block_to_bedrock(&block).await?;
-            block_settlement.set_last_message_id(msg_id);
+        if let Some(client) = self.block_settlement_client.as_mut() {
+            let last_message_id = client.last_message_id();
+            let block = block_data.into_pending_block(self.store.signing_key(), last_message_id);
+            let msg_id = client.submit_block_to_bedrock(&block).await?;
+            client.set_last_message_id(msg_id);
             log::info!("Posted block data to Bedrock");
         }
 
@@ -185,11 +184,7 @@ impl SequencerCore {
             }
         }
 
-        let prev_block_hash = self
-            .block_store
-            .get_block_at_id(self.chain_height)?
-            .header
-            .hash;
+        let prev_block_hash = self.store.get_block_at_id(self.chain_height)?.header.hash;
 
         let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
@@ -208,9 +203,9 @@ impl SequencerCore {
 
         let block = hashable_data
             .clone()
-            .into_pending_block(self.block_store.signing_key(), bedrock_parent_id);
+            .into_pending_block(self.store.signing_key(), bedrock_parent_id);
 
-        self.block_store.update(block, &self.state)?;
+        self.store.update(block, &self.state)?;
 
         self.chain_height = new_block_height;
 
@@ -236,8 +231,8 @@ impl SequencerCore {
         &self.state
     }
 
-    pub fn block_store(&self) -> &SequencerBlockStore {
-        &self.block_store
+    pub fn block_store(&self) -> &SequencerStore {
+        &self.store
     }
 
     pub fn chain_height(&self) -> u64 {
@@ -248,17 +243,19 @@ impl SequencerCore {
         &self.sequencer_config
     }
 
-    pub fn delete_finalized_block_from_db(&mut self, block_id: u64) -> Result<()> {
-        self.block_store.delete_block_at_id(block_id)
+    pub fn delete_finalized_blocks_from_db(&mut self, block_ids: &[u64]) -> Result<()> {
+        block_ids
+            .iter()
+            .try_for_each(|&id| self.store.delete_block_at_id(id))
     }
 
     pub async fn resubmit_pending_blocks(&self) -> Result<()> {
-        for res in self.block_store.get_pending_blocks() {
+        for res in self.store.get_pending_blocks() {
             let block = res?;
             match block.bedrock_status {
                 BedrockStatus::Pending => {
-                    if let Some(block_settlement) = self.block_settlement_client.as_ref() {
-                        block_settlement.submit_block_to_bedrock(&block).await?;
+                    if let Some(client) = self.block_settlement_client.as_ref() {
+                        client.submit_block_to_bedrock(&block).await?;
                         log::info!("Posted block data to Bedrock");
                     }
                 }
@@ -712,10 +709,7 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap()
             .block_id;
-        let block = sequencer
-            .block_store
-            .get_block_at_id(current_height)
-            .unwrap();
+        let block = sequencer.store.get_block_at_id(current_height).unwrap();
 
         // Only one should be included in the block
         assert_eq!(block.body.transactions, vec![tx.clone()]);
@@ -752,10 +746,7 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap()
             .block_id;
-        let block = sequencer
-            .block_store
-            .get_block_at_id(current_height)
-            .unwrap();
+        let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert_eq!(block.body.transactions, vec![tx.clone()]);
 
         // Add same transaction should fail
@@ -764,10 +755,7 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap()
             .block_id;
-        let block = sequencer
-            .block_store
-            .get_block_at_id(current_height)
-            .unwrap();
+        let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert!(block.body.transactions.is_empty());
     }
 
@@ -800,10 +788,7 @@ mod tests {
                 .produce_new_block_with_mempool_transactions()
                 .unwrap()
                 .block_id;
-            let block = sequencer
-                .block_store
-                .get_block_at_id(current_height)
-                .unwrap();
+            let block = sequencer.store.get_block_at_id(current_height).unwrap();
             assert_eq!(block.body.transactions, vec![tx.clone()]);
         }
 

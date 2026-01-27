@@ -11,15 +11,15 @@ use common::{
         message::{Message, Request},
         parser::RpcRequest,
         requests::{
-            DeleteFinalizedBlockRequest, DeleteFinalizedBlockResponse, GetAccountBalanceRequest,
-            GetAccountBalanceResponse, GetAccountRequest, GetAccountResponse,
-            GetAccountsNoncesRequest, GetAccountsNoncesResponse, GetBlockDataRequest,
-            GetBlockDataResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
-            GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest,
-            GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
-            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
-            GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse,
-            SendTxRequest, SendTxResponse,
+            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
+            GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
+            GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
+            GetBlockRangeDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
+            GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
+            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest,
+            SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -44,7 +44,6 @@ pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT: &str = "get_account";
 pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
 pub const GET_PROGRAM_IDS: &str = "get_program_ids";
-pub const DELETE_FINALIZED_BLOCK: &str = "delete_finalized_block";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -315,19 +314,6 @@ impl JsonHandler {
         respond(response)
     }
 
-    async fn delete_finalized_block(&self, request: Request) -> Result<Value, RpcErr> {
-        let delete_finalized_block_req = DeleteFinalizedBlockRequest::parse(Some(request.params))?;
-        let block_id = delete_finalized_block_req.block_id;
-
-        self.sequencer_state
-            .lock()
-            .await
-            .delete_finalized_block_from_db(block_id)?;
-
-        let response = DeleteFinalizedBlockResponse;
-        respond(response)
-    }
-
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -343,7 +329,6 @@ impl JsonHandler {
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
             GET_PROGRAM_IDS => self.process_get_program_ids(request).await,
-            DELETE_FINALIZED_BLOCK => self.delete_finalized_block(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }

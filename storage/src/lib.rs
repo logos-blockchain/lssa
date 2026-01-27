@@ -238,7 +238,7 @@ impl RocksDBIO {
                 rerr,
                 Some("Failed to write first block in db".to_string()),
             )
-        });
+        })?;
 
         Ok(())
     }

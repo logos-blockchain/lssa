@@ -73,11 +73,6 @@ pub struct GetProofForCommitmentRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProgramIdsRequest {}
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DeleteFinalizedBlockRequest {
-    pub block_id: u64,
-}
-
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -92,7 +87,6 @@ parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
 parse_request!(GetProgramIdsRequest);
-parse_request!(DeleteFinalizedBlockRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -222,6 +216,3 @@ pub struct GetInitialTestnetAccountsResponse {
     pub account_id: String,
     pub balance: u64,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DeleteFinalizedBlockResponse;
