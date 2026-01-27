@@ -210,7 +210,7 @@ impl SequencerCore {
             .clone()
             .into_pending_block(self.block_store.signing_key(), bedrock_parent_id);
 
-        self.block_store.put_block_at_id(block)?;
+        self.block_store.update(block, &self.state)?;
 
         self.chain_height = new_block_height;
 

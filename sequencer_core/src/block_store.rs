@@ -6,6 +6,7 @@ use common::{
     block::{Block, BlockHash},
     transaction::EncodedTransaction,
 };
+use nssa::V02State;
 use storage::RocksDBIO;
 
 pub struct SequencerBlockStore {
@@ -53,13 +54,6 @@ impl SequencerBlockStore {
         Ok(self.dbio.get_block(id)?)
     }
 
-    pub fn put_block_at_id(&mut self, block: Block) -> Result<()> {
-        let new_transactions_map = block_to_transactions_map(&block);
-        self.dbio.put_block(block, false)?;
-        self.tx_hash_to_block_map.extend(new_transactions_map);
-        Ok(())
-    }
-
     pub fn delete_block_at_id(&mut self, block_id: u64) -> Result<()> {
         Ok(self.dbio.delete_block(block_id)?)
     }
@@ -92,6 +86,10 @@ impl SequencerBlockStore {
 
     pub(crate) fn get_pending_blocks(&self) -> impl Iterator<Item = Result<Block>> {
         self.dbio.get_all_blocks().map(|res| Ok(res?))
+    }
+
+    pub(crate) fn update(&self, block: Block, state: &V02State) -> Result<()> {
+        Ok(self.dbio.atomic_update(block, state)?)
     }
 }
 
@@ -140,7 +138,8 @@ mod tests {
         let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(None, retrieved_tx);
         // Add the block with the transaction
-        node_store.put_block_at_id(block).unwrap();
+        let dummy_state = V02State::new_with_genesis_accounts(&[], &[]);
+        node_store.update(block, &dummy_state).unwrap();
         // Try again
         let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(Some(tx), retrieved_tx);

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use nssa_core::{
     Commitment, CommitmentSetDigest, DUMMY_COMMITMENT, MembershipProof, Nullifier,
@@ -15,6 +15,7 @@ use crate::{
 
 pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
+#[derive(BorshSerialize, BorshDeserialize)]
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
     commitments: HashMap<Commitment, usize>,
@@ -60,8 +61,49 @@ impl CommitmentSet {
     }
 }
 
-type NullifierSet = HashSet<Nullifier>;
+struct NullifierSet(BTreeSet<Nullifier>);
 
+impl NullifierSet {
+    fn new() -> Self {
+        Self(BTreeSet::new())
+    }
+
+    fn extend(&mut self, new_nullifiers: Vec<Nullifier>) {
+        self.0.extend(new_nullifiers.into_iter());
+    }
+
+    fn contains(&self, nullifier: &Nullifier) -> bool {
+        self.0.contains(nullifier)
+    }
+}
+
+impl BorshSerialize for NullifierSet {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        self.0.iter().collect::<Vec<_>>().serialize(writer)
+    }
+}
+
+impl BorshDeserialize for NullifierSet {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let vec = Vec::<Nullifier>::deserialize_reader(reader)?;
+
+        let mut set = BTreeSet::new();
+        for n in vec {
+            if !set.insert(n) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "duplicate nullifier in NullifierSet",
+                ));
+            }
+        }
+
+        Ok(Self(set))
+    }
+}
+
+use borsh::{BorshDeserialize, BorshSerialize};
+
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct V02State {
     public_state: HashMap<AccountId, Account>,
     private_state: (CommitmentSet, NullifierSet),
