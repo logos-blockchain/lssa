@@ -1,0 +1,17 @@
+[package]
+name = "indexer_service"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+indexer_service_protocol.workspace = true
+indexer_service_rpc = { workspace = true, features = ["server"] }
+
+clap = { workspace = true, features = ["derive"] }
+anyhow.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+env_logger.workspace = true
+log.workspace = true
+jsonrpsee.workspace = true
+async-trait = "0.1.89"

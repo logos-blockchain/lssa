@@ -8,7 +8,7 @@ use rand::{RngCore, rngs::OsRng};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Signature {
-    value: [u8; 64],
+    pub value: [u8; 64],
 }
 
 impl Signature {

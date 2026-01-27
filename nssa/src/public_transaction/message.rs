@@ -9,10 +9,10 @@ use crate::{AccountId, error::NssaError, program::Program};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Message {
-    pub(crate) program_id: ProgramId,
-    pub(crate) account_ids: Vec<AccountId>,
-    pub(crate) nonces: Vec<Nonce>,
-    pub(crate) instruction_data: InstructionData,
+    pub program_id: ProgramId,
+    pub account_ids: Vec<AccountId>,
+    pub nonces: Vec<Nonce>,
+    pub instruction_data: InstructionData,
 }
 
 impl Message {
