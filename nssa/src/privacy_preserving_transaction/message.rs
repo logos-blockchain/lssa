@@ -45,12 +45,12 @@ impl EncryptedAccountData {
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Message {
-    pub(crate) public_account_ids: Vec<AccountId>,
-    pub(crate) nonces: Vec<Nonce>,
-    pub(crate) public_post_states: Vec<Account>,
+    pub public_account_ids: Vec<AccountId>,
+    pub nonces: Vec<Nonce>,
+    pub public_post_states: Vec<Account>,
     pub encrypted_private_post_states: Vec<EncryptedAccountData>,
     pub new_commitments: Vec<Commitment>,
-    pub(crate) new_nullifiers: Vec<(Nullifier, CommitmentSetDigest)>,
+    pub new_nullifiers: Vec<(Nullifier, CommitmentSetDigest)>,
 }
 
 impl Message {
