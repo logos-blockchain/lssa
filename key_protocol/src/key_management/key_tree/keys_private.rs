@@ -1,8 +1,6 @@
-use common::HashType;
 use k256::{Scalar, elliptic_curve::PrimeField};
 use nssa_core::{NullifierPublicKey, encryption::ViewingPublicKey};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, digest::FixedOutput};
 
 use crate::key_management::{
     KeyChain,
@@ -31,21 +29,10 @@ impl KeyNode for ChildKeysPrivate {
             .last_chunk::<32>()
             .expect("hash_value is 64 bytes, must be safe to get last 32");
 
-        // TODO: check these generations
-        let nsk = ssk.generate_nullifier_secret_key();
-        let vsk = ssk.generate_viewing_secret_key();
+        let nsk = ssk.generate_nullifier_secret_key(None);
+        let vsk = ssk.generate_viewing_secret_key(None);
 
-        let npk: NullifierPublicKey = {
-            let mut hasher = sha2::Sha256::new();
-
-            hasher.update("LEE/keys");
-            hasher.update(nsk);
-            hasher.update([7u8]);
-            hasher.update([0u8; 23]);
-
-            NullifierPublicKey(<HashType>::from(hasher.finalize_fixed()))
-        };
-
+        let npk = NullifierPublicKey::from(&nsk);
         let vpk = ViewingPublicKey::from_scalar(vsk);
 
         Self {
@@ -89,20 +76,10 @@ impl KeyNode for ChildKeysPrivate {
             .last_chunk::<32>()
             .expect("hash_value is 64 bytes, must be safe to get last 32");
 
-        let nsk = ssk.generate_child_nullifier_secret_key(cci);
-        let vsk = ssk.generate_child_viewing_secret_key(cci);
+        let nsk = ssk.generate_nullifier_secret_key(Some(cci));
+        let vsk = ssk.generate_viewing_secret_key(Some(cci));
 
-        let npk: NullifierPublicKey = {
-            let mut hasher = sha2::Sha256::new();
-
-            hasher.update("LEE/chain");
-            hasher.update(nsk);
-            hasher.update([7u8]);
-            hasher.update([0u8; 22]);
-
-            NullifierPublicKey(<HashType>::from(hasher.finalize_fixed()))
-        };
-
+        let npk = NullifierPublicKey::from(&nsk);
         let vpk = ViewingPublicKey::from_scalar(vsk);
 
         Self {
@@ -221,22 +198,21 @@ mod tests {
         ];
 
         let expected_nsk: NullifierSecretKey = [
-            82, 238, 58, 161, 96, 201, 25, 193, 53, 101, 100, 173, 183, 167, 165, 141, 252, 214,
-            214, 3, 176, 186, 62, 112, 56, 54, 6, 197, 29, 178, 88, 214,
+            19, 100, 119, 73, 191, 225, 234, 219, 129, 88, 40, 229, 63, 225, 189, 136, 69, 172,
+            221, 186, 147, 83, 150, 207, 70, 17, 228, 70, 113, 87, 227, 31,
         ];
-
         let expected_npk: NullifierPublicKey = nssa_core::NullifierPublicKey([
-            40, 104, 183, 124, 101, 11, 61, 45, 140, 53, 3, 155, 139, 134, 105, 108, 60, 229, 165,
-            195, 187, 246, 14, 88, 76, 69, 137, 154, 29, 113, 205, 153,
+            133, 235, 223, 151, 12, 69, 26, 222, 60, 125, 235, 125, 167, 212, 201, 168, 101, 242,
+            111, 239, 1, 228, 12, 252, 146, 53, 75, 17, 187, 255, 122, 181,
         ]);
 
         let expected_vsk: ViewingSecretKey = [
-            14, 114, 31, 116, 147, 114, 62, 111, 176, 100, 211, 68, 38, 47, 250, 34, 224, 249, 25,
-            40, 35, 37, 237, 224, 161, 58, 228, 154, 44, 162, 128, 138,
+            218, 219, 193, 132, 160, 6, 178, 194, 139, 248, 199, 81, 17, 133, 37, 201, 58, 104, 49,
+            222, 187, 46, 156, 93, 14, 118, 209, 243, 38, 101, 77, 45,
         ];
         let expected_vpk_as_bytes: [u8; 33] = [
-            3, 243, 200, 219, 91, 171, 128, 76, 173, 117, 255, 212, 233, 71, 205, 204, 89, 104, 92,
-            187, 249, 154, 197, 102, 241, 66, 15, 55, 194, 189, 16, 124, 176,
+            3, 164, 65, 167, 88, 167, 179, 51, 159, 27, 241, 174, 77, 174, 142, 106, 128, 96, 69,
+            74, 117, 231, 42, 193, 235, 153, 206, 116, 102, 7, 101, 192, 45,
         ];
 
         assert!(expected_ccc == child_node.ccc);

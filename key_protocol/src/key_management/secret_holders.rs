@@ -74,69 +74,51 @@ impl SeedHolder {
 }
 
 impl SecretSpendingKey {
-    pub fn generate_nullifier_secret_key(&self) -> NullifierSecretKey {
-        let mut hasher = sha2::Sha256::new();
+    pub fn generate_nullifier_secret_key(&self, index: Option<u32>) -> NullifierSecretKey {
+        let index = match index {
+            None => 0u32,
+            _ => index.expect("Expect a valid u32"),
+        };
 
-        hasher.update("LEE/keys");
+        const PREFIX: &[u8; 8] = b"LEE/keys";
+        const SUFFIX_1: &[u8; 1] = &[1];
+        const SUFFIX_2: &[u8; 19] = &[0; 19];
+
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(PREFIX);
         hasher.update(self.0);
-        hasher.update([1u8]);
-        hasher.update([0u8; 23]);
+        hasher.update(SUFFIX_1);
+        hasher.update(index.to_le_bytes());
+        hasher.update(SUFFIX_2);
 
         <NullifierSecretKey>::from(hasher.finalize_fixed())
     }
 
-    pub fn generate_viewing_secret_key(&self) -> ViewingSecretKey {
-        let mut hasher = sha2::Sha256::new();
+    pub fn generate_viewing_secret_key(&self, index: Option<u32>) -> ViewingSecretKey {
+        let index = match index {
+            None => 0u32,
+            _ => index.expect("Expect a valid u32"),
+        };
+        const PREFIX: &[u8; 8] = b"LEE/keys";
+        const SUFFIX_1: &[u8; 1] = &[2];
+        const SUFFIX_2: &[u8; 19] = &[0; 19];
 
-        hasher.update("LEE/keys");
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(PREFIX);
         hasher.update(self.0);
-        hasher.update([2u8]);
-        hasher.update([0u8; 23]);
+        hasher.update(SUFFIX_1);
+        hasher.update(index.to_le_bytes());
+        hasher.update(SUFFIX_2);
 
         <HashType>::from(hasher.finalize_fixed())
     }
 
-    pub fn produce_private_key_holder(&self) -> PrivateKeyHolder {
+    // TODO: this should use index
+    pub fn produce_private_key_holder(&self, index: Option<u32>) -> PrivateKeyHolder {
         PrivateKeyHolder {
-            nullifier_secret_key: self.generate_nullifier_secret_key(),
-            viewing_secret_key: self.generate_viewing_secret_key(),
+            nullifier_secret_key: self.generate_nullifier_secret_key(index),
+            viewing_secret_key: self.generate_viewing_secret_key(index),
         }
-    }
-
-    pub fn generate_child_nullifier_secret_key(&self, cci: u32) -> NullifierSecretKey {
-        let mut key = vec![];
-        key.extend_from_slice(b"LEE/chain");
-
-        let mut input = vec![];
-
-        input.extend_from_slice(&self.0);
-        input.extend_from_slice(&[1u8]);
-        input.extend_from_slice(&cci.to_le_bytes());
-        input.extend_from_slice(&[0u8; 22]);
-
-        let hash_value = hmac_sha512::HMAC::mac(input, key);
-
-        *hash_value
-            .first_chunk::<32>()
-            .expect("hash_value is 64 bytes, must be safe to get first 32")
-    }
-
-    pub fn generate_child_viewing_secret_key(&self, cci: u32) -> ViewingSecretKey {
-        let mut key = vec![];
-        key.extend_from_slice(b"LEE/chain");
-
-        let mut input = vec![];
-
-        input.extend_from_slice(&self.0);
-        input.extend_from_slice(&[2u8]);
-        input.extend_from_slice(&cci.to_le_bytes());
-        input.extend_from_slice(&[0u8; 22]);
-
-        let hash_value = hmac_sha512::HMAC::mac(input, key);
-
-        *hash_value
-            .first_chunk::<32>()
-            .expect("hash_value is 64 bytes, must be safe to get first 32")
     }
 }
 
@@ -179,7 +161,7 @@ mod tests {
 
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let _ = top_secret_key_holder.generate_viewing_secret_key();
+        let _ = top_secret_key_holder.generate_viewing_secret_key(None);
     }
 
     #[test]

@@ -29,9 +29,9 @@ impl AsRef<[u8]> for NullifierPublicKey {
 impl From<&NullifierSecretKey> for NullifierPublicKey {
     fn from(value: &NullifierSecretKey) -> Self {
         let mut bytes = Vec::new();
-        const PREFIX: &[u8; 9] = b"LEE/chain";
+        const PREFIX: &[u8; 8] = b"LEE/keys";
         const SUFFIX_1: &[u8; 1] = &[7];
-        const SUFFIX_2: &[u8; 22] = &[0; 22];
+        const SUFFIX_2: &[u8; 23] = &[0; 23];
         bytes.extend_from_slice(PREFIX);
         bytes.extend_from_slice(value);
         bytes.extend_from_slice(SUFFIX_1);

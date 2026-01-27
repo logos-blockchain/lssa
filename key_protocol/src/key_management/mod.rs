@@ -27,7 +27,7 @@ impl KeyChain {
         let seed_holder = SeedHolder::new_os_random();
         let secret_spending_key = seed_holder.produce_top_secret_key_holder();
 
-        let private_key_holder = secret_spending_key.produce_private_key_holder();
+        let private_key_holder = secret_spending_key.produce_private_key_holder(None);
 
         let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
         let viewing_public_key = private_key_holder.generate_viewing_public_key();
@@ -46,7 +46,7 @@ impl KeyChain {
         let seed_holder = SeedHolder::new_mnemonic(passphrase);
         let secret_spending_key = seed_holder.produce_top_secret_key_holder();
 
-        let private_key_holder = secret_spending_key.produce_private_key_holder();
+        let private_key_holder = secret_spending_key.produce_private_key_holder(None);
 
         let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
         let viewing_public_key = private_key_holder.generate_viewing_public_key();
@@ -64,7 +64,7 @@ impl KeyChain {
         ephemeral_public_key_sender: EphemeralPublicKey,
     ) -> SharedSecretKey {
         SharedSecretKey::new(
-            &self.secret_spending_key.generate_viewing_secret_key(),
+            &self.secret_spending_key.generate_viewing_secret_key(None),
             &ephemeral_public_key_sender,
         )
     }
@@ -110,7 +110,7 @@ mod tests {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let utxo_secret_key_holder = top_secret_key_holder.produce_private_key_holder();
+        let utxo_secret_key_holder = top_secret_key_holder.produce_private_key_holder(None);
 
         let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
         let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
