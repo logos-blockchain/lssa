@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use anyhow::{Context, Result, anyhow};
 use bedrock_client::BedrockClient;
-use common::block::{BedrockStatus, Block, HashableBlockData};
+use common::block::Block;
 use logos_blockchain_core::mantle::{
     MantleTx, Op, OpProof, SignedMantleTx, Transaction, TxHash, ledger,
     ops::channel::{ChannelId, MsgId, inscribe::InscriptionOp},

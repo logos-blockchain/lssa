@@ -69,7 +69,7 @@ impl NullifierSet {
     }
 
     fn extend(&mut self, new_nullifiers: Vec<Nullifier>) {
-        self.0.extend(new_nullifiers.into_iter());
+        self.0.extend(new_nullifiers);
     }
 
     fn contains(&self, nullifier: &Nullifier) -> bool {

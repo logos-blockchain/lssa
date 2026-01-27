@@ -5,7 +5,7 @@ use anyhow::Result;
 use common::PINATA_BASE58;
 use common::{
     HashType,
-    block::{BedrockStatus, Block, BlockHash, HashableBlockData},
+    block::{BedrockStatus, Block, HashableBlockData},
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::SequencerConfig;
