@@ -17,17 +17,17 @@ impl ChildKeysPublic {
         let mut hash_input = vec![];
 
         match ((2u32).pow(31)).cmp(&cci) {
-            // Harden
-            std::cmp::Ordering::Less => {
-                hash_input.extend_from_slice(self.csk.value());
-                hash_input.extend_from_slice(&(cci).to_le_bytes());
+            // Non-harden
+            std::cmp::Ordering::Greater => {
+                hash_input.extend_from_slice(self.cpk.value());
+                hash_input.extend_from_slice(&cci.to_le_bytes());
 
                 hmac_sha512::HMAC::mac(hash_input, self.ccc)
             }
-            // Non-harden
+            // Harden
             _ => {
-                hash_input.extend_from_slice(self.cpk.value());
-                hash_input.extend_from_slice(&cci.to_le_bytes());
+                hash_input.extend_from_slice(self.csk.value());
+                hash_input.extend_from_slice(&(cci).to_le_bytes());
 
                 hmac_sha512::HMAC::mac(hash_input, self.ccc)
             }
@@ -223,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn test_edge_case_child_keys_generation_2_power_32() {
+    fn test_edge_case_child_keys_generation_2_power_31() {
         let seed = [
             88, 189, 37, 237, 199, 125, 151, 226, 69, 153, 165, 113, 191, 69, 188, 221, 9, 34, 173,
             134, 61, 109, 34, 103, 121, 39, 237, 14, 107, 194, 24, 194, 191, 14, 237, 185, 12, 87,
@@ -231,29 +231,23 @@ mod tests {
             187, 148, 92, 44, 253, 210, 37,
         ];
         let root_keys = ChildKeysPublic::root(seed);
-        let cci = (2u32).pow(32); //equivant to 0, thus non-harden.
+        let cci = (2u32).pow(31); //equivant to 0, thus non-harden.
         let child_keys = ChildKeysPublic::nth_child(&root_keys, cci);
 
-        print!(
-            "{} {}",
-            child_keys.csk.value()[0],
-            child_keys.csk.value()[1]
-        );
-
         let expected_ccc = [
-            210, 59, 14, 158, 52, 215, 216, 93, 160, 246, 178, 122, 211, 252, 0, 33, 248, 197, 242,
-            243, 78, 210, 67, 55, 212, 147, 3, 12, 80, 132, 245, 139,
+            101, 15, 69, 152, 144, 22, 105, 89, 175, 21, 13, 50, 160, 167, 93, 80, 94, 99, 192,
+            252, 1, 126, 196, 217, 149, 164, 60, 75, 237, 90, 104, 83,
         ];
 
         let expected_csk: PrivateKey = PrivateKey::try_new([
-            167, 114, 72, 184, 108, 61, 60, 219, 210, 140, 142, 224, 253, 204, 175, 165, 147, 135,
-            43, 42, 9, 224, 164, 196, 179, 178, 169, 162, 41, 56, 161, 146,
+            46, 196, 131, 199, 190, 180, 250, 222, 41, 188, 221, 156, 255, 239, 251, 207, 239, 202,
+            166, 216, 107, 236, 195, 48, 167, 69, 97, 13, 132, 117, 76, 89,
         ])
         .unwrap();
 
         let expected_cpk: PublicKey = PublicKey::try_new([
-            127, 243, 89, 67, 37, 211, 15, 39, 31, 110, 175, 89, 9, 102, 209, 99, 105, 194, 172, 8,
-            194, 11, 207, 250, 1, 9, 6, 173, 49, 155, 130, 29,
+            93, 151, 154, 238, 175, 198, 53, 146, 255, 43, 37, 52, 214, 165, 69, 161, 38, 20, 68,
+            166, 143, 80, 149, 216, 124, 203, 240, 114, 168, 111, 33, 83,
         ])
         .unwrap();
 
