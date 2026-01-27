@@ -38,7 +38,7 @@ pub const CF_BLOCK_NAME: &str = "cf_block";
 /// Name of meta column family
 pub const CF_META_NAME: &str = "cf_meta";
 /// Name of state column family
-pub const CF_NSSA_STATE_NAME: &str = "cf_state";
+pub const CF_NSSA_STATE_NAME: &str = "cf_nssa_state";
 
 pub type DbResult<T> = Result<T, DbError>;
 
@@ -191,9 +191,9 @@ impl RocksDBIO {
     }
 
     pub fn put_nssa_state_in_db(&self, state: &V02State, batch: &mut WriteBatch) -> DbResult<()> {
-        let cf_state = self.nssa_state_column();
+        let cf_nssa_state = self.nssa_state_column();
         batch.put_cf(
-            &cf_state,
+            &cf_nssa_state,
             borsh::to_vec(&DB_NSSA_STATE_KEY).map_err(|err| {
                 DbError::borsh_cast_message(
                     err,
@@ -344,6 +344,35 @@ impl RocksDBIO {
 
         if let Some(data) = res {
             Ok(borsh::from_slice::<Block>(&data).map_err(|serr| {
+                DbError::borsh_cast_message(
+                    serr,
+                    Some("Failed to deserialize block data".to_string()),
+                )
+            })?)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Block on this id not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_nssa_state(&self) -> DbResult<V02State> {
+        let cf_nssa_state = self.nssa_state_column();
+        let res = self
+            .db
+            .get_cf(
+                &cf_nssa_state,
+                borsh::to_vec(&DB_NSSA_STATE_KEY).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block id".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(borsh::from_slice::<V02State>(&data).map_err(|serr| {
                 DbError::borsh_cast_message(
                     serr,
                     Some("Failed to deserialize block data".to_string()),

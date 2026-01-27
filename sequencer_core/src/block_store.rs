@@ -90,6 +90,10 @@ impl SequencerStore {
         self.tx_hash_to_block_map.extend(new_transactions_map);
         Ok(())
     }
+
+    pub fn get_nssa_state(&self) -> Option<V02State> {
+        self.dbio.get_nssa_state().ok()
+    }
 }
 
 pub(crate) fn block_to_transactions_map(block: &Block) -> HashMap<HashType, u64> {

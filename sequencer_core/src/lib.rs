@@ -60,7 +60,7 @@ impl SequencerCore {
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
-        let block_store = SequencerStore::open_db_with_genesis(
+        let store = SequencerStore::open_db_with_genesis(
             &config.home.join("rocksdb"),
             Some(genesis_block),
             signing_key,
@@ -86,7 +86,9 @@ impl SequencerCore {
             .map(|acc_data| (acc_data.account_id.parse().unwrap(), acc_data.balance))
             .collect();
 
-        let mut state = nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments);
+        let mut state = store.get_nssa_state().unwrap_or_else(|| {
+            nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments)
+        });
 
         #[cfg(feature = "testnet")]
         state.add_pinata_program(PINATA_BASE58.parse().unwrap());
@@ -98,9 +100,9 @@ impl SequencerCore {
         });
 
         let channel_genesis_msg_id = MsgId::from([0; 32]);
-        let mut this = Self {
+        let sequencer_core = Self {
             state,
-            store: block_store,
+            store,
             mempool,
             chain_height: config.genesis_id,
             sequencer_config: config,
@@ -108,28 +110,7 @@ impl SequencerCore {
             last_bedrock_msg_id: channel_genesis_msg_id,
         };
 
-        this.sync_state_with_stored_blocks();
-
-        (this, mempool_handle)
-    }
-
-    /// If there are stored blocks ahead of the current height, this method will load and process
-    /// all transaction in them in the order they are stored. The NSSA state will be updated
-    /// accordingly.
-    fn sync_state_with_stored_blocks(&mut self) {
-        let mut next_block_id = self.sequencer_config.genesis_id + 1;
-        while let Ok(block) = self.store.get_block_at_id(next_block_id) {
-            for encoded_transaction in block.body.transactions {
-                let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
-                // Process transaction and update state
-                self.execute_check_transaction_on_state(transaction)
-                    .unwrap();
-                // Update the tx hash to block id map.
-                self.store.insert(&encoded_transaction, next_block_id);
-            }
-            self.chain_height = next_block_id;
-            next_block_id += 1;
-        }
+        (sequencer_core, mempool_handle)
     }
 
     fn execute_check_transaction_on_state(
