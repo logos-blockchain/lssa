@@ -20,6 +20,7 @@ members = [
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
   "bedrock_client",
+  "indexer_core",
 ]
 
 [workspace.dependencies]
@@ -35,6 +36,7 @@ sequencer_runner = { path = "sequencer_runner" }
 wallet = { path = "wallet" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
+indexer_core = { path = "indexer_core" }
 
 tokio = { version = "1.28.2", features = [
   "net",
@@ -77,11 +79,13 @@ chrono = "0.4.41"
 borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
-url = "2.5.4"
+url = { version = "2.5.4", features = ["serde"] }
+tokio-retry = "0.3.0"
 
 logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-chain-broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",

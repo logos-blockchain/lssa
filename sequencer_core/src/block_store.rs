@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
 use common::{HashType, block::Block, transaction::EncodedTransaction};
-use storage::RocksDBIO;
+use storage::sequencer::RocksDBIO;
 
 pub struct SequencerBlockStore {
     dbio: RocksDBIO,
