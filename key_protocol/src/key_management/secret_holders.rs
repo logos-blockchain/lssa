@@ -23,7 +23,6 @@ pub struct SeedHolder {
 pub struct SecretSpendingKey(pub(crate) [u8; 32]);
 
 pub type ViewingSecretKey = Scalar;
-pub type OutgoingViewingSecretKey = Scalar;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Private key holder. Produces public keys. Can produce account_id. Can produce shared secret for
