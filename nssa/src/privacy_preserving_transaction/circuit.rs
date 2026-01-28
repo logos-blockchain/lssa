@@ -20,6 +20,16 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Proof(pub(crate) Vec<u8>);
 
+impl Proof {
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
+
+    pub fn from_inner(inner: Vec<u8>) -> Self {
+        Self(inner)
+    }
+}
+
 #[derive(Clone)]
 pub struct ProgramWithDependencies {
     pub program: Program,

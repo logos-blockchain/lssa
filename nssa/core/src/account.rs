@@ -68,6 +68,10 @@ impl AccountId {
     pub fn value(&self) -> &[u8; 32] {
         &self.value
     }
+
+    pub fn into_value(self) -> [u8; 32] {
+        self.value
+    }
 }
 
 impl AsRef<[u8]> for AccountId {

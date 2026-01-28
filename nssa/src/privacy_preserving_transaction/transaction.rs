@@ -16,7 +16,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct PrivacyPreservingTransaction {
     pub message: Message,
-    witness_set: WitnessSet,
+    pub witness_set: WitnessSet,
 }
 
 impl PrivacyPreservingTransaction {
