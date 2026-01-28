@@ -57,7 +57,9 @@ pub async fn startup_sequencer(
             let (pending_blocks, block_settlement_client) = {
                 let sequencer_core = seq_core_wrapped_for_block_retry.lock().await;
                 let client = sequencer_core.block_settlement_client();
-                let pending_blocks = sequencer_core.get_pending_blocks();
+                let pending_blocks = sequencer_core
+                    .get_pending_blocks()
+                    .expect("Sequencer should be able to retrieve pending blocks");
                 (pending_blocks, client)
             };
 

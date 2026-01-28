@@ -9,7 +9,7 @@ use common::{
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::SequencerConfig;
-use log::warn;
+use log::{info, warn};
 use logos_blockchain_core::mantle::ops::channel::MsgId;
 use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
@@ -66,29 +66,40 @@ impl SequencerCore {
             signing_key,
         )
         .unwrap();
-        let mut initial_commitments = vec![];
 
-        for init_comm_data in config.initial_commitments.clone() {
-            let npk = init_comm_data.npk;
+        let mut state = match store.get_nssa_state() {
+            Some(state) => {
+                info!("Found local database. Loading state and pending blocks from it.");
+                state
+            },
+            None => {
+                info!(
+                    "No database found when starting the sequencer. Creating a fresh new with the initial data in config"
+                );
+                let mut initial_commitments = vec![];
 
-            let mut acc = init_comm_data.account;
+                for init_comm_data in config.initial_commitments.clone() {
+                    let npk = init_comm_data.npk;
 
-            acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
+                    let mut acc = init_comm_data.account;
 
-            let comm = nssa_core::Commitment::new(&npk, &acc);
+                    acc.program_owner =
+                        nssa::program::Program::authenticated_transfer_program().id();
 
-            initial_commitments.push(comm);
-        }
+                    let comm = nssa_core::Commitment::new(&npk, &acc);
 
-        let init_accs: Vec<(nssa::AccountId, u128)> = config
-            .initial_accounts
-            .iter()
-            .map(|acc_data| (acc_data.account_id.parse().unwrap(), acc_data.balance))
-            .collect();
+                    initial_commitments.push(comm);
+                }
 
-        let mut state = store.get_nssa_state().unwrap_or_else(|| {
-            nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments)
-        });
+                let init_accs: Vec<(nssa::AccountId, u128)> = config
+                    .initial_accounts
+                    .iter()
+                    .map(|acc_data| (acc_data.account_id.parse().unwrap(), acc_data.balance))
+                    .collect();
+
+                nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments)
+            }
+        };
 
         #[cfg(feature = "testnet")]
         state.add_pinata_program(PINATA_BASE58.parse().unwrap());
@@ -227,12 +238,14 @@ impl SequencerCore {
             .try_for_each(|&id| self.store.delete_block_at_id(id))
     }
 
-    pub fn get_pending_blocks(&self) -> Vec<Block> {
-        self.store
-            .get_pending_blocks()
-            .flatten()
+    pub fn get_pending_blocks(&self) -> Result<Vec<Block>> {
+        Ok(self
+            .store
+            .get_all_blocks()
+            .collect::<Result<Vec<Block>>>()?
+            .into_iter()
             .filter(|block| matches!(block.bedrock_status, BedrockStatus::Pending))
-            .collect()
+            .collect())
     }
 
     pub fn block_settlement_client(&self) -> Option<BlockSettlementClient> {
