@@ -73,6 +73,11 @@ pub struct GetProofForCommitmentRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProgramIdsRequest {}
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PostIndexerMessageRequest {
+    pub message: crate::communication::indexer::Message,
+}
+
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -87,6 +92,7 @@ parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
 parse_request!(GetProgramIdsRequest);
+parse_request!(PostIndexerMessageRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -215,4 +221,9 @@ pub struct GetInitialTestnetAccountsResponse {
     /// Hex encoded account id
     pub account_id: String,
     pub balance: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PostIndexerMessageResponse {
+    pub status: String,
 }

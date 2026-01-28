@@ -23,6 +23,7 @@ use nssa_core::{
 };
 pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
+use url::Url;
 
 use crate::{
     config::{PersistentStorage, WalletConfigOverrides},
@@ -188,13 +189,9 @@ impl WalletCore {
             config.apply_overrides(config_overrides);
         }
 
-        let basic_auth = config
-            .basic_auth
-            .as_ref()
-            .map(|auth| (auth.username.clone(), auth.password.clone()));
         let sequencer_client = Arc::new(SequencerClient::new_with_auth(
-            config.sequencer_addr.clone(),
-            basic_auth,
+            Url::parse(&config.sequencer_addr)?,
+            config.basic_auth.clone(),
         )?);
         let tx_poller = TxPoller::new(config.clone(), Arc::clone(&sequencer_client));
 
