@@ -104,7 +104,7 @@ async fn amm_public() -> Result<()> {
             &recipient_account_id_1.to_string(),
         )),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 
@@ -130,7 +130,7 @@ async fn amm_public() -> Result<()> {
             &recipient_account_id_2.to_string(),
         )),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 

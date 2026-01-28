@@ -21,7 +21,7 @@ async fn successful_transfer_to_existing_account() -> Result<()> {
         from: format_public_account_id(ACC_SENDER),
         to: Some(format_public_account_id(ACC_RECEIVER)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 
@@ -76,7 +76,7 @@ pub async fn successful_transfer_to_new_account() -> Result<()> {
         from: format_public_account_id(ACC_SENDER),
         to: Some(format_public_account_id(&new_persistent_account_id)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 
@@ -112,7 +112,7 @@ async fn failed_transfer_with_insufficient_balance() -> Result<()> {
         from: format_public_account_id(ACC_SENDER),
         to: Some(format_public_account_id(ACC_RECEIVER)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 1000000,
     });
 
@@ -150,7 +150,7 @@ async fn two_consecutive_successful_transfers() -> Result<()> {
         from: format_public_account_id(ACC_SENDER),
         to: Some(format_public_account_id(ACC_RECEIVER)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 
@@ -182,7 +182,7 @@ async fn two_consecutive_successful_transfers() -> Result<()> {
         from: format_public_account_id(ACC_SENDER),
         to: Some(format_public_account_id(ACC_RECEIVER)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 

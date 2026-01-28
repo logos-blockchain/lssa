@@ -1,6 +1,6 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::AccountId;
-use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
+use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::ViewingPublicKey};
 
 use super::{NativeTokenTransfer, auth_transfer_preparation};
 use crate::PrivacyPreservingAccount;
@@ -38,7 +38,7 @@ impl NativeTokenTransfer<'_> {
         &self,
         from: AccountId,
         to_npk: NullifierPublicKey,
-        to_ipk: IncomingViewingPublicKey,
+        to_vpk: ViewingPublicKey,
         balance_to_move: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
         let (instruction_data, program, tx_pre_check) = auth_transfer_preparation(balance_to_move);
@@ -49,7 +49,7 @@ impl NativeTokenTransfer<'_> {
                     PrivacyPreservingAccount::Public(from),
                     PrivacyPreservingAccount::PrivateForeign {
                         npk: to_npk,
-                        ipk: to_ipk,
+                        vpk: to_vpk,
                     },
                 ],
                 instruction_data,

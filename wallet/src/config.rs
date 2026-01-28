@@ -399,7 +399,7 @@ impl Default for WalletConfig {
                             75,
                             20
                         ],
-                        "incoming_viewing_secret_key": [
+                        "viewing_secret_key": [
                             251,
                             201,
                             22,
@@ -432,40 +432,6 @@ impl Default for WalletConfig {
                             153,
                             182,
                             158
-                        ],
-                        "outgoing_viewing_secret_key": [
-                            25,
-                            67,
-                            121,
-                            76,
-                            175,
-                            100,
-                            30,
-                            198,
-                            105,
-                            123,
-                            49,
-                            169,
-                            75,
-                            178,
-                            75,
-                            210,
-                            100,
-                            143,
-                            210,
-                            243,
-                            228,
-                            243,
-                            21,
-                            18,
-                            36,
-                            84,
-                            164,
-                            186,
-                            139,
-                            113,
-                            214,
-                            12
                         ]
                     },
                     "nullifer_public_key": [
@@ -502,7 +468,7 @@ impl Default for WalletConfig {
                         228,
                         97
                     ],
-                    "incoming_viewing_public_key": [
+                    "viewing_public_key": [
                         3,
                         235,
                         139,
@@ -628,7 +594,7 @@ impl Default for WalletConfig {
                             164,
                             13
                         ],
-                        "incoming_viewing_secret_key": [
+                        "viewing_secret_key": [
                             193,
                             181,
                             14,
@@ -661,40 +627,6 @@ impl Default for WalletConfig {
                             105,
                             104,
                             231
-                        ],
-                        "outgoing_viewing_secret_key": [
-                            20,
-                            170,
-                            220,
-                            108,
-                            41,
-                            23,
-                            155,
-                            217,
-                            247,
-                            190,
-                            175,
-                            168,
-                            247,
-                            34,
-                            105,
-                            134,
-                            114,
-                            74,
-                            104,
-                            91,
-                            211,
-                            62,
-                            126,
-                            13,
-                            130,
-                            100,
-                            241,
-                            214,
-                            250,
-                            236,
-                            38,
-                            150
                         ]
                     },
                     "nullifer_public_key": [
@@ -731,7 +663,7 @@ impl Default for WalletConfig {
                         140,
                         47
                     ],
-                    "incoming_viewing_public_key": [
+                    "viewing_public_key": [
                         2,
                         181,
                         98,

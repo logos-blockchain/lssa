@@ -7,7 +7,7 @@ use nssa::{
 };
 use nssa_core::{
     Commitment, MembershipProof, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
-    account::AccountWithMetadata, encryption::IncomingViewingPublicKey, program::InstructionData,
+    account::AccountWithMetadata, encryption::ViewingPublicKey, program::InstructionData,
 };
 
 use crate::{WalletCore, helperfunctions::produce_random_nonces};
@@ -15,7 +15,7 @@ use crate::{WalletCore, helperfunctions::produce_random_nonces};
 pub(crate) struct AccountPreparedData {
     pub nsk: Option<NullifierSecretKey>,
     pub npk: NullifierPublicKey,
-    pub ipk: IncomingViewingPublicKey,
+    pub vpk: ViewingPublicKey,
     pub auth_acc: AccountWithMetadata,
     pub proof: Option<MembershipProof>,
 }
@@ -40,7 +40,7 @@ impl WalletCore {
         let mut proof = None;
 
         let from_npk = from_keys.nullifer_public_key;
-        let from_ipk = from_keys.incoming_viewing_public_key;
+        let from_vpk = from_keys.viewing_public_key;
 
         let sender_commitment = Commitment::new(&from_npk, &from_acc);
 
@@ -61,7 +61,7 @@ impl WalletCore {
         Ok(AccountPreparedData {
             nsk,
             npk: from_npk,
-            ipk: from_ipk,
+            vpk: from_vpk,
             auth_acc: sender_pre,
             proof,
         })
@@ -79,7 +79,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: from_nsk,
             npk: from_npk,
-            ipk: from_ipk,
+            vpk: from_vpk,
             auth_acc: sender_pre,
             proof: from_proof,
         } = self.private_acc_preparation(from, true, true).await?;
@@ -87,7 +87,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: to_nsk,
             npk: to_npk,
-            ipk: to_ipk,
+            vpk: to_vpk,
             auth_acc: recipient_pre,
             proof: _,
         } = self.private_acc_preparation(to, true, false).await?;
@@ -95,10 +95,10 @@ impl WalletCore {
         tx_pre_check(&sender_pre.account, &recipient_pre.account)?;
 
         let eph_holder_from = EphemeralKeyHolder::new(&from_npk);
-        let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_ipk);
+        let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_vpk);
 
         let eph_holder_to = EphemeralKeyHolder::new(&to_npk);
-        let shared_secret_to = eph_holder_to.calculate_shared_secret_sender(&to_ipk);
+        let shared_secret_to = eph_holder_to.calculate_shared_secret_sender(&to_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[sender_pre, recipient_pre],
@@ -123,12 +123,12 @@ impl WalletCore {
             vec![
                 (
                     from_npk.clone(),
-                    from_ipk.clone(),
+                    from_vpk.clone(),
                     eph_holder_from.generate_ephemeral_public_key(),
                 ),
                 (
                     to_npk.clone(),
-                    to_ipk.clone(),
+                    to_vpk.clone(),
                     eph_holder_to.generate_ephemeral_public_key(),
                 ),
             ],
@@ -156,7 +156,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: from_nsk,
             npk: from_npk,
-            ipk: from_ipk,
+            vpk: from_vpk,
             auth_acc: sender_pre,
             proof: from_proof,
         } = self.private_acc_preparation(from, true, true).await?;
@@ -164,7 +164,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: _,
             npk: to_npk,
-            ipk: to_ipk,
+            vpk: to_vpk,
             auth_acc: recipient_pre,
             proof: _,
         } = self.private_acc_preparation(to, false, false).await?;
@@ -172,10 +172,10 @@ impl WalletCore {
         tx_pre_check(&sender_pre.account, &recipient_pre.account)?;
 
         let eph_holder_from = EphemeralKeyHolder::new(&from_npk);
-        let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_ipk);
+        let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_vpk);
 
         let eph_holder_to = EphemeralKeyHolder::new(&to_npk);
-        let shared_secret_to = eph_holder_to.calculate_shared_secret_sender(&to_ipk);
+        let shared_secret_to = eph_holder_to.calculate_shared_secret_sender(&to_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[sender_pre, recipient_pre],
@@ -197,12 +197,12 @@ impl WalletCore {
             vec![
                 (
                     from_npk.clone(),
-                    from_ipk.clone(),
+                    from_vpk.clone(),
                     eph_holder_from.generate_ephemeral_public_key(),
                 ),
                 (
                     to_npk.clone(),
-                    to_ipk.clone(),
+                    to_vpk.clone(),
                     eph_holder_to.generate_ephemeral_public_key(),
                 ),
             ],
@@ -223,7 +223,7 @@ impl WalletCore {
         &self,
         from: AccountId,
         to_npk: NullifierPublicKey,
-        to_ipk: IncomingViewingPublicKey,
+        to_vpk: ViewingPublicKey,
         instruction_data: InstructionData,
         tx_pre_check: impl FnOnce(&Account, &Account) -> Result<(), ExecutionFailureKind>,
         program: Program,
@@ -231,7 +231,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: from_nsk,
             npk: from_npk,
-            ipk: from_ipk,
+            vpk: from_vpk,
             auth_acc: sender_pre,
             proof: from_proof,
         } = self.private_acc_preparation(from, true, true).await?;
@@ -244,8 +244,8 @@ impl WalletCore {
 
         let eph_holder = EphemeralKeyHolder::new(&to_npk);
 
-        let shared_secret_from = eph_holder.calculate_shared_secret_sender(&from_ipk);
-        let shared_secret_to = eph_holder.calculate_shared_secret_sender(&to_ipk);
+        let shared_secret_from = eph_holder.calculate_shared_secret_sender(&from_vpk);
+        let shared_secret_to = eph_holder.calculate_shared_secret_sender(&to_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[sender_pre, recipient_pre],
@@ -267,12 +267,12 @@ impl WalletCore {
             vec![
                 (
                     from_npk.clone(),
-                    from_ipk.clone(),
+                    from_vpk.clone(),
                     eph_holder.generate_ephemeral_public_key(),
                 ),
                 (
                     to_npk.clone(),
-                    to_ipk.clone(),
+                    to_vpk.clone(),
                     eph_holder.generate_ephemeral_public_key(),
                 ),
             ],
@@ -301,7 +301,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: from_nsk,
             npk: from_npk,
-            ipk: from_ipk,
+            vpk: from_vpk,
             auth_acc: sender_pre,
             proof: from_proof,
         } = self.private_acc_preparation(from, true, true).await?;
@@ -315,7 +315,7 @@ impl WalletCore {
         let recipient_pre = AccountWithMetadata::new(to_acc.clone(), false, to);
 
         let eph_holder = EphemeralKeyHolder::new(&from_npk);
-        let shared_secret = eph_holder.calculate_shared_secret_sender(&from_ipk);
+        let shared_secret = eph_holder.calculate_shared_secret_sender(&from_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[sender_pre, recipient_pre],
@@ -333,7 +333,7 @@ impl WalletCore {
             vec![],
             vec![(
                 from_npk.clone(),
-                from_ipk.clone(),
+                from_vpk.clone(),
                 eph_holder.generate_ephemeral_public_key(),
             )],
             output,
@@ -366,7 +366,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: to_nsk,
             npk: to_npk,
-            ipk: to_ipk,
+            vpk: to_vpk,
             auth_acc: recipient_pre,
             proof: _,
         } = self.private_acc_preparation(to, true, false).await?;
@@ -376,7 +376,7 @@ impl WalletCore {
         let sender_pre = AccountWithMetadata::new(from_acc.clone(), true, from);
 
         let eph_holder = EphemeralKeyHolder::new(&to_npk);
-        let shared_secret = eph_holder.calculate_shared_secret_sender(&to_ipk);
+        let shared_secret = eph_holder.calculate_shared_secret_sender(&to_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[sender_pre, recipient_pre],
@@ -394,7 +394,7 @@ impl WalletCore {
             vec![from_acc.nonce],
             vec![(
                 to_npk.clone(),
-                to_ipk.clone(),
+                to_vpk.clone(),
                 eph_holder.generate_ephemeral_public_key(),
             )],
             output,
@@ -432,7 +432,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: _,
             npk: to_npk,
-            ipk: to_ipk,
+            vpk: to_vpk,
             auth_acc: recipient_pre,
             proof: _,
         } = self.private_acc_preparation(to, false, false).await?;
@@ -442,7 +442,7 @@ impl WalletCore {
         let sender_pre = AccountWithMetadata::new(from_acc.clone(), true, from);
 
         let eph_holder = EphemeralKeyHolder::new(&to_npk);
-        let shared_secret = eph_holder.calculate_shared_secret_sender(&to_ipk);
+        let shared_secret = eph_holder.calculate_shared_secret_sender(&to_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[sender_pre, recipient_pre],
@@ -460,7 +460,7 @@ impl WalletCore {
             vec![from_acc.nonce],
             vec![(
                 to_npk.clone(),
-                to_ipk.clone(),
+                to_vpk.clone(),
                 eph_holder.generate_ephemeral_public_key(),
             )],
             output,
@@ -487,7 +487,7 @@ impl WalletCore {
         &self,
         from: AccountId,
         to_npk: NullifierPublicKey,
-        to_ipk: IncomingViewingPublicKey,
+        to_vpk: ViewingPublicKey,
         instruction_data: InstructionData,
         tx_pre_check: impl FnOnce(&Account, &Account) -> Result<(), ExecutionFailureKind>,
         program: Program,
@@ -504,7 +504,7 @@ impl WalletCore {
         let recipient_pre = AccountWithMetadata::new(to_acc.clone(), false, &to_npk);
 
         let eph_holder = EphemeralKeyHolder::new(&to_npk);
-        let shared_secret = eph_holder.calculate_shared_secret_sender(&to_ipk);
+        let shared_secret = eph_holder.calculate_shared_secret_sender(&to_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[sender_pre, recipient_pre],
@@ -522,7 +522,7 @@ impl WalletCore {
             vec![from_acc.nonce],
             vec![(
                 to_npk.clone(),
-                to_ipk.clone(),
+                to_vpk.clone(),
                 eph_holder.generate_ephemeral_public_key(),
             )],
             output,
@@ -548,13 +548,13 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: _,
             npk: from_npk,
-            ipk: from_ipk,
+            vpk: from_vpk,
             auth_acc: sender_pre,
             proof: _,
         } = self.private_acc_preparation(from, false, false).await?;
 
         let eph_holder_from = EphemeralKeyHolder::new(&from_npk);
-        let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_ipk);
+        let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_vpk);
 
         let instruction: u128 = 0;
 
@@ -574,7 +574,7 @@ impl WalletCore {
             vec![],
             vec![(
                 from_npk.clone(),
-                from_ipk.clone(),
+                from_vpk.clone(),
                 eph_holder_from.generate_ephemeral_public_key(),
             )],
             output,

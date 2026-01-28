@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub mod shared_key_derivation;
 
 #[cfg(feature = "host")]
-pub use shared_key_derivation::{EphemeralPublicKey, EphemeralSecretKey, IncomingViewingPublicKey};
+pub use shared_key_derivation::{EphemeralPublicKey, EphemeralSecretKey, ViewingPublicKey};
 
 use crate::{Commitment, account::Account};
 

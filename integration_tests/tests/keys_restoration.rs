@@ -50,7 +50,7 @@ async fn restore_keys_from_seed() -> Result<()> {
         from: format_private_account_id(&from.to_string()),
         to: Some(format_private_account_id(&to_account_id1.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
@@ -60,7 +60,7 @@ async fn restore_keys_from_seed() -> Result<()> {
         from: format_private_account_id(&from.to_string()),
         to: Some(format_private_account_id(&to_account_id2.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 101,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
@@ -96,7 +96,7 @@ async fn restore_keys_from_seed() -> Result<()> {
         from: format_public_account_id(&from.to_string()),
         to: Some(format_public_account_id(&to_account_id3.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 102,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
@@ -106,7 +106,7 @@ async fn restore_keys_from_seed() -> Result<()> {
         from: format_public_account_id(&from.to_string()),
         to: Some(format_public_account_id(&to_account_id4.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 103,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
@@ -169,7 +169,7 @@ async fn restore_keys_from_seed() -> Result<()> {
         from: format_private_account_id(&to_account_id1.to_string()),
         to: Some(format_private_account_id(&to_account_id2.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 10,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
@@ -178,7 +178,7 @@ async fn restore_keys_from_seed() -> Result<()> {
         from: format_public_account_id(&to_account_id3.to_string()),
         to: Some(format_public_account_id(&to_account_id4.to_string())),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 11,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;

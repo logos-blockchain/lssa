@@ -5,7 +5,7 @@ use nssa::{AccountId, PrivateKey};
 use nssa_core::{
     MembershipProof, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
     account::{AccountWithMetadata, Nonce},
-    encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
+    encryption::{EphemeralPublicKey, ViewingPublicKey},
 };
 
 use crate::WalletCore;
@@ -16,7 +16,7 @@ pub enum PrivacyPreservingAccount {
     PrivateOwned(AccountId),
     PrivateForeign {
         npk: NullifierPublicKey,
-        ipk: IncomingViewingPublicKey,
+        vpk: ViewingPublicKey,
     },
 }
 
@@ -28,7 +28,7 @@ impl PrivacyPreservingAccount {
     pub fn is_private(&self) -> bool {
         matches!(
             &self,
-            Self::PrivateOwned(_) | Self::PrivateForeign { npk: _, ipk: _ }
+            Self::PrivateOwned(_) | Self::PrivateForeign { npk: _, vpk: _ }
         )
     }
 }
@@ -36,7 +36,7 @@ impl PrivacyPreservingAccount {
 pub struct PrivateAccountKeys {
     pub npk: NullifierPublicKey,
     pub ssk: SharedSecretKey,
-    pub ipk: IncomingViewingPublicKey,
+    pub vpk: ViewingPublicKey,
     pub epk: EphemeralPublicKey,
 }
 
@@ -80,13 +80,13 @@ impl AccountManager {
 
                     (State::Private(pre), mask)
                 }
-                PrivacyPreservingAccount::PrivateForeign { npk, ipk } => {
+                PrivacyPreservingAccount::PrivateForeign { npk, vpk } => {
                     let acc = nssa_core::account::Account::default();
                     let auth_acc = AccountWithMetadata::new(acc, false, &npk);
                     let pre = AccountPreparedData {
                         nsk: None,
                         npk,
-                        ipk,
+                        vpk,
                         pre_state: auth_acc,
                         proof: None,
                     };
@@ -138,8 +138,8 @@ impl AccountManager {
 
                     Some(PrivateAccountKeys {
                         npk: pre.npk.clone(),
-                        ssk: eph_holder.calculate_shared_secret_sender(&pre.ipk),
-                        ipk: pre.ipk.clone(),
+                        ssk: eph_holder.calculate_shared_secret_sender(&pre.vpk),
+                        vpk: pre.vpk.clone(),
                         epk: eph_holder.generate_ephemeral_public_key(),
                     })
                 }
@@ -192,7 +192,7 @@ impl AccountManager {
 struct AccountPreparedData {
     nsk: Option<NullifierSecretKey>,
     npk: NullifierPublicKey,
-    ipk: IncomingViewingPublicKey,
+    vpk: ViewingPublicKey,
     pre_state: AccountWithMetadata,
     proof: Option<MembershipProof>,
 }
@@ -213,7 +213,7 @@ async fn private_acc_preparation(
     let nsk = from_keys.private_key_holder.nullifier_secret_key;
 
     let from_npk = from_keys.nullifer_public_key;
-    let from_ipk = from_keys.incoming_viewing_public_key;
+    let from_vpk = from_keys.viewing_public_key;
 
     // TODO: Remove this unwrap, error types must be compatible
     let proof = wallet
@@ -228,7 +228,7 @@ async fn private_acc_preparation(
     Ok(AccountPreparedData {
         nsk: Some(nsk),
         npk: from_npk,
-        ipk: from_ipk,
+        vpk: from_vpk,
         pre_state: sender_pre,
         proof,
     })

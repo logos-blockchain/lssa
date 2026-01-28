@@ -10,7 +10,8 @@ pub struct NullifierPublicKey(pub [u8; 32]);
 
 impl From<&NullifierPublicKey> for AccountId {
     fn from(value: &NullifierPublicKey) -> Self {
-        const PRIVATE_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.2/AccountId/Private/\x00\x00\x00";
+        const PRIVATE_ACCOUNT_ID_PREFIX: &[u8; 32] =
+            b"/LEE/v0.3/AccountId/Private/\x00\x00\x00\x00";
 
         let mut bytes = [0; 64];
         bytes[0..32].copy_from_slice(PRIVATE_ACCOUNT_ID_PREFIX);
@@ -28,9 +29,9 @@ impl AsRef<[u8]> for NullifierPublicKey {
 impl From<&NullifierSecretKey> for NullifierPublicKey {
     fn from(value: &NullifierSecretKey) -> Self {
         let mut bytes = Vec::new();
-        const PREFIX: &[u8; 9] = b"NSSA_keys";
+        const PREFIX: &[u8; 8] = b"LEE/keys";
         const SUFFIX_1: &[u8; 1] = &[7];
-        const SUFFIX_2: &[u8; 22] = &[0; 22];
+        const SUFFIX_2: &[u8; 23] = &[0; 23];
         bytes.extend_from_slice(PREFIX);
         bytes.extend_from_slice(value);
         bytes.extend_from_slice(SUFFIX_1);
