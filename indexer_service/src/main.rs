@@ -51,7 +51,13 @@ async fn run_server(port: u16) -> Result<jsonrpsee::server::ServerHandle> {
 
     info!("Starting Indexer Service RPC server on {addr}");
 
+    #[cfg(not(feature = "mock-responses"))]
     let handle = server.start(indexer_service::service::IndexerService.into_rpc());
+    #[cfg(feature = "mock-responses")]
+    let handle = server.start(
+        indexer_service::mock_service::MockIndexerService::new_with_mock_blocks().into_rpc(),
+    );
+
     Ok(handle)
 }
 

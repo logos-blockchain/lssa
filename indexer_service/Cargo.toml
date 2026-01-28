@@ -9,9 +9,13 @@ indexer_service_rpc = { workspace = true, features = ["server"] }
 
 clap = { workspace = true, features = ["derive"] }
 anyhow.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tokio-util.workspace = true
 env_logger.workspace = true
 log.workspace = true
 jsonrpsee.workspace = true
 async-trait = "0.1.89"
+
+[features]
+# Return mock responses with generated data for testing purposes
+mock-responses = []
