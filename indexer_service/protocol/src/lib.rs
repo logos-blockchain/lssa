@@ -36,7 +36,7 @@ pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,
     pub bedrock_status: BedrockStatus,
-    pub bedrock_parent_id: MsgId,
+    pub bedrock_parent_id: MantleMsgId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -190,7 +190,7 @@ pub struct Hash(
 );
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub struct MsgId(
+pub struct MantleMsgId(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded Bedrock message id")]
     pub [u8; 32],

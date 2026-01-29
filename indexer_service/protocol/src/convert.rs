@@ -606,7 +606,7 @@ impl TryFrom<common::block::Block> for Block {
             header: header.into(),
             body: body.try_into()?,
             bedrock_status: bedrock_status.into(),
-            bedrock_parent_id: MsgId(bedrock_parent_id),
+            bedrock_parent_id: MantleMsgId(bedrock_parent_id),
         })
     }
 }
