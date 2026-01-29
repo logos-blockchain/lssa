@@ -45,7 +45,11 @@ impl Display for TransactionMalformationError {
 impl std::error::Error for TransactionMalformationError {}
 
 impl SequencerCore {
-    /// Start Sequencer from configuration and construct transaction sender
+    /// Starts the sequencer using the provided configuration.
+    /// If an existing database is found, the sequencer state is loaded from it and
+    /// assumed to represent the correct latest state consistent with Bedrock-finalized data.
+    /// If no database is found, the sequencer performs a fresh start from genesis,
+    /// initializing its state with the accounts defined in the configuration file.
     pub fn start_from_config(config: SequencerConfig) -> (Self, MemPoolHandle<EncodedTransaction>) {
         let hashable_data = HashableBlockData {
             block_id: config.genesis_id,
@@ -231,10 +235,22 @@ impl SequencerCore {
         &self.sequencer_config
     }
 
-    pub fn delete_blocks_from_db(&mut self, block_ids: &[u64]) -> Result<()> {
-        block_ids
+    /// Deletes finalized blocks from the sequencer's pending block list.
+    /// This method must be called when new blocks are finalized on Bedrock.
+    /// All pending blocks with an ID less than or equal to `last_finalized_block_id`
+    /// are removed from the database.
+    pub fn delete_finalized_blocks_from_db(&mut self, last_finalized_block_id: u64) -> Result<()> {
+        if let Some(first_pending_block_id) = self
+            .get_pending_blocks()?
             .iter()
-            .try_for_each(|&id| self.store.delete_block_at_id(id))
+            .map(|block| block.header.block_id)
+            .min()
+        {
+            (first_pending_block_id..=last_finalized_block_id)
+                .try_for_each(|id| self.store.delete_block_at_id(id))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn get_pending_blocks(&self) -> Result<Vec<Block>> {
@@ -794,5 +810,27 @@ mod tests {
             balance_acc_2,
             config.initial_accounts[1].balance + balance_to_move
         );
+    }
+
+    #[test]
+    fn test_delete_blocks() {
+        let config = setup_sequencer_config();
+        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config);
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 4);
+
+        let last_finalized_block = 3;
+        sequencer
+            .delete_finalized_blocks_from_db(last_finalized_block)
+            .unwrap();
+        assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 1);
     }
 }
