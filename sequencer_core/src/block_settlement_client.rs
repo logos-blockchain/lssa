@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, str::FromStr};
 
 use anyhow::{Context, Result, anyhow};
 use bedrock_client::BedrockClient;
@@ -10,6 +10,7 @@ use logos_blockchain_core::mantle::{
 use logos_blockchain_key_management_system_service::keys::{
     ED25519_SECRET_KEY_SIZE, Ed25519Key, Ed25519PublicKey,
 };
+use reqwest::Url;
 
 use crate::config::BedrockConfig;
 
@@ -25,14 +26,15 @@ impl BlockSettlementClient {
     pub fn try_new(home: &Path, config: &BedrockConfig) -> Result<Self> {
         let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key"))
             .context("Failed to load or create signing key")?;
-        let bedrock_channel_id = ChannelId::from(config.channel_id);
-        let bedrock_client = BedrockClient::new(None, config.node_url.clone())
-            .context("Failed to initialize bedrock client")?;
+        let bedrock_url = Url::from_str(config.node_url.as_ref())
+            .context("Bedrock node address is not a valid url")?;
+        let bedrock_client =
+            BedrockClient::new(None, bedrock_url).context("Failed to initialize bedrock client")?;
         let channel_genesis_msg = MsgId::from([0; 32]);
         Ok(Self {
             bedrock_client,
             bedrock_signing_key,
-            bedrock_channel_id,
+            bedrock_channel_id: config.channel_id,
             last_message_id: channel_genesis_msg,
         })
     }

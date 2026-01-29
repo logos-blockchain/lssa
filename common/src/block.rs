@@ -78,6 +78,10 @@ impl HashableBlockData {
             bedrock_status: BedrockStatus::Pending,
         }
     }
+
+    pub fn block_hash(&self) -> BlockHash {
+        OwnHasher::hash(&borsh::to_vec(&self).unwrap())
+    }
 }
 
 impl From<Block> for HashableBlockData {
