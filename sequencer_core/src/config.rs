@@ -5,7 +5,8 @@ use std::{
 };
 
 use anyhow::Result;
-use reqwest::Url;
+use common::sequencer_client::BasicAuth;
+use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -57,9 +58,11 @@ pub struct SequencerConfig {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BedrockConfig {
     /// Bedrock channel ID
-    pub channel_id: [u8; 32],
+    pub channel_id: ChannelId,
     /// Bedrock Url
-    pub node_url: Url,
+    pub node_url: String,
+    /// Bedrock auth
+    pub auth: Option<BasicAuth>,
 }
 
 impl SequencerConfig {

@@ -927,9 +927,14 @@ name = "bedrock_client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "futures",
+ "log",
+ "logos-blockchain-chain-broadcast-service",
  "logos-blockchain-common-http-client",
  "logos-blockchain-core",
  "reqwest",
+ "serde",
+ "tokio-retry",
 ]
 
 [[package]]
@@ -1335,6 +1340,7 @@ dependencies = [
  "borsh",
  "hex",
  "log",
+ "logos-blockchain-common-http-client",
  "logos-blockchain-core",
  "nssa",
  "nssa_core",
@@ -1343,6 +1349,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.17",
+ "url",
 ]
 
 [[package]]
@@ -2627,7 +2634,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -2774,6 +2781,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee796ad498c8d9a1d68e477df8f754ed784ef875de1414ebdaf169f70a6a784"
 
 [[package]]
+name = "indexer_core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bedrock_client",
+ "borsh",
+ "common",
+ "futures",
+ "log",
+ "logos-blockchain-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "indexer_service"
 version = "0.1.0"
 dependencies = [
@@ -2870,6 +2894,7 @@ dependencies = [
  "env_logger",
  "futures",
  "hex",
+ "indexer_core",
  "key_protocol",
  "log",
  "nssa",
@@ -2878,6 +2903,7 @@ dependencies = [
  "sequencer_runner",
  "tempfile",
  "tokio",
+ "url",
  "wallet",
 ]
 
@@ -4678,7 +4704,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -6200,6 +6226,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-retry"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f57eb36ecbe0fc510036adff84824dd3c24bb781e21bfa67b69d556aa85214f"
+dependencies = [
+ "pin-project",
+ "rand 0.8.5",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-rustls"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6596,6 +6633,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "url",
 ]
 
 [[package]]

@@ -1,13 +1,12 @@
 {
-    "home": ".",
+    "home": "",
     "override_rust_log": null,
     "genesis_id": 1,
     "is_genesis_random": true,
     "max_num_tx_in_block": 20,
-    "mempool_max_size": 1000,
-    "block_create_timeout_millis": 5000,
-    "retry_pending_blocks_timeout_millis": 7000,
-    "port": 3040,
+    "mempool_max_size": 10000,
+    "block_create_timeout_millis": 10000,
+    "port": 0,
     "initial_accounts": [
         {
             "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
@@ -158,7 +157,7 @@
     ],
     "bedrock_config": {
         "channel_id": "0101010101010101010101010101010101010101010101010101010101010101",
-        "node_url": "http://localhost:8080",
+        "node_url": "http://127.0.0.1:8080",
         "auth": {
             "username": "user"
         }

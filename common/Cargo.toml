@@ -18,3 +18,5 @@ hex.workspace = true
 borsh.workspace = true
 base64.workspace = true
 logos-blockchain-core.workspace = true
+url.workspace = true
+logos-blockchain-common-http-client.workspace = true

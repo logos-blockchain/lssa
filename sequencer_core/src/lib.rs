@@ -55,8 +55,8 @@ impl SequencerCore {
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let channel_genesis_msg = MsgId::from([0; 32]);
-        let genesis_block = hashable_data.into_pending_block(&signing_key, channel_genesis_msg);
+        let channel_genesis_msg_id = MsgId::from([0; 32]);
+        let genesis_block = hashable_data.into_pending_block(&signing_key, channel_genesis_msg_id);
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
@@ -110,7 +110,6 @@ impl SequencerCore {
                 .expect("Block settlement client should be constructible")
         });
 
-        let channel_genesis_msg_id = MsgId::from([0; 32]);
         let sequencer_core = Self {
             state,
             store,
