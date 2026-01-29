@@ -253,6 +253,7 @@ impl SequencerCore {
         }
     }
 
+    /// Returns the list of stored pending blocks.
     pub fn get_pending_blocks(&self) -> Result<Vec<Block>> {
         Ok(self
             .store
@@ -813,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_blocks() {
+    fn test_get_pending_blocks() {
         let config = setup_sequencer_config();
         let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config);
         sequencer
@@ -826,11 +827,27 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap();
         assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn test_delete_blocks() {
+        let config = setup_sequencer_config();
+        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config);
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
 
         let last_finalized_block = 3;
         sequencer
             .delete_finalized_blocks_from_db(last_finalized_block)
             .unwrap();
+
         assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 1);
     }
 }
