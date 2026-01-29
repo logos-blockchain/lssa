@@ -15,7 +15,6 @@ impl IndexerService {
     }
 }
 
-// `async_trait` is required by `jsonrpsee`
 #[async_trait::async_trait]
 impl indexer_service_rpc::RpcServer for IndexerService {
     async fn subscribe_to_blocks(

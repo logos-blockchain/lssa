@@ -161,7 +161,6 @@ impl MockIndexerService {
     }
 }
 
-// `async_trait` is required by `jsonrpsee`
 #[async_trait::async_trait]
 impl indexer_service_rpc::RpcServer for MockIndexerService {
     async fn subscribe_to_blocks(
