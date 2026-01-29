@@ -13,9 +13,10 @@ members = [
   "sequencer_core",
   "sequencer_rpc",
   "sequencer_runner",
-  "indexer_service",
-  "indexer_service/protocol",
-  "indexer_service/rpc",
+  "indexer/core",
+  "indexer/service",
+  "indexer/service/protocol",
+  "indexer/service/rpc",
   "explorer_service",
   "program_methods",
   "program_methods/guest",
@@ -25,7 +26,6 @@ members = [
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
   "bedrock_client",
-  "indexer_core",
 ]
 
 [workspace.dependencies]
@@ -38,14 +38,14 @@ key_protocol = { path = "key_protocol" }
 sequencer_core = { path = "sequencer_core" }
 sequencer_rpc = { path = "sequencer_rpc" }
 sequencer_runner = { path = "sequencer_runner" }
-indexer_service = { path = "indexer_service" }
-indexer_service_protocol = { path = "indexer_service/protocol" }
-indexer_service_rpc = { path = "indexer_service/rpc" }
+indexer_core = { path = "indexer/core" }
+indexer_service = { path = "indexer/service" }
+indexer_service_protocol = { path = "indexer/service/protocol" }
+indexer_service_rpc = { path = "indexer/service/rpc" }
 wallet = { path = "wallet" }
 wallet-ffi = { path = "wallet-ffi" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
-indexer_core = { path = "indexer_core" }
 
 tokio = { version = "1.28.2", features = [
   "net",
