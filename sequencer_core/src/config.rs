@@ -5,15 +5,17 @@ use std::{
 };
 
 use anyhow::Result;
-use common::sequencer_client::BasicAuth;
+pub use bedrock_client::BackoffConfig;
+use common::config::BasicAuth;
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
+use nssa::AccountId;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 /// Helperstruct for account serialization
 pub struct AccountInitialData {
-    /// Hex encoded account id
-    pub account_id: String,
+    pub account_id: AccountId,
     pub balance: u128,
 }
 
@@ -52,15 +54,20 @@ pub struct SequencerConfig {
     /// Sequencer own signing key
     pub signing_key: [u8; 32],
     /// Bedrock configuration options
-    pub bedrock_config: Option<BedrockConfig>,
+    pub bedrock_config: BedrockConfig,
+    /// Indexer RPC URL
+    pub indexer_rpc_url: Url,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BedrockConfig {
+    /// Fibonacci backoff retry strategy configuration
+    #[serde(default)]
+    pub backoff: BackoffConfig,
     /// Bedrock channel ID
     pub channel_id: ChannelId,
     /// Bedrock Url
-    pub node_url: String,
+    pub node_url: Url,
     /// Bedrock auth
     pub auth: Option<BasicAuth>,
 }

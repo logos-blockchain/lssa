@@ -81,7 +81,7 @@ impl PrivacyPreservingTransaction {
         let signer_account_ids = self.signer_account_ids();
         // Check nonces corresponds to the current nonces on the public state.
         for (account_id, nonce) in signer_account_ids.iter().zip(&message.nonces) {
-            let current_nonce = state.get_account_by_id(account_id).nonce;
+            let current_nonce = state.get_account_by_id(*account_id).nonce;
             if current_nonce != *nonce {
                 return Err(NssaError::InvalidInput("Nonce mismatch".into()));
             }
@@ -93,7 +93,7 @@ impl PrivacyPreservingTransaction {
             .iter()
             .map(|account_id| {
                 AccountWithMetadata::new(
-                    state.get_account_by_id(account_id),
+                    state.get_account_by_id(*account_id),
                     signer_account_ids.contains(account_id),
                     *account_id,
                 )

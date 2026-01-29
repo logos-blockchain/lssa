@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{HashType, block::Block, transaction::EncodedTransaction};
+use common::{HashType, block::Block, transaction::NSSATransaction};
 use nssa::V02State;
 use storage::RocksDBIO;
 
@@ -20,7 +20,7 @@ impl SequencerStore {
     /// ATTENTION: Will overwrite genesis block.
     pub fn open_db_with_genesis(
         location: &Path,
-        genesis_block: Option<Block>,
+        genesis_block: Option<&Block>,
         signing_key: nssa::PrivateKey,
     ) -> Result<Self> {
         let tx_hash_to_block_map = if let Some(block) = &genesis_block {
@@ -55,7 +55,7 @@ impl SequencerStore {
     }
 
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
-    pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<EncodedTransaction> {
+    pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<NSSATransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
         let block = block_id.map(|&id| self.get_block_at_id(id));
         if let Some(Ok(block)) = block {
@@ -68,7 +68,7 @@ impl SequencerStore {
         None
     }
 
-    pub fn insert(&mut self, tx: &EncodedTransaction, block_id: u64) {
+    pub fn insert(&mut self, tx: &NSSATransaction, block_id: u64) {
         self.tx_hash_to_block_map.insert(tx.hash(), block_id);
     }
 
@@ -84,8 +84,8 @@ impl SequencerStore {
         self.dbio.get_all_blocks().map(|res| Ok(res?))
     }
 
-    pub(crate) fn update(&mut self, block: Block, state: &V02State) -> Result<()> {
-        let new_transactions_map = block_to_transactions_map(&block);
+    pub(crate) fn update(&mut self, block: &Block, state: &V02State) -> Result<()> {
+        let new_transactions_map = block_to_transactions_map(block);
         self.dbio.atomic_update(block, state)?;
         self.tx_hash_to_block_map.extend(new_transactions_map);
         Ok(())
@@ -121,7 +121,7 @@ mod tests {
 
         let genesis_block_hashable_data = HashableBlockData {
             block_id: 0,
-            prev_block_hash: [0; 32],
+            prev_block_hash: HashType([0; 32]),
             timestamp: 0,
             transactions: vec![],
         };
@@ -129,7 +129,7 @@ mod tests {
         let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
         // Start an empty node store
         let mut node_store =
-            SequencerStore::open_db_with_genesis(path, Some(genesis_block), signing_key).unwrap();
+            SequencerStore::open_db_with_genesis(path, Some(&genesis_block), signing_key).unwrap();
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
         let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
@@ -139,7 +139,7 @@ mod tests {
         assert_eq!(None, retrieved_tx);
         // Add the block with the transaction
         let dummy_state = V02State::new_with_genesis_accounts(&[], &[]);
-        node_store.update(block, &dummy_state).unwrap();
+        node_store.update(&block, &dummy_state).unwrap();
         // Try again
         let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(Some(tx), retrieved_tx);

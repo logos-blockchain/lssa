@@ -1,4 +1,4 @@
-use indexer_service_protocol::{BedrockStatus, Block, BlockBody, BlockHeader, BlockId, Hash};
+use indexer_service_protocol::{BedrockStatus, Block, BlockBody, BlockHeader, BlockId, HashType};
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_params_map};
 
@@ -7,7 +7,7 @@ use crate::{api, components::TransactionPreview, format_utils};
 #[derive(Clone, PartialEq, Eq)]
 enum BlockIdOrHash {
     BlockId(BlockId),
-    Hash(Hash),
+    Hash(HashType),
 }
 
 /// Block page component
@@ -29,7 +29,7 @@ pub fn BlockPage() -> impl IntoView {
             if let Some(bytes) = format_utils::parse_hex(id_str)
                 && let Ok(hash_array) = <[u8; 32]>::try_from(bytes)
             {
-                return Some(BlockIdOrHash::Hash(Hash(hash_array)));
+                return Some(BlockIdOrHash::Hash(HashType(hash_array)));
             }
 
             None

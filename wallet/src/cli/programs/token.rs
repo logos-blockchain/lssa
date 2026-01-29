@@ -724,9 +724,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![
@@ -775,9 +773,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_sender, sender_account_id)];
@@ -811,9 +807,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![
@@ -850,9 +844,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![
@@ -902,9 +894,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_definition, definition_account_id)];
@@ -948,9 +938,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_sender, sender_account_id)];
@@ -984,9 +972,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_definition, definition_account_id)];
@@ -1020,9 +1006,7 @@ impl WalletSubcommand for TokenProgramSubcommandDeshielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_definition, definition_account_id)];
@@ -1078,9 +1062,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     println!("Transaction data is {:?}", tx.message);
@@ -1109,9 +1091,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_recipient, recipient_account_id)];
@@ -1145,9 +1125,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_holder, holder_account_id)];
@@ -1181,9 +1159,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_holder, holder_account_id)];
@@ -1230,9 +1206,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     println!("Transaction data is {:?}", tx.message);
@@ -1273,9 +1247,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![
@@ -1314,9 +1286,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_definition, definition_account_id)];
@@ -1352,9 +1322,7 @@ impl WalletSubcommand for CreateNewTokenProgramSubcommand {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
                     let acc_decode_data = vec![Decode(secret_supply, supply_account_id)];

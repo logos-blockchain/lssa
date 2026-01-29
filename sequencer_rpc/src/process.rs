@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
 use actix_web::Error as HttpError;
-use base58::FromBase58;
 use base64::{Engine, engine::general_purpose};
 use common::{
-    HashType,
     block::HashableBlockData,
     rpc_primitives::{
         errors::RpcError,
@@ -18,16 +16,19 @@ use common::{
             GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
             GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
             GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, HelloRequest, HelloResponse, PostIndexerMessageRequest,
-            PostIndexerMessageResponse, SendTxRequest, SendTxResponse,
+            GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest,
+            SendTxResponse,
         },
     },
-    transaction::{EncodedTransaction, NSSATransaction},
+    transaction::NSSATransaction,
 };
 use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
-use sequencer_core::{TransactionMalformationError, config::AccountInitialData};
+use sequencer_core::{
+    block_settlement_client::BlockSettlementClientTrait, config::AccountInitialData,
+    indexer_client::IndexerClientTrait,
+};
 use serde_json::Value;
 
 use super::{JsonHandler, respond, types::err_rpc::RpcErr};
@@ -44,7 +45,6 @@ pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT: &str = "get_account";
 pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
 pub const GET_PROGRAM_IDS: &str = "get_program_ids";
-pub const POST_INDEXER_MESSAGE: &str = "post_indexer_message";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -52,8 +52,16 @@ pub const TRANSACTION_SUBMITTED: &str = "Transaction submitted";
 
 pub const GET_INITIAL_TESTNET_ACCOUNTS: &str = "get_initial_testnet_accounts";
 
-impl JsonHandler {
-    pub async fn process(&self, message: Message) -> Result<Message, HttpError> {
+pub trait Process: Send + Sync + 'static {
+    fn process(&self, message: Message) -> impl Future<Output = Result<Message, HttpError>> + Send;
+}
+
+impl<
+    BC: BlockSettlementClientTrait + Send + Sync + 'static,
+    IC: IndexerClientTrait + Send + Sync + 'static,
+> Process for JsonHandler<BC, IC>
+{
+    async fn process(&self, message: Message) -> Result<Message, HttpError> {
         let id = message.id();
         if let Message::Request(request) = message {
             let message_inner = self
@@ -67,7 +75,9 @@ impl JsonHandler {
             )))
         }
     }
+}
 
+impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC> {
     /// Example of request processing
     #[allow(clippy::unused_async)]
     async fn process_temp_hello(&self, request: Request) -> Result<Value, RpcErr> {
@@ -82,19 +92,16 @@ impl JsonHandler {
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let send_tx_req = SendTxRequest::parse(Some(request.params))?;
-        let tx = borsh::from_slice::<EncodedTransaction>(&send_tx_req.transaction).unwrap();
-        let tx_hash = hex::encode(tx.hash());
+        let tx = borsh::from_slice::<NSSATransaction>(&send_tx_req.transaction).unwrap();
+        let tx_hash = tx.hash();
 
-        let transaction = NSSATransaction::try_from(&tx)
-            .map_err(|_| TransactionMalformationError::FailedToDecode { tx: tx.hash() })?;
-
-        let authenticated_tx = sequencer_core::transaction_pre_check(transaction)
+        let authenticated_tx = sequencer_core::transaction_pre_check(tx)
             .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         // TODO: Do we need a timeout here? It will be usable if we have too many transactions to
         // process
         self.mempool_handle
-            .push(authenticated_tx.into())
+            .push(authenticated_tx)
             .await
             .expect("Mempool is closed, this is a bug");
 
@@ -190,19 +197,11 @@ impl JsonHandler {
     /// The account_id must be a valid hex string of the correct length.
     async fn process_get_account_balance(&self, request: Request) -> Result<Value, RpcErr> {
         let get_account_req = GetAccountBalanceRequest::parse(Some(request.params))?;
-        let account_id_bytes = get_account_req
-            .account_id
-            .from_base58()
-            .map_err(|_| RpcError::invalid_params("invalid base58".to_string()))?;
-        let account_id = nssa::AccountId::new(
-            account_id_bytes
-                .try_into()
-                .map_err(|_| RpcError::invalid_params("invalid length".to_string()))?,
-        );
+        let account_id = get_account_req.account_id;
 
         let balance = {
             let state = self.sequencer_state.lock().await;
-            let account = state.state().get_account_by_id(&account_id);
+            let account = state.state().get_account_by_id(account_id);
             account.balance
         };
 
@@ -215,21 +214,14 @@ impl JsonHandler {
     /// Each account_id must be a valid hex string of the correct length.
     async fn process_get_accounts_nonces(&self, request: Request) -> Result<Value, RpcErr> {
         let get_account_nonces_req = GetAccountsNoncesRequest::parse(Some(request.params))?;
-        let mut account_ids = vec![];
-        for account_id_raw in get_account_nonces_req.account_ids {
-            let account_id = account_id_raw
-                .parse::<nssa::AccountId>()
-                .map_err(|e| RpcError::invalid_params(e.to_string()))?;
-
-            account_ids.push(account_id);
-        }
+        let account_ids = get_account_nonces_req.account_ids;
 
         let nonces = {
             let state = self.sequencer_state.lock().await;
 
             account_ids
                 .into_iter()
-                .map(|account_id| state.state().get_account_by_id(&account_id).nonce)
+                .map(|account_id| state.state().get_account_by_id(account_id).nonce)
                 .collect()
         };
 
@@ -243,15 +235,12 @@ impl JsonHandler {
     async fn process_get_account(&self, request: Request) -> Result<Value, RpcErr> {
         let get_account_nonces_req = GetAccountRequest::parse(Some(request.params))?;
 
-        let account_id = get_account_nonces_req
-            .account_id
-            .parse::<nssa::AccountId>()
-            .map_err(|e| RpcError::invalid_params(e.to_string()))?;
+        let account_id = get_account_nonces_req.account_id;
 
         let account = {
             let state = self.sequencer_state.lock().await;
 
-            state.state().get_account_by_id(&account_id)
+            state.state().get_account_by_id(account_id)
         };
 
         let response = GetAccountResponse { account };
@@ -263,11 +252,7 @@ impl JsonHandler {
     /// The hash must be a valid hex string of the correct length.
     async fn process_get_transaction_by_hash(&self, request: Request) -> Result<Value, RpcErr> {
         let get_transaction_req = GetTransactionByHashRequest::parse(Some(request.params))?;
-        let bytes: Vec<u8> = hex::decode(get_transaction_req.hash)
-            .map_err(|_| RpcError::invalid_params("invalid hex".to_string()))?;
-        let hash: HashType = bytes
-            .try_into()
-            .map_err(|_| RpcError::invalid_params("invalid length".to_string()))?;
+        let hash = get_transaction_req.hash;
 
         let transaction = {
             let state = self.sequencer_state.lock().await;
@@ -315,18 +300,6 @@ impl JsonHandler {
         respond(response)
     }
 
-    async fn process_indexer_message(&self, request: Request) -> Result<Value, RpcErr> {
-        let _indexer_post_req = PostIndexerMessageRequest::parse(Some(request.params))?;
-
-        // ToDo: Add indexer messages handling
-
-        let response = PostIndexerMessageResponse {
-            status: "Success".to_string(),
-        };
-
-        respond(response)
-    }
-
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -342,7 +315,6 @@ impl JsonHandler {
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
             GET_PROGRAM_IDS => self.process_get_program_ids(request).await,
-            POST_INDEXER_MESSAGE => self.process_indexer_message(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
@@ -350,23 +322,26 @@ impl JsonHandler {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{str::FromStr as _, sync::Arc};
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
     use common::{
-        sequencer_client::BasicAuth, test_utils::sequencer_sign_key_for_testing,
-        transaction::EncodedTransaction,
+        config::BasicAuth, test_utils::sequencer_sign_key_for_testing, transaction::NSSATransaction,
     };
+    use nssa::AccountId;
     use sequencer_core::{
-        SequencerCore,
-        config::{AccountInitialData, BedrockConfig, SequencerConfig},
+        config::{AccountInitialData, BackoffConfig, BedrockConfig, SequencerConfig},
+        mock::{MockBlockSettlementClient, MockIndexerClient, SequencerCoreWithMockClients},
     };
     use serde_json::Value;
     use tempfile::tempdir;
     use tokio::sync::Mutex;
 
-    use crate::{JsonHandler, rpc_handler};
+    use crate::rpc_handler;
+
+    type JsonHandlerWithMockClients =
+        crate::JsonHandler<MockBlockSettlementClient, MockIndexerClient>;
 
     fn sequencer_config_for_tests() -> SequencerConfig {
         let tempdir = tempdir().unwrap();
@@ -382,12 +357,12 @@ mod tests {
         ];
 
         let initial_acc1 = AccountInitialData {
-            account_id: acc1_id.to_base58(),
+            account_id: AccountId::from_str(&acc1_id.to_base58()).unwrap(),
             balance: 10000,
         };
 
         let initial_acc2 = AccountInitialData {
-            account_id: acc2_id.to_base58(),
+            account_id: AccountId::from_str(&acc2_id.to_base58()).unwrap(),
             balance: 20000,
         };
 
@@ -406,32 +381,46 @@ mod tests {
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
             retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
-            bedrock_config: Some(BedrockConfig {
+            bedrock_config: BedrockConfig {
+                backoff: BackoffConfig {
+                    start_delay_millis: 100,
+                    max_retries: 5,
+                },
                 channel_id: [42; 32].into(),
-                node_url: "http://localhost:8080".to_string(),
+                node_url: "http://localhost:8080".parse().unwrap(),
                 auth: Some(BasicAuth {
                     username: "user".to_string(),
                     password: None,
                 }),
-            }),
+            },
+            indexer_rpc_url: "ws://localhost:8779".parse().unwrap(),
         }
     }
 
-    async fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
+    async fn components_for_tests() -> (
+        JsonHandlerWithMockClients,
+        Vec<AccountInitialData>,
+        NSSATransaction,
+    ) {
         let config = sequencer_config_for_tests();
 
-        let (mut sequencer_core, mempool_handle) = SequencerCore::start_from_config(config);
+        let (mut sequencer_core, mempool_handle) =
+            SequencerCoreWithMockClients::start_from_config(config).await;
         let initial_accounts = sequencer_core.sequencer_config().initial_accounts.clone();
 
         let signing_key = nssa::PrivateKey::try_new([1; 32]).unwrap();
         let balance_to_move = 10;
         let tx = common::test_utils::create_transaction_native_token_transfer(
-            [
-                148, 179, 206, 253, 199, 51, 82, 86, 232, 2, 152, 122, 80, 243, 54, 207, 237, 112,
-                83, 153, 44, 59, 204, 49, 128, 84, 160, 227, 216, 149, 97, 102,
-            ],
+            AccountId::from_str(
+                &[
+                    148, 179, 206, 253, 199, 51, 82, 86, 232, 2, 152, 122, 80, 243, 54, 207, 237,
+                    112, 83, 153, 44, 59, 204, 49, 128, 84, 160, 227, 216, 149, 97, 102,
+                ]
+                .to_base58(),
+            )
+            .unwrap(),
             0,
-            [2; 32],
+            AccountId::from_str(&[2; 32].to_base58()).unwrap(),
             balance_to_move,
             signing_key,
         );
@@ -448,7 +437,7 @@ mod tests {
         let sequencer_core = Arc::new(Mutex::new(sequencer_core));
 
         (
-            JsonHandler {
+            JsonHandlerWithMockClients {
                 sequencer_state: sequencer_core,
                 mempool_handle,
             },
@@ -457,14 +446,16 @@ mod tests {
         )
     }
 
-    async fn call_rpc_handler_with_json(handler: JsonHandler, request_json: Value) -> Value {
+    async fn call_rpc_handler_with_json(
+        handler: JsonHandlerWithMockClients,
+        request_json: Value,
+    ) -> Value {
         use actix_web::{App, test, web};
 
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(handler))
-                .route("/", web::post().to(rpc_handler)),
-        )
+        let app = test::init_service(App::new().app_data(web::Data::new(handler)).route(
+            "/",
+            web::post().to(rpc_handler::<JsonHandlerWithMockClients>),
+        ))
         .await;
 
         let req = test::TestRequest::post()
@@ -513,10 +504,17 @@ mod tests {
             "jsonrpc": "2.0",
             "id": 1,
             "error": {
-                "code": -32602,
-                "message": "Invalid params",
-                "data": "invalid base58"
-            }
+                "cause": {
+                    "info": {
+                        "error_message": "Failed parsing args: invalid base58: InvalidBase58Character('_', 3)"
+                    },
+                    "name": "PARSE_ERROR"
+                },
+                "code": -32700,
+                "data": "Failed parsing args: invalid base58: InvalidBase58Character('_', 3)",
+                "message": "Parse error",
+                "name": "REQUEST_VALIDATION_ERROR"
+            },
         });
         let response = call_rpc_handler_with_json(json_handler, request).await;
 
@@ -536,10 +534,17 @@ mod tests {
             "jsonrpc": "2.0",
             "id": 1,
             "error": {
-                "code": -32602,
-                "message": "Invalid params",
-                "data": "invalid length"
-            }
+                "cause": {
+                    "info": {
+                        "error_message": "Failed parsing args: invalid length: expected 32 bytes, got 6"
+                    },
+                    "name": "PARSE_ERROR"
+                },
+                "code": -32700,
+                "data": "Failed parsing args: invalid length: expected 32 bytes, got 6",
+                "message": "Parse error",
+                "name": "REQUEST_VALIDATION_ERROR"
+            },
         });
         let response = call_rpc_handler_with_json(json_handler, request).await;
 
@@ -550,7 +555,7 @@ mod tests {
     async fn test_get_account_balance_for_existing_account() {
         let (json_handler, initial_accounts, _) = components_for_tests().await;
 
-        let acc1_id = initial_accounts[0].account_id.clone();
+        let acc1_id = initial_accounts[0].account_id;
 
         let request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -597,8 +602,8 @@ mod tests {
     async fn test_get_accounts_nonces_for_existent_account() {
         let (json_handler, initial_accounts, _) = components_for_tests().await;
 
-        let acc1_id = initial_accounts[0].account_id.clone();
-        let acc2_id = initial_accounts[1].account_id.clone();
+        let acc1_id = initial_accounts[0].account_id;
+        let acc2_id = initial_accounts[1].account_id;
 
         let request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -681,10 +686,17 @@ mod tests {
             "jsonrpc": "2.0",
             "id": 1,
             "error": {
-                "code": -32602,
-                "message": "Invalid params",
-                "data": "invalid hex"
-            }
+                "cause": {
+                    "info": {
+                        "error_message": "Failed parsing args: Odd number of digits"
+                    },
+                    "name": "PARSE_ERROR"
+                },
+                "code": -32700,
+                "data": "Failed parsing args: Odd number of digits",
+                "message": "Parse error",
+                "name": "REQUEST_VALIDATION_ERROR"
+            },
         });
 
         let response = call_rpc_handler_with_json(json_handler, request).await;
@@ -705,9 +717,16 @@ mod tests {
             "jsonrpc": "2.0",
             "id": 1,
             "error": {
-                "code": -32602,
-                "message": "Invalid params",
-                "data": "invalid length"
+                "cause": {
+                    "info": {
+                        "error_message": "Failed parsing args: Invalid string length"
+                    },
+                    "name": "PARSE_ERROR"
+                },
+                "code": -32700,
+                "data": "Failed parsing args: Invalid string length",
+                "message": "Parse error",
+                "name": "REQUEST_VALIDATION_ERROR"
             }
         });
 

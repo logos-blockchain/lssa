@@ -1,4 +1,4 @@
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::{BTreeMap, HashMap, btree_map::Entry};
 
 use anyhow::Result;
 use key_protocol::{
@@ -29,8 +29,8 @@ impl WalletChainStore {
             anyhow::bail!("Roots not found; please run setup beforehand");
         }
 
-        let mut public_init_acc_map = HashMap::new();
-        let mut private_init_acc_map = HashMap::new();
+        let mut public_init_acc_map = BTreeMap::new();
+        let mut private_init_acc_map = BTreeMap::new();
 
         let public_root = persistent_accounts
             .iter()
@@ -69,11 +69,11 @@ impl WalletChainStore {
                 }
                 PersistentAccountData::Preconfigured(acc_data) => match acc_data {
                     InitialAccountData::Public(data) => {
-                        public_init_acc_map.insert(data.account_id.parse()?, data.pub_sign_key);
+                        public_init_acc_map.insert(data.account_id, data.pub_sign_key);
                     }
                     InitialAccountData::Private(data) => {
                         private_init_acc_map
-                            .insert(data.account_id.parse()?, (data.key_chain, data.account));
+                            .insert(data.account_id, (data.key_chain, data.account));
                     }
                 },
             }
@@ -92,13 +92,13 @@ impl WalletChainStore {
     }
 
     pub fn new_storage(config: WalletConfig, password: String) -> Result<Self> {
-        let mut public_init_acc_map = HashMap::new();
-        let mut private_init_acc_map = HashMap::new();
+        let mut public_init_acc_map = BTreeMap::new();
+        let mut private_init_acc_map = BTreeMap::new();
 
         for init_acc_data in config.initial_accounts.clone() {
             match init_acc_data {
                 InitialAccountData::Public(data) => {
-                    public_init_acc_map.insert(data.account_id.parse()?, data.pub_sign_key);
+                    public_init_acc_map.insert(data.account_id, data.pub_sign_key);
                 }
                 InitialAccountData::Private(data) => {
                     let mut account = data.account;
@@ -106,8 +106,7 @@ impl WalletChainStore {
                     // the config. Therefore we overwrite it here on startup. Fix this when program
                     // id can be fetched from the node and queried from the wallet.
                     account.program_owner = Program::authenticated_transfer_program().id();
-                    private_init_acc_map
-                        .insert(data.account_id.parse()?, (data.key_chain, account));
+                    private_init_acc_map.insert(data.account_id, (data.key_chain, account));
                 }
             }
         }
@@ -262,7 +261,7 @@ mod tests {
     fn create_sample_wallet_config() -> WalletConfig {
         WalletConfig {
             override_rust_log: None,
-            sequencer_addr: "http://127.0.0.1".to_string(),
+            sequencer_addr: "http://127.0.0.1".parse().unwrap(),
             seq_poll_timeout_millis: 12000,
             seq_tx_poll_max_blocks: 5,
             seq_poll_max_retries: 10,

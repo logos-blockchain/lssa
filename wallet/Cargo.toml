@@ -28,7 +28,8 @@ rand.workspace = true
 itertools.workspace = true
 sha2.workspace = true
 futures.workspace = true
-async-stream = "0.3.6"
+risc0-zkvm.workspace = true
+async-stream.workspace = true
 indicatif = { version = "0.18.3", features = ["improved_unicode"] }
 optfield = "0.4.0"
 url.workspace = true

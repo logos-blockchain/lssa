@@ -2,6 +2,7 @@ use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use common::HashType;
 use nssa::{ProgramDeploymentTransaction, program::Program};
 
 use crate::{
@@ -89,7 +90,7 @@ pub struct Args {
 
 #[derive(Debug, Clone)]
 pub enum SubcommandReturnValue {
-    PrivacyPreservingTransfer { tx_hash: String },
+    PrivacyPreservingTransfer { tx_hash: HashType },
     RegisterAccount { account_id: nssa::AccountId },
     Account(nssa::Account),
     Empty,

@@ -1,9 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use sha2::{Digest, Sha256, digest::FixedOutput};
 
-use crate::transaction::EncodedTransaction;
+use crate::{HashType, transaction::NSSATransaction};
 
-pub type HashType = [u8; 32];
 pub type MantleMsgId = [u8; 32];
 
 #[derive(Debug, Clone)]
@@ -16,11 +15,11 @@ impl OwnHasher {
         let mut hasher = Sha256::new();
 
         hasher.update(data);
-        <HashType>::from(hasher.finalize_fixed())
+        HashType(<[u8; 32]>::from(hasher.finalize_fixed()))
     }
 }
 
-pub type BlockHash = [u8; 32];
+pub type BlockHash = HashType;
 pub type BlockId = u64;
 pub type TimeStamp = u64;
 
@@ -35,7 +34,7 @@ pub struct BlockHeader {
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BlockBody {
-    pub transactions: Vec<EncodedTransaction>,
+    pub transactions: Vec<NSSATransaction>,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
@@ -58,7 +57,7 @@ pub struct HashableBlockData {
     pub block_id: BlockId,
     pub prev_block_hash: BlockHash,
     pub timestamp: TimeStamp,
-    pub transactions: Vec<EncodedTransaction>,
+    pub transactions: Vec<NSSATransaction>,
 }
 
 impl HashableBlockData {
@@ -104,12 +103,12 @@ impl From<Block> for HashableBlockData {
 
 #[cfg(test)]
 mod tests {
-    use crate::{block::HashableBlockData, test_utils};
+    use crate::{HashType, block::HashableBlockData, test_utils};
 
     #[test]
     fn test_encoding_roundtrip() {
         let transactions = vec![test_utils::produce_dummy_empty_transaction()];
-        let block = test_utils::produce_dummy_block(1, Some([1; 32]), transactions);
+        let block = test_utils::produce_dummy_block(1, Some(HashType([1; 32])), transactions);
         let hashable = HashableBlockData::from(block);
         let bytes = borsh::to_vec(&hashable).unwrap();
         let block_from_bytes = borsh::from_slice::<HashableBlockData>(&bytes).unwrap();

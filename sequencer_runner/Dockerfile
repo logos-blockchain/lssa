@@ -63,9 +63,6 @@ COPY --from=builder --chown=sequencer_user:sequencer_user /usr/local/bin/r0vm /u
 COPY sequencer_runner/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Volume for configuration directory
-VOLUME ["/etc/sequencer_runner"]
-
 # Expose default port
 EXPOSE 3040
 

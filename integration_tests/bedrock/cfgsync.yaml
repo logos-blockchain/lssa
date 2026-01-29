@@ -1,0 +1,14 @@
+port: 4400
+n_hosts: 4
+timeout: 10
+
+# Tracing
+tracing_settings:
+  logger: None
+  tracing: None
+  filter: !EnvFilter
+    filters:
+      logos-blockchain: debug
+  metrics: None
+  console: None
+  level: INFO

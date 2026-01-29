@@ -1,4 +1,4 @@
-use indexer_service_protocol::{Account, AccountId, Block, BlockId, Hash, Transaction};
+use indexer_service_protocol::{Account, AccountId, Block, BlockId, HashType, Transaction};
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -46,7 +46,7 @@ pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
     if let Some(bytes) = parse_hex(&query)
         && let Ok(hash_array) = <[u8; 32]>::try_from(bytes)
     {
-        let hash = Hash(hash_array);
+        let hash = HashType(hash_array);
 
         // Try as block hash
         if let Ok(block) = client.get_block_by_hash(hash).await {
@@ -98,7 +98,7 @@ pub async fn get_block_by_id(block_id: BlockId) -> Result<Block, ServerFnError> 
 
 /// Get block by hash
 #[server]
-pub async fn get_block_by_hash(block_hash: Hash) -> Result<Block, ServerFnError> {
+pub async fn get_block_by_hash(block_hash: HashType) -> Result<Block, ServerFnError> {
     use indexer_service_rpc::RpcClient as _;
     let client = expect_context::<IndexerRpcClient>();
     client
@@ -109,7 +109,7 @@ pub async fn get_block_by_hash(block_hash: Hash) -> Result<Block, ServerFnError>
 
 /// Get transaction by hash
 #[server]
-pub async fn get_transaction(tx_hash: Hash) -> Result<Transaction, ServerFnError> {
+pub async fn get_transaction(tx_hash: HashType) -> Result<Transaction, ServerFnError> {
     use indexer_service_rpc::RpcClient as _;
     let client = expect_context::<IndexerRpcClient>();
     client
