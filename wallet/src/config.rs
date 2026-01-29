@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use common::sequencer_client::BasicAuth;
+use common::config::BasicAuth;
 use key_protocol::key_management::{
     KeyChain,
     key_tree::{
@@ -13,10 +13,11 @@ use key_protocol::key_management::{
 };
 use log::warn;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPublic {
-    pub account_id: String,
+    pub account_id: nssa::AccountId,
     pub pub_sign_key: nssa::PrivateKey,
 }
 
@@ -29,7 +30,7 @@ pub struct PersistentAccountDataPublic {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPrivate {
-    pub account_id: String,
+    pub account_id: nssa::AccountId,
     pub account: nssa_core::account::Account,
     pub key_chain: KeyChain,
 }
@@ -90,8 +91,8 @@ impl PersistentStorage {
 impl InitialAccountData {
     pub fn account_id(&self) -> nssa::AccountId {
         match &self {
-            Self::Public(acc) => acc.account_id.parse().unwrap(),
-            Self::Private(acc) => acc.account_id.parse().unwrap(),
+            Self::Public(acc) => acc.account_id,
+            Self::Private(acc) => acc.account_id,
         }
     }
 }
@@ -161,7 +162,7 @@ pub struct WalletConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub override_rust_log: Option<String>,
     /// Sequencer URL
-    pub sequencer_addr: String,
+    pub sequencer_addr: Url,
     /// Sequencer polling duration for new blocks in milliseconds
     pub seq_poll_timeout_millis: u64,
     /// Sequencer polling max number of blocks to find transaction
@@ -181,7 +182,7 @@ impl Default for WalletConfig {
     fn default() -> Self {
         Self {
             override_rust_log: None,
-            sequencer_addr: "http://127.0.0.1:3040".to_string(),
+            sequencer_addr: "http://127.0.0.1:3040".parse().unwrap(),
             seq_poll_timeout_millis: 12000,
             seq_tx_poll_max_blocks: 5,
             seq_poll_max_retries: 5,

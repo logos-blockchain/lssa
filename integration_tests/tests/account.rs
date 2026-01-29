@@ -1,5 +1,5 @@
 use anyhow::Result;
-use integration_tests::{ACC_SENDER, TestContext};
+use integration_tests::TestContext;
 use log::info;
 use nssa::program::Program;
 use tokio::test;
@@ -10,7 +10,7 @@ async fn get_existing_account() -> Result<()> {
 
     let account = ctx
         .sequencer_client()
-        .get_account(ACC_SENDER.to_string())
+        .get_account(ctx.existing_public_accounts()[0])
         .await?
         .account;
 

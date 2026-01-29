@@ -118,9 +118,7 @@ impl WalletSubcommand for PinataProgramSubcommandPublic {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 println!("Transaction data is {transfer_tx:?}");
 
@@ -153,9 +151,7 @@ impl WalletSubcommand for PinataProgramSubcommandPrivate {
                 println!("Results of tx send are {res:#?}");
 
                 let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
+                let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
 
                 println!("Transaction data is {transfer_tx:?}");
 

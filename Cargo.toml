@@ -13,9 +13,10 @@ members = [
   "sequencer_core",
   "sequencer_rpc",
   "sequencer_runner",
-  "indexer_service",
-  "indexer_service/protocol",
-  "indexer_service/rpc",
+  "indexer/core",
+  "indexer/service",
+  "indexer/service/protocol",
+  "indexer/service/rpc",
   "explorer_service",
   "program_methods",
   "program_methods/guest",
@@ -25,7 +26,6 @@ members = [
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
   "bedrock_client",
-  "indexer_core",
 ]
 
 [workspace.dependencies]
@@ -38,14 +38,14 @@ key_protocol = { path = "key_protocol" }
 sequencer_core = { path = "sequencer_core" }
 sequencer_rpc = { path = "sequencer_rpc" }
 sequencer_runner = { path = "sequencer_runner" }
-indexer_service = { path = "indexer_service" }
-indexer_service_protocol = { path = "indexer_service/protocol" }
-indexer_service_rpc = { path = "indexer_service/rpc" }
+indexer_core = { path = "indexer/core" }
+indexer_service = { path = "indexer/service" }
+indexer_service_protocol = { path = "indexer/service/protocol" }
+indexer_service_rpc = { path = "indexer/service/rpc" }
 wallet = { path = "wallet" }
 wallet-ffi = { path = "wallet-ffi" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
-indexer_core = { path = "indexer_core" }
 
 tokio = { version = "1.28.2", features = [
   "net",
@@ -62,6 +62,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 openssl-probe = { version = "0.1.2" }
 serde = { version = "1.0.60", default-features = false, features = ["derive"] }
 serde_json = "1.0.81"
+serde_with = "3.16.1"
 actix = "0.13.0"
 actix-cors = "0.6.1"
 jsonrpsee = "0.26.0"
@@ -93,6 +94,7 @@ itertools = "0.14.0"
 url = { version = "2.5.4", features = ["serde"] }
 tokio-retry = "0.3.0"
 schemars = "1.2.0"
+async-stream = "0.3.6"
 
 logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }

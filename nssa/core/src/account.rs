@@ -1,11 +1,10 @@
-#[cfg(feature = "host")]
 use std::{fmt::Display, str::FromStr};
 
-#[cfg(feature = "host")]
 use base58::{FromBase58, ToBase58};
 use borsh::{BorshDeserialize, BorshSerialize};
 pub use data::Data;
 use serde::{Deserialize, Serialize};
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 use crate::program::ProgramId;
 
@@ -47,8 +46,8 @@ impl AccountWithMetadata {
     Default,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
+    SerializeDisplay,
+    DeserializeFromStr,
     PartialEq,
     Eq,
     Hash,
@@ -80,23 +79,19 @@ impl AsRef<[u8]> for AccountId {
     }
 }
 
-#[cfg(feature = "host")]
 #[derive(Debug, thiserror::Error)]
 pub enum AccountIdError {
-    #[error("invalid base58")]
-    InvalidBase58(#[from] anyhow::Error),
+    #[error("invalid base58: {0:?}")]
+    InvalidBase58(base58::FromBase58Error),
     #[error("invalid length: expected 32 bytes, got {0}")]
     InvalidLength(usize),
 }
 
-#[cfg(feature = "host")]
 impl FromStr for AccountId {
     type Err = AccountIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = s
-            .from_base58()
-            .map_err(|err| anyhow::anyhow!("Invalid base58 err {err:?}"))?;
+        let bytes = s.from_base58().map_err(AccountIdError::InvalidBase58)?;
         if bytes.len() != 32 {
             return Err(AccountIdError::InvalidLength(bytes.len()));
         }
@@ -106,7 +101,6 @@ impl FromStr for AccountId {
     }
 }
 
-#[cfg(feature = "host")]
 impl Display for AccountId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value.to_base58())

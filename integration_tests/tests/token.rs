@@ -60,8 +60,8 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Create new token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_public_account_id(supply_account_id),
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -73,7 +73,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token definition account
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
 
@@ -91,7 +91,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token holding account with the total supply
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
 
@@ -110,8 +110,8 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Transfer 7 tokens from supply_acc to recipient_account_id
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id.to_string()),
-        to: Some(format_public_account_id(&recipient_account_id.to_string())),
+        from: format_public_account_id(supply_account_id),
+        to: Some(format_public_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: 7,
@@ -125,7 +125,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the supply account after transfer
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
     assert_eq!(supply_acc.program_owner, Program::token().id());
@@ -136,7 +136,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the recipient account after transfer
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
     assert_eq!(recipient_acc.program_owner, Program::token().id());
@@ -146,8 +146,8 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Burn 3 tokens from recipient_acc
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: format_public_account_id(&recipient_account_id.to_string()),
+        definition: format_public_account_id(definition_account_id),
+        holder: format_public_account_id(recipient_account_id),
         amount: 3,
     };
 
@@ -159,7 +159,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token definition account after burn
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
 
@@ -174,7 +174,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the recipient account after burn
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
 
@@ -182,8 +182,8 @@ async fn create_and_transfer_public_token() -> Result<()> {
 
     // Mint 10 tokens at recipient_acc
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: Some(format_public_account_id(&recipient_account_id.to_string())),
+        definition: format_public_account_id(definition_account_id),
+        holder: Some(format_public_account_id(recipient_account_id)),
         holder_npk: None,
         holder_ipk: None,
         amount: 10,
@@ -197,7 +197,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token definition account after mint
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
 
@@ -212,7 +212,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the recipient account after mint
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
 
@@ -271,8 +271,8 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     // Create new token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -285,7 +285,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     // Check the status of the token definition account
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
 
@@ -306,8 +306,8 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     // Transfer 7 tokens from supply_acc to recipient_account_id
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
+        from: format_private_account_id(supply_account_id),
+        to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: 7,
@@ -332,8 +332,8 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     // Burn 3 tokens from recipient_acc
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: format_private_account_id(&recipient_account_id.to_string()),
+        definition: format_public_account_id(definition_account_id),
+        holder: format_private_account_id(recipient_account_id),
         amount: 3,
     };
 
@@ -345,7 +345,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     // Check the token definition account after burn
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
 
@@ -415,8 +415,8 @@ async fn create_token_with_private_definition() -> Result<()> {
 
     // Create token with private definition
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        definition_account_id: format_private_account_id(definition_account_id),
+        supply_account_id: format_public_account_id(supply_account_id),
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -436,7 +436,7 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Verify supply account
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
 
@@ -472,10 +472,8 @@ async fn create_token_with_private_definition() -> Result<()> {
 
     // Mint to public account
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
-        holder: Some(format_public_account_id(
-            &recipient_account_id_public.to_string(),
-        )),
+        definition: format_private_account_id(definition_account_id),
+        holder: Some(format_public_account_id(recipient_account_id_public)),
         holder_npk: None,
         holder_ipk: None,
         amount: 10,
@@ -500,7 +498,7 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Verify public recipient received tokens
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id_public.to_string())
+        .get_account(recipient_account_id_public)
         .await?
         .account;
 
@@ -511,10 +509,8 @@ async fn create_token_with_private_definition() -> Result<()> {
 
     // Mint to private account
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
-        holder: Some(format_private_account_id(
-            &recipient_account_id_private.to_string(),
-        )),
+        definition: format_private_account_id(definition_account_id),
+        holder: Some(format_private_account_id(recipient_account_id_private)),
         holder_npk: None,
         holder_ipk: None,
         amount: 5,
@@ -580,8 +576,8 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
 
     // Create token with both private definition and supply
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition_account_id: format_private_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -628,8 +624,8 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
 
     // Transfer tokens
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
+        from: format_private_account_id(supply_account_id),
+        to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: 7,
@@ -716,8 +712,8 @@ async fn shielded_token_transfer() -> Result<()> {
 
     // Create token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_public_account_id(supply_account_id),
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -729,8 +725,8 @@ async fn shielded_token_transfer() -> Result<()> {
 
     // Perform shielded transfer: public supply -> private recipient
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
+        from: format_public_account_id(supply_account_id),
+        to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: 7,
@@ -744,7 +740,7 @@ async fn shielded_token_transfer() -> Result<()> {
     // Verify supply account balance
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
     assert_eq!(u128::from_le_bytes(supply_acc.data[33..].try_into()?), 30);
@@ -813,8 +809,8 @@ async fn deshielded_token_transfer() -> Result<()> {
 
     // Create token with private supply
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -826,8 +822,8 @@ async fn deshielded_token_transfer() -> Result<()> {
 
     // Perform deshielded transfer: private supply -> public recipient
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_public_account_id(&recipient_account_id.to_string())),
+        from: format_private_account_id(supply_account_id),
+        to: Some(format_public_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: 7,
@@ -855,7 +851,7 @@ async fn deshielded_token_transfer() -> Result<()> {
     // Verify recipient balance
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
     assert_eq!(u128::from_le_bytes(recipient_acc.data[33..].try_into()?), 7);
@@ -897,8 +893,8 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
 
     // Create token
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
+        definition_account_id: format_private_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
         name: "A NAME".to_string(),
         total_supply: 37,
     };
@@ -932,7 +928,7 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
 
     // Mint using claiming path (foreign account)
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
+        definition: format_private_account_id(definition_account_id),
         holder: None,
         holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
         holder_ipk: Some(hex::encode(holder_keys.incoming_viewing_public_key.0)),

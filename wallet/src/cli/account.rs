@@ -70,7 +70,7 @@ impl WalletSubcommand for NewSubcommand {
                 let private_key = wallet_core
                     .storage
                     .user_data
-                    .get_pub_account_signing_key(&account_id)
+                    .get_pub_account_signing_key(account_id)
                     .unwrap();
 
                 let public_key = PublicKey::new_from_private_key(private_key);
@@ -238,7 +238,7 @@ impl WalletSubcommand for AccountSubcommand {
                             let private_key = wallet_core
                                 .storage
                                 .user_data
-                                .get_pub_account_signing_key(&account_id)
+                                .get_pub_account_signing_key(account_id)
                                 .ok_or(anyhow::anyhow!("Public account not found in storage"))?;
 
                             let public_key = PublicKey::new_from_private_key(private_key);

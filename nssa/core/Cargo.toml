@@ -7,12 +7,12 @@ edition = "2024"
 risc0-zkvm.workspace = true
 borsh.workspace = true
 serde.workspace = true
+serde_with.workspace = true
 thiserror.workspace = true
 bytemuck.workspace = true
+base58.workspace = true
 k256 = { workspace = true, optional = true }
-base58 = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
-
 chacha20 = { version = "0.9", default-features = false }
 
 [dev-dependencies]
@@ -20,4 +20,4 @@ serde_json.workspace = true
 
 [features]
 default = []
-host = ["dep:k256", "dep:base58", "dep:anyhow"]
+host = ["dep:k256", "dep:anyhow"]

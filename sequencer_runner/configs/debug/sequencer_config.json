@@ -162,5 +162,6 @@
         "auth": {
             "username": "user"
         }
-    }
+    },
+    "indexer_rpc_url": "ws://localhost:8779"
 }

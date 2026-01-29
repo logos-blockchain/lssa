@@ -6,17 +6,18 @@ edition = "2024"
 [dependencies]
 nssa_core = { workspace = true, features = ["host"] }
 nssa.workspace = true
-sequencer_core = { workspace = true, features = ["testnet"] }
+sequencer_core = { workspace = true, features = ["default", "testnet"] }
 sequencer_runner.workspace = true
 wallet.workspace = true
 common.workspace = true
 key_protocol.workspace = true
-indexer_core.workspace = true
+indexer_service.workspace = true
 url.workspace = true
 
 anyhow.workspace = true
 env_logger.workspace = true
 log.workspace = true
+serde_json.workspace = true
 actix-web.workspace = true
 base64.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
@@ -24,3 +25,5 @@ hex.workspace = true
 tempfile.workspace = true
 borsh.workspace = true
 futures.workspace = true
+rand.workspace = true
+testcontainers = { version = "0.26.3", features = ["docker-compose"] }

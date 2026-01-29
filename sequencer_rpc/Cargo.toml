@@ -7,7 +7,7 @@ edition = "2024"
 nssa.workspace = true
 common.workspace = true
 mempool.workspace = true
-sequencer_core.workspace = true
+sequencer_core = { workspace = true }
 
 anyhow.workspace = true
 serde_json.workspace = true
@@ -23,3 +23,6 @@ itertools.workspace = true
 actix-web.workspace = true
 tokio.workspace = true
 borsh.workspace = true
+
+[dev-dependencies]
+sequencer_core = { workspace = true, features = ["mock"] }

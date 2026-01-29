@@ -89,7 +89,7 @@ pub fn produce_data_for_storage(
     for (account_id, key) in &user_data.default_pub_account_signing_keys {
         vec_for_storage.push(
             InitialAccountData::Public(InitialAccountDataPublic {
-                account_id: account_id.to_string(),
+                account_id: *account_id,
                 pub_sign_key: key.clone(),
             })
             .into(),
@@ -99,7 +99,7 @@ pub fn produce_data_for_storage(
     for (account_id, (key_chain, account)) in &user_data.default_user_private_accounts {
         vec_for_storage.push(
             InitialAccountData::Private(InitialAccountDataPrivate {
-                account_id: account_id.to_string(),
+                account_id: *account_id,
                 account: account.clone(),
                 key_chain: key_chain.clone(),
             })

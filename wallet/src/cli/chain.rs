@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Subcommand;
+use common::HashType;
 
 use crate::{
     WalletCore,
@@ -20,7 +21,7 @@ pub enum ChainSubcommand {
     Transaction {
         /// hash - valid 32 byte hex string
         #[arg(short = 't', long)]
-        hash: String,
+        hash: HashType,
     },
 }
 

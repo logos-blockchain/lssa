@@ -152,7 +152,7 @@ impl Token<'_> {
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&sender_account_id)
+            .get_pub_account_signing_key(sender_account_id)
         else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
@@ -339,7 +339,7 @@ impl Token<'_> {
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&holder_account_id)
+            .get_pub_account_signing_key(holder_account_id)
             .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
         let witness_set =
             nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
@@ -463,7 +463,7 @@ impl Token<'_> {
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&definition_account_id)
+            .get_pub_account_signing_key(definition_account_id)
         else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };

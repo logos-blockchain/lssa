@@ -45,11 +45,13 @@ async fn deploy_and_execute_program() -> Result<()> {
     let _response = ctx.sequencer_client().send_tx_public(transaction).await?;
 
     info!("Waiting for next block creation");
-    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+    // Waiting for long time as it may take some time for such a big transaction to be included in a
+    // block
+    tokio::time::sleep(Duration::from_secs(2 * TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
     let post_state_account = ctx
         .sequencer_client()
-        .get_account(account_id.to_string())
+        .get_account(account_id)
         .await?
         .account;
 
