@@ -1,3 +1,3 @@
 pub mod error;
-pub mod sequencer;
 pub mod indexer;
+pub mod sequencer;

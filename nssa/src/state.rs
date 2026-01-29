@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     Commitment, CommitmentSetDigest, DUMMY_COMMITMENT, MembershipProof, Nullifier,
     account::{Account, AccountId},
@@ -15,6 +16,7 @@ use crate::{
 
 pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
+#[derive(BorshSerialize, BorshDeserialize)]
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
     commitments: HashMap<Commitment, usize>,
@@ -62,6 +64,7 @@ impl CommitmentSet {
 
 type NullifierSet = HashSet<Nullifier>;
 
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct V02State {
     public_state: HashMap<AccountId, Account>,
     private_state: (CommitmentSet, NullifierSet),

@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{NullifierPublicKey, account::Account};
 
-#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, Clone, PartialEq, Eq, Hash))]
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, Clone, Hash))]
 pub struct Commitment(pub(super) [u8; 32]);
 
 /// A commitment to all zero data.

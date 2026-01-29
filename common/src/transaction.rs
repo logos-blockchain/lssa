@@ -1,5 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use log::info;
+use log::{info, warn};
+use nssa::V02State;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, digest::FixedOutput};
 
@@ -99,6 +100,22 @@ impl EncodedTransaction {
         info!("Transaction tx_kind is {:?}", self.tx_kind);
     }
 }
+
+pub fn execute_check_transaction_on_state(
+        state: &mut V02State,
+        tx: NSSATransaction,
+    ) -> Result<NSSATransaction, nssa::error::NssaError> {
+        match &tx {
+            NSSATransaction::Public(tx) => state.transition_from_public_transaction(tx),
+            NSSATransaction::PrivacyPreserving(tx) => state
+                .transition_from_privacy_preserving_transaction(tx),
+            NSSATransaction::ProgramDeployment(tx) => state
+                .transition_from_program_deployment_transaction(tx),
+        }
+        .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
+
+        Ok(tx)
+    }
 
 #[cfg(test)]
 mod tests {
