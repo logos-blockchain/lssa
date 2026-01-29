@@ -201,10 +201,7 @@ impl RocksDBIO {
                 )
             })?,
             borsh::to_vec(state).map_err(|err| {
-                DbError::borsh_cast_message(
-                    err,
-                    Some("Failed to serialize first block id".to_string()),
-                )
+                DbError::borsh_cast_message(err, Some("Failed to serialize NSSA state".to_string()))
             })?,
         );
 
