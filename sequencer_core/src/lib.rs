@@ -232,7 +232,7 @@ impl SequencerCore {
         &self.sequencer_config
     }
 
-    pub fn delete_finalized_blocks_from_db(&mut self, block_ids: &[u64]) -> Result<()> {
+    pub fn delete_blocks_from_db(&mut self, block_ids: &[u64]) -> Result<()> {
         block_ids
             .iter()
             .try_for_each(|&id| self.store.delete_block_at_id(id))
