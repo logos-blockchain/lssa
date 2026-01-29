@@ -30,12 +30,14 @@ pub struct Account {
 
 pub type BlockId = u64;
 pub type TimeStamp = u64;
+pub type MsgId = [u8; 32];
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,
     pub bedrock_status: BedrockStatus,
+    pub bedrock_parent_id: MsgId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
