@@ -1,5 +1,4 @@
 pub mod block;
-pub mod communication;
 pub mod error;
 pub mod rpc_primitives;
 pub mod sequencer_client;

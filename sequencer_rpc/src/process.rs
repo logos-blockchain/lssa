@@ -44,7 +44,6 @@ pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT: &str = "get_account";
 pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
 pub const GET_PROGRAM_IDS: &str = "get_program_ids";
-pub const POST_INDEXER_MESSAGE: &str = "post_indexer_message";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -315,18 +314,6 @@ impl JsonHandler {
         respond(response)
     }
 
-    async fn process_indexer_message(&self, request: Request) -> Result<Value, RpcErr> {
-        let _indexer_post_req = PostIndexerMessageRequest::parse(Some(request.params))?;
-
-        // ToDo: Add indexer messages handling
-
-        let response = PostIndexerMessageResponse {
-            status: "Success".to_string(),
-        };
-
-        respond(response)
-    }
-
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -342,7 +329,6 @@ impl JsonHandler {
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
             GET_PROGRAM_IDS => self.process_get_program_ids(request).await,
-            POST_INDEXER_MESSAGE => self.process_indexer_message(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }

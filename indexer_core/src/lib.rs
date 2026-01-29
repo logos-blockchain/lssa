@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bedrock_client::BedrockClient;
-use common::{
-    block::HashableBlockData, communication::indexer::Message,
-    rpc_primitives::requests::PostIndexerMessageResponse, sequencer_client::SequencerClient,
-};
+use common::{block::HashableBlockData, sequencer_client::SequencerClient};
 use futures::StreamExt;
 use log::info;
 use logos_blockchain_core::mantle::{
@@ -95,13 +92,6 @@ impl IndexerCore {
             ))
             .await;
         }
-    }
-
-    pub async fn send_message_to_sequencer(
-        &self,
-        message: Message,
-    ) -> Result<PostIndexerMessageResponse> {
-        Ok(self.sequencer_client.post_indexer_message(message).await?)
     }
 }
 

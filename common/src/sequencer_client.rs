@@ -22,8 +22,7 @@ use crate::{
             GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
             GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
             GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, PostIndexerMessageRequest, PostIndexerMessageResponse,
-            SendTxRequest, SendTxResponse,
+            GetTransactionByHashResponse, SendTxRequest, SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -393,25 +392,6 @@ impl SequencerClient {
         let resp_deser = serde_json::from_value::<GetProgramIdsResponse>(resp)
             .unwrap()
             .program_ids;
-
-        Ok(resp_deser)
-    }
-
-    /// Post indexer into sequencer
-    pub async fn post_indexer_message(
-        &self,
-        message: crate::communication::indexer::Message,
-    ) -> Result<PostIndexerMessageResponse, SequencerClientError> {
-        let last_req = PostIndexerMessageRequest { message };
-
-        let req = serde_json::to_value(last_req).unwrap();
-
-        let resp = self
-            .call_method_with_payload("post_indexer_message", req)
-            .await
-            .unwrap();
-
-        let resp_deser = serde_json::from_value(resp).unwrap();
 
         Ok(resp_deser)
     }
