@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use common::sequencer_client::BasicAuth;
+use common::common::BasicAuth;
 use key_protocol::key_management::{
     KeyChain,
     key_tree::{

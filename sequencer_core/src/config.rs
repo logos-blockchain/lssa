@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use common::sequencer_client::BasicAuth;
+use common::config::BasicAuth;
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 

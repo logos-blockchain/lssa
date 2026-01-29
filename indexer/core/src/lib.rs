@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bedrock_client::BedrockClient;
-use common::{block::HashableBlockData, sequencer_client::SequencerClient};
+use common::block::HashableBlockData;
 use futures::StreamExt;
 use log::info;
 use logos_blockchain_core::mantle::{
@@ -17,10 +17,9 @@ pub mod config;
 pub mod state;
 
 pub struct IndexerCore {
-    pub bedrock_client: BedrockClient,
-    pub sequencer_client: SequencerClient,
-    pub config: IndexerConfig,
-    pub state: IndexerState,
+    bedrock_client: BedrockClient,
+    config: IndexerConfig,
+    state: IndexerState,
 }
 
 impl IndexerCore {
@@ -29,10 +28,6 @@ impl IndexerCore {
             bedrock_client: BedrockClient::new(
                 config.bedrock_client_config.auth.clone().map(Into::into),
                 config.bedrock_client_config.addr.clone(),
-            )?,
-            sequencer_client: SequencerClient::new_with_auth(
-                config.sequencer_client_config.addr.clone(),
-                config.sequencer_client_config.auth.clone(),
             )?,
             config,
             // No state setup for now, future task.
