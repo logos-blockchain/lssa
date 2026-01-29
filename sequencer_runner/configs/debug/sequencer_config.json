@@ -5,7 +5,8 @@
     "is_genesis_random": true,
     "max_num_tx_in_block": 20,
     "mempool_max_size": 1000,
-    "block_create_timeout_millis": 10000,
+    "block_create_timeout_millis": 5000,
+    "retry_pending_blocks_timeout_millis": 7000,
     "port": 3040,
     "initial_accounts": [
         {
@@ -157,6 +158,6 @@
     ],
     "bedrock_config": {
         "channel_id": [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        "node_url": "http://localhost:8080"
+        "node_url": "http://localhost:58072"
     }
 }

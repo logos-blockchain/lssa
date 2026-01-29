@@ -40,6 +40,8 @@ pub struct SequencerConfig {
     pub mempool_max_size: usize,
     /// Interval in which blocks produced
     pub block_create_timeout_millis: u64,
+    /// Interval in which pending blocks are retried
+    pub retry_pending_blocks_timeout_millis: u64,
     /// Port to listen
     pub port: u16,
     /// List of initial accounts data

@@ -9,3 +9,4 @@ common.workspace = true
 thiserror.workspace = true
 borsh.workspace = true
 rocksdb.workspace = true
+nssa.workspace = true

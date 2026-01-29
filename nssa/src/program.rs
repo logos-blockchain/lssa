@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     account::AccountWithMetadata,
     program::{InstructionData, ProgramId, ProgramOutput},
@@ -14,7 +15,7 @@ use crate::{
 /// TODO: Make this variable when fees are implemented
 const MAX_NUM_CYCLES_PUBLIC_EXECUTION: u64 = 1024 * 1024 * 32; // 32M cycles
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Program {
     id: ProgramId,
     elf: Vec<u8>,

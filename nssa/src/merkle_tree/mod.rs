@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use sha2::{Digest, Sha256};
 
 mod default_values;
@@ -20,6 +21,7 @@ fn hash_value(value: &Value) -> Node {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct MerkleTree {
     nodes: Vec<Node>,
     capacity: usize,

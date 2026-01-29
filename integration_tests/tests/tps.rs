@@ -186,6 +186,7 @@ impl TpsTestManager {
             initial_commitments: vec![initial_commitment],
             signing_key: [37; 32],
             bedrock_config: None,
+            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
         }
     }
 }

@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use logos_blockchain_core::mantle::ops::channel::MsgId;
 use sha2::{Digest, Sha256, digest::FixedOutput};
 
 use crate::transaction::EncodedTransaction;
@@ -49,6 +50,11 @@ pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,
     pub bedrock_status: BedrockStatus,
+    #[borsh(
+        serialize_with = "borsh_msg_id::serialize",
+        deserialize_with = "borsh_msg_id::deserialize"
+    )]
+    pub bedrock_parent_id: MsgId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -60,7 +66,11 @@ pub struct HashableBlockData {
 }
 
 impl HashableBlockData {
-    pub fn into_pending_block(self, signing_key: &nssa::PrivateKey) -> Block {
+    pub fn into_pending_block(
+        self,
+        signing_key: &nssa::PrivateKey,
+        bedrock_parent_id: MsgId,
+    ) -> Block {
         let data_bytes = borsh::to_vec(&self).unwrap();
         let signature = nssa::Signature::new(signing_key, &data_bytes);
         let hash = OwnHasher::hash(&data_bytes);
@@ -76,6 +86,7 @@ impl HashableBlockData {
                 transactions: self.transactions,
             },
             bedrock_status: BedrockStatus::Pending,
+            bedrock_parent_id,
         }
     }
 }
@@ -88,6 +99,22 @@ impl From<Block> for HashableBlockData {
             timestamp: value.header.timestamp,
             transactions: value.body.transactions,
         }
+    }
+}
+
+mod borsh_msg_id {
+    use std::io::{Read, Write};
+
+    use logos_blockchain_core::mantle::ops::channel::MsgId;
+
+    pub fn serialize<W: Write>(v: &MsgId, w: &mut W) -> std::io::Result<()> {
+        w.write_all(v.as_ref())
+    }
+
+    pub fn deserialize<R: Read>(r: &mut R) -> std::io::Result<MsgId> {
+        let mut buf = [0u8; 32];
+        r.read_exact(&mut buf)?;
+        Ok(MsgId::from(buf))
     }
 }
 
