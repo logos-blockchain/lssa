@@ -3225,22 +3225,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bedrock_client",
- "borsh",
  "clap 4.5.53",
- "common",
  "env_logger",
- "futures",
+ "indexer_core",
  "indexer_service_protocol",
  "indexer_service_rpc",
  "jsonrpsee",
  "log",
- "logos-blockchain-core",
- "serde",
- "serde_json",
  "tokio",
  "tokio-util",
- "url",
 ]
 
 [[package]]

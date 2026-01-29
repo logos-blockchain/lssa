@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 
 use anyhow::{Context as _, Result};
 use clap::Parser;
@@ -10,6 +10,8 @@ use tokio_util::sync::CancellationToken;
 #[derive(Debug, Parser)]
 #[clap(version)]
 struct Args {
+    #[clap(rename = "config")]
+    config_path: PathBuf,
     #[clap(short, long, default_value = "8779")]
     port: u16,
 }
@@ -18,11 +20,11 @@ struct Args {
 async fn main() -> Result<()> {
     env_logger::init();
 
-    let args = Args::parse();
+    let Args { config_path, port } = Args::parse();
 
     let cancellation_token = listen_for_shutdown_signal();
 
-    let handle = run_server(args.port).await?;
+    let handle = run_server(config_path, port).await?;
     let handle_clone = handle.clone();
 
     tokio::select! {
@@ -39,7 +41,9 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn run_server(port: u16) -> Result<jsonrpsee::server::ServerHandle> {
+async fn run_server(config_path: PathBuf, port: u16) -> Result<jsonrpsee::server::ServerHandle> {
+    let config = IndexerServiceConfig::from_file(&config_path)?;
+
     let server = Server::builder()
         .build(SocketAddr::from(([0, 0, 0, 0], port)))
         .await
@@ -52,7 +56,11 @@ async fn run_server(port: u16) -> Result<jsonrpsee::server::ServerHandle> {
     info!("Starting Indexer Service RPC server on {addr}");
 
     #[cfg(not(feature = "mock-responses"))]
-    let handle = server.start(indexer_service::service::IndexerService.into_rpc());
+    let handle = {
+        let service = indexer_service::service::IndexerService::new(config)
+            .context("Failed to initialize indexer service")?;
+        server.start(service.into_rpc())
+    }?;
     #[cfg(feature = "mock-responses")]
     let handle = server.start(
         indexer_service::mock_service::MockIndexerService::new_with_mock_blocks().into_rpc(),

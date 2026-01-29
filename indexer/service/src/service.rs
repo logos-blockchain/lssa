@@ -1,7 +1,19 @@
+use anyhow::Result;
+use indexer_core::{IndexerCore, config::IndexerConfig};
 use indexer_service_protocol::{Account, AccountId, Block, BlockId, Hash, Transaction};
 use jsonrpsee::{core::SubscriptionResult, types::ErrorObjectOwned};
 
-pub struct IndexerService;
+pub struct IndexerService {
+    indexer: IndexerCore,
+}
+
+impl IndexerService {
+    pub fn new(config: IndexerConfig) -> Result<Self> {
+        Ok(Self {
+            indexer: IndexerCore::new(config)?,
+        })
+    }
+}
 
 // `async_trait` is required by `jsonrpsee`
 #[async_trait::async_trait]

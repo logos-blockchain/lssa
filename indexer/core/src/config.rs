@@ -1,6 +1,6 @@
 use std::{fs::File, io::BufReader, path::Path};
 
-use anyhow::{Context, Result};
+use anyhow::{Context as _, Result};
 use bedrock_client::BackoffConfig;
 use common::config::BasicAuth;
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
@@ -23,12 +23,12 @@ pub struct IndexerConfig {
 }
 
 impl IndexerConfig {
-    pub fn from_path(config_home: &Path) -> Result<IndexerConfig> {
-        let file = File::open(config_home)
-            .with_context(|| format!("Failed to open indexer config at {config_home:?}"))?;
+    pub fn from_path(config_path: &Path) -> Result<IndexerConfig> {
+        let file = File::open(config_path)
+            .with_context(|| format!("Failed to open indexer config at {config_path:?}"))?;
         let reader = BufReader::new(file);
 
         serde_json::from_reader(reader)
-            .with_context(|| format!("Failed to parse indexer config at {config_home:?}"))
+            .with_context(|| format!("Failed to parse indexer config at {config_path:?}"))
     }
 }
