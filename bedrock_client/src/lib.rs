@@ -17,6 +17,8 @@ pub struct BackoffConfig {
 
 // Simple wrapper
 // maybe extend in the future for our purposes
+// `Clone` is cheap because `CommonHttpClient` is internally reference counted (`Arc`).
+#[derive(Clone)]
 pub struct BedrockClient {
     http_client: CommonHttpClient,
     node_url: Url,

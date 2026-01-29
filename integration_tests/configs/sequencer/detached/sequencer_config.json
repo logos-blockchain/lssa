@@ -6,6 +6,7 @@
     "max_num_tx_in_block": 20,
     "mempool_max_size": 10000,
     "block_create_timeout_millis": 10000,
+    "retry_pending_blocks_timeout_millis": 240000,
     "port": 0,
     "initial_accounts": [
         {
