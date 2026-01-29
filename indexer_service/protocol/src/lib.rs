@@ -30,7 +30,6 @@ pub struct Account {
 
 pub type BlockId = u64;
 pub type TimeStamp = u64;
-pub type MsgId = [u8; 32];
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Block {
@@ -187,6 +186,13 @@ pub struct Data(
 pub struct Hash(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded hash")]
+    pub [u8; 32],
+);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct MsgId(
+    #[serde(with = "base64::arr")]
+    #[schemars(with = "String", description = "base64-encoded Bedrock message id")]
     pub [u8; 32],
 );
 

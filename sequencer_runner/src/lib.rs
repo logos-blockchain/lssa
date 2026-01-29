@@ -68,7 +68,7 @@ pub async fn startup_sequencer(
             };
 
             info!("Resubmitting {} pending blocks", pending_blocks.len());
-            for block in pending_blocks.iter() {
+            for block in &pending_blocks {
                 if let Err(e) = client.submit_block_to_bedrock(block).await {
                     warn!(
                         "Failed to resubmit block with id {} with error {}",

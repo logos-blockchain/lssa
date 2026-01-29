@@ -80,20 +80,20 @@ impl SequencerCore {
                 info!(
                     "No database found when starting the sequencer. Creating a fresh new with the initial data in config"
                 );
-                let mut initial_commitments = vec![];
+                let initial_commitments: Vec<nssa_core::Commitment> = config
+                    .initial_commitments
+                    .iter()
+                    .map(|init_comm_data| {
+                        let npk = &init_comm_data.npk;
 
-                for init_comm_data in config.initial_commitments.clone() {
-                    let npk = init_comm_data.npk;
+                        let mut acc = init_comm_data.account.clone();
 
-                    let mut acc = init_comm_data.account;
+                        acc.program_owner =
+                            nssa::program::Program::authenticated_transfer_program().id();
 
-                    acc.program_owner =
-                        nssa::program::Program::authenticated_transfer_program().id();
-
-                    let comm = nssa_core::Commitment::new(&npk, &acc);
-
-                    initial_commitments.push(comm);
-                }
+                        nssa_core::Commitment::new(&npk, &acc)
+                    })
+                    .collect();
 
                 let init_accs: Vec<(nssa::AccountId, u128)> = config
                     .initial_accounts
@@ -239,7 +239,7 @@ impl SequencerCore {
     /// This method must be called when new blocks are finalized on Bedrock.
     /// All pending blocks with an ID less than or equal to `last_finalized_block_id`
     /// are removed from the database.
-    pub fn delete_finalized_blocks_from_db(&mut self, last_finalized_block_id: u64) -> Result<()> {
+    pub fn clean_finalized_blocks_from_db(&mut self, last_finalized_block_id: u64) -> Result<()> {
         if let Some(first_pending_block_id) = self
             .get_pending_blocks()?
             .iter()
@@ -845,7 +845,7 @@ mod tests {
 
         let last_finalized_block = 3;
         sequencer
-            .delete_finalized_blocks_from_db(last_finalized_block)
+            .clean_finalized_blocks_from_db(last_finalized_block)
             .unwrap();
 
         assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 1);
