@@ -40,6 +40,7 @@ static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 pub struct TestContext {
     sequencer_server_handle: ServerHandle,
     sequencer_loop_handle: JoinHandle<Result<()>>,
+    sequencer_retry_pending_blocks_handle: JoinHandle<Result<()>>,
     indexer_loop_handle: Option<JoinHandle<Result<()>>>,
     sequencer_client: SequencerClient,
     wallet: WalletCore,
@@ -94,10 +95,15 @@ impl TestContext {
 
         debug!("Test context setup");
 
-        let (sequencer_server_handle, sequencer_addr, sequencer_loop_handle, temp_sequencer_dir) =
-            Self::setup_sequencer(sequencer_config)
-                .await
-                .context("Failed to setup sequencer")?;
+        let (
+            sequencer_server_handle,
+            sequencer_addr,
+            sequencer_loop_handle,
+            sequencer_retry_pending_blocks_handle,
+            temp_sequencer_dir,
+        ) = Self::setup_sequencer(sequencer_config)
+            .await
+            .context("Failed to setup sequencer")?;
 
         // Convert 0.0.0.0 to 127.0.0.1 for client connections
         // When binding to port 0, the server binds to 0.0.0.0:<random_port>
@@ -130,6 +136,7 @@ impl TestContext {
             Ok(Self {
                 sequencer_server_handle,
                 sequencer_loop_handle,
+                sequencer_retry_pending_blocks_handle,
                 indexer_loop_handle,
                 sequencer_client,
                 wallet,
@@ -140,6 +147,7 @@ impl TestContext {
             Ok(Self {
                 sequencer_server_handle,
                 sequencer_loop_handle,
+                sequencer_retry_pending_blocks_handle,
                 indexer_loop_handle: None,
                 sequencer_client,
                 wallet,
@@ -151,7 +159,13 @@ impl TestContext {
 
     async fn setup_sequencer(
         mut config: SequencerConfig,
-    ) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>, TempDir)> {
+    ) -> Result<(
+        ServerHandle,
+        SocketAddr,
+        JoinHandle<Result<()>>,
+        JoinHandle<Result<()>>,
+        TempDir,
+    )> {
         let temp_sequencer_dir =
             tempfile::tempdir().context("Failed to create temp dir for sequencer home")?;
 
@@ -167,13 +181,14 @@ impl TestContext {
             sequencer_server_handle,
             sequencer_addr,
             sequencer_loop_handle,
-            _retry_pending_blocks_handle,
+            sequencer_retry_pending_blocks_handle,
         ) = sequencer_runner::startup_sequencer(config).await?;
 
         Ok((
             sequencer_server_handle,
             sequencer_addr,
             sequencer_loop_handle,
+            sequencer_retry_pending_blocks_handle,
             temp_sequencer_dir,
         ))
     }
@@ -234,6 +249,7 @@ impl Drop for TestContext {
         let Self {
             sequencer_server_handle,
             sequencer_loop_handle,
+            sequencer_retry_pending_blocks_handle,
             indexer_loop_handle,
             sequencer_client: _,
             wallet: _,
@@ -242,6 +258,7 @@ impl Drop for TestContext {
         } = self;
 
         sequencer_loop_handle.abort();
+        sequencer_retry_pending_blocks_handle.abort();
         if let Some(indexer_loop_handle) = indexer_loop_handle {
             indexer_loop_handle.abort();
         }
