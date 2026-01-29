@@ -16,6 +16,7 @@ use crate::{
 pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
 #[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
     commitments: HashMap<Commitment, usize>,
@@ -61,6 +62,7 @@ impl CommitmentSet {
     }
 }
 
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 struct NullifierSet(BTreeSet<Nullifier>);
 
 impl NullifierSet {
@@ -104,6 +106,7 @@ impl BorshDeserialize for NullifierSet {
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct V02State {
     public_state: HashMap<AccountId, Account>,
     private_state: (CommitmentSet, NullifierSet),
@@ -4569,5 +4572,16 @@ pub mod tests {
 
         // Assert - should fail because the malicious program tries to manipulate is_authorized
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_state_serialization_roundtrip() {
+        let account_id_1 = AccountId::new([1; 32]);
+        let account_id_2 = AccountId::new([2; 32]);
+        let initial_data = [(account_id_1, 100u128), (account_id_2, 151u128)];
+        let state = V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let bytes = borsh::to_vec(&state).unwrap();
+        let state_from_bytes: V02State = borsh::from_slice(&bytes).unwrap();
+        assert_eq!(state, state_from_bytes);
     }
 }
