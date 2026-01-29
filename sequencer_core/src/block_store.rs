@@ -108,7 +108,6 @@ pub(crate) fn block_to_transactions_map(block: &Block) -> HashMap<HashType, u64>
 #[cfg(test)]
 mod tests {
     use common::{block::HashableBlockData, test_utils::sequencer_sign_key_for_testing};
-    use logos_blockchain_core::mantle::ops::channel::MsgId;
     use tempfile::tempdir;
 
     use super::*;
@@ -127,8 +126,7 @@ mod tests {
             transactions: vec![],
         };
 
-        let genesis_block =
-            genesis_block_hashable_data.into_pending_block(&signing_key, MsgId::from([0; 32]));
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
         // Start an empty node store
         let mut node_store =
             SequencerStore::open_db_with_genesis(path, Some(genesis_block), signing_key).unwrap();

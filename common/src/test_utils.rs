@@ -1,5 +1,3 @@
-use logos_blockchain_core::mantle::ops::channel::MsgId;
-
 use crate::{
     block::{Block, HashableBlockData},
     transaction::{EncodedTransaction, NSSATransaction},
@@ -32,7 +30,7 @@ pub fn produce_dummy_block(
         transactions,
     };
 
-    block_data.into_pending_block(&sequencer_sign_key_for_testing(), MsgId::from([0; 32]))
+    block_data.into_pending_block(&sequencer_sign_key_for_testing(), [0; 32])
 }
 
 pub fn produce_dummy_empty_transaction() -> EncodedTransaction {

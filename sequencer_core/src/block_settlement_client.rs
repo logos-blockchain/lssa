@@ -47,7 +47,7 @@ impl BlockSettlementClient {
         let inscribe_op = InscriptionOp {
             channel_id: self.bedrock_channel_id,
             inscription: inscription_data,
-            parent: block.bedrock_parent_id,
+            parent: block.bedrock_parent_id.into(),
             signer: verifying_key,
         };
         let inscribe_op_id = inscribe_op.id();

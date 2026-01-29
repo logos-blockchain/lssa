@@ -5,12 +5,11 @@ use anyhow::Result;
 use common::PINATA_BASE58;
 use common::{
     HashType,
-    block::{BedrockStatus, Block, HashableBlockData},
+    block::{BedrockStatus, Block, HashableBlockData, MantleMsgId},
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::SequencerConfig;
 use log::{info, warn};
-use logos_blockchain_core::mantle::ops::channel::MsgId;
 use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +26,7 @@ pub struct SequencerCore {
     sequencer_config: SequencerConfig,
     chain_height: u64,
     block_settlement_client: Option<BlockSettlementClient>,
-    last_bedrock_msg_id: MsgId,
+    last_bedrock_msg_id: MantleMsgId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -59,7 +58,7 @@ impl SequencerCore {
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let channel_genesis_msg_id = MsgId::from([0; 32]);
+        let channel_genesis_msg_id = [0; 32];
         let genesis_block = hashable_data.into_pending_block(&signing_key, channel_genesis_msg_id);
 
         // Sequencer should panic if unable to open db,
@@ -91,7 +90,7 @@ impl SequencerCore {
                         acc.program_owner =
                             nssa::program::Program::authenticated_transfer_program().id();
 
-                        nssa_core::Commitment::new(&npk, &acc)
+                        nssa_core::Commitment::new(npk, &acc)
                     })
                     .collect();
 
@@ -152,7 +151,7 @@ impl SequencerCore {
             let block =
                 block_data.into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
             let msg_id = client.submit_block_to_bedrock(&block).await?;
-            self.last_bedrock_msg_id = msg_id;
+            self.last_bedrock_msg_id = msg_id.into();
             log::info!("Posted block data to Bedrock");
         }
 

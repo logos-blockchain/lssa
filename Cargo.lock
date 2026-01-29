@@ -1341,7 +1341,6 @@ dependencies = [
  "hex",
  "log",
  "logos-blockchain-common-http-client",
- "logos-blockchain-core",
  "nssa",
  "nssa_core",
  "reqwest",
