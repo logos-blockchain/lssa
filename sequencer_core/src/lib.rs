@@ -71,7 +71,7 @@ impl SequencerCore {
             Some(state) => {
                 info!("Found local database. Loading state and pending blocks from it.");
                 state
-            },
+            }
             None => {
                 info!(
                     "No database found when starting the sequencer. Creating a fresh new with the initial data in config"

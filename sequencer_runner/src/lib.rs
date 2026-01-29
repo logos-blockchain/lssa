@@ -67,6 +67,7 @@ pub async fn startup_sequencer(
                 continue;
             };
 
+            info!("Resubmitting {} pending blocks", pending_blocks.len());
             for block in pending_blocks.iter() {
                 if let Err(e) = client.submit_block_to_bedrock(block).await {
                     warn!(
