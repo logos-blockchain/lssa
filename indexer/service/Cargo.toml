@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-indexer_service_protocol.workspace = true
+indexer_service_protocol = { workspace = true, features = ["convert"] }
 indexer_service_rpc = { workspace = true, features = ["server"] }
 indexer_core.workspace = true
 
@@ -15,7 +15,9 @@ tokio-util.workspace = true
 env_logger.workspace = true
 log.workspace = true
 jsonrpsee.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+futures.workspace = true
 async-trait = "0.1.89"
 
 [features]

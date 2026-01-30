@@ -24,7 +24,7 @@ pub trait Rpc {
     }
 
     #[subscription(name = "subscribeToFinalizedBlocks", item = Block)]
-    async fn subscribe_to_finalized_blocks(&self, from: BlockId) -> SubscriptionResult;
+    async fn subscribe_to_finalized_blocks(&self) -> SubscriptionResult;
 
     #[method(name = "getBlockById")]
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned>;

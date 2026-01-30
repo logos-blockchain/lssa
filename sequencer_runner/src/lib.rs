@@ -188,22 +188,11 @@ async fn listen_for_bedrock_blocks_loop(seq_core: Arc<Mutex<SequencerCore>>) -> 
     let indexer_client = seq_core.lock().await.indexer_client().clone();
 
     loop {
-        let first_pending_block_id = {
-            let sequencer_core = seq_core.lock().await;
-
-            sequencer_core
-                .first_pending_block_id()
-                .context("Failed to get first pending block ID")?
-                .unwrap_or(sequencer_core.chain_height())
-        };
-
-        info!("Subscribing to blocks from ID {first_pending_block_id}");
+        // TODO: Subscribe from the first pending block ID?
         let mut subscription = indexer_client
-            .subscribe_to_finalized_blocks(first_pending_block_id)
+            .subscribe_to_finalized_blocks()
             .await
-            .with_context(|| {
-                format!("Failed to subscribe to blocks from {first_pending_block_id}")
-            })?;
+            .context("Failed to subscribe to finalized blocks")?;
 
         while let Some(block) = subscription.next().await {
             let block = block.context("Failed to get next block from subscription")?;

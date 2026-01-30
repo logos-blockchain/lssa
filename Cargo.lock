@@ -3207,6 +3207,7 @@ name = "indexer_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "bedrock_client",
  "borsh",
  "common",
@@ -3227,11 +3228,13 @@ dependencies = [
  "async-trait",
  "clap 4.5.53",
  "env_logger",
+ "futures",
  "indexer_core",
  "indexer_service_protocol",
  "indexer_service_rpc",
  "jsonrpsee",
  "log",
+ "serde",
  "serde_json",
  "tokio",
  "tokio-util",

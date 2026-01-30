@@ -166,10 +166,13 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
     async fn subscribe_to_finalized_blocks(
         &self,
         subscription_sink: jsonrpsee::PendingSubscriptionSink,
-        from: BlockId,
     ) -> SubscriptionResult {
         let sink = subscription_sink.accept().await?;
-        for block in self.blocks.iter().filter(|b| b.header.block_id >= from) {
+        for block in self
+            .blocks
+            .iter()
+            .filter(|b| b.bedrock_status == BedrockStatus::Finalized)
+        {
             let json = serde_json::value::to_raw_value(block).unwrap();
             sink.send(json).await?;
         }

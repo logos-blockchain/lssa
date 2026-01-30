@@ -116,20 +116,21 @@ impl TestContext {
         .context("Failed to create sequencer client")?;
 
         if let Some(indexer_config) = indexer_config {
-            let indexer_core = IndexerCore::new(indexer_config)?;
+            // let indexer_core = IndexerCore::new(indexer_config)?;
 
-            let indexer_loop_handle = Some(tokio::spawn(async move {
-                indexer_core.subscribe_parse_block_stream().await
-            }));
+            // let indexer_loop_handle = Some(tokio::spawn(async move {
+            //     indexer_core.subscribe_parse_block_stream().await
+            // }));
 
-            Ok(Self {
-                _sequencer_handle,
-                indexer_loop_handle,
-                sequencer_client,
-                wallet,
-                _temp_sequencer_dir: temp_sequencer_dir,
-                _temp_wallet_dir: temp_wallet_dir,
-            })
+            // Ok(Self {
+            //     _sequencer_handle,
+            //     indexer_loop_handle,
+            //     sequencer_client,
+            //     wallet,
+            //     _temp_sequencer_dir: temp_sequencer_dir,
+            //     _temp_wallet_dir: temp_wallet_dir,
+            // })
+            todo!()
         } else {
             Ok(Self {
                 _sequencer_handle,

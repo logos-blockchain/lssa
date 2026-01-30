@@ -93,6 +93,7 @@ itertools = "0.14.0"
 url = { version = "2.5.4", features = ["serde"] }
 tokio-retry = "0.3.0"
 schemars = "1.2.0"
+async-stream = "0.3.6"
 
 logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }

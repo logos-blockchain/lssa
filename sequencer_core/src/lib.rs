@@ -260,14 +260,6 @@ impl SequencerCore {
         }
     }
 
-    pub fn first_pending_block_id(&self) -> Result<Option<u64>> {
-        Ok(self
-            .get_pending_blocks()?
-            .iter()
-            .map(|block| block.header.block_id)
-            .min())
-    }
-
     /// Returns the list of stored pending blocks.
     pub fn get_pending_blocks(&self) -> Result<Vec<Block>> {
         Ok(self
