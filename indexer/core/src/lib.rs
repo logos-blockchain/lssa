@@ -60,7 +60,9 @@ impl IndexerCore {
                         let l2_blocks_parsed = parse_blocks(
                             l1_block.into_transactions().into_iter(),
                             &self.config.channel_id,
-                        );
+                        ).collect::<Vec<_>>();
+
+                        info!("Parsed {} L2 blocks", l2_blocks_parsed.len());
 
                         for l2_block in l2_blocks_parsed {
                             // State modification, will be updated in future
