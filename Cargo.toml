@@ -6,6 +6,7 @@ members = [
   "key_protocol",
   "mempool",
   "wallet",
+  "wallet-ffi",
   "common",
   "nssa",
   "nssa/core",
@@ -40,6 +41,7 @@ indexer_service = { path = "indexer_service" }
 indexer_service_protocol = { path = "indexer_service/protocol" }
 indexer_service_rpc = { path = "indexer_service/rpc" }
 wallet = { path = "wallet" }
+wallet-ffi = { path = "wallet-ffi" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
 indexer_core = { path = "indexer_core" }
