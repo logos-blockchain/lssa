@@ -1,17 +1,15 @@
-use std::{fmt::Display, time::Instant};
+use std::time::Instant;
 
 use anyhow::Result;
 #[cfg(feature = "testnet")]
 use common::PINATA_BASE58;
 use common::{
-    HashType,
     block::{BedrockStatus, Block, HashableBlockData, MantleMsgId},
-    transaction::{EncodedTransaction, NSSATransaction},
+    transaction::{EncodedTransaction, NSSATransaction, TransactionMalformationError},
 };
 use config::SequencerConfig;
 use log::{info, warn};
 use mempool::{MemPool, MemPoolHandle};
-use serde::{Deserialize, Serialize};
 
 use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerStore};
 
@@ -28,20 +26,6 @@ pub struct SequencerCore {
     block_settlement_client: Option<BlockSettlementClient>,
     last_bedrock_msg_id: MantleMsgId,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum TransactionMalformationError {
-    InvalidSignature,
-    FailedToDecode { tx: HashType },
-}
-
-impl Display for TransactionMalformationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:#?}")
-    }
-}
-
-impl std::error::Error for TransactionMalformationError {}
 
 impl SequencerCore {
     /// Starts the sequencer using the provided configuration.
@@ -268,36 +252,12 @@ impl SequencerCore {
     }
 }
 
-// TODO: Introduce type-safe wrapper around checked transaction, e.g. AuthenticatedTransaction
-pub fn transaction_pre_check(
-    tx: NSSATransaction,
-) -> Result<NSSATransaction, TransactionMalformationError> {
-    // Stateless checks here
-    match tx {
-        NSSATransaction::Public(tx) => {
-            if tx.witness_set().is_valid_for(tx.message()) {
-                Ok(NSSATransaction::Public(tx))
-            } else {
-                Err(TransactionMalformationError::InvalidSignature)
-            }
-        }
-        NSSATransaction::PrivacyPreserving(tx) => {
-            if tx.witness_set().signatures_are_valid_for(tx.message()) {
-                Ok(NSSATransaction::PrivacyPreserving(tx))
-            } else {
-                Err(TransactionMalformationError::InvalidSignature)
-            }
-        }
-        NSSATransaction::ProgramDeployment(tx) => Ok(NSSATransaction::ProgramDeployment(tx)),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::pin::pin;
 
     use base58::{FromBase58, ToBase58};
-    use common::test_utils::sequencer_sign_key_for_testing;
+    use common::{test_utils::sequencer_sign_key_for_testing, transaction::transaction_pre_check};
     use nssa::PrivateKey;
 
     use super::*;

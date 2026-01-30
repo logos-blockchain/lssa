@@ -22,12 +22,12 @@ use common::{
             PostIndexerMessageResponse, SendTxRequest, SendTxResponse,
         },
     },
-    transaction::{EncodedTransaction, NSSATransaction},
+    transaction::{EncodedTransaction, NSSATransaction, TransactionMalformationError, transaction_pre_check},
 };
 use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
-use sequencer_core::{TransactionMalformationError, config::AccountInitialData};
+use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
 
 use super::{JsonHandler, respond, types::err_rpc::RpcErr};
@@ -88,7 +88,7 @@ impl JsonHandler {
         let transaction = NSSATransaction::try_from(&tx)
             .map_err(|_| TransactionMalformationError::FailedToDecode { tx: tx.hash() })?;
 
-        let authenticated_tx = sequencer_core::transaction_pre_check(transaction)
+        let authenticated_tx = transaction_pre_check(transaction)
             .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         // TODO: Do we need a timeout here? It will be usable if we have too many transactions to

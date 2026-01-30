@@ -18,6 +18,7 @@ use crate::{config::IndexerConfig, state::IndexerState};
 
 pub mod config;
 pub mod state;
+pub mod block_store;
 
 pub struct IndexerCore {
     pub bedrock_client: BedrockClient,

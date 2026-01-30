@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 common.workspace = true
 bedrock_client.workspace = true
+nssa.workspace = true
+storage.workspace = true
 
 anyhow.workspace = true
 log.workspace = true

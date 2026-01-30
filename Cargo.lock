@@ -2790,8 +2790,10 @@ dependencies = [
  "futures",
  "log",
  "logos-blockchain-core",
+ "nssa",
  "serde",
  "serde_json",
+ "storage",
  "tokio",
  "url",
 ]

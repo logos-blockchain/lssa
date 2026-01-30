@@ -29,8 +29,6 @@ pub const DB_META_FIRST_BLOCK_IN_DB_KEY: &str = "first_block_in_db";
 pub const DB_META_LAST_BLOCK_IN_DB_KEY: &str = "last_block_in_db";
 /// Key base for storing metainformation which describe if first block has been set
 pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
-/// Key base for storing metainformation about the last finalized block on Bedrock
-pub const DB_META_LAST_FINALIZED_BLOCK_ID: &str = "last_finalized_block_id";
 /// Key base for storing metainformation about the last breakpoint
 pub const DB_META_LAST_BREAKPOINT_ID: &str = "last_breakpoint_id";
 
@@ -57,8 +55,7 @@ pub struct RocksDBIO {
 impl RocksDBIO {
     pub fn open_or_create(
         path: &Path,
-        start_block: Option<Block>,
-        initial_state: V02State,
+        start_data: Option<(Block, V02State)>,
     ) -> DbResult<Self> {
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
@@ -85,12 +82,11 @@ impl RocksDBIO {
 
         if is_start_set {
             Ok(dbio)
-        } else if let Some(block) = start_block {
+        } else if let Some((block, initial_state)) = start_data {
             let block_id = block.header.block_id;
             dbio.put_meta_first_block_in_db(block)?;
             dbio.put_meta_is_first_block_set()?;
             dbio.put_meta_last_block_in_db(block_id)?;
-            dbio.put_meta_last_finalized_block_id(None)?;
 
             // First breakpoint setup
             dbio.put_breakpoint(0, initial_state)?;
@@ -255,7 +251,7 @@ impl RocksDBIO {
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
-        self.put_block(block, true)?;
+        self.put_block(block)?;
         Ok(())
     }
 
@@ -268,28 +264,6 @@ impl RocksDBIO {
                     DbError::borsh_cast_message(
                         err,
                         Some("Failed to serialize DB_META_LAST_BLOCK_IN_DB_KEY".to_string()),
-                    )
-                })?,
-                borsh::to_vec(&block_id).map_err(|err| {
-                    DbError::borsh_cast_message(
-                        err,
-                        Some("Failed to serialize last block id".to_string()),
-                    )
-                })?,
-            )
-            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
-        Ok(())
-    }
-
-    pub fn put_meta_last_finalized_block_id(&self, block_id: Option<u64>) -> DbResult<()> {
-        let cf_meta = self.meta_column();
-        self.db
-            .put_cf(
-                &cf_meta,
-                borsh::to_vec(&DB_META_LAST_FINALIZED_BLOCK_ID).map_err(|err| {
-                    DbError::borsh_cast_message(
-                        err,
-                        Some("Failed to serialize DB_META_LAST_FINALIZED_BLOCK_ID".to_string()),
                     )
                 })?,
                 borsh::to_vec(&block_id).map_err(|err| {
@@ -342,16 +316,8 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_block(&self, block: Block, first: bool) -> DbResult<()> {
+    pub fn put_block(&self, block: Block) -> DbResult<()> {
         let cf_block = self.block_column();
-
-        if !first {
-            let last_curr_block = self.get_meta_last_block_in_db()?;
-
-            if block.header.block_id > last_curr_block {
-                self.put_meta_last_block_in_db(block.header.block_id)?;
-            }
-        }
 
         self.db
             .put_cf(
@@ -370,6 +336,12 @@ impl RocksDBIO {
                 })?,
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        let last_curr_block = self.get_meta_last_block_in_db()?;
+
+        if block.header.block_id > last_curr_block {
+            self.put_meta_last_block_in_db(block.header.block_id)?;
+        }
 
         if block.header.block_id.is_multiple_of(BREAKPOINT_INTERVAL) {
             self.put_next_breakpoint()?;
@@ -465,7 +437,15 @@ impl RocksDBIO {
             let br_id = closest_breakpoint_id(block_id);
             let mut breakpoint = self.get_breakpoint(br_id)?;
 
-            for id in (BREAKPOINT_INTERVAL * br_id)..=block_id {
+            // ToDo: update it to handle any genesis id
+            // right now works correctly only if genesis_id < BREAKPOINT_INTERVAL
+            let start = if br_id != 0 {
+                BREAKPOINT_INTERVAL * br_id
+            } else {
+                self.get_meta_first_block_in_db()?
+            };
+
+            for id in start..=block_id {
                 let block = self.get_block(id)?;
 
                 for encoded_transaction in block.body.transactions {
@@ -481,6 +461,10 @@ impl RocksDBIO {
                 "Block on this id not found".to_string(),
             ))
         }
+    }
+
+    pub fn final_state(&self) -> DbResult<V02State> {
+        self.calculate_state_for_id(self.get_meta_last_block_in_db()?)
     }
 
     pub fn put_next_breakpoint(&self) -> DbResult<()> {
