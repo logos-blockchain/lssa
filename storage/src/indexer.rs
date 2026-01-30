@@ -2,7 +2,7 @@ use std::{ops::Div, path::Path, sync::Arc};
 
 use common::{
     block::Block,
-    transaction::{NSSATransaction, execute_check_transaction_on_state},
+    transaction::{NSSATransaction, execute_check_transaction_on_state, transaction_pre_check},
 };
 use nssa::V02State;
 use rocksdb::{
@@ -53,10 +53,7 @@ pub struct RocksDBIO {
 }
 
 impl RocksDBIO {
-    pub fn open_or_create(
-        path: &Path,
-        start_data: Option<(Block, V02State)>,
-    ) -> DbResult<Self> {
+    pub fn open_or_create(path: &Path, start_data: Option<(Block, V02State)>) -> DbResult<Self> {
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         // ToDo: Add more column families for different data
@@ -449,9 +446,27 @@ impl RocksDBIO {
                 let block = self.get_block(id)?;
 
                 for encoded_transaction in block.body.transactions {
-                    let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
+                    let transaction =
+                        NSSATransaction::try_from(&encoded_transaction).map_err(|err| {
+                            DbError::db_interaction_error(format!(
+                                "failed to decode transaction in block {} with err {err:?}",
+                                block.header.block_id
+                            ))
+                        })?;
 
-                    execute_check_transaction_on_state(&mut breakpoint, transaction).unwrap();
+                    execute_check_transaction_on_state(
+                        &mut breakpoint,
+                        transaction_pre_check(transaction).map_err(|err| {
+                            DbError::db_interaction_error(format!(
+                                "transaction pre check failed with err {err:?}"
+                            ))
+                        })?,
+                    )
+                    .map_err(|err| {
+                        DbError::db_interaction_error(format!(
+                            "transaction execution failed with err {err:?}"
+                        ))
+                    })?;
                 }
             }
 

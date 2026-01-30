@@ -5,24 +5,12 @@ use std::{
 };
 
 use anyhow::Result;
-use common::sequencer_client::BasicAuth;
+use common::{
+    block::{AccountInitialData, CommitmentsInitialData},
+    sequencer_client::BasicAuth,
+};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct for account serialization
-pub struct AccountInitialData {
-    /// Hex encoded account id
-    pub account_id: String,
-    pub balance: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct to initialize commitments
-pub struct CommitmentsInitialData {
-    pub npk: nssa_core::NullifierPublicKey,
-    pub account: nssa_core::account::Account,
-}
 
 // TODO: Provide default values
 #[derive(Clone, Serialize, Deserialize)]

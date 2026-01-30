@@ -1,4 +1,7 @@
-use common::{rpc_primitives::errors::{RpcError, RpcParseError}, transaction::TransactionMalformationError};
+use common::{
+    rpc_primitives::errors::{RpcError, RpcParseError},
+    transaction::TransactionMalformationError,
+};
 use log::debug;
 
 pub struct RpcErr(pub RpcError);

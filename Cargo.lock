@@ -2791,6 +2791,7 @@ dependencies = [
  "log",
  "logos-blockchain-core",
  "nssa",
+ "nssa_core",
  "serde",
  "serde_json",
  "storage",

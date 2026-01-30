@@ -5,7 +5,7 @@ use base58::FromBase58;
 use base64::{Engine, engine::general_purpose};
 use common::{
     HashType,
-    block::HashableBlockData,
+    block::{AccountInitialData, HashableBlockData},
     rpc_primitives::{
         errors::RpcError,
         message::{Message, Request},
@@ -14,20 +14,21 @@ use common::{
             GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
             GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
             GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
-            GetBlockRangeDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
-            GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
-            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
-            GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, HelloRequest, HelloResponse, PostIndexerMessageRequest,
-            PostIndexerMessageResponse, SendTxRequest, SendTxResponse,
+            GetBlockRangeDataResponse, GetGenesisBlockRequest, GetGenesisBlockResponse,
+            GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest,
+            GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
+            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse,
+            PostIndexerMessageRequest, PostIndexerMessageResponse, SendTxRequest, SendTxResponse,
         },
     },
-    transaction::{EncodedTransaction, NSSATransaction, TransactionMalformationError, transaction_pre_check},
+    transaction::{
+        EncodedTransaction, NSSATransaction, TransactionMalformationError, transaction_pre_check,
+    },
 };
 use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
-use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
 
 use super::{JsonHandler, respond, types::err_rpc::RpcErr};
@@ -37,6 +38,7 @@ pub const SEND_TX: &str = "send_tx";
 pub const GET_BLOCK: &str = "get_block";
 pub const GET_BLOCK_RANGE: &str = "get_block_range";
 pub const GET_GENESIS: &str = "get_genesis";
+pub const GET_GENESIS_BLOCK: &str = "get_genesis_block";
 pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
 pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
@@ -153,6 +155,25 @@ impl JsonHandler {
         };
 
         let response = GetGenesisIdResponse { genesis_id };
+
+        respond(response)
+    }
+
+    async fn process_get_genesis_block(&self, request: Request) -> Result<Value, RpcErr> {
+        let _get_genesis_req = GetGenesisBlockRequest::parse(Some(request.params))?;
+
+        let genesis_block = {
+            let state = self.sequencer_state.lock().await;
+
+            let gen_id = state.block_store().genesis_id();
+
+            state.block_store().get_block_at_id(gen_id)?
+        };
+
+        let response = GetGenesisBlockResponse {
+            genesis_block_borsh_ser: borsh::to_vec(&genesis_block)
+                .expect("Block must serialize correctly"),
+        };
 
         respond(response)
     }
@@ -334,6 +355,7 @@ impl JsonHandler {
             GET_BLOCK => self.process_get_block_data(request).await,
             GET_BLOCK_RANGE => self.process_get_block_range_data(request).await,
             GET_GENESIS => self.process_get_genesis(request).await,
+            GET_GENESIS_BLOCK => self.process_get_genesis_block(request).await,
             GET_LAST_BLOCK => self.process_get_last_block(request).await,
             GET_INITIAL_TESTNET_ACCOUNTS => self.get_initial_testnet_accounts(request).await,
             GET_ACCOUNT_BALANCE => self.process_get_account_balance(request).await,
@@ -355,12 +377,12 @@ mod tests {
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
     use common::{
-        sequencer_client::BasicAuth, test_utils::sequencer_sign_key_for_testing,
-        transaction::EncodedTransaction,
+        block::AccountInitialData, sequencer_client::BasicAuth,
+        test_utils::sequencer_sign_key_for_testing, transaction::EncodedTransaction,
     };
     use sequencer_core::{
         SequencerCore,
-        config::{AccountInitialData, BedrockConfig, SequencerConfig},
+        config::{BedrockConfig, SequencerConfig},
     };
     use serde_json::Value;
     use tempfile::tempdir;

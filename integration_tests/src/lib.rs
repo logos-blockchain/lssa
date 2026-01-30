@@ -127,7 +127,7 @@ impl TestContext {
             indexer_config.sequencer_client_config.addr =
                 Url::parse(&sequencer_addr).context("Failed to parse sequencer addr")?;
 
-            let indexer_core = IndexerCore::new(indexer_config)?;
+            let indexer_core = IndexerCore::new(indexer_config).await?;
 
             let indexer_loop_handle = Some(tokio::spawn(async move {
                 indexer_core.subscribe_parse_block_stream().await

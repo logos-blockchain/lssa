@@ -1,9 +1,9 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use bedrock_client::BedrockClient;
+// ToDo: Remove after testnet
+use common::PINATA_BASE58;
 use common::{
-    block::HashableBlockData, communication::indexer::Message,
+    block::Block, communication::indexer::Message,
     rpc_primitives::requests::PostIndexerMessageResponse, sequencer_client::SequencerClient,
 };
 use futures::StreamExt;
@@ -12,37 +12,65 @@ use logos_blockchain_core::mantle::{
     Op, SignedMantleTx,
     ops::channel::{ChannelId, inscribe::InscriptionOp},
 };
-use tokio::sync::RwLock;
 
-use crate::{config::IndexerConfig, state::IndexerState};
+use crate::{block_store::IndexerStore, config::IndexerConfig};
 
+pub mod block_store;
 pub mod config;
 pub mod state;
-pub mod block_store;
 
 pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
     pub sequencer_client: SequencerClient,
     pub config: IndexerConfig,
-    pub state: IndexerState,
+    pub store: IndexerStore,
 }
 
 impl IndexerCore {
-    pub fn new(config: IndexerConfig) -> Result<Self> {
+    pub async fn new(config: IndexerConfig) -> Result<Self> {
+        let sequencer_client = SequencerClient::new_with_auth(
+            config.sequencer_client_config.addr.clone(),
+            config.sequencer_client_config.auth.clone(),
+        )?;
+
+        let start_block = sequencer_client.get_genesis_block().await?;
+
+        let initial_commitments: Vec<nssa_core::Commitment> = config
+            .initial_commitments
+            .iter()
+            .map(|init_comm_data| {
+                let npk = &init_comm_data.npk;
+
+                let mut acc = init_comm_data.account.clone();
+
+                acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
+
+                nssa_core::Commitment::new(npk, &acc)
+            })
+            .collect();
+
+        let init_accs: Vec<(nssa::AccountId, u128)> = config
+            .initial_accounts
+            .iter()
+            .map(|acc_data| (acc_data.account_id.parse().unwrap(), acc_data.balance))
+            .collect();
+
+        let mut state = nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments);
+
+        // ToDo: Remove after testnet
+        state.add_pinata_program(PINATA_BASE58.parse().unwrap());
+
+        let home = config.home.clone();
+
         Ok(Self {
             bedrock_client: BedrockClient::new(
                 config.bedrock_client_config.auth.clone().map(Into::into),
                 config.bedrock_client_config.addr.clone(),
             )?,
-            sequencer_client: SequencerClient::new_with_auth(
-                config.sequencer_client_config.addr.clone(),
-                config.sequencer_client_config.auth.clone(),
-            )?,
+            sequencer_client,
             config,
-            // No state setup for now, future task.
-            state: IndexerState {
-                latest_seen_block: Arc::new(RwLock::new(0)),
-            },
+            // ToDo: Implement restarts
+            store: IndexerStore::open_db_with_genesis(&home, Some((start_block, state)))?,
         })
     }
 
@@ -70,18 +98,13 @@ impl IndexerCore {
                     );
 
                     for l2_block in l2_blocks_parsed {
+                        let l2_block_height = l2_block.header.block_id;
+
                         // State modification, will be updated in future
-                        {
-                            let mut guard = self.state.latest_seen_block.write().await;
-                            if l2_block.block_id > *guard {
-                                *guard = l2_block.block_id;
-                            }
-                        }
+                        self.store.put_block(l2_block)?;
 
                         // Sending data into sequencer, may need to be expanded.
-                        let message = Message::L2BlockFinalized {
-                            l2_block_height: l2_block.block_id,
-                        };
+                        let message = Message::L2BlockFinalized { l2_block_height };
 
                         let status = self.send_message_to_sequencer(message.clone()).await?;
 
@@ -109,7 +132,7 @@ impl IndexerCore {
 fn parse_blocks(
     block_txs: impl Iterator<Item = SignedMantleTx>,
     decoded_channel_id: &ChannelId,
-) -> impl Iterator<Item = HashableBlockData> {
+) -> impl Iterator<Item = Block> {
     block_txs.flat_map(|tx| {
         tx.mantle_tx.ops.into_iter().filter_map(|op| match op {
             Op::ChannelInscribe(InscriptionOp {
@@ -117,7 +140,7 @@ fn parse_blocks(
                 inscription,
                 ..
             }) if channel_id == *decoded_channel_id => {
-                borsh::from_slice::<HashableBlockData>(&inscription).ok()
+                borsh::from_slice::<Block>(&inscription).ok()
             }
             _ => None,
         })

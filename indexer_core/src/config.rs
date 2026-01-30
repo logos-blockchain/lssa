@@ -1,8 +1,15 @@
-use std::{fs::File, io::BufReader, path::Path};
+use std::{
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result};
 use bedrock_client::BackoffConfig;
-use common::sequencer_client::BasicAuth;
+use common::{
+    block::{AccountInitialData, CommitmentsInitialData},
+    sequencer_client::BasicAuth,
+};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -17,6 +24,12 @@ pub struct ClientConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Note: For individual RPC requests we use Fibonacci backoff retry strategy
 pub struct IndexerConfig {
+    /// Home dir of sequencer storage
+    pub home: PathBuf,
+    /// List of initial accounts data
+    pub initial_accounts: Vec<AccountInitialData>,
+    /// List of initial commitments
+    pub initial_commitments: Vec<CommitmentsInitialData>,
     pub resubscribe_interval_millis: u64,
     pub backoff: BackoffConfig,
     pub bedrock_client_config: ClientConfig,

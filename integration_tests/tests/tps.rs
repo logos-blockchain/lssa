@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use common::block::{AccountInitialData, CommitmentsInitialData};
 use integration_tests::TestContext;
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use log::info;
@@ -15,7 +16,7 @@ use nssa_core::{
     account::{AccountWithMetadata, data::Data},
     encryption::IncomingViewingPublicKey,
 };
-use sequencer_core::config::{AccountInitialData, CommitmentsInitialData, SequencerConfig};
+use sequencer_core::config::SequencerConfig;
 use tokio::test;
 
 // TODO: Make a proper benchmark instead of an ad-hoc test

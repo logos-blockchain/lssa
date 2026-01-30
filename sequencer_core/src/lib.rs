@@ -257,11 +257,13 @@ mod tests {
     use std::pin::pin;
 
     use base58::{FromBase58, ToBase58};
-    use common::{test_utils::sequencer_sign_key_for_testing, transaction::transaction_pre_check};
+    use common::{
+        block::AccountInitialData, test_utils::sequencer_sign_key_for_testing,
+        transaction::transaction_pre_check,
+    };
     use nssa::PrivateKey;
 
     use super::*;
-    use crate::config::AccountInitialData;
 
     fn parse_unwrap_tx_body_into_nssa_tx(tx_body: EncodedTransaction) -> NSSATransaction {
         NSSATransaction::try_from(&tx_body)
