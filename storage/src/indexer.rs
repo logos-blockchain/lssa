@@ -1,5 +1,9 @@
 use std::{ops::Div, path::Path, sync::Arc};
-use common::{block::Block, transaction::{NSSATransaction, execute_check_transaction_on_state}};
+
+use common::{
+    block::Block,
+    transaction::{NSSATransaction, execute_check_transaction_on_state},
+};
 use nssa::V02State;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
@@ -51,7 +55,11 @@ pub struct RocksDBIO {
 }
 
 impl RocksDBIO {
-    pub fn open_or_create(path: &Path, start_block: Option<Block>, initial_state: V02State) -> DbResult<Self> {
+    pub fn open_or_create(
+        path: &Path,
+        start_block: Option<Block>,
+        initial_state: V02State,
+    ) -> DbResult<Self> {
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         // ToDo: Add more column families for different data
@@ -200,7 +208,8 @@ impl RocksDBIO {
 
     pub fn get_meta_last_breakpoint_id(&self) -> DbResult<u64> {
         let cf_meta = self.meta_column();
-        let res = self.db
+        let res = self
+            .db
             .get_cf(
                 &cf_meta,
                 borsh::to_vec(&DB_META_LAST_BREAKPOINT_ID).map_err(|err| {
@@ -456,7 +465,7 @@ impl RocksDBIO {
             let br_id = closest_breakpoint_id(block_id);
             let mut breakpoint = self.get_breakpoint(br_id)?;
 
-            for id in (BREAKPOINT_INTERVAL*br_id)..=block_id {
+            for id in (BREAKPOINT_INTERVAL * br_id)..=block_id {
                 let block = self.get_block(id)?;
 
                 for encoded_transaction in block.body.transactions {

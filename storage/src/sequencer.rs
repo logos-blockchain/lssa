@@ -1,8 +1,9 @@
 use std::{path::Path, sync::Arc};
 
 use common::block::Block;
+use nssa::V02State;
 use rocksdb::{
-    BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
+    BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options, WriteBatch,
 };
 
 use crate::error::DbError;
@@ -28,15 +29,15 @@ pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
 /// Key base for storing metainformation about the last finalized block on Bedrock
 pub const DB_META_LAST_FINALIZED_BLOCK_ID: &str = "last_finalized_block_id";
 
-/// Key base for storing snapshot which describe block id
-pub const DB_SNAPSHOT_BLOCK_ID_KEY: &str = "block_id";
+/// Key base for storing the NSSA state
+pub const DB_NSSA_STATE_KEY: &str = "nssa_state";
 
 /// Name of block column family
 pub const CF_BLOCK_NAME: &str = "cf_block";
 /// Name of meta column family
 pub const CF_META_NAME: &str = "cf_meta";
-/// Name of snapshot column family
-pub const CF_SNAPSHOT_NAME: &str = "cf_snapshot";
+/// Name of state column family
+pub const CF_NSSA_STATE_NAME: &str = "cf_nssa_state";
 
 pub type DbResult<T> = Result<T, DbError>;
 
@@ -51,7 +52,7 @@ impl RocksDBIO {
         // ToDo: Add more column families for different data
         let cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
-        let cfsnapshot = ColumnFamilyDescriptor::new(CF_SNAPSHOT_NAME, cf_opts.clone());
+        let cfstate = ColumnFamilyDescriptor::new(CF_NSSA_STATE_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -59,7 +60,7 @@ impl RocksDBIO {
         let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(
             &db_opts,
             path,
-            vec![cfb, cfmeta, cfsnapshot],
+            vec![cfb, cfmeta, cfstate],
         );
 
         let dbio = Self {
@@ -91,7 +92,7 @@ impl RocksDBIO {
         // ToDo: Add more column families for different data
         let _cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let _cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
-        let _cfsnapshot = ColumnFamilyDescriptor::new(CF_SNAPSHOT_NAME, cf_opts.clone());
+        let _cfstate = ColumnFamilyDescriptor::new(CF_NSSA_STATE_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -108,8 +109,8 @@ impl RocksDBIO {
         self.db.cf_handle(CF_BLOCK_NAME).unwrap()
     }
 
-    pub fn snapshot_column(&self) -> Arc<BoundColumnFamily<'_>> {
-        self.db.cf_handle(CF_SNAPSHOT_NAME).unwrap()
+    pub fn nssa_state_column(&self) -> Arc<BoundColumnFamily<'_>> {
+        self.db.cf_handle(CF_NSSA_STATE_NAME).unwrap()
     }
 
     pub fn get_meta_first_block_in_db(&self) -> DbResult<u64> {
@@ -188,6 +189,24 @@ impl RocksDBIO {
         Ok(res.is_some())
     }
 
+    pub fn put_nssa_state_in_db(&self, state: &V02State, batch: &mut WriteBatch) -> DbResult<()> {
+        let cf_nssa_state = self.nssa_state_column();
+        batch.put_cf(
+            &cf_nssa_state,
+            borsh::to_vec(&DB_NSSA_STATE_KEY).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize DB_NSSA_STATE_KEY".to_string()),
+                )
+            })?,
+            borsh::to_vec(state).map_err(|err| {
+                DbError::borsh_cast_message(err, Some("Failed to serialize NSSA state".to_string()))
+            })?,
+        );
+
+        Ok(())
+    }
+
     pub fn put_meta_first_block_in_db(&self, block: Block) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
@@ -208,7 +227,15 @@ impl RocksDBIO {
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
-        self.put_block(block, true)?;
+        let mut batch = WriteBatch::default();
+        self.put_block(block, true, &mut batch)?;
+        self.db.write(batch).map_err(|rerr| {
+            DbError::rocksdb_cast_message(
+                rerr,
+                Some("Failed to write first block in db".to_string()),
+            )
+        })?;
+
         Ok(())
     }
 
@@ -273,7 +300,7 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_block(&self, block: Block, first: bool) -> DbResult<()> {
+    pub fn put_block(&self, block: Block, first: bool, batch: &mut WriteBatch) -> DbResult<()> {
         let cf_block = self.block_column();
 
         if !first {
@@ -284,23 +311,15 @@ impl RocksDBIO {
             }
         }
 
-        self.db
-            .put_cf(
-                &cf_block,
-                borsh::to_vec(&block.header.block_id).map_err(|err| {
-                    DbError::borsh_cast_message(
-                        err,
-                        Some("Failed to serialize block id".to_string()),
-                    )
-                })?,
-                borsh::to_vec(&block).map_err(|err| {
-                    DbError::borsh_cast_message(
-                        err,
-                        Some("Failed to serialize block data".to_string()),
-                    )
-                })?,
-            )
-            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        batch.put_cf(
+            &cf_block,
+            borsh::to_vec(&block.header.block_id).map_err(|err| {
+                DbError::borsh_cast_message(err, Some("Failed to serialize block id".to_string()))
+            })?,
+            borsh::to_vec(&block).map_err(|err| {
+                DbError::borsh_cast_message(err, Some("Failed to serialize block data".to_string()))
+            })?,
+        );
         Ok(())
     }
 
@@ -333,32 +352,90 @@ impl RocksDBIO {
         }
     }
 
-    pub fn get_snapshot_block_id(&self) -> DbResult<u64> {
-        let cf_snapshot = self.snapshot_column();
+    pub fn get_nssa_state(&self) -> DbResult<V02State> {
+        let cf_nssa_state = self.nssa_state_column();
         let res = self
             .db
             .get_cf(
-                &cf_snapshot,
-                borsh::to_vec(&DB_SNAPSHOT_BLOCK_ID_KEY).map_err(|err| {
+                &cf_nssa_state,
+                borsh::to_vec(&DB_NSSA_STATE_KEY).map_err(|err| {
                     DbError::borsh_cast_message(
                         err,
-                        Some("Failed to serialize DB_SNAPSHOT_BLOCK_ID_KEY".to_string()),
+                        Some("Failed to serialize block id".to_string()),
                     )
                 })?,
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
         if let Some(data) = res {
-            Ok(borsh::from_slice::<u64>(&data).map_err(|err| {
+            Ok(borsh::from_slice::<V02State>(&data).map_err(|serr| {
                 DbError::borsh_cast_message(
-                    err,
-                    Some("Failed to deserialize last block".to_string()),
+                    serr,
+                    Some("Failed to deserialize block data".to_string()),
                 )
             })?)
         } else {
             Err(DbError::db_interaction_error(
-                "Snapshot block ID not found".to_string(),
+                "Block on this id not found".to_string(),
             ))
         }
+    }
+
+    pub fn delete_block(&self, block_id: u64) -> DbResult<()> {
+        let cf_block = self.block_column();
+        let key = borsh::to_vec(&block_id).map_err(|err| {
+            DbError::borsh_cast_message(err, Some("Failed to serialize block id".to_string()))
+        })?;
+
+        if self
+            .db
+            .get_cf(&cf_block, &key)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?
+            .is_none()
+        {
+            return Err(DbError::db_interaction_error(
+                "Block on this id not found".to_string(),
+            ));
+        }
+
+        self.db
+            .delete_cf(&cf_block, key)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        Ok(())
+    }
+
+    pub fn get_all_blocks(&self) -> impl Iterator<Item = DbResult<Block>> {
+        let cf_block = self.block_column();
+        self.db
+            .iterator_cf(&cf_block, rocksdb::IteratorMode::Start)
+            .map(|res| {
+                let (_key, value) = res.map_err(|rerr| {
+                    DbError::rocksdb_cast_message(
+                        rerr,
+                        Some("Failed to get key value pair".to_string()),
+                    )
+                })?;
+
+                borsh::from_slice::<Block>(&value).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to deserialize block data".to_string()),
+                    )
+                })
+            })
+    }
+
+    pub fn atomic_update(&self, block: Block, state: &V02State) -> DbResult<()> {
+        let block_id = block.header.block_id;
+        let mut batch = WriteBatch::default();
+        self.put_block(block, false, &mut batch)?;
+        self.put_nssa_state_in_db(state, &mut batch)?;
+        self.db.write(batch).map_err(|rerr| {
+            DbError::rocksdb_cast_message(
+                rerr,
+                Some(format!("Failed to udpate db with block {block_id}")),
+            )
+        })
     }
 }

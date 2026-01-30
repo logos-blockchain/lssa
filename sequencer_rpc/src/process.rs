@@ -405,6 +405,7 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
+            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
             bedrock_config: Some(BedrockConfig {
                 channel_id: [42; 32].into(),
                 node_url: "http://localhost:8080".to_string(),

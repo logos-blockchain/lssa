@@ -599,12 +599,14 @@ impl TryFrom<common::block::Block> for Block {
             header,
             body,
             bedrock_status,
+            bedrock_parent_id,
         } = value;
 
         Ok(Self {
             header: header.into(),
             body: body.try_into()?,
             bedrock_status: bedrock_status.into(),
+            bedrock_parent_id: MantleMsgId(bedrock_parent_id),
         })
     }
 }
@@ -617,12 +619,14 @@ impl TryFrom<Block> for common::block::Block {
             header,
             body,
             bedrock_status,
+            bedrock_parent_id,
         } = value;
 
         Ok(Self {
             header: header.try_into()?,
             body: body.try_into()?,
             bedrock_status: bedrock_status.into(),
+            bedrock_parent_id: bedrock_parent_id.0,
         })
     }
 }

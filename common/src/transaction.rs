@@ -102,20 +102,22 @@ impl EncodedTransaction {
 }
 
 pub fn execute_check_transaction_on_state(
-        state: &mut V02State,
-        tx: NSSATransaction,
-    ) -> Result<NSSATransaction, nssa::error::NssaError> {
-        match &tx {
-            NSSATransaction::Public(tx) => state.transition_from_public_transaction(tx),
-            NSSATransaction::PrivacyPreserving(tx) => state
-                .transition_from_privacy_preserving_transaction(tx),
-            NSSATransaction::ProgramDeployment(tx) => state
-                .transition_from_program_deployment_transaction(tx),
+    state: &mut V02State,
+    tx: NSSATransaction,
+) -> Result<NSSATransaction, nssa::error::NssaError> {
+    match &tx {
+        NSSATransaction::Public(tx) => state.transition_from_public_transaction(tx),
+        NSSATransaction::PrivacyPreserving(tx) => {
+            state.transition_from_privacy_preserving_transaction(tx)
         }
-        .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
-
-        Ok(tx)
+        NSSATransaction::ProgramDeployment(tx) => {
+            state.transition_from_program_deployment_transaction(tx)
+        }
     }
+    .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
+
+    Ok(tx)
+}
 
 #[cfg(test)]
 mod tests {
