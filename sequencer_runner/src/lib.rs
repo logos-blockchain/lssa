@@ -91,7 +91,7 @@ pub async fn startup_sequencer(
         Duration::from_millis(app_config.retry_pending_blocks_timeout_millis);
     let port = app_config.port;
 
-    let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config);
+    let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config).await;
 
     info!("Sequencer core set up");
 
@@ -185,7 +185,7 @@ async fn retry_pending_blocks_loop(
 async fn listen_for_bedrock_blocks_loop(seq_core: Arc<Mutex<SequencerCore>>) -> Result<Never> {
     use indexer_service_rpc::RpcClient as _;
 
-    let indexer_client = seq_core.lock().await.indexer_client().clone();
+    let indexer_client = seq_core.lock().await.indexer_client();
 
     loop {
         // TODO: Subscribe from the first pending block ID?

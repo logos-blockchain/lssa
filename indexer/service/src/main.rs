@@ -63,7 +63,7 @@ async fn run_server(config_path: PathBuf, port: u16) -> Result<jsonrpsee::server
         let service = indexer_service::service::IndexerService::new(config)
             .context("Failed to initialize indexer service")?;
         server.start(service.into_rpc())
-    }?;
+    };
     #[cfg(feature = "mock-responses")]
     let handle = server.start(
         indexer_service::mock_service::MockIndexerService::new_with_mock_blocks().into_rpc(),

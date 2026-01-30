@@ -407,7 +407,7 @@ mod tests {
     async fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
         let config = sequencer_config_for_tests();
 
-        let (mut sequencer_core, mempool_handle) = SequencerCore::start_from_config(config);
+        let (mut sequencer_core, mempool_handle) = SequencerCore::start_from_config(config).await;
         let initial_accounts = sequencer_core.sequencer_config().initial_accounts.clone();
 
         let signing_key = nssa::PrivateKey::try_new([1; 32]).unwrap();

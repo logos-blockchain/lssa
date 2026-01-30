@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use bedrock_client::BedrockClient;
-use common::block::{Block, };
+use common::block::Block;
 use futures::StreamExt;
 use log::info;
 use logos_blockchain_core::mantle::{
@@ -38,9 +38,7 @@ impl IndexerCore {
         })
     }
 
-    pub async fn subscribe_parse_block_stream(
-        &self,
-    ) -> impl futures::Stream<Item = Result<Block>> {
+    pub async fn subscribe_parse_block_stream(&self) -> impl futures::Stream<Item = Result<Block>> {
         async_stream::stream! {
             loop {
                 let mut stream_pinned = Box::pin(self.bedrock_client.get_lib_stream().await?);
