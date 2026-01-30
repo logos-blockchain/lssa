@@ -46,6 +46,7 @@ pub struct TestContext {
     wallet: WalletCore,
     _temp_sequencer_dir: TempDir,
     _temp_wallet_dir: TempDir,
+    _temp_indexer_dir: Option<TempDir>,
 }
 
 impl TestContext {
@@ -127,6 +128,12 @@ impl TestContext {
             indexer_config.sequencer_client_config.addr =
                 Url::parse(&sequencer_addr).context("Failed to parse sequencer addr")?;
 
+            let temp_indexer_dir =
+                tempfile::tempdir().context("Failed to create temp dir for indexer home")?;
+
+            debug!("Using temp indexer home at {:?}", temp_indexer_dir.path());
+            indexer_config.home = temp_indexer_dir.path().to_owned();
+
             let indexer_core = IndexerCore::new(indexer_config).await?;
 
             let indexer_loop_handle = Some(tokio::spawn(async move {
@@ -142,6 +149,7 @@ impl TestContext {
                 wallet,
                 _temp_sequencer_dir: temp_sequencer_dir,
                 _temp_wallet_dir: temp_wallet_dir,
+                _temp_indexer_dir: Some(temp_indexer_dir),
             })
         } else {
             Ok(Self {
@@ -153,6 +161,7 @@ impl TestContext {
                 wallet,
                 _temp_sequencer_dir: temp_sequencer_dir,
                 _temp_wallet_dir: temp_wallet_dir,
+                _temp_indexer_dir: None,
             })
         }
     }
@@ -255,6 +264,7 @@ impl Drop for TestContext {
             wallet: _,
             _temp_sequencer_dir,
             _temp_wallet_dir,
+            _temp_indexer_dir,
         } = self;
 
         sequencer_loop_handle.abort();

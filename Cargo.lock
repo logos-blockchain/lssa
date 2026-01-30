@@ -5914,7 +5914,6 @@ dependencies = [
  "borsh",
  "common",
  "nssa",
- "nssa_core",
  "rocksdb",
  "thiserror 2.0.17",
 ]

@@ -127,6 +127,6 @@
     },
     "resubscribe_interval_millis": 1000,
     "sequencer_client_config": {
-        "addr": "will_be_replaced_in_runtime"
+        "addr": "http://0.0.0.0"
     }
 }

@@ -81,9 +81,9 @@ impl RocksDBIO {
             Ok(dbio)
         } else if let Some((block, initial_state)) = start_data {
             let block_id = block.header.block_id;
+            dbio.put_meta_last_block_in_db(block_id)?;
             dbio.put_meta_first_block_in_db(block)?;
             dbio.put_meta_is_first_block_set()?;
-            dbio.put_meta_last_block_in_db(block_id)?;
 
             // First breakpoint setup
             dbio.put_breakpoint(0, initial_state)?;
