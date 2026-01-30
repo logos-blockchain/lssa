@@ -19,7 +19,7 @@ pub enum ChainSubcommand {
     /// Get transaction at hash from sequencer
     Transaction {
         /// hash - valid 32 byte hex string
-        #[arg(short, long)]
+        #[arg(short = 't', long)]
         hash: String,
     },
 }

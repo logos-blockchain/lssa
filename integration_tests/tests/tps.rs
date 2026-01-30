@@ -25,7 +25,11 @@ pub async fn tps_test() -> Result<()> {
     let target_tps = 12;
 
     let tps_test = TpsTestManager::new(target_tps, num_transactions);
-    let ctx = TestContext::new_with_sequencer_config(tps_test.generate_sequencer_config()).await?;
+    let ctx = TestContext::new_with_sequencer_and_maybe_indexer_configs(
+        tps_test.generate_sequencer_config(),
+        None,
+    )
+    .await?;
 
     let target_time = tps_test.target_time();
     info!(
@@ -185,6 +189,8 @@ impl TpsTestManager {
             initial_accounts: initial_public_accounts,
             initial_commitments: vec![initial_commitment],
             signing_key: [37; 32],
+            bedrock_config: None,
+            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
         }
     }
 }
@@ -234,16 +240,16 @@ fn build_privacy_transaction() -> PrivacyPreservingTransaction {
         ]],
     );
     let (output, proof) = circuit::execute_and_prove(
-        &[sender_pre, recipient_pre],
-        &Program::serialize_instruction(balance_to_move).unwrap(),
-        &[1, 2],
-        &[0xdeadbeef1, 0xdeadbeef2],
-        &[
+        vec![sender_pre, recipient_pre],
+        Program::serialize_instruction(balance_to_move).unwrap(),
+        vec![1, 2],
+        vec![0xdeadbeef1, 0xdeadbeef2],
+        vec![
             (sender_npk.clone(), sender_ss),
             (recipient_npk.clone(), recipient_ss),
         ],
-        &[sender_nsk],
-        &[Some(proof)],
+        vec![sender_nsk],
+        vec![Some(proof)],
         &program.into(),
     )
     .unwrap();

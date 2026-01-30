@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     account::AccountWithMetadata,
     program::{InstructionData, ProgramId, ProgramOutput},
@@ -14,7 +15,7 @@ use crate::{
 /// TODO: Make this variable when fees are implemented
 const MAX_NUM_CYCLES_PUBLIC_EXECUTION: u64 = 1024 * 1024 * 32; // 32M cycles
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Program {
     id: ProgramId,
     elf: Vec<u8>,
@@ -226,12 +227,32 @@ mod tests {
             }
         }
 
+        pub fn changer_claimer() -> Self {
+            use test_program_methods::{CHANGER_CLAIMER_ELF, CHANGER_CLAIMER_ID};
+
+            Program {
+                id: CHANGER_CLAIMER_ID,
+                elf: CHANGER_CLAIMER_ELF.to_vec(),
+            }
+        }
+
         pub fn noop() -> Self {
             use test_program_methods::{NOOP_ELF, NOOP_ID};
 
             Program {
                 id: NOOP_ID,
                 elf: NOOP_ELF.to_vec(),
+            }
+        }
+
+        pub fn malicious_authorization_changer() -> Self {
+            use test_program_methods::{
+                MALICIOUS_AUTHORIZATION_CHANGER_ELF, MALICIOUS_AUTHORIZATION_CHANGER_ID,
+            };
+
+            Program {
+                id: MALICIOUS_AUTHORIZATION_CHANGER_ID,
+                elf: MALICIOUS_AUTHORIZATION_CHANGER_ELF.to_vec(),
             }
         }
 

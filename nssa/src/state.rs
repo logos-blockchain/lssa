@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     Commitment, CommitmentSetDigest, DUMMY_COMMITMENT, MembershipProof, Nullifier,
     account::{Account, AccountId},
@@ -15,6 +16,8 @@ use crate::{
 
 pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
     commitments: HashMap<Commitment, usize>,
@@ -60,8 +63,49 @@ impl CommitmentSet {
     }
 }
 
-type NullifierSet = HashSet<Nullifier>;
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+struct NullifierSet(BTreeSet<Nullifier>);
 
+impl NullifierSet {
+    fn new() -> Self {
+        Self(BTreeSet::new())
+    }
+
+    fn extend(&mut self, new_nullifiers: Vec<Nullifier>) {
+        self.0.extend(new_nullifiers);
+    }
+
+    fn contains(&self, nullifier: &Nullifier) -> bool {
+        self.0.contains(nullifier)
+    }
+}
+
+impl BorshSerialize for NullifierSet {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        self.0.iter().collect::<Vec<_>>().serialize(writer)
+    }
+}
+
+impl BorshDeserialize for NullifierSet {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let vec = Vec::<Nullifier>::deserialize_reader(reader)?;
+
+        let mut set = BTreeSet::new();
+        for n in vec {
+            if !set.insert(n) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "duplicate nullifier in NullifierSet",
+                ));
+            }
+        }
+
+        Ok(Self(set))
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct V02State {
     public_state: HashMap<AccountId, Account>,
     private_state: (CommitmentSet, NullifierSet),
@@ -504,6 +548,7 @@ pub mod tests {
             self.insert_program(Program::chain_caller());
             self.insert_program(Program::amm());
             self.insert_program(Program::claimer());
+            self.insert_program(Program::changer_claimer());
             self
         }
 
@@ -865,13 +910,13 @@ pub mod tests {
         let epk = EphemeralPublicKey::from_scalar(esk);
 
         let (output, proof) = circuit::execute_and_prove(
-            &[sender, recipient],
-            &Program::serialize_instruction(balance_to_move).unwrap(),
-            &[0, 2],
-            &[0xdeadbeef],
-            &[(recipient_keys.npk(), shared_secret)],
-            &[],
-            &[None],
+            vec![sender, recipient],
+            Program::serialize_instruction(balance_to_move).unwrap(),
+            vec![0, 2],
+            vec![0xdeadbeef],
+            vec![(recipient_keys.npk(), shared_secret)],
+            vec![],
+            vec![None],
             &Program::authenticated_transfer_program().into(),
         )
         .unwrap();
@@ -912,16 +957,16 @@ pub mod tests {
         let epk_2 = EphemeralPublicKey::from_scalar(esk_2);
 
         let (output, proof) = circuit::execute_and_prove(
-            &[sender_pre, recipient_pre],
-            &Program::serialize_instruction(balance_to_move).unwrap(),
-            &[1, 2],
-            &new_nonces,
-            &[
+            vec![sender_pre, recipient_pre],
+            Program::serialize_instruction(balance_to_move).unwrap(),
+            vec![1, 2],
+            new_nonces.to_vec(),
+            vec![
                 (sender_keys.npk(), shared_secret_1),
                 (recipient_keys.npk(), shared_secret_2),
             ],
-            &[sender_keys.nsk],
-            &[state.get_proof_for_commitment(&sender_commitment), None],
+            vec![sender_keys.nsk],
+            vec![state.get_proof_for_commitment(&sender_commitment), None],
             &program.into(),
         )
         .unwrap();
@@ -965,13 +1010,13 @@ pub mod tests {
         let epk = EphemeralPublicKey::from_scalar(esk);
 
         let (output, proof) = circuit::execute_and_prove(
-            &[sender_pre, recipient_pre],
-            &Program::serialize_instruction(balance_to_move).unwrap(),
-            &[1, 0],
-            &[new_nonce],
-            &[(sender_keys.npk(), shared_secret)],
-            &[sender_keys.nsk],
-            &[state.get_proof_for_commitment(&sender_commitment)],
+            vec![sender_pre, recipient_pre],
+            Program::serialize_instruction(balance_to_move).unwrap(),
+            vec![1, 0],
+            vec![new_nonce],
+            vec![(sender_keys.npk(), shared_secret)],
+            vec![sender_keys.nsk],
+            vec![state.get_proof_for_commitment(&sender_commitment)],
             &program.into(),
         )
         .unwrap();
@@ -1179,13 +1224,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1206,13 +1251,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1233,13 +1278,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account],
-            &Program::serialize_instruction(()).unwrap(),
-            &[0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account],
+            Program::serialize_instruction(()).unwrap(),
+            vec![0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1260,13 +1305,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account],
-            &Program::serialize_instruction(vec![0]).unwrap(),
-            &[0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account],
+            Program::serialize_instruction(vec![0]).unwrap(),
+            vec![0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1289,13 +1334,13 @@ pub mod tests {
         let large_data: Vec<u8> = vec![0; nssa_core::account::data::DATA_MAX_LENGTH_IN_BYTES + 1];
 
         let result = execute_and_prove(
-            &[public_account],
-            &Program::serialize_instruction(large_data).unwrap(),
-            &[0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account],
+            Program::serialize_instruction(large_data).unwrap(),
+            vec![0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.to_owned().into(),
         );
 
@@ -1316,13 +1361,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account],
-            &Program::serialize_instruction(()).unwrap(),
-            &[0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account],
+            Program::serialize_instruction(()).unwrap(),
+            vec![0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1352,13 +1397,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account_1, public_account_2],
-            &Program::serialize_instruction(()).unwrap(),
-            &[0, 0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account_1, public_account_2],
+            Program::serialize_instruction(()).unwrap(),
+            vec![0, 0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1379,13 +1424,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account],
-            &Program::serialize_instruction(()).unwrap(),
-            &[0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account],
+            Program::serialize_instruction(()).unwrap(),
+            vec![0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1415,13 +1460,13 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[public_account_1, public_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[0, 0],
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account_1, public_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![0, 0],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1453,13 +1498,13 @@ pub mod tests {
         // Setting only one visibility mask for a circuit execution with two pre_state accounts.
         let visibility_mask = [0];
         let result = execute_and_prove(
-            &[public_account_1, public_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &visibility_mask,
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account_1, public_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            visibility_mask.to_vec(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1486,11 +1531,11 @@ pub mod tests {
         // Setting only one nonce for an execution with two private accounts.
         let private_account_nonces = [0xdeadbeef1];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &private_account_nonces,
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            private_account_nonces.to_vec(),
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1500,8 +1545,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1530,13 +1575,13 @@ pub mod tests {
             SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
         )];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &private_account_keys,
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            private_account_keys.to_vec(),
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1563,11 +1608,11 @@ pub mod tests {
         // Setting no second commitment proof.
         let private_account_membership_proofs = [Some((0, vec![]))];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1577,8 +1622,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &private_account_membership_proofs,
+            vec![sender_keys.nsk],
+            private_account_membership_proofs.to_vec(),
             &program.into(),
         );
 
@@ -1605,11 +1650,11 @@ pub mod tests {
         // Setting no auth key for an execution with one non default private accounts.
         let private_account_nsks = [];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1619,8 +1664,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &private_account_nsks,
-            &[],
+            private_account_nsks.to_vec(),
+            vec![],
             &program.into(),
         );
 
@@ -1663,13 +1708,13 @@ pub mod tests {
         let private_account_nsks = [recipient_keys.nsk];
         let private_account_membership_proofs = [Some((0, vec![]))];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &private_account_keys,
-            &private_account_nsks,
-            &private_account_membership_proofs,
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            private_account_keys.to_vec(),
+            private_account_nsks.to_vec(),
+            private_account_membership_proofs.to_vec(),
             &program.into(),
         );
 
@@ -1701,11 +1746,11 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1715,8 +1760,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1749,11 +1794,11 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1763,8 +1808,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1796,11 +1841,11 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1810,8 +1855,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1843,11 +1888,11 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1857,8 +1902,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1888,11 +1933,11 @@ pub mod tests {
         );
 
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1902,8 +1947,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -1927,13 +1972,13 @@ pub mod tests {
 
         let visibility_mask = [0, 3];
         let result = execute_and_prove(
-            &[public_account_1, public_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &visibility_mask,
-            &[],
-            &[],
-            &[],
-            &[],
+            vec![public_account_1, public_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            visibility_mask.to_vec(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
             &program.into(),
         );
 
@@ -1961,11 +2006,11 @@ pub mod tests {
         // accounts.
         let private_account_nonces = [0xdeadbeef1, 0xdeadbeef2, 0xdeadbeef3];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &private_account_nonces,
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            private_account_nonces.to_vec(),
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -1975,8 +2020,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -2017,13 +2062,13 @@ pub mod tests {
             ),
         ];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &[1, 2],
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &private_account_keys,
-            &[sender_keys.nsk],
-            &[Some((0, vec![]))],
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            vec![1, 2],
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            private_account_keys.to_vec(),
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
             &program.into(),
         );
 
@@ -2053,11 +2098,11 @@ pub mod tests {
         let private_account_nsks = [sender_keys.nsk, recipient_keys.nsk];
         let private_account_membership_proofs = [Some((0, vec![])), Some((1, vec![]))];
         let result = execute_and_prove(
-            &[private_account_1, private_account_2],
-            &Program::serialize_instruction(10u128).unwrap(),
-            &visibility_mask,
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1, private_account_2],
+            Program::serialize_instruction(10u128).unwrap(),
+            visibility_mask.to_vec(),
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (
                     sender_keys.npk(),
                     SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
@@ -2067,8 +2112,8 @@ pub mod tests {
                     SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
                 ),
             ],
-            &private_account_nsks,
-            &private_account_membership_proofs,
+            private_account_nsks.to_vec(),
+            private_account_membership_proofs.to_vec(),
             &program.into(),
         );
 
@@ -2149,16 +2194,16 @@ pub mod tests {
         let private_account_membership_proofs = [Some((1, vec![])), Some((1, vec![]))];
         let shared_secret = SharedSecretKey::new(&[55; 32], &sender_keys.ivk());
         let result = execute_and_prove(
-            &[private_account_1.clone(), private_account_1],
-            &Program::serialize_instruction(100u128).unwrap(),
-            &visibility_mask,
-            &[0xdeadbeef1, 0xdeadbeef2],
-            &[
+            vec![private_account_1.clone(), private_account_1],
+            Program::serialize_instruction(100u128).unwrap(),
+            visibility_mask.to_vec(),
+            vec![0xdeadbeef1, 0xdeadbeef2],
+            vec![
                 (sender_keys.npk(), shared_secret),
                 (sender_keys.npk(), shared_secret),
             ],
-            &private_account_nsks,
-            &private_account_membership_proofs,
+            private_account_nsks.to_vec(),
+            private_account_membership_proofs.to_vec(),
             &program.into(),
         );
 
@@ -3941,8 +3986,9 @@ pub mod tests {
         assert_eq!(to_post, expected_to_post);
     }
 
-    #[test]
-    fn test_private_chained_call() {
+    #[test_case::test_case(1; "single call")]
+    #[test_case::test_case(2; "two calls")]
+    fn test_private_chained_call(number_of_calls: u32) {
         // Arrange
         let chain_caller = Program::chain_caller();
         let auth_transfers = Program::authenticated_transfer_program();
@@ -3978,7 +4024,7 @@ pub mod tests {
         let instruction: (u128, ProgramId, u32, Option<PdaSeed>) = (
             amount,
             Program::authenticated_transfer_program().id(),
-            1,
+            number_of_calls,
             None,
         );
 
@@ -3999,14 +4045,14 @@ pub mod tests {
         let to_new_nonce = 0xdeadbeef2;
 
         let from_expected_post = Account {
-            balance: initial_balance - amount,
+            balance: initial_balance - number_of_calls as u128 * amount,
             nonce: from_new_nonce,
             ..from_account.account.clone()
         };
         let from_expected_commitment = Commitment::new(&from_keys.npk(), &from_expected_post);
 
         let to_expected_post = Account {
-            balance: amount,
+            balance: number_of_calls as u128 * amount,
             nonce: to_new_nonce,
             ..to_account.account.clone()
         };
@@ -4014,13 +4060,13 @@ pub mod tests {
 
         // Act
         let (output, proof) = execute_and_prove(
-            &[to_account, from_account],
-            &Program::serialize_instruction(instruction).unwrap(),
-            &[1, 1],
-            &[from_new_nonce, to_new_nonce],
-            &[(from_keys.npk(), to_ss), (to_keys.npk(), from_ss)],
-            &[from_keys.nsk, to_keys.nsk],
-            &[
+            vec![to_account, from_account],
+            Program::serialize_instruction(instruction).unwrap(),
+            vec![1, 1],
+            vec![from_new_nonce, to_new_nonce],
+            vec![(from_keys.npk(), to_ss), (to_keys.npk(), from_ss)],
+            vec![from_keys.nsk, to_keys.nsk],
+            vec![
                 state.get_proof_for_commitment(&from_commitment),
                 state.get_proof_for_commitment(&to_commitment),
             ],
@@ -4255,13 +4301,13 @@ pub mod tests {
 
         // Execute and prove the circuit with the authorized account but no commitment proof
         let (output, proof) = execute_and_prove(
-            std::slice::from_ref(&authorized_account),
-            &Program::serialize_instruction(balance).unwrap(),
-            &[1],
-            &[nonce],
-            &[(private_keys.npk(), shared_secret)],
-            &[private_keys.nsk],
-            &[None],
+            vec![authorized_account],
+            Program::serialize_instruction(balance).unwrap(),
+            vec![1],
+            vec![nonce],
+            vec![(private_keys.npk(), shared_secret)],
+            vec![private_keys.nsk],
+            vec![None],
             &program.into(),
         )
         .unwrap();
@@ -4308,13 +4354,13 @@ pub mod tests {
 
         // Step 2: Execute claimer program to claim the account with authentication
         let (output, proof) = execute_and_prove(
-            std::slice::from_ref(&authorized_account),
-            &Program::serialize_instruction(balance).unwrap(),
-            &[1],
-            &[nonce],
-            &[(private_keys.npk(), shared_secret)],
-            &[private_keys.nsk],
-            &[None],
+            vec![authorized_account.clone()],
+            Program::serialize_instruction(balance).unwrap(),
+            vec![1],
+            vec![nonce],
+            vec![(private_keys.npk(), shared_secret)],
+            vec![private_keys.nsk],
+            vec![None],
             &claimer_program.into(),
         )
         .unwrap();
@@ -4356,16 +4402,185 @@ pub mod tests {
 
         // Step 3: Try to execute noop program with authentication but without initialization
         let res = execute_and_prove(
-            std::slice::from_ref(&account_metadata),
-            &Program::serialize_instruction(()).unwrap(),
-            &[1],
-            &[nonce2],
-            &[(private_keys.npk(), shared_secret2)],
-            &[private_keys.nsk],
-            &[None],
+            vec![account_metadata],
+            Program::serialize_instruction(()).unwrap(),
+            vec![1],
+            vec![nonce2],
+            vec![(private_keys.npk(), shared_secret2)],
+            vec![private_keys.nsk],
+            vec![None],
             &noop_program.into(),
         );
 
         assert!(matches!(res, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_public_changer_claimer_no_data_change_no_claim_succeeds() {
+        let initial_data = [];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let account_id = AccountId::new([1; 32]);
+        let program_id = Program::changer_claimer().id();
+        // Don't change data (None) and don't claim (false)
+        let instruction: (Option<Vec<u8>>, bool) = (None, false);
+
+        let message =
+            public_transaction::Message::try_new(program_id, vec![account_id], vec![], instruction)
+                .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+
+        // Should succeed - no changes made, no claim needed
+        assert!(result.is_ok());
+        // Account should remain default/unclaimed
+        assert_eq!(state.get_account_by_id(&account_id), Account::default());
+    }
+
+    #[test]
+    fn test_public_changer_claimer_data_change_no_claim_fails() {
+        let initial_data = [];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let account_id = AccountId::new([1; 32]);
+        let program_id = Program::changer_claimer().id();
+        // Change data but don't claim (false) - should fail
+        let new_data = vec![1, 2, 3, 4, 5];
+        let instruction: (Option<Vec<u8>>, bool) = (Some(new_data), false);
+
+        let message =
+            public_transaction::Message::try_new(program_id, vec![account_id], vec![], instruction)
+                .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+
+        // Should fail - cannot modify data without claiming the account
+        assert!(matches!(result, Err(NssaError::InvalidProgramBehavior)));
+    }
+
+    #[test]
+    fn test_private_changer_claimer_no_data_change_no_claim_succeeds() {
+        let program = Program::changer_claimer();
+        let sender_keys = test_private_account_keys_1();
+        let private_account =
+            AccountWithMetadata::new(Account::default(), true, &sender_keys.npk());
+        // Don't change data (None) and don't claim (false)
+        let instruction: (Option<Vec<u8>>, bool) = (None, false);
+
+        let result = execute_and_prove(
+            vec![private_account],
+            Program::serialize_instruction(instruction).unwrap(),
+            vec![1],
+            vec![2],
+            vec![(
+                sender_keys.npk(),
+                SharedSecretKey::new(&[3; 32], &sender_keys.ivk()),
+            )],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
+            &program.into(),
+        );
+
+        // Should succeed - no changes made, no claim needed
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_private_changer_claimer_data_change_no_claim_fails() {
+        let program = Program::changer_claimer();
+        let sender_keys = test_private_account_keys_1();
+        let private_account =
+            AccountWithMetadata::new(Account::default(), true, &sender_keys.npk());
+        // Change data but don't claim (false) - should fail
+        let new_data = vec![1, 2, 3, 4, 5];
+        let instruction: (Option<Vec<u8>>, bool) = (Some(new_data), false);
+
+        let result = execute_and_prove(
+            vec![private_account],
+            Program::serialize_instruction(instruction).unwrap(),
+            vec![1],
+            vec![2],
+            vec![(
+                sender_keys.npk(),
+                SharedSecretKey::new(&[3; 32], &sender_keys.ivk()),
+            )],
+            vec![sender_keys.nsk],
+            vec![Some((0, vec![]))],
+            &program.into(),
+        );
+
+        // Should fail - cannot modify data without claiming the account
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_malicious_authorization_changer_should_fail_in_privacy_preserving_circuit() {
+        // Arrange
+        let malicious_program = Program::malicious_authorization_changer();
+        let auth_transfers = Program::authenticated_transfer_program();
+        let sender_keys = test_public_account_keys_1();
+        let recipient_keys = test_private_account_keys_1();
+
+        let sender_account = AccountWithMetadata::new(
+            Account {
+                program_owner: auth_transfers.id(),
+                balance: 100,
+                ..Default::default()
+            },
+            false,
+            sender_keys.account_id(),
+        );
+        let recipient_account =
+            AccountWithMetadata::new(Account::default(), true, &recipient_keys.npk());
+
+        let recipient_commitment =
+            Commitment::new(&recipient_keys.npk(), &recipient_account.account);
+        let state = V02State::new_with_genesis_accounts(
+            &[(sender_account.account_id, sender_account.account.balance)],
+            std::slice::from_ref(&recipient_commitment),
+        )
+        .with_test_programs();
+
+        let balance_to_transfer = 10u128;
+        let instruction = (balance_to_transfer, auth_transfers.id());
+
+        let recipient_esk = [3; 32];
+        let recipient = SharedSecretKey::new(&recipient_esk, &recipient_keys.ivk());
+
+        let mut dependencies = HashMap::new();
+        dependencies.insert(auth_transfers.id(), auth_transfers);
+        let program_with_deps = ProgramWithDependencies::new(malicious_program, dependencies);
+
+        let recipient_new_nonce = 0xdeadbeef1;
+
+        // Act - execute the malicious program - this should fail during proving
+        let result = execute_and_prove(
+            vec![sender_account, recipient_account],
+            Program::serialize_instruction(instruction).unwrap(),
+            vec![0, 1],
+            vec![recipient_new_nonce],
+            vec![(recipient_keys.npk(), recipient)],
+            vec![recipient_keys.nsk],
+            vec![state.get_proof_for_commitment(&recipient_commitment)],
+            &program_with_deps,
+        );
+
+        // Assert - should fail because the malicious program tries to manipulate is_authorized
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_state_serialization_roundtrip() {
+        let account_id_1 = AccountId::new([1; 32]);
+        let account_id_2 = AccountId::new([2; 32]);
+        let initial_data = [(account_id_1, 100u128), (account_id_2, 151u128)];
+        let state = V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let bytes = borsh::to_vec(&state).unwrap();
+        let state_from_bytes: V02State = borsh::from_slice(&bytes).unwrap();
+        assert_eq!(state, state_from_bytes);
     }
 }

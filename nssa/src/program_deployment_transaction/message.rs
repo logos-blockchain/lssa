@@ -9,4 +9,8 @@ impl Message {
     pub fn new(bytecode: Vec<u8>) -> Self {
         Self { bytecode }
     }
+
+    pub fn into_bytecode(self) -> Vec<u8> {
+        self.bytecode
+    }
 }

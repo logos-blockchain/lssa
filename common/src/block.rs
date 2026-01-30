@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256, digest::FixedOutput};
 use crate::transaction::EncodedTransaction;
 
 pub type HashType = [u8; 32];
+pub type MantleMsgId = [u8; 32];
 
 #[derive(Debug, Clone)]
 /// Our own hasher.
@@ -23,7 +24,7 @@ pub type BlockHash = [u8; 32];
 pub type BlockId = u64;
 pub type TimeStamp = u64;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BlockHeader {
     pub block_id: BlockId,
     pub prev_block_hash: BlockHash,
@@ -32,18 +33,27 @@ pub struct BlockHeader {
     pub signature: nssa::Signature,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BlockBody {
     pub transactions: Vec<EncodedTransaction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum BedrockStatus {
+    Pending,
+    Safe,
+    Finalized,
+}
+
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,
+    pub bedrock_status: BedrockStatus,
+    pub bedrock_parent_id: MantleMsgId,
 }
 
-#[derive(Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct HashableBlockData {
     pub block_id: BlockId,
     pub prev_block_hash: BlockHash,
@@ -52,7 +62,11 @@ pub struct HashableBlockData {
 }
 
 impl HashableBlockData {
-    pub fn into_block(self, signing_key: &nssa::PrivateKey) -> Block {
+    pub fn into_pending_block(
+        self,
+        signing_key: &nssa::PrivateKey,
+        bedrock_parent_id: MantleMsgId,
+    ) -> Block {
         let data_bytes = borsh::to_vec(&self).unwrap();
         let signature = nssa::Signature::new(signing_key, &data_bytes);
         let hash = OwnHasher::hash(&data_bytes);
@@ -67,7 +81,13 @@ impl HashableBlockData {
             body: BlockBody {
                 transactions: self.transactions,
             },
+            bedrock_status: BedrockStatus::Pending,
+            bedrock_parent_id,
         }
+    }
+
+    pub fn block_hash(&self) -> BlockHash {
+        OwnHasher::hash(&borsh::to_vec(&self).unwrap())
     }
 }
 

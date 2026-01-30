@@ -77,7 +77,7 @@ fn main() {
         instruction_words,
         vec![pinata, winner],
         vec![
-            AccountPostState::new(pinata_post),
+            AccountPostState::new_claimed_if_default(pinata_post),
             AccountPostState::new(winner_post),
         ],
     );
