@@ -32,9 +32,6 @@ pub trait Rpc {
     #[method(name = "getBlockByHash")]
     async fn get_block_by_hash(&self, block_hash: Hash) -> Result<Block, ErrorObjectOwned>;
 
-    #[method(name = "getLastBlockId")]
-    async fn get_last_block_id(&self) -> Result<BlockId, ErrorObjectOwned>;
-
     #[method(name = "getAccount")]
     async fn get_account(&self, account_id: AccountId) -> Result<Account, ErrorObjectOwned>;
 

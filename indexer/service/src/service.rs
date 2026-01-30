@@ -33,10 +33,6 @@ impl indexer_service_rpc::RpcServer for IndexerService {
         todo!()
     }
 
-    async fn get_last_block_id(&self) -> Result<BlockId, ErrorObjectOwned> {
-        todo!()
-    }
-
     async fn get_account(&self, _account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
         todo!()
     }
