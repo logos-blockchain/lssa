@@ -163,13 +163,17 @@ impl MockIndexerService {
 
 #[async_trait::async_trait]
 impl indexer_service_rpc::RpcServer for MockIndexerService {
-    async fn subscribe_to_blocks(
+    async fn subscribe_to_finalized_blocks(
         &self,
-        _subscription_sink: jsonrpsee::PendingSubscriptionSink,
-        _from: BlockId,
+        subscription_sink: jsonrpsee::PendingSubscriptionSink,
+        from: BlockId,
     ) -> SubscriptionResult {
-        // Subscription not implemented for mock service
-        Err("Subscriptions not supported in mock service".into())
+        let sink = subscription_sink.accept().await?;
+        for block in self.blocks.iter().filter(|b| b.header.block_id >= from) {
+            let json = serde_json::value::to_raw_value(block).unwrap();
+            sink.send(json).await?;
+        }
+        Ok(())
     }
 
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned> {

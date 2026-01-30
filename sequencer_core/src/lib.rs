@@ -19,6 +19,8 @@ mod block_settlement_client;
 pub mod block_store;
 pub mod config;
 
+type IndexerClient = jsonrpsee::http_client::HttpClient;
+
 pub struct SequencerCore {
     state: nssa::V02State,
     store: SequencerStore,
@@ -26,6 +28,7 @@ pub struct SequencerCore {
     sequencer_config: SequencerConfig,
     chain_height: u64,
     block_settlement_client: Option<BlockSettlementClient>,
+    indexer_client: IndexerClient,
     last_bedrock_msg_id: MantleMsgId,
 }
 
@@ -113,6 +116,10 @@ impl SequencerCore {
                 .expect("Block settlement client should be constructible")
         });
 
+        let indexer_client = jsonrpsee::http_client::HttpClientBuilder::default()
+            .build(config.indexer_rpc_url.clone())
+            .expect("Failed to create Indexer client");
+
         let sequencer_core = Self {
             state,
             store,
@@ -120,6 +127,7 @@ impl SequencerCore {
             chain_height: config.genesis_id,
             sequencer_config: config,
             block_settlement_client,
+            indexer_client,
             last_bedrock_msg_id: channel_genesis_msg_id,
         };
 
@@ -252,6 +260,14 @@ impl SequencerCore {
         }
     }
 
+    pub fn first_pending_block_id(&self) -> Result<Option<u64>> {
+        Ok(self
+            .get_pending_blocks()?
+            .iter()
+            .map(|block| block.header.block_id)
+            .min())
+    }
+
     /// Returns the list of stored pending blocks.
     pub fn get_pending_blocks(&self) -> Result<Vec<Block>> {
         Ok(self
@@ -265,6 +281,10 @@ impl SequencerCore {
 
     pub fn block_settlement_client(&self) -> Option<BlockSettlementClient> {
         self.block_settlement_client.clone()
+    }
+
+    pub fn indexer_client(&self) -> &IndexerClient {
+        &self.indexer_client
     }
 }
 
@@ -329,6 +349,7 @@ mod tests {
             signing_key: *sequencer_sign_key_for_testing().value(),
             bedrock_config: None,
             retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            indexer_rpc_url: "http://localhost:8779".parse().unwrap(),
         }
     }
 

@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use common::common::BasicAuth;
+use common::config::BasicAuth;
 use key_protocol::key_management::{
     KeyChain,
     key_tree::{

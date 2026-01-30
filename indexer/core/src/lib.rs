@@ -69,14 +69,14 @@ impl IndexerCore {
                             }
                         }
 
-                        // Sending data into sequencer, may need to be expanded.
-                        let message = Message::L2BlockFinalized {
-                            l2_block_height: l2_block.block_id,
-                        };
+                        // // Sending data into sequencer, may need to be expanded.
+                        // let message = Message::L2BlockFinalized {
+                        //     l2_block_height: l2_block.block_id,
+                        // };
 
-                        let status = self.send_message_to_sequencer(message.clone()).await?;
+                        // let status = self.send_message_to_sequencer(message.clone()).await?;
 
-                        info!("Sent message {message:#?} to sequencer; status {status:#?}");
+                        // info!("Sent message {message:#?} to sequencer; status {status:#?}");
                     }
                 }
             }

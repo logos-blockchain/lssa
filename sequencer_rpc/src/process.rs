@@ -18,8 +18,8 @@ use common::{
             GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
             GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
             GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, HelloRequest, HelloResponse, PostIndexerMessageRequest,
-            PostIndexerMessageResponse, SendTxRequest, SendTxResponse,
+            GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest,
+            SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -341,7 +341,7 @@ mod tests {
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
     use common::{
-        sequencer_client::BasicAuth, test_utils::sequencer_sign_key_for_testing,
+        config::BasicAuth, test_utils::sequencer_sign_key_for_testing,
         transaction::EncodedTransaction,
     };
     use sequencer_core::{
@@ -394,12 +394,13 @@ mod tests {
             retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
             bedrock_config: Some(BedrockConfig {
                 channel_id: [42; 32].into(),
-                node_url: "http://localhost:8080".to_string(),
+                node_url: "http://localhost:8080".parse().unwrap(),
                 auth: Some(BasicAuth {
                     username: "user".to_string(),
                     password: None,
                 }),
             }),
+            indexer_rpc_url: "http://localhost:8779".parse().unwrap(),
         }
     }
 

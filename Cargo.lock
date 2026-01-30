@@ -3232,6 +3232,7 @@ dependencies = [
  "indexer_service_rpc",
  "jsonrpsee",
  "log",
+ "serde_json",
  "tokio",
  "tokio-util",
 ]
@@ -6446,6 +6447,7 @@ dependencies = [
  "chrono",
  "common",
  "futures",
+ "jsonrpsee",
  "log",
  "logos-blockchain-core",
  "logos-blockchain-key-management-system-service",
@@ -6459,6 +6461,7 @@ dependencies = [
  "storage",
  "tempfile",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -6495,6 +6498,9 @@ dependencies = [
  "clap 4.5.53",
  "common",
  "env_logger",
+ "futures",
+ "indexer_service_protocol",
+ "indexer_service_rpc",
  "log",
  "sequencer_core",
  "sequencer_rpc",

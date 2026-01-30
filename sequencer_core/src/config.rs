@@ -8,6 +8,7 @@ use anyhow::Result;
 use common::config::BasicAuth;
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 /// Helperstruct for account serialization
@@ -53,6 +54,8 @@ pub struct SequencerConfig {
     pub signing_key: [u8; 32],
     /// Bedrock configuration options
     pub bedrock_config: Option<BedrockConfig>,
+    /// Indexer RPC URL
+    pub indexer_rpc_url: Url,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -60,7 +63,7 @@ pub struct BedrockConfig {
     /// Bedrock channel ID
     pub channel_id: ChannelId,
     /// Bedrock Url
-    pub node_url: String,
+    pub node_url: Url,
     /// Bedrock auth
     pub auth: Option<BasicAuth>,
 }

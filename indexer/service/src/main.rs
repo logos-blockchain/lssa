@@ -2,6 +2,7 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use anyhow::{Context as _, Result};
 use clap::Parser;
+use indexer_core::config::IndexerConfig;
 use indexer_service_rpc::RpcServer as _;
 use jsonrpsee::server::Server;
 use log::{error, info};
@@ -10,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 #[derive(Debug, Parser)]
 #[clap(version)]
 struct Args {
-    #[clap(rename = "config")]
+    #[clap(name = "config")]
     config_path: PathBuf,
     #[clap(short, long, default_value = "8779")]
     port: u16,
@@ -42,7 +43,9 @@ async fn main() -> Result<()> {
 }
 
 async fn run_server(config_path: PathBuf, port: u16) -> Result<jsonrpsee::server::ServerHandle> {
-    let config = IndexerServiceConfig::from_file(&config_path)?;
+    let config = IndexerConfig::from_path(&config_path)?;
+    #[cfg(feature = "mock-responses")]
+    let _ = config;
 
     let server = Server::builder()
         .build(SocketAddr::from(([0, 0, 0, 0], port)))

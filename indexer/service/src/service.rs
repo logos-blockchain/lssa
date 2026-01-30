@@ -17,7 +17,7 @@ impl IndexerService {
 
 #[async_trait::async_trait]
 impl indexer_service_rpc::RpcServer for IndexerService {
-    async fn subscribe_to_blocks(
+    async fn subscribe_to_finalized_blocks(
         &self,
         _subscription_sink: jsonrpsee::PendingSubscriptionSink,
         _from: BlockId,

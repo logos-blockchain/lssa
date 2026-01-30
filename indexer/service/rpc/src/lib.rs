@@ -23,8 +23,8 @@ pub trait Rpc {
         Ok(serde_json::to_value(block_schema).expect("Schema serialization should not fail"))
     }
 
-    #[subscription(name = "subscribeToBlocks", item = Vec<Block>)]
-    async fn subscribe_to_blocks(&self, from: BlockId) -> SubscriptionResult;
+    #[subscription(name = "subscribeToFinalizedBlocks", item = Block)]
+    async fn subscribe_to_finalized_blocks(&self, from: BlockId) -> SubscriptionResult;
 
     #[method(name = "getBlockById")]
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned>;
