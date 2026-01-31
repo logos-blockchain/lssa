@@ -5,7 +5,7 @@ use anyhow::{Context as _, Result};
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
 use futures::FutureExt as _;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -194,12 +194,10 @@ async fn listen_for_bedrock_blocks_loop(seq_core: Arc<Mutex<SequencerCore>>) -> 
             .await
             .context("Failed to subscribe to finalized blocks")?;
 
-        while let Some(block) = subscription.next().await {
-            let block = block.context("Failed to get next block from subscription")?;
-            let block_id = block.header.block_id;
+        while let Some(block_id) = subscription.next().await {
+            let block_id = block_id.context("Failed to get next block from subscription")?;
 
             info!("Received new L2 block with ID {block_id}");
-            debug!("Block data: {block:#?}");
 
             seq_core
                 .lock()

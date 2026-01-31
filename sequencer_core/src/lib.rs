@@ -265,7 +265,10 @@ impl SequencerCore {
             .map(|block| block.header.block_id)
             .min()
         {
-            info!("FIRST PENDING BLOCK: {}", first_pending_block_id);
+            info!(
+                "Clearing pending blocks up to id: {}",
+                last_finalized_block_id
+            );
             (first_pending_block_id..=last_finalized_block_id)
                 .try_for_each(|id| self.store.delete_block_at_id(id))
         } else {

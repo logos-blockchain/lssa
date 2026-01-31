@@ -8,7 +8,7 @@ use common::{
     sequencer_client::SequencerClient,
     transaction::{EncodedTransaction, NSSATransaction},
 };
-use indexer_core::{IndexerCore, config::IndexerConfig};
+use indexer_core::config::IndexerConfig;
 use log::debug;
 use nssa::PrivacyPreservingTransaction;
 use nssa_core::Commitment;

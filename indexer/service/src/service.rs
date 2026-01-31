@@ -4,14 +4,18 @@ use anyhow::{Context as _, Result, anyhow};
 use futures::StreamExt as _;
 use indexer_core::{IndexerCore, config::IndexerConfig};
 use indexer_service_protocol::{Account, AccountId, Block, BlockId, Hash, Transaction};
-use jsonrpsee::{SubscriptionSink, core::{Serialize, SubscriptionResult}, types::ErrorObjectOwned};
-use tokio::sync::Mutex;
+use jsonrpsee::{
+    SubscriptionMessage, SubscriptionSink,
+    core::{Serialize, SubscriptionResult},
+    types::ErrorObjectOwned,
+};
+use serde_json::value::RawValue;
+use tokio::sync::{Mutex, broadcast};
 
 pub struct IndexerService {
     service_impl: Arc<Mutex<IndexerServiceImpl>>,
     respond_subscribers_loop_handle: tokio::task::JoinHandle<Result<()>>,
 }
-
 impl Drop for IndexerService {
     fn drop(&mut self) {
         self.respond_subscribers_loop_handle.abort();
@@ -20,9 +24,9 @@ impl Drop for IndexerService {
 
 impl IndexerService {
     pub fn new(config: IndexerConfig) -> Result<Self> {
-        let service_impl = Arc::new(Mutex::new(IndexerServiceImpl::new(
-            IndexerCore::new(config)?,
-        )));
+        let service_impl = Arc::new(Mutex::new(IndexerServiceImpl::new(IndexerCore::new(
+            config,
+        )?)));
 
         let respond_subscribers_loop_handle = tokio::spawn(
             IndexerServiceImpl::respond_subscribers_loop(Arc::clone(&service_impl)),
@@ -41,8 +45,27 @@ impl indexer_service_rpc::RpcServer for IndexerService {
         &self,
         subscription_sink: jsonrpsee::PendingSubscriptionSink,
     ) -> SubscriptionResult {
+        let mut rx = self
+            .service_impl
+            .lock()
+            .await
+            .finalized_block_id_tx
+            .subscribe();
+
         let sink = subscription_sink.accept().await?;
-        self.service_impl.lock().await.add_subscription(Subscription::new(sink)).await;
+
+        tokio::spawn(async move {
+            while let Ok(block_id) = rx.recv().await {
+                let msg = SubscriptionMessage::from(
+                    RawValue::from_string(block_id.to_string())
+                        .expect("u64 string is always valid JSON"),
+                );
+                if sink.send(msg).await.is_err() {
+                    break;
+                }
+            }
+        });
+
         Ok(())
     }
 
@@ -78,19 +101,17 @@ impl indexer_service_rpc::RpcServer for IndexerService {
 
 struct IndexerServiceImpl {
     indexer: IndexerCore,
-    subscriptions: Vec<Subscription<Block>>,
+    finalized_block_id_tx: broadcast::Sender<BlockId>,
 }
 
 impl IndexerServiceImpl {
     fn new(indexer: IndexerCore) -> Self {
+        let (finalized_block_id_tx, _block_rx) = broadcast::channel(1024);
+
         Self {
             indexer,
-            subscriptions: Vec::new(),
+            finalized_block_id_tx,
         }
-    }
-
-    async fn add_subscription(&mut self, subscription: Subscription<Block>) {
-        self.subscriptions.push(subscription);
     }
 
     async fn respond_subscribers_loop(service_impl: Arc<Mutex<IndexerServiceImpl>>) -> Result<()> {
@@ -98,40 +119,16 @@ impl IndexerServiceImpl {
 
         let mut block_stream = pin!(indexer_clone.subscribe_parse_block_stream().await);
         while let Some(block) = block_stream.next().await {
-            let block= block.context("Failed to get L2 block data")?;
-            let block = block.try_into().context("Failed to convert L2 Block into protocol Block")?;
+            let block = block.context("Failed to get L2 block data")?;
 
             // Cloning subscriptions to avoid holding the lock while sending
-            let subscriptions = service_impl.lock().await.subscriptions.clone();
-            for sink in subscriptions {
-                sink.send(&block).await?;
-            }
+            service_impl
+                .lock()
+                .await
+                .finalized_block_id_tx
+                .send(block.header.block_id)?;
         }
 
         Err(anyhow!("Block stream ended unexpectedly"))
-    }
-}
-
-#[derive(Clone)]
-struct Subscription<T> {
-    sink: SubscriptionSink,
-    _marker: std::marker::PhantomData<T>,
-}
-
-impl<T> Subscription<T> {
-    fn new(sink: SubscriptionSink) -> Self {
-        Self {
-            sink,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    async fn send(&self, item: &T) -> Result<()>
-    where T: Serialize
-    {
-        let json = serde_json::value::to_raw_value(item)
-            .context("Failed to serialize item for subscription")?;
-        self.sink.send(json).await?;
-        Ok(())
     }
 }

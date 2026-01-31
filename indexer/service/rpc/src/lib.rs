@@ -23,7 +23,7 @@ pub trait Rpc {
         Ok(serde_json::to_value(block_schema).expect("Schema serialization should not fail"))
     }
 
-    #[subscription(name = "subscribeToFinalizedBlocks", item = Block)]
+    #[subscription(name = "subscribeToFinalizedBlocks", item = BlockId)]
     async fn subscribe_to_finalized_blocks(&self) -> SubscriptionResult;
 
     #[method(name = "getBlockById")]
