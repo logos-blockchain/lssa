@@ -70,7 +70,7 @@ impl SequencerCore {
         // as fixing this issue may require actions non-native to program scope
         let store = SequencerStore::open_db_with_genesis(
             &config.home.join("rocksdb"),
-            Some(genesis_block),
+            Some(&genesis_block),
             signing_key,
         )
         .unwrap();
@@ -118,6 +118,15 @@ impl SequencerCore {
                 .expect("Block settlement client should be constructible")
         });
 
+        let last_bedrock_msg_id = if let Some(client) = block_settlement_client.as_ref() {
+            let (_, msg_id) = client
+                .create_inscribe_tx(&genesis_block)
+                .expect("Inscription transaction with genesis block should be constructible");
+            msg_id.into()
+        } else {
+            channel_genesis_msg_id
+        };
+
         let indexer_client = Arc::new(
             jsonrpsee::ws_client::WsClientBuilder::default()
                 .build(config.indexer_rpc_url.clone())
@@ -133,7 +142,7 @@ impl SequencerCore {
             sequencer_config: config,
             block_settlement_client,
             indexer_client,
-            last_bedrock_msg_id: channel_genesis_msg_id,
+            last_bedrock_msg_id,
         };
 
         (sequencer_core, mempool_handle)
@@ -158,11 +167,9 @@ impl SequencerCore {
     }
 
     pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
-        let block_data = self.produce_new_block_with_mempool_transactions()?;
+        let block = self.produce_new_block_with_mempool_transactions()?;
 
         if let Some(client) = self.block_settlement_client.as_mut() {
-            let block =
-                block_data.into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
             let msg_id = client.submit_block_to_bedrock(&block).await?;
             self.last_bedrock_msg_id = msg_id.into();
             log::info!("Posted block data to Bedrock");
@@ -172,7 +179,7 @@ impl SequencerCore {
     }
 
     /// Produces new block from transactions in mempool
-    pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<HashableBlockData> {
+    pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<Block> {
         let now = Instant::now();
 
         let new_block_height = self.chain_height + 1;
@@ -209,7 +216,7 @@ impl SequencerCore {
             .clone()
             .into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
 
-        self.store.update(block, &self.state)?;
+        self.store.update(&block, &self.state)?;
 
         self.chain_height = new_block_height;
 
@@ -228,7 +235,7 @@ impl SequencerCore {
             hashable_data.transactions.len(),
             now.elapsed().as_secs()
         );
-        Ok(hashable_data)
+        Ok(block)
     }
 
     pub fn state(&self) -> &nssa::V02State {
@@ -692,7 +699,7 @@ mod tests {
 
         let block = sequencer.produce_new_block_with_mempool_transactions();
         assert!(block.is_ok());
-        assert_eq!(block.unwrap().block_id, genesis_height + 1);
+        assert_eq!(block.unwrap().header.block_id, genesis_height + 1);
     }
 
     #[tokio::test]
@@ -730,6 +737,7 @@ mod tests {
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap()
+            .header
             .block_id;
         let block = sequencer.store.get_block_at_id(current_height).unwrap();
 
@@ -767,6 +775,7 @@ mod tests {
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap()
+            .header
             .block_id;
         let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert_eq!(block.body.transactions, vec![tx.clone()]);
@@ -776,6 +785,7 @@ mod tests {
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap()
+            .header
             .block_id;
         let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert!(block.body.transactions.is_empty());
@@ -810,6 +820,7 @@ mod tests {
             let current_height = sequencer
                 .produce_new_block_with_mempool_transactions()
                 .unwrap()
+                .header
                 .block_id;
             let block = sequencer.store.get_block_at_id(current_height).unwrap();
             assert_eq!(block.body.transactions, vec![tx.clone()]);
