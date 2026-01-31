@@ -2,6 +2,7 @@
 name = "test_program_methods"
 version = "0.1.0"
 edition = "2024"
+license = { workspace = true }
 
 [build-dependencies]
 risc0-build.workspace = true
