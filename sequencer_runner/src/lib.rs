@@ -4,7 +4,7 @@ use actix_web::dev::ServerHandle;
 use anyhow::{Context as _, Result};
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
-use futures::FutureExt as _;
+use futures::{FutureExt as _, never::Never};
 use log::{error, info, warn};
 use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
@@ -18,10 +18,6 @@ struct Args {
     /// Path to configs
     home_dir: PathBuf,
 }
-
-/// An enum that can never be instantiated, used to replace unstable `!` type.
-#[derive(Debug)]
-pub enum Never {}
 
 /// Handle to manage the sequencer and its tasks.
 ///

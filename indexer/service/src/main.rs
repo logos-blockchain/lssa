@@ -1,10 +1,7 @@
-use std::{net::SocketAddr, path::PathBuf};
+use std::path::PathBuf;
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use clap::Parser;
-use indexer_core::config::IndexerConfig;
-use indexer_service_rpc::RpcServer as _;
-use jsonrpsee::server::Server;
 use log::{error, info};
 use tokio_util::sync::CancellationToken;
 
@@ -25,14 +22,14 @@ async fn main() -> Result<()> {
 
     let cancellation_token = listen_for_shutdown_signal();
 
-    let handle = run_server(config_path, port).await?;
-    let handle_clone = handle.clone();
+    let config = indexer_service::IndexerConfig::from_path(&config_path)?;
+    let indexer_handle = indexer_service::run_server(config, port).await?;
 
     tokio::select! {
         _ = cancellation_token.cancelled() => {
             info!("Shutting down server...");
         }
-        _ = handle_clone.stopped() => {
+        _ = indexer_handle.stopped() => {
             error!("Server stopped unexpectedly");
         }
     }
@@ -40,36 +37,6 @@ async fn main() -> Result<()> {
     info!("Server shutdown complete");
 
     Ok(())
-}
-
-async fn run_server(config_path: PathBuf, port: u16) -> Result<jsonrpsee::server::ServerHandle> {
-    let config = IndexerConfig::from_path(&config_path)?;
-    #[cfg(feature = "mock-responses")]
-    let _ = config;
-
-    let server = Server::builder()
-        .build(SocketAddr::from(([0, 0, 0, 0], port)))
-        .await
-        .context("Failed to build RPC server")?;
-
-    let addr = server
-        .local_addr()
-        .context("Failed to get local address of RPC server")?;
-
-    info!("Starting Indexer Service RPC server on {addr}");
-
-    #[cfg(not(feature = "mock-responses"))]
-    let handle = {
-        let service = indexer_service::service::IndexerService::new(config)
-            .context("Failed to initialize indexer service")?;
-        server.start(service.into_rpc())
-    };
-    #[cfg(feature = "mock-responses")]
-    let handle = server.start(
-        indexer_service::mock_service::MockIndexerService::new_with_mock_blocks().into_rpc(),
-    );
-
-    Ok(handle)
 }
 
 fn listen_for_shutdown_signal() -> CancellationToken {

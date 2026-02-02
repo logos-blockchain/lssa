@@ -3321,7 +3321,7 @@ dependencies = [
  "env_logger",
  "futures",
  "hex",
- "indexer_core",
+ "indexer_service",
  "key_protocol",
  "log",
  "nssa",
