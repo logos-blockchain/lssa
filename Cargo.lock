@@ -6738,6 +6738,7 @@ dependencies = [
  "cbindgen",
  "common",
  "nssa",
+ "tempfile",
  "tokio",
  "wallet",
 ]
