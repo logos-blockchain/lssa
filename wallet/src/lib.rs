@@ -149,6 +149,7 @@ impl WalletCore {
         let PersistentStorage {
             accounts: persistent_accounts,
             last_synced_block,
+            labels,
         } = PersistentStorage::from_path(&storage_path)
             .with_context(|| format!("Failed to read persistent storage at {storage_path:#?}"))?;
 
@@ -156,7 +157,7 @@ impl WalletCore {
             config_path,
             storage_path,
             config_overrides,
-            |config| WalletChainStore::new(config, persistent_accounts),
+            |config| WalletChainStore::new(config, persistent_accounts, labels),
             last_synced_block,
         )
     }
@@ -225,7 +226,11 @@ impl WalletCore {
 
     /// Store persistent data at home
     pub async fn store_persistent_data(&self) -> Result<()> {
-        let data = produce_data_for_storage(&self.storage.user_data, self.last_synced_block);
+        let data = produce_data_for_storage(
+            &self.storage.user_data,
+            self.last_synced_block,
+            self.storage.labels.clone(),
+        );
         let storage = serde_json::to_vec_pretty(&data)?;
 
         let mut storage_file = tokio::fs::File::create(&self.storage_path).await?;

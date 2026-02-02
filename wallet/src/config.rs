@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{BufReader, Write as _},
     path::Path,
 };
@@ -62,10 +63,30 @@ pub enum PersistentAccountData {
     Preconfigured(InitialAccountData),
 }
 
+/// A human-readable label for an account.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Label(String);
+
+impl Label {
+    pub fn new(label: String) -> Self {
+        Self(label)
+    }
+}
+
+impl std::fmt::Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistentStorage {
     pub accounts: Vec<PersistentAccountData>,
     pub last_synced_block: u64,
+    /// Account labels keyed by account ID string (e.g.,
+    /// "2rnKprXqWGWJTkDZKsQbFXa4ctKRbapsdoTKQFnaVGG8")
+    #[serde(default)]
+    pub labels: HashMap<String, Label>,
 }
 
 impl PersistentStorage {
