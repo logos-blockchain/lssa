@@ -175,7 +175,7 @@ pub struct GasConfig {
     pub gas_limit_runtime: u64,
 }
 
-#[optfield::optfield(pub WalletConfigOverrides, rewrap, attrs = (derive(Debug, Default)))]
+#[optfield::optfield(pub WalletConfigOverrides, rewrap, attrs = (derive(Debug, Default, Clone)))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletConfig {
     /// Override rust log (env var logging level)
