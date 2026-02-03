@@ -57,7 +57,7 @@
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           };
 
-          logosExecutionZoneWalletFfi = craneLib.buildPackage (
+          walletFfiPackage = craneLib.buildPackage (
             commonArgs
             // {
               pname = "logos-execution-zone-wallet-ffi";
@@ -74,20 +74,22 @@
           );
         in
         {
-          logos-execution-zone-wallet-ffi = logosExecutionZoneWalletFfi;
-          default = logosExecutionZoneWalletFfi;
+          wallet = walletFfiPackage;
+          default = walletFfiPackage;
         }
       );
       devShells = forAll (
         system:
         let
           pkgs = mkPkgs system;
-          walletFfi = self.packages.${system}.logos-execution-zone-wallet-ffi;
+          walletFfiPackage = self.packages.${system}.wallet;
+          walletFfiShell = pkgs.mkShell {
+            inputsFrom = [ walletFfiPackage ];
+          };
         in
         {
-          default = pkgs.mkShell {
-            inputsFrom = [ walletFfi ];
-          };
+          wallet = walletFfiShell;
+          default = walletFfiShell;
         }
       );
     };
