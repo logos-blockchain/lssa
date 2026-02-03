@@ -7,15 +7,13 @@ use std::{
 use anyhow::{Context, Result};
 use bedrock_client::BackoffConfig;
 use common::{
-    block::{AccountInitialData, CommitmentsInitialData},
-    sequencer_client::BasicAuth,
-};
+    block::{AccountInitialData, CommitmentsInitialData}, config::BasicAuth};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BedrockClientConfig {
+pub struct ClientConfig {
     pub addr: Url,
     pub auth: Option<BasicAuth>,
 }
@@ -31,7 +29,8 @@ pub struct IndexerConfig {
     pub resubscribe_interval_millis: u64,
     /// For individual RPC requests we use Fibonacci backoff retry strategy.
     pub backoff: BackoffConfig,
-    pub bedrock_client_config: BedrockClientConfig,
+    pub bedrock_client_config: ClientConfig,
+    pub sequencer_client_config: ClientConfig,
     pub channel_id: ChannelId,
 }
 

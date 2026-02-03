@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 use anyhow::Result;
 #[cfg(feature = "testnet")]

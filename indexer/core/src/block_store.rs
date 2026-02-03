@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
 use common::{
@@ -8,8 +8,9 @@ use common::{
 use nssa::V02State;
 use storage::indexer::RocksDBIO;
 
+#[derive(Clone)]
 pub struct IndexerStore {
-    dbio: RocksDBIO,
+    dbio: Arc<RocksDBIO>,
 }
 
 impl IndexerStore {
@@ -23,7 +24,7 @@ impl IndexerStore {
     ) -> Result<Self> {
         let dbio = RocksDBIO::open_or_create(location, start_data)?;
 
-        Ok(Self { dbio })
+        Ok(Self { dbio: Arc::new(dbio) })
     }
 
     /// Reopening existing database

@@ -90,7 +90,6 @@ parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
 parse_request!(GetProgramIdsRequest);
-parse_request!(PostIndexerMessageRequest);
 parse_request!(GetGenesisBlockRequest);
 
 #[derive(Serialize, Deserialize, Debug)]

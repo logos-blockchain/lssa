@@ -44,7 +44,6 @@ pub struct TestContext {
     _indexer_handle: IndexerHandle,
     _temp_sequencer_dir: TempDir,
     _temp_wallet_dir: TempDir,
-    _temp_indexer_dir: Option<TempDir>,
 }
 
 impl TestContext {

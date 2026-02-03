@@ -6,9 +6,7 @@ use std::{
 
 use anyhow::Result;
 use common::{
-    block::{AccountInitialData, CommitmentsInitialData},
-    sequencer_client::BasicAuth,
-};
+    block::{AccountInitialData, CommitmentsInitialData}, config::BasicAuth};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;
