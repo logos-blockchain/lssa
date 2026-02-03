@@ -1,0 +1,11 @@
+# Leptos build outputs
+/target
+/pkg
+/site
+
+# WASM artifacts
+*.wasm
+
+# Environment
+.env
+.env.local

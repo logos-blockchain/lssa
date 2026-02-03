@@ -11,7 +11,7 @@ sequencer_runner.workspace = true
 wallet.workspace = true
 common.workspace = true
 key_protocol.workspace = true
-indexer_core.workspace = true
+indexer_service.workspace = true
 url.workspace = true
 
 anyhow.workspace = true

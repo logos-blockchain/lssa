@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Instant};
+use std::{fmt::Display, sync::Arc, time::Instant};
 
 use anyhow::Result;
 #[cfg(feature = "testnet")]
@@ -19,6 +19,8 @@ mod block_settlement_client;
 pub mod block_store;
 pub mod config;
 
+type IndexerClient = Arc<jsonrpsee::ws_client::WsClient>;
+
 pub struct SequencerCore {
     state: nssa::V02State,
     store: SequencerStore,
@@ -26,6 +28,7 @@ pub struct SequencerCore {
     sequencer_config: SequencerConfig,
     chain_height: u64,
     block_settlement_client: Option<BlockSettlementClient>,
+    indexer_client: IndexerClient,
     last_bedrock_msg_id: MantleMsgId,
 }
 
@@ -49,7 +52,9 @@ impl SequencerCore {
     /// assumed to represent the correct latest state consistent with Bedrock-finalized data.
     /// If no database is found, the sequencer performs a fresh start from genesis,
     /// initializing its state with the accounts defined in the configuration file.
-    pub fn start_from_config(config: SequencerConfig) -> (Self, MemPoolHandle<EncodedTransaction>) {
+    pub async fn start_from_config(
+        config: SequencerConfig,
+    ) -> (Self, MemPoolHandle<EncodedTransaction>) {
         let hashable_data = HashableBlockData {
             block_id: config.genesis_id,
             transactions: vec![],
@@ -65,7 +70,7 @@ impl SequencerCore {
         // as fixing this issue may require actions non-native to program scope
         let store = SequencerStore::open_db_with_genesis(
             &config.home.join("rocksdb"),
-            Some(genesis_block),
+            Some(&genesis_block),
             signing_key,
         )
         .unwrap();
@@ -113,6 +118,22 @@ impl SequencerCore {
                 .expect("Block settlement client should be constructible")
         });
 
+        let last_bedrock_msg_id = if let Some(client) = block_settlement_client.as_ref() {
+            let (_, msg_id) = client
+                .create_inscribe_tx(&genesis_block)
+                .expect("Inscription transaction with genesis block should be constructible");
+            msg_id.into()
+        } else {
+            channel_genesis_msg_id
+        };
+
+        let indexer_client = Arc::new(
+            jsonrpsee::ws_client::WsClientBuilder::default()
+                .build(config.indexer_rpc_url.clone())
+                .await
+                .expect("Failed to create Indexer client"),
+        );
+
         let sequencer_core = Self {
             state,
             store,
@@ -120,7 +141,8 @@ impl SequencerCore {
             chain_height: config.genesis_id,
             sequencer_config: config,
             block_settlement_client,
-            last_bedrock_msg_id: channel_genesis_msg_id,
+            indexer_client,
+            last_bedrock_msg_id,
         };
 
         (sequencer_core, mempool_handle)
@@ -145,11 +167,9 @@ impl SequencerCore {
     }
 
     pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
-        let block_data = self.produce_new_block_with_mempool_transactions()?;
+        let block = self.produce_new_block_with_mempool_transactions()?;
 
         if let Some(client) = self.block_settlement_client.as_mut() {
-            let block =
-                block_data.into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
             let msg_id = client.submit_block_to_bedrock(&block).await?;
             self.last_bedrock_msg_id = msg_id.into();
             log::info!("Posted block data to Bedrock");
@@ -159,7 +179,7 @@ impl SequencerCore {
     }
 
     /// Produces new block from transactions in mempool
-    pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<HashableBlockData> {
+    pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<Block> {
         let now = Instant::now();
 
         let new_block_height = self.chain_height + 1;
@@ -196,7 +216,7 @@ impl SequencerCore {
             .clone()
             .into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
 
-        self.store.update(block, &self.state)?;
+        self.store.update(&block, &self.state)?;
 
         self.chain_height = new_block_height;
 
@@ -215,7 +235,7 @@ impl SequencerCore {
             hashable_data.transactions.len(),
             now.elapsed().as_secs()
         );
-        Ok(hashable_data)
+        Ok(block)
     }
 
     pub fn state(&self) -> &nssa::V02State {
@@ -245,6 +265,10 @@ impl SequencerCore {
             .map(|block| block.header.block_id)
             .min()
         {
+            info!(
+                "Clearing pending blocks up to id: {}",
+                last_finalized_block_id
+            );
             (first_pending_block_id..=last_finalized_block_id)
                 .try_for_each(|id| self.store.delete_block_at_id(id))
         } else {
@@ -265,6 +289,10 @@ impl SequencerCore {
 
     pub fn block_settlement_client(&self) -> Option<BlockSettlementClient> {
         self.block_settlement_client.clone()
+    }
+
+    pub fn indexer_client(&self) -> IndexerClient {
+        Arc::clone(&self.indexer_client)
     }
 }
 
@@ -329,6 +357,7 @@ mod tests {
             signing_key: *sequencer_sign_key_for_testing().value(),
             bedrock_config: None,
             retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            indexer_rpc_url: "http://localhost:8779".parse().unwrap(),
         }
     }
 
@@ -374,7 +403,7 @@ mod tests {
     async fn common_setup_with_config(
         config: SequencerConfig,
     ) -> (SequencerCore, MemPoolHandle<EncodedTransaction>) {
-        let (mut sequencer, mempool_handle) = SequencerCore::start_from_config(config);
+        let (mut sequencer, mempool_handle) = SequencerCore::start_from_config(config).await;
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
         mempool_handle.push(tx).await.unwrap();
@@ -386,10 +415,10 @@ mod tests {
         (sequencer, mempool_handle)
     }
 
-    #[test]
-    fn test_start_from_config() {
+    #[tokio::test]
+    async fn test_start_from_config() {
         let config = setup_sequencer_config();
-        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone());
+        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone()).await;
 
         assert_eq!(sequencer.chain_height, config.genesis_id);
         assert_eq!(sequencer.sequencer_config.max_num_tx_in_block, 10);
@@ -423,8 +452,8 @@ mod tests {
         assert_eq!(20000, balance_acc_2);
     }
 
-    #[test]
-    fn test_start_different_intial_accounts_balances() {
+    #[tokio::test]
+    async fn test_start_different_intial_accounts_balances() {
         let acc1_account_id: Vec<u8> = vec![
             27, 132, 197, 86, 123, 18, 100, 64, 153, 93, 62, 213, 170, 186, 5, 101, 215, 30, 24,
             52, 96, 72, 25, 255, 156, 23, 245, 233, 213, 221, 7, 143,
@@ -448,7 +477,7 @@ mod tests {
         let initial_accounts = vec![initial_acc1, initial_acc2];
 
         let config = setup_sequencer_config_variable_initial_accounts(initial_accounts);
-        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone());
+        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone()).await;
 
         let acc1_account_id = config.initial_accounts[0]
             .account_id
@@ -673,7 +702,7 @@ mod tests {
 
         let block = sequencer.produce_new_block_with_mempool_transactions();
         assert!(block.is_ok());
-        assert_eq!(block.unwrap().block_id, genesis_height + 1);
+        assert_eq!(block.unwrap().header.block_id, genesis_height + 1);
     }
 
     #[tokio::test]
@@ -711,6 +740,7 @@ mod tests {
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap()
+            .header
             .block_id;
         let block = sequencer.store.get_block_at_id(current_height).unwrap();
 
@@ -748,6 +778,7 @@ mod tests {
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap()
+            .header
             .block_id;
         let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert_eq!(block.body.transactions, vec![tx.clone()]);
@@ -757,6 +788,7 @@ mod tests {
         let current_height = sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap()
+            .header
             .block_id;
         let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert!(block.body.transactions.is_empty());
@@ -775,7 +807,8 @@ mod tests {
         // from `acc_1` to `acc_2`. The block created with that transaction will be kept stored in
         // the temporary directory for the block storage of this test.
         {
-            let (mut sequencer, mempool_handle) = SequencerCore::start_from_config(config.clone());
+            let (mut sequencer, mempool_handle) =
+                SequencerCore::start_from_config(config.clone()).await;
             let signing_key = PrivateKey::try_new([1; 32]).unwrap();
 
             let tx = common::test_utils::create_transaction_native_token_transfer(
@@ -790,6 +823,7 @@ mod tests {
             let current_height = sequencer
                 .produce_new_block_with_mempool_transactions()
                 .unwrap()
+                .header
                 .block_id;
             let block = sequencer.store.get_block_at_id(current_height).unwrap();
             assert_eq!(block.body.transactions, vec![tx.clone()]);
@@ -797,7 +831,7 @@ mod tests {
 
         // Instantiating a new sequencer from the same config. This should load the existing block
         // with the above transaction and update the state to reflect that.
-        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone());
+        let (sequencer, _mempool_handle) = SequencerCore::start_from_config(config.clone()).await;
         let balance_acc_1 = sequencer.state.get_account_by_id(&acc1_account_id).balance;
         let balance_acc_2 = sequencer.state.get_account_by_id(&acc2_account_id).balance;
 
@@ -812,10 +846,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_get_pending_blocks() {
+    #[tokio::test]
+    async fn test_get_pending_blocks() {
         let config = setup_sequencer_config();
-        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config);
+        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config).await;
         sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap();
@@ -828,10 +862,10 @@ mod tests {
         assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 4);
     }
 
-    #[test]
-    fn test_delete_blocks() {
+    #[tokio::test]
+    async fn test_delete_blocks() {
         let config = setup_sequencer_config();
-        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config);
+        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config).await;
         sequencer
             .produce_new_block_with_mempool_transactions()
             .unwrap();
