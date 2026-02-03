@@ -207,18 +207,6 @@ typedef struct FfiTransferResult {
 } FfiTransferResult;
 
 /**
- * Initialize the global Tokio runtime.
- *
- * This must be called before any async operations (like network calls).
- * Safe to call multiple times - subsequent calls are no-ops.
- *
- * # Returns
- * - `Success` if the runtime was initialized or already exists
- * - `RuntimeError` if runtime creation failed
- */
-enum WalletFfiError wallet_ffi_init_runtime(void);
-
-/**
  * Create a new public account.
  *
  * Public accounts use standard transaction signing and are suitable for
