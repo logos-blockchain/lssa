@@ -1,13 +1,3 @@
-use std::{path::Path, sync::Arc};
-
-use common::block::Block;
-use nssa::V02State;
-use rocksdb::{
-    BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options, WriteBatch,
-};
-
-use crate::error::DbError;
-
 /// Maximal size of stored blocks in base
 ///
 /// Used to control db size
@@ -46,7 +36,7 @@ pub struct RocksDBIO {
 }
 
 impl RocksDBIO {
-    pub fn open_or_create(path: &Path, start_block: Option<Block>) -> DbResult<Self> {
+    pub fn open_or_create(path: &Path, start_block: Option<&Block>) -> DbResult<Self> {
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         // ToDo: Add more column families for different data
@@ -207,7 +197,7 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_meta_first_block_in_db(&self, block: Block) -> DbResult<()> {
+    pub fn put_meta_first_block_in_db(&self, block: &Block) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
             .put_cf(
@@ -300,7 +290,7 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_block(&self, block: Block, first: bool, batch: &mut WriteBatch) -> DbResult<()> {
+    pub fn put_block(&self, block: &Block, first: bool, batch: &mut WriteBatch) -> DbResult<()> {
         let cf_block = self.block_column();
 
         if !first {
@@ -316,7 +306,7 @@ impl RocksDBIO {
             borsh::to_vec(&block.header.block_id).map_err(|err| {
                 DbError::borsh_cast_message(err, Some("Failed to serialize block id".to_string()))
             })?,
-            borsh::to_vec(&block).map_err(|err| {
+            borsh::to_vec(block).map_err(|err| {
                 DbError::borsh_cast_message(err, Some("Failed to serialize block data".to_string()))
             })?,
         );
@@ -426,7 +416,7 @@ impl RocksDBIO {
             })
     }
 
-    pub fn atomic_update(&self, block: Block, state: &V02State) -> DbResult<()> {
+    pub fn atomic_update(&self, block: &Block, state: &V02State) -> DbResult<()> {
         let block_id = block.header.block_id;
         let mut batch = WriteBatch::default();
         self.put_block(block, false, &mut batch)?;

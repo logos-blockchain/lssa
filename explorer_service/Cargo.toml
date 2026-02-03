@@ -1,0 +1,72 @@
+[package]
+name = "explorer_service"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+indexer_service_protocol.workspace = true
+
+# Leptos framework
+leptos = "0.8.15"
+leptos_meta = "0.8.5"
+leptos_router = "0.8.11"
+
+# Serialization
+serde.workspace = true
+
+# Logging
+log.workspace = true
+console_error_panic_hook = "0.1"
+console_log = "1.0"
+
+# Date/Time
+chrono.workspace = true
+
+# Hex encoding/decoding
+hex.workspace = true
+
+# URL encoding
+urlencoding = "2.1"
+
+# WASM-specific
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+  "Window",
+  "Document",
+  "Location",
+  "HtmlInputElement",
+] }
+
+# Server-side dependencies (optional, enabled by features)
+indexer_service_rpc = { workspace = true, features = [
+  "client",
+], optional = true }
+jsonrpsee = { workspace = true, features = ["http-client"], optional = true }
+tokio = { workspace = true, optional = true }
+axum = { version = "0.8.8", optional = true }
+leptos_axum = { version = "0.8.7", optional = true }
+clap = { workspace = true, features = ["derive"], optional = true }
+url = { workspace = true, optional = true }
+env_logger = { workspace = true, optional = true }
+
+[features]
+hydrate = ["leptos/hydrate"]
+ssr = [
+  "leptos/ssr",
+  "dep:indexer_service_rpc",
+  "dep:jsonrpsee",
+  "dep:tokio",
+  "dep:axum",
+  "dep:leptos_axum",
+  "dep:clap",
+  "dep:url",
+  "dep:env_logger",
+]
+
+[package.metadata.leptos]
+bin-features = ["ssr"]
+lib-features = ["hydrate"]
+assets-dir = "public"

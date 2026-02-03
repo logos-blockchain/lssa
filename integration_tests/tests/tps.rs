@@ -192,6 +192,7 @@ impl TpsTestManager {
             signing_key: [37; 32],
             bedrock_config: None,
             retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            indexer_rpc_url: "http://localhost:8779".parse().unwrap(),
         }
     }
 }

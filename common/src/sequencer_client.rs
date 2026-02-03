@@ -1,10 +1,9 @@
-use std::{collections::HashMap, ops::RangeInclusive, str::FromStr};
+use std::{collections::HashMap, ops::RangeInclusive};
 
 use anyhow::Result;
-use logos_blockchain_common_http_client::BasicAuthCredentials;
 use nssa_core::program::ProgramId;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use url::Url;
 
@@ -14,70 +13,21 @@ use super::rpc_primitives::requests::{
 };
 use crate::{
     block::Block,
+    config::BasicAuth,
     error::{SequencerClientError, SequencerRpcError},
     rpc_primitives::{
         self,
         requests::{
             GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest,
             GetAccountsNoncesResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
-            GetGenesisBlockRequest, GetGenesisBlockResponse, GetInitialTestnetAccountsResponse,
-            GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
-            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
-            GetTransactionByHashRequest, GetTransactionByHashResponse, PostIndexerMessageRequest,
-            PostIndexerMessageResponse, SendTxRequest, SendTxResponse,
+            GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
+            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse, SendTxRequest, SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
 };
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicAuth {
-    pub username: String,
-    pub password: Option<String>,
-}
-
-impl std::fmt::Display for BasicAuth {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.username)?;
-        if let Some(password) = &self.password {
-            write!(f, ":{password}")?;
-        }
-
-        Ok(())
-    }
-}
-
-impl FromStr for BasicAuth {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parse = || {
-            let mut parts = s.splitn(2, ':');
-            let username = parts.next()?;
-            let password = parts.next().filter(|p| !p.is_empty());
-            if parts.next().is_some() {
-                return None;
-            }
-
-            Some((username, password))
-        };
-
-        let (username, password) = parse().ok_or_else(|| {
-            anyhow::anyhow!("Invalid auth format. Expected 'user' or 'user:password'")
-        })?;
-
-        Ok(Self {
-            username: username.to_string(),
-            password: password.map(|p| p.to_string()),
-        })
-    }
-}
-
-impl From<BasicAuth> for BasicAuthCredentials {
-    fn from(value: BasicAuth) -> Self {
-        BasicAuthCredentials::new(value.username, value.password)
-    }
-}
 
 #[derive(Clone)]
 pub struct SequencerClient {
@@ -412,25 +362,6 @@ impl SequencerClient {
         let resp_deser = serde_json::from_value::<GetProgramIdsResponse>(resp)
             .unwrap()
             .program_ids;
-
-        Ok(resp_deser)
-    }
-
-    /// Post indexer into sequencer
-    pub async fn post_indexer_message(
-        &self,
-        message: crate::communication::indexer::Message,
-    ) -> Result<PostIndexerMessageResponse, SequencerClientError> {
-        let last_req = PostIndexerMessageRequest { message };
-
-        let req = serde_json::to_value(last_req).unwrap();
-
-        let resp = self
-            .call_method_with_payload("post_indexer_message", req)
-            .await
-            .unwrap();
-
-        let resp_deser = serde_json::from_value(resp).unwrap();
 
         Ok(resp_deser)
     }

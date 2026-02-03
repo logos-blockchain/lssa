@@ -2,23 +2,23 @@
 
 use std::{net::SocketAddr, path::PathBuf, sync::LazyLock};
 
-use actix_web::dev::ServerHandle;
 use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use common::{
     sequencer_client::SequencerClient,
     transaction::{EncodedTransaction, NSSATransaction},
 };
-use futures::FutureExt as _;
-use indexer_core::{IndexerCore, config::IndexerConfig};
+use indexer_service::IndexerHandle;
 use log::debug;
 use nssa::PrivacyPreservingTransaction;
 use nssa_core::Commitment;
 use sequencer_core::config::SequencerConfig;
+use sequencer_runner::SequencerHandle;
 use tempfile::TempDir;
-use tokio::task::JoinHandle;
 use url::Url;
 use wallet::{WalletCore, config::WalletConfigOverrides};
+
+mod config;
 
 // TODO: Remove this and control time from tests
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
@@ -38,19 +38,17 @@ static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 /// It's memory and logically safe to create multiple instances of this struct in parallel tests,
 /// as each instance uses its own temporary directories for sequencer and wallet data.
 pub struct TestContext {
-    sequencer_server_handle: ServerHandle,
-    sequencer_loop_handle: JoinHandle<Result<()>>,
-    sequencer_retry_pending_blocks_handle: JoinHandle<Result<()>>,
-    indexer_loop_handle: Option<JoinHandle<Result<()>>>,
     sequencer_client: SequencerClient,
     wallet: WalletCore,
+    _sequencer_handle: SequencerHandle,
+    _indexer_handle: IndexerHandle,
     _temp_sequencer_dir: TempDir,
     _temp_wallet_dir: TempDir,
     _temp_indexer_dir: Option<TempDir>,
 }
 
 impl TestContext {
-    /// Create new test context in detached mode. Default.
+    /// Create new test context.
     pub async fn new() -> Result<Self> {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
 
@@ -60,51 +58,26 @@ impl TestContext {
         let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
             .context("Failed to create sequencer config from file")?;
 
-        Self::new_with_sequencer_and_maybe_indexer_configs(sequencer_config, None).await
+        Self::new_with_sequencer_config(sequencer_config).await
     }
 
-    /// Create new test context in local bedrock node attached mode.
-    pub async fn new_bedrock_local_attached() -> Result<Self> {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-
-        let sequencer_config_path = PathBuf::from(manifest_dir)
-            .join("configs/sequencer/bedrock_local_attached/sequencer_config.json");
-
-        let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
-            .context("Failed to create sequencer config from file")?;
-
-        let indexer_config_path =
-            PathBuf::from(manifest_dir).join("configs/indexer/indexer_config.json");
-
-        let indexer_config = IndexerConfig::from_path(&indexer_config_path)
-            .context("Failed to create indexer config from file")?;
-
-        Self::new_with_sequencer_and_maybe_indexer_configs(sequencer_config, Some(indexer_config))
-            .await
-    }
-
-    /// Create new test context with custom sequencer config and maybe indexer config.
+    /// Create new test context with custom sequencer config.
     ///
     /// `home` and `port` fields of the provided config will be overridden to meet tests parallelism
     /// requirements.
-    pub async fn new_with_sequencer_and_maybe_indexer_configs(
-        sequencer_config: SequencerConfig,
-        indexer_config: Option<IndexerConfig>,
-    ) -> Result<Self> {
+    pub async fn new_with_sequencer_config(sequencer_config: SequencerConfig) -> Result<Self> {
         // Ensure logger is initialized only once
         *LOGGER;
 
         debug!("Test context setup");
 
-        let (
-            sequencer_server_handle,
-            sequencer_addr,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-            temp_sequencer_dir,
-        ) = Self::setup_sequencer(sequencer_config)
-            .await
-            .context("Failed to setup sequencer")?;
+        let bedrock_addr = todo!();
+        let indexer_config = config::indexer_config(bedrock_addr);
+
+        let (_sequencer_handle, sequencer_addr, temp_sequencer_dir) =
+            Self::setup_sequencer(sequencer_config)
+                .await
+                .context("Failed to setup sequencer")?;
 
         // Convert 0.0.0.0 to 127.0.0.1 for client connections
         // When binding to port 0, the server binds to 0.0.0.0:<random_port>
@@ -124,57 +97,23 @@ impl TestContext {
         )
         .context("Failed to create sequencer client")?;
 
-        if let Some(mut indexer_config) = indexer_config {
-            indexer_config.sequencer_client_config.addr =
-                Url::parse(&sequencer_addr).context("Failed to parse sequencer addr")?;
+        let _indexer_handle = indexer_service::run_server(indexer_config, 0)
+            .await
+            .context("Failed to run Indexer Service")?;
 
-            let temp_indexer_dir =
-                tempfile::tempdir().context("Failed to create temp dir for indexer home")?;
-
-            debug!("Using temp indexer home at {:?}", temp_indexer_dir.path());
-            indexer_config.home = temp_indexer_dir.path().to_owned();
-
-            let indexer_core = IndexerCore::new(indexer_config).await?;
-
-            let indexer_loop_handle = Some(tokio::spawn(async move {
-                indexer_core.subscribe_parse_block_stream().await
-            }));
-
-            Ok(Self {
-                sequencer_server_handle,
-                sequencer_loop_handle,
-                sequencer_retry_pending_blocks_handle,
-                indexer_loop_handle,
-                sequencer_client,
-                wallet,
-                _temp_sequencer_dir: temp_sequencer_dir,
-                _temp_wallet_dir: temp_wallet_dir,
-                _temp_indexer_dir: Some(temp_indexer_dir),
-            })
-        } else {
-            Ok(Self {
-                sequencer_server_handle,
-                sequencer_loop_handle,
-                sequencer_retry_pending_blocks_handle,
-                indexer_loop_handle: None,
-                sequencer_client,
-                wallet,
-                _temp_sequencer_dir: temp_sequencer_dir,
-                _temp_wallet_dir: temp_wallet_dir,
-                _temp_indexer_dir: None,
-            })
-        }
+        Ok(Self {
+            sequencer_client,
+            wallet,
+            _sequencer_handle,
+            _indexer_handle,
+            _temp_sequencer_dir: temp_sequencer_dir,
+            _temp_wallet_dir: temp_wallet_dir,
+        })
     }
 
     async fn setup_sequencer(
         mut config: SequencerConfig,
-    ) -> Result<(
-        ServerHandle,
-        SocketAddr,
-        JoinHandle<Result<()>>,
-        JoinHandle<Result<()>>,
-        TempDir,
-    )> {
+    ) -> Result<(SequencerHandle, SocketAddr, TempDir)> {
         let temp_sequencer_dir =
             tempfile::tempdir().context("Failed to create temp dir for sequencer home")?;
 
@@ -186,20 +125,10 @@ impl TestContext {
         // Setting port to 0 lets the OS choose a free port for us
         config.port = 0;
 
-        let (
-            sequencer_server_handle,
-            sequencer_addr,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-        ) = sequencer_runner::startup_sequencer(config).await?;
+        let (sequencer_handle, sequencer_addr) =
+            sequencer_runner::startup_sequencer(config).await?;
 
-        Ok((
-            sequencer_server_handle,
-            sequencer_addr,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-            temp_sequencer_dir,
-        ))
+        Ok((sequencer_handle, sequencer_addr, temp_sequencer_dir))
     }
 
     async fn setup_wallet(sequencer_addr: String) -> Result<(WalletCore, TempDir)> {
@@ -248,33 +177,6 @@ impl TestContext {
     /// Get reference to the sequencer client.
     pub fn sequencer_client(&self) -> &SequencerClient {
         &self.sequencer_client
-    }
-}
-
-impl Drop for TestContext {
-    fn drop(&mut self) {
-        debug!("Test context cleanup");
-
-        let Self {
-            sequencer_server_handle,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-            indexer_loop_handle,
-            sequencer_client: _,
-            wallet: _,
-            _temp_sequencer_dir,
-            _temp_wallet_dir,
-            _temp_indexer_dir,
-        } = self;
-
-        sequencer_loop_handle.abort();
-        sequencer_retry_pending_blocks_handle.abort();
-        if let Some(indexer_loop_handle) = indexer_loop_handle {
-            indexer_loop_handle.abort();
-        }
-
-        // Can't wait here as Drop can't be async, but anyway stop signal should be sent
-        sequencer_server_handle.stop(true).now_or_never();
     }
 }
 
