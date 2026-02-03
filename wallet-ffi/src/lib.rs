@@ -28,6 +28,8 @@ pub mod transfer;
 pub mod types;
 pub mod wallet;
 
+use std::sync::OnceLock;
+
 // Re-export public types for cbindgen
 pub use error::WalletFfiError as FfiError;
 use tokio::runtime::Handle;
@@ -35,36 +37,27 @@ pub use types::*;
 
 use crate::error::{print_error, WalletFfiError};
 
+static TOKIO_RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+
 /// Get a reference to the global runtime.
-pub(crate) fn get_runtime() -> Result<Handle, WalletFfiError> {
-    Handle::try_current().map_err(|_| WalletFfiError::RuntimeError)
+pub(crate) fn get_runtime() -> Result<&'static Handle, WalletFfiError> {
+    let runtime = TOKIO_RUNTIME.get_or_init(|| {
+        match tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => runtime,
+            Err(e) => {
+                print_error(format!("{e}"));
+                panic!("Error initializing tokio runtime");
+            }
+        }
+    });
+    Ok(runtime.handle())
 }
 
 /// Run an async future on the global runtime, blocking until completion.
 pub(crate) fn block_on<F: std::future::Future>(future: F) -> Result<F::Output, WalletFfiError> {
     let runtime = get_runtime()?;
     Ok(runtime.block_on(future))
-}
-
-/// Initialize the global Tokio runtime.
-///
-/// This must be called before any async operations (like network calls).
-/// Safe to call multiple times - subsequent calls are no-ops.
-///
-/// # Returns
-/// - `Success` if the runtime was initialized or already exists
-/// - `RuntimeError` if runtime creation failed
-#[no_mangle]
-pub extern "C" fn wallet_ffi_init_runtime() -> WalletFfiError {
-    let result = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build();
-
-    match result {
-        Ok(_) => WalletFfiError::Success,
-        Err(e) => {
-            print_error(format!("Failed to initialize runtime: {}", e));
-            WalletFfiError::RuntimeError
-        }
-    }
 }
