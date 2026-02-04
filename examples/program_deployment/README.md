@@ -3,7 +3,7 @@
 This guide walks you through running the sequencer, compiling example programs, deploying a Hello World program, and interacting with accounts.
 
 You'll find:
-- Programs: example NSSA programs under `methods/guest/src/bin`.
+- Programs: example LEZ programs under `methods/guest/src/bin`.
 - Runners: scripts to create and submit transactions to invoke these programs publicly and privately under `src/bin`.
 
 # 0. Install the wallet
@@ -13,16 +13,7 @@ cargo install --path wallet --force
 ```
 
 # 1. Run the sequencer
-From the project’s root directory, start the sequencer:
-```bash
-cd sequencer_runner
-RUST_LOG=info cargo run $(pwd)/configs/debug
-```
-Keep this terminal open. We’ll use it only to observe the node logs.
-
-> [!NOTE]
-> If you have already ran this before you'll see a `rocksdb` directory with stored blocks. Be sure to remove that directory to follow this tutorial.
-
+From the project’s root directory, start the sequencer.
 
 ## Checking and setting up the wallet
 For sanity let's check that the wallet can connect to it.
