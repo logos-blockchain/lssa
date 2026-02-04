@@ -1,11 +1,14 @@
 use indexer_service_protocol::{Account, AccountId, Block, BlockId, Hash, Transaction};
-use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
+use jsonrpsee::proc_macros::rpc;
+#[cfg(feature = "server")]
+use jsonrpsee::{core::SubscriptionResult, types::ErrorObjectOwned};
 
 #[cfg(all(not(feature = "server"), not(feature = "client")))]
 compile_error!("At least one of `server` or `client` features must be enabled.");
 
-#[cfg_attr(feature = "server", rpc(server))]
-#[cfg_attr(feature = "client", rpc(client))]
+#[cfg_attr(all(feature = "server", not(feature = "client")), rpc(server))]
+#[cfg_attr(all(feature = "client", not(feature = "server")), rpc(client))]
+#[cfg_attr(all(feature = "server", feature = "client"), rpc(server, client))]
 pub trait Rpc {
     #[method(name = "get_schema")]
     fn get_schema(&self) -> Result<serde_json::Value, ErrorObjectOwned> {
@@ -37,4 +40,15 @@ pub trait Rpc {
 
     #[method(name = "getTransaction")]
     async fn get_transaction(&self, tx_hash: Hash) -> Result<Transaction, ErrorObjectOwned>;
+
+    #[method(name = "getBlocks")]
+    async fn get_blocks(&self, offset: u32, limit: u32) -> Result<Vec<Block>, ErrorObjectOwned>;
+
+    #[method(name = "getTransactionsByAccount")]
+    async fn get_transactions_by_account(
+        &self,
+        account_id: AccountId,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<Transaction>, ErrorObjectOwned>;
 }
