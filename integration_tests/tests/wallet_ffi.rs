@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use integration_tests::{ACC_SENDER, TestContext};
+use integration_tests::{ACC_SENDER, ACC_SENDER_PRIVATE, TestContext};
 use log::info;
 use nssa::{Account, AccountId, PublicKey, program::Program};
 use tempfile::tempdir;
@@ -65,6 +65,8 @@ unsafe extern "C" {
         account_id: *const FfiBytes32,
         out_keys: *mut FfiPrivateAccountKeys,
     ) -> error::WalletFfiError;
+
+    fn wallet_ffi_free_private_account_keys(keys: *mut FfiPrivateAccountKeys);
 }
 
 fn new_wallet_ffi_with_test_context_config(ctx: &TestContext) -> *mut WalletHandle {
@@ -377,34 +379,41 @@ fn test_wallet_ffi_get_public_account_keys() -> Result<()> {
     Ok(())
 }
 
-// #[test]
-// fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
-//     let ctx = TestContext::new_blocking()?;
-//     let account_id: AccountId = ACC_SENDER.parse().unwrap();
-//     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
-//     let mut out_key = FfiPrivateAccountKeys::default();
-//
-//     let key: PublicKey = unsafe {
-//         let ffi_account_id = FfiBytes32::from(&account_id);
-//         let _result = wallet_ffi_get_private_account_keys(
-//             wallet_ffi_handle,
-//             (&ffi_account_id) as *const FfiBytes32,
-//             (&mut out_key) as *mut FfiPublicAccountKey,
-//         );
-//         (&out_key).try_into().unwrap()
-//     };
-//
-//     let expected_key = {
-//         let private_key = ctx
-//             .wallet()
-//             .get_account_public_signing_key(&account_id)
-//             .unwrap();
-//         PublicKey::new_from_private_key(private_key)
-//     };
-//
-//     assert_eq!(key, expected_key);
-//
-//     info!("Successfully retrieved account key");
-//
-//     Ok(())
-// }
+#[test]
+fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
+    let ctx = TestContext::new_blocking()?;
+    let account_id: AccountId = ACC_SENDER_PRIVATE.parse().unwrap();
+    let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
+    let mut keys = FfiPrivateAccountKeys::default();
+
+    unsafe {
+        let ffi_account_id = FfiBytes32::from(&account_id);
+        let _result = wallet_ffi_get_private_account_keys(
+            wallet_ffi_handle,
+            (&ffi_account_id) as *const FfiBytes32,
+            (&mut keys) as *mut FfiPrivateAccountKeys,
+        );
+    };
+
+    let key_chain = &ctx
+        .wallet()
+        .storage()
+        .user_data
+        .get_private_account(&account_id)
+        .unwrap()
+        .0;
+
+    let expected_npk = &key_chain.nullifer_public_key;
+    let expected_ivk = &key_chain.incoming_viewing_public_key;
+
+    assert_eq!(&keys.npk(), expected_npk);
+    assert_eq!(&keys.ivk().unwrap(), expected_ivk);
+
+    unsafe {
+        wallet_ffi_free_private_account_keys((&mut keys) as *mut FfiPrivateAccountKeys);
+    }
+
+    info!("Successfully retrieved account keys");
+
+    Ok(())
+}

@@ -38,6 +38,8 @@ pub enum WalletFfiError {
     SerializationError = 14,
     /// Invalid conversion from FFI types to NSSA types
     InvalidTypeConversion,
+    /// Invalid Key value
+    InvalidKeyValue,
     /// Internal error (catch-all)
     InternalError = 99,
 }

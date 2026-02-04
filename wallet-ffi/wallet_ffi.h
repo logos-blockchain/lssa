@@ -100,6 +100,10 @@ typedef enum WalletFfiError {
    */
   INVALID_TYPE_CONVERSION,
   /**
+   * Invalid Key value
+   */
+  INVALID_KEY_VALUE,
+  /**
    * Internal error (catch-all)
    */
   INTERNAL_ERROR = 99,

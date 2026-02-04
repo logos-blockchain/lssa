@@ -10,6 +10,7 @@ crate-type = ["rlib", "cdylib", "staticlib"]
 wallet.workspace = true
 nssa.workspace = true
 common.workspace = true
+nssa_core.workspace = true
 tokio.workspace = true
 
 [build-dependencies]

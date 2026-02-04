@@ -6745,6 +6745,7 @@ dependencies = [
  "cbindgen",
  "common",
  "nssa",
+ "nssa_core",
  "tempfile",
  "tokio",
  "wallet",

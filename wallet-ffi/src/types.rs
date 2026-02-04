@@ -4,6 +4,7 @@ use core::slice;
 use std::{ffi::c_char, ptr};
 
 use nssa::{Account, Data};
+use nssa_core::encryption::shared_key_derivation::Secp256k1Point;
 
 use crate::error::WalletFfiError;
 
@@ -147,6 +148,26 @@ impl FfiBytes32 {
     /// Create from an AccountId.
     pub fn from_account_id(id: &nssa::AccountId) -> Self {
         Self { data: *id.value() }
+    }
+}
+
+impl FfiPrivateAccountKeys {
+    pub fn npk(&self) -> nssa_core::NullifierPublicKey {
+        nssa_core::NullifierPublicKey(self.nullifier_public_key.data)
+    }
+
+    pub fn ivk(&self) -> Result<nssa_core::encryption::IncomingViewingPublicKey, WalletFfiError> {
+        if self.incoming_viewing_public_key_len == 33 {
+            let slice = unsafe {
+                slice::from_raw_parts(
+                    self.incoming_viewing_public_key,
+                    self.incoming_viewing_public_key_len,
+                )
+            };
+            Ok(Secp256k1Point(slice.to_vec()))
+        } else {
+            Err(WalletFfiError::InvalidKeyValue)
+        }
     }
 }
 
