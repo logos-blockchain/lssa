@@ -11,7 +11,8 @@ use nssa::{Account, AccountId, PublicKey, program::Program};
 use tempfile::tempdir;
 use wallet::WalletCore;
 use wallet_ffi::{
-    FfiAccount, FfiAccountList, FfiBytes32, FfiPublicAccountKey, WalletHandle, error,
+    FfiAccount, FfiAccountList, FfiBytes32, FfiPrivateAccountKeys, FfiPublicAccountKey,
+    WalletHandle, error,
 };
 
 unsafe extern "C" {
@@ -57,6 +58,12 @@ unsafe extern "C" {
         handle: *mut WalletHandle,
         account_id: *const FfiBytes32,
         out_public_key: *mut FfiPublicAccountKey,
+    ) -> error::WalletFfiError;
+
+    fn wallet_ffi_get_private_account_keys(
+        handle: *mut WalletHandle,
+        account_id: *const FfiBytes32,
+        out_keys: *mut FfiPrivateAccountKeys,
     ) -> error::WalletFfiError;
 }
 
@@ -369,3 +376,35 @@ fn test_wallet_ffi_get_public_account_keys() -> Result<()> {
 
     Ok(())
 }
+
+// #[test]
+// fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
+//     let ctx = TestContext::new_blocking()?;
+//     let account_id: AccountId = ACC_SENDER.parse().unwrap();
+//     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
+//     let mut out_key = FfiPrivateAccountKeys::default();
+//
+//     let key: PublicKey = unsafe {
+//         let ffi_account_id = FfiBytes32::from(&account_id);
+//         let _result = wallet_ffi_get_private_account_keys(
+//             wallet_ffi_handle,
+//             (&ffi_account_id) as *const FfiBytes32,
+//             (&mut out_key) as *mut FfiPublicAccountKey,
+//         );
+//         (&out_key).try_into().unwrap()
+//     };
+//
+//     let expected_key = {
+//         let private_key = ctx
+//             .wallet()
+//             .get_account_public_signing_key(&account_id)
+//             .unwrap();
+//         PublicKey::new_from_private_key(private_key)
+//     };
+//
+//     assert_eq!(key, expected_key);
+//
+//     info!("Successfully retrieved account key");
+//
+//     Ok(())
+// }

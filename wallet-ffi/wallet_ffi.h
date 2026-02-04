@@ -146,6 +146,13 @@ typedef struct FfiProgramId {
 } FfiProgramId;
 
 /**
+ * U128 - 16 bytes little endian
+ */
+typedef struct FfiU128 {
+  uint8_t data[16];
+} FfiU128;
+
+/**
  * Account data structure - C-compatible version of nssa Account.
  *
  * Note: `balance` and `nonce` are u128 values represented as little-endian
@@ -156,7 +163,7 @@ typedef struct FfiAccount {
   /**
    * Balance as little-endian [u8; 16]
    */
-  uint8_t balance[16];
+  struct FfiU128 balance;
   /**
    * Pointer to account data bytes
    */
@@ -168,7 +175,7 @@ typedef struct FfiAccount {
   /**
    * Nonce as little-endian [u8; 16]
    */
-  uint8_t nonce[16];
+  struct FfiU128 nonce;
 } FfiAccount;
 
 /**

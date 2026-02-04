@@ -30,6 +30,13 @@ pub struct FfiProgramId {
     pub data: [u32; 8],
 }
 
+/// U128 - 16 bytes little endian
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct FfiU128 {
+    pub data: [u8; 16],
+}
+
 /// Account data structure - C-compatible version of nssa Account.
 ///
 /// Note: `balance` and `nonce` are u128 values represented as little-endian
@@ -38,23 +45,23 @@ pub struct FfiProgramId {
 pub struct FfiAccount {
     pub program_owner: FfiProgramId,
     /// Balance as little-endian [u8; 16]
-    pub balance: [u8; 16],
+    pub balance: FfiU128,
     /// Pointer to account data bytes
     pub data: *const u8,
     /// Length of account data
     pub data_len: usize,
     /// Nonce as little-endian [u8; 16]
-    pub nonce: [u8; 16],
+    pub nonce: FfiU128,
 }
 
 impl Default for FfiAccount {
     fn default() -> Self {
         Self {
             program_owner: FfiProgramId::default(),
-            balance: [0u8; 16],
+            balance: FfiU128::default(),
             data: std::ptr::null(),
             data_len: 0,
-            nonce: [0u8; 16],
+            nonce: FfiU128::default(),
         }
     }
 }
@@ -143,6 +150,20 @@ impl FfiBytes32 {
     }
 }
 
+impl From<u128> for FfiU128 {
+    fn from(value: u128) -> Self {
+        Self {
+            data: value.to_le_bytes(),
+        }
+    }
+}
+
+impl From<FfiU128> for u128 {
+    fn from(value: FfiU128) -> Self {
+        u128::from_le_bytes(value.data)
+    }
+}
+
 impl From<&nssa::AccountId> for FfiBytes32 {
     fn from(id: &nssa::AccountId) -> Self {
         Self::from_account_id(id)
@@ -172,10 +193,10 @@ impl From<nssa::Account> for FfiAccount {
         };
         FfiAccount {
             program_owner,
-            balance: value.balance.to_le_bytes(),
+            balance: value.balance.into(),
             data,
             data_len,
-            nonce: value.nonce.to_le_bytes(),
+            nonce: value.nonce.into(),
         }
     }
 }
@@ -192,13 +213,11 @@ impl TryFrom<&FfiAccount> for nssa::Account {
         } else {
             Data::default()
         };
-        let balance = u128::from_le_bytes(value.balance);
-        let nonce = u128::from_le_bytes(value.nonce);
         Ok(Account {
             program_owner: value.program_owner.data,
-            balance,
+            balance: value.balance.into(),
             data,
-            nonce,
+            nonce: value.nonce.into(),
         })
     }
 }
