@@ -65,7 +65,7 @@ pub unsafe extern "C" fn wallet_ffi_get_public_account_key(
     let public_key = PublicKey::new_from_private_key(private_key);
 
     unsafe {
-        (*out_public_key).public_key.data = *public_key.value();
+        *out_public_key = public_key.into();
     }
 
     WalletFfiError::Success

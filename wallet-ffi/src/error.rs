@@ -36,8 +36,8 @@ pub enum WalletFfiError {
     SyncError = 13,
     /// Serialization/deserialization error
     SerializationError = 14,
-    /// Found invalid data for account
-    InvalidAccountData,
+    /// Invalid conversion from FFI types to NSSA types
+    InvalidTypeConversion,
     /// Internal error (catch-all)
     InternalError = 99,
 }

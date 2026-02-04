@@ -96,9 +96,9 @@ typedef enum WalletFfiError {
    */
   SERIALIZATION_ERROR = 14,
   /**
-   * Found invalid data for account
+   * Invalid conversion from FFI types to NSSA types
    */
-  INVALID_ACCOUNT_DATA,
+  INVALID_TYPE_CONVERSION,
   /**
    * Internal error (catch-all)
    */

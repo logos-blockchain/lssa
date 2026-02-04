@@ -187,7 +187,7 @@ impl TryFrom<&FfiAccount> for nssa::Account {
         let data = if value.data_len > 0 {
             unsafe {
                 let slice = slice::from_raw_parts(value.data, value.data_len);
-                Data::try_from(slice.to_vec()).map_err(|_| WalletFfiError::InvalidAccountData)?
+                Data::try_from(slice.to_vec()).map_err(|_| WalletFfiError::InvalidTypeConversion)?
             }
         } else {
             Data::default()
@@ -200,5 +200,23 @@ impl TryFrom<&FfiAccount> for nssa::Account {
             data,
             nonce,
         })
+    }
+}
+
+impl From<nssa::PublicKey> for FfiPublicAccountKey {
+    fn from(value: nssa::PublicKey) -> Self {
+        Self {
+            public_key: FfiBytes32::from_bytes(*value.value()),
+        }
+    }
+}
+
+impl TryFrom<&FfiPublicAccountKey> for nssa::PublicKey {
+    type Error = WalletFfiError;
+
+    fn try_from(value: &FfiPublicAccountKey) -> Result<Self, Self::Error> {
+        let public_key = nssa::PublicKey::try_new(value.public_key.data)
+            .map_err(|_| WalletFfiError::InvalidTypeConversion)?;
+        Ok(public_key)
     }
 }
