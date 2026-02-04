@@ -119,27 +119,23 @@ cd integration_tests
 RUST_LOG=info RISC0_DEV_MODE=1 cargo run $(pwd)/configs/debug all
 ```
 
-# Run the sequencer
+# Run the sequencer and node
 
-The sequencer can be run locally:
+The sequencer and node can be run locally:
 
-```bash
-cd sequencer_runner
-RUST_LOG=info cargo run --release configs/debug
-```
+### 1. On one terminal go to the ⁨`logos-blockchain/logos-blockchain`⁩ repo and run a local logos blockchain node:
+   - ⁨`git checkout master; git pull`⁩
+   - ⁨`cargo clean`⁩
+   - ⁨`rm ~/.logos-blockchain-circuits`⁩
+   - ⁨`./scripts/setup-logos-blockchain-circuits.sh`⁩
+   - ⁨`cargo build --all-features`⁩
+   - ⁨`./target/debug/logos-blockchain-node nodes/node/config-one-node.yaml`⁩
 
-If everything went well you should see an output similar to this:
-```bash
-[2025-11-13T19:50:29Z INFO  sequencer_runner] Sequencer core set up
-[2025-11-13T19:50:29Z INFO  network] Starting http server at 0.0.0.0:3040
-[2025-11-13T19:50:29Z INFO  actix_server::builder] starting 8 workers
-[2025-11-13T19:50:29Z INFO  sequencer_runner] HTTP server started
-[2025-11-13T19:50:29Z INFO  sequencer_runner] Starting main sequencer loop
-[2025-11-13T19:50:29Z INFO  actix_server::server] Tokio runtime found; starting in existing Tokio runtime
-[2025-11-13T19:50:29Z INFO  actix_server::server] starting service: "actix-web-service-0.0.0.0:3040", workers: 8, listening on: 0.0.0.0:3040
-[2025-11-13T19:50:39Z INFO  sequencer_runner] Collecting transactions from mempool, block creation
-[2025-11-13T19:50:39Z INFO  sequencer_core] Created block with 0 transactions in 0 seconds
-[2025-11-13T19:50:39Z INFO  sequencer_runner] Block with id 2 created
-[2025-11-13T19:50:39Z INFO  sequencer_runner] Waiting for new transactions
-```
+### 2. On another terminal go to the ⁨`logos-blockchain/lssa`⁩ repo and run indexer service:
+   - ⁨`git checkout schouhy/full-bedrock-integration`⁩
+   - ⁨`RUST_LOG=info cargo run --release -p indexer_service $(pwd)/integration_tests/configs/indexer/indexer_config.json`⁩
+
+### 3. On another terminal go to the ⁨`logos-blockchain/lssa`⁩ repo and run the sequencer:
+   - ⁨`git checkout schouhy/full-bedrock-integration`⁩
+   - ⁨`RUST_LOG=info RISC0_DEV_MODE=1 cargo run --release -p sequencer_runner sequencer_runner/configs/debug`⁩
 
