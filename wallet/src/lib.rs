@@ -545,6 +545,7 @@ impl WalletCore {
                 .insert_private_account_data(affected_account_id, new_acc);
         }
     }
+
     pub fn config_path(&self) -> &PathBuf {
         &self.config_path
     }
@@ -556,5 +557,4 @@ impl WalletCore {
     pub fn config_overrides(&self) -> &Option<WalletConfigOverrides> {
         &self.config_overrides
     }
-
 }
