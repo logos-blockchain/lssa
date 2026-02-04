@@ -63,12 +63,6 @@ impl TestContext {
         Self::new_with_sequencer_and_maybe_indexer_configs(sequencer_config, None).await
     }
 
-    pub fn new_blocking() -> Result<Self> {
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(Self::new())
-    }
-
     /// Create new test context in local bedrock node attached mode.
     pub async fn new_bedrock_local_attached() -> Result<Self> {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -280,6 +274,19 @@ impl Drop for TestContext {
 
         // Can't wait here as Drop can't be async, but anyway stop signal should be sent
         sequencer_server_handle.stop(true).now_or_never();
+    }
+}
+
+pub struct BlockingTestContext {
+    pub ctx: TestContext,
+    pub runtime: tokio::runtime::Runtime,
+}
+
+impl BlockingTestContext {
+    pub fn new() -> Result<Self> {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let ctx = runtime.block_on(TestContext::new())?;
+        Ok(Self { ctx, runtime })
     }
 }
 
