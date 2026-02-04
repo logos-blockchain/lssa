@@ -2,6 +2,7 @@
 name = "wallet-ffi"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
@@ -13,4 +14,4 @@ common.workspace = true
 tokio.workspace = true
 
 [build-dependencies]
-cbindgen = "0.26"
+cbindgen = "0.29"

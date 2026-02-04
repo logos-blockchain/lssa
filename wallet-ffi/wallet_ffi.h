@@ -24,7 +24,7 @@
 #ifndef WALLET_FFI_H
 #define WALLET_FFI_H
 
-/* Generated with cbindgen:0.26.0 */
+/* Generated with cbindgen:0.29.2 */
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -661,4 +661,4 @@ char *wallet_ffi_get_sequencer_addr(struct WalletHandle *handle);
  */
 void wallet_ffi_free_string(char *ptr);
 
-#endif /* WALLET_FFI_H */
+#endif  /* WALLET_FFI_H */

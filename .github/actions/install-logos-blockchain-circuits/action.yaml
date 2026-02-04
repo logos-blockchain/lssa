@@ -1,0 +1,19 @@
+name: Setup Logos Blockchain Circuits
+
+description: Set up Logos Blockchain Circom Circuits, Rapidsnark prover and Rapidsnark verifier using the setup-logos-blockchain-circuits.sh script.
+
+inputs:
+  github-token:
+    description: GitHub token for downloading releases
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup logos-blockchain-circuits
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        curl -sSL https://raw.githubusercontent.com/logos-blockchain/logos-blockchain/main/scripts/setup-logos-blockchain-circuits.sh | bash
