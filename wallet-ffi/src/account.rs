@@ -7,9 +7,7 @@ use nssa::AccountId;
 use crate::{
     block_on,
     error::{print_error, WalletFfiError},
-    types::{
-        FfiAccount, FfiAccountList, FfiAccountListEntry, FfiBytes32, FfiProgramId, WalletHandle,
-    },
+    types::{FfiAccount, FfiAccountList, FfiAccountListEntry, FfiBytes32, WalletHandle},
     wallet::get_wallet,
 };
 
@@ -350,26 +348,8 @@ pub unsafe extern "C" fn wallet_ffi_get_account_public(
         Err(e) => return e,
     };
 
-    // Convert account data to FFI type
-    let data_vec: Vec<u8> = account.data.into();
-    let data_len = data_vec.len();
-    let data_ptr = if data_len > 0 {
-        let data_boxed = data_vec.into_boxed_slice();
-        Box::into_raw(data_boxed) as *const u8
-    } else {
-        ptr::null()
-    };
-
-    let program_owner = FfiProgramId {
-        data: account.program_owner,
-    };
-
     unsafe {
-        (*out_account).program_owner = program_owner;
-        (*out_account).balance = account.balance.to_le_bytes();
-        (*out_account).nonce = account.nonce.to_le_bytes();
-        (*out_account).data = data_ptr;
-        (*out_account).data_len = data_len;
+        *out_account = account.into();
     }
 
     WalletFfiError::Success

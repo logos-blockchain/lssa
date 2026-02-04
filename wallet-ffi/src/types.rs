@@ -1,6 +1,11 @@
 //! C-compatible type definitions for the FFI layer.
 
-use std::ffi::c_char;
+use core::slice;
+use std::{ffi::c_char, ptr};
+
+use nssa::{Account, Data};
+
+use crate::error::WalletFfiError;
 
 /// Opaque pointer to the Wallet instance.
 ///
@@ -147,5 +152,53 @@ impl From<&nssa::AccountId> for FfiBytes32 {
 impl From<FfiBytes32> for nssa::AccountId {
     fn from(bytes: FfiBytes32) -> Self {
         nssa::AccountId::new(bytes.data)
+    }
+}
+
+impl From<nssa::Account> for FfiAccount {
+    fn from(value: nssa::Account) -> Self {
+        // Convert account data to FFI type
+        let data_vec: Vec<u8> = value.data.into();
+        let data_len = data_vec.len();
+        let data = if data_len > 0 {
+            let data_boxed = data_vec.into_boxed_slice();
+            Box::into_raw(data_boxed) as *const u8
+        } else {
+            ptr::null()
+        };
+
+        let program_owner = FfiProgramId {
+            data: value.program_owner,
+        };
+        FfiAccount {
+            program_owner,
+            balance: value.balance.to_le_bytes(),
+            data,
+            data_len,
+            nonce: value.nonce.to_le_bytes(),
+        }
+    }
+}
+
+impl TryFrom<&FfiAccount> for nssa::Account {
+    type Error = WalletFfiError;
+
+    fn try_from(value: &FfiAccount) -> Result<Self, Self::Error> {
+        let data = if value.data_len > 0 {
+            unsafe {
+                let slice = slice::from_raw_parts(value.data, value.data_len);
+                Data::try_from(slice.to_vec()).map_err(|_| WalletFfiError::InvalidAccountData)?
+            }
+        } else {
+            Data::default()
+        };
+        let balance = u128::from_le_bytes(value.balance);
+        let nonce = u128::from_le_bytes(value.nonce);
+        Ok(Account {
+            program_owner: value.program_owner.data,
+            balance,
+            data,
+            nonce,
+        })
     }
 }

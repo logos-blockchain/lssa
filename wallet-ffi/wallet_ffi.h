@@ -96,6 +96,10 @@ typedef enum WalletFfiError {
    */
   SERIALIZATION_ERROR = 14,
   /**
+   * Found invalid data for account
+   */
+  INVALID_ACCOUNT_DATA,
+  /**
    * Internal error (catch-all)
    */
   INTERNAL_ERROR = 99,

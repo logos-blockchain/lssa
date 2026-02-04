@@ -6,10 +6,11 @@ use std::{
 
 use anyhow::Result;
 use integration_tests::{ACC_SENDER, TestContext};
-use nssa::AccountId;
+use log::info;
+use nssa::{Account, AccountId, program::Program};
 use tempfile::tempdir;
 use wallet::WalletCore;
-use wallet_ffi::{FfiAccountList, FfiBytes32, WalletHandle, error};
+use wallet_ffi::{FfiAccount, FfiAccountList, FfiBytes32, WalletHandle, error};
 
 unsafe extern "C" {
     fn wallet_ffi_create_new(
@@ -41,11 +42,20 @@ unsafe extern "C" {
         is_public: bool,
         out_balance: *mut [u8; 16],
     ) -> error::WalletFfiError;
+
+    fn wallet_ffi_get_account_public(
+        handle: *mut WalletHandle,
+        account_id: *const FfiBytes32,
+        out_account: *mut FfiAccount,
+    ) -> error::WalletFfiError;
+
+    fn wallet_ffi_free_account_data(account: *mut FfiAccount);
 }
 
-fn new_wallet_from_test_context(ctx: &TestContext) -> *mut WalletHandle {
+fn new_wallet_ffi_with_test_context_config(ctx: &TestContext) -> *mut WalletHandle {
     let tempdir = tempfile::tempdir().unwrap();
-    let temp_config_path = tempdir.path().join("wallet_config.json");
+    let config_path = tempdir.path().join("wallet_config.json");
+    let storage_path = tempdir.path().join("storage.json");
     let mut config = ctx.wallet().config().to_owned();
     if let Some(config_overrides) = ctx.wallet().config_overrides().clone() {
         config.apply_overrides(config_overrides);
@@ -54,15 +64,15 @@ fn new_wallet_from_test_context(ctx: &TestContext) -> *mut WalletHandle {
         .write(true)
         .create(true)
         .truncate(true)
-        .open(&temp_config_path)
+        .open(&config_path)
         .unwrap();
 
     let config_with_overrides_serialized = serde_json::to_vec_pretty(&config).unwrap();
 
     file.write_all(&config_with_overrides_serialized).unwrap();
 
-    let config_path = CString::new(temp_config_path.to_str().unwrap()).unwrap();
-    let storage_path = CString::new(ctx.wallet().storage_path().to_str().unwrap()).unwrap();
+    let config_path = CString::new(config_path.to_str().unwrap()).unwrap();
+    let storage_path = CString::new(storage_path.to_str().unwrap()).unwrap();
     let password = CString::new(ctx.wallet_password()).unwrap();
 
     unsafe {
@@ -74,7 +84,7 @@ fn new_wallet_from_test_context(ctx: &TestContext) -> *mut WalletHandle {
     }
 }
 
-fn new_wallet_ffi_on_tempdir_for_tests(password: &str) -> *mut WalletHandle {
+fn new_wallet_ffi_with_default_config(password: &str) -> *mut WalletHandle {
     let tempdir = tempdir().unwrap();
     let config_path = tempdir.path().join("wallet_config.json");
     let storage_path = tempdir.path().join("storage.json");
@@ -91,7 +101,7 @@ fn new_wallet_ffi_on_tempdir_for_tests(password: &str) -> *mut WalletHandle {
     }
 }
 
-fn new_wallet_rust_for_tests(password: &str) -> WalletCore {
+fn new_wallet_rust_with_default_config(password: &str) -> WalletCore {
     let tempdir = tempdir().unwrap();
     let config_path = tempdir.path().join("wallet_config.json");
     let storage_path = tempdir.path().join("storage.json");
@@ -106,14 +116,14 @@ fn new_wallet_rust_for_tests(password: &str) -> WalletCore {
 }
 
 #[test]
-fn test_create_public_accounts() {
+fn test_wallet_ffi_create_public_accounts() {
     let password = "password_for_tests";
     let n_accounts = 10;
     // First `n_accounts` public accounts created with Rust wallet
     let new_public_account_ids_rust = {
         let mut account_ids = Vec::new();
 
-        let mut wallet_rust = new_wallet_rust_for_tests(password);
+        let mut wallet_rust = new_wallet_rust_with_default_config(password);
         for _ in 0..n_accounts {
             let account_id = wallet_rust.create_new_account_public(None).0;
             account_ids.push(*account_id.value());
@@ -125,7 +135,7 @@ fn test_create_public_accounts() {
     let new_public_account_ids_ffi = unsafe {
         let mut account_ids = Vec::new();
 
-        let wallet_ffi_handle = new_wallet_ffi_on_tempdir_for_tests(password);
+        let wallet_ffi_handle = new_wallet_ffi_with_default_config(password);
         for _ in 0..n_accounts {
             let mut out_account_id = FfiBytes32::from_bytes([0; 32]);
             wallet_ffi_create_account_public(
@@ -141,14 +151,14 @@ fn test_create_public_accounts() {
 }
 
 #[test]
-fn test_create_private_accounts() {
+fn test_wallet_ffi_create_private_accounts() {
     let password = "password_for_tests";
     let n_accounts = 10;
     // First `n_accounts` private accounts created with Rust wallet
     let new_private_account_ids_rust = {
         let mut account_ids = Vec::new();
 
-        let mut wallet_rust = new_wallet_rust_for_tests(password);
+        let mut wallet_rust = new_wallet_rust_with_default_config(password);
         for _ in 0..n_accounts {
             let account_id = wallet_rust.create_new_account_private(None).0;
             account_ids.push(*account_id.value());
@@ -160,7 +170,7 @@ fn test_create_private_accounts() {
     let new_private_account_ids_ffi = unsafe {
         let mut account_ids = Vec::new();
 
-        let wallet_ffi_handle = new_wallet_ffi_on_tempdir_for_tests(password);
+        let wallet_ffi_handle = new_wallet_ffi_with_default_config(password);
         for _ in 0..n_accounts {
             let mut out_account_id = FfiBytes32::from_bytes([0; 32]);
             wallet_ffi_create_account_private(
@@ -176,12 +186,12 @@ fn test_create_private_accounts() {
 }
 
 #[test]
-fn test_list_accounts() {
+fn test_wallet_ffi_list_accounts() {
     let password = "password_for_tests";
 
     // Create the wallet FFI
     let wallet_ffi_handle = unsafe {
-        let handle = new_wallet_ffi_on_tempdir_for_tests(password);
+        let handle = new_wallet_ffi_with_default_config(password);
         // Create 5 public accounts and 5 private accounts
         for _ in 0..5 {
             let mut out_account_id = FfiBytes32::from_bytes([0; 32]);
@@ -194,7 +204,7 @@ fn test_list_accounts() {
 
     // Create the wallet Rust
     let wallet_rust = {
-        let mut wallet = new_wallet_rust_for_tests(password);
+        let mut wallet = new_wallet_rust_with_default_config(password);
         // Create 5 public accounts and 5 private accounts
         for _ in 0..5 {
             wallet.create_new_account_public(None);
@@ -265,21 +275,57 @@ fn test_list_accounts() {
 fn test_wallet_ffi_get_balance_public() -> Result<()> {
     let ctx = TestContext::new_blocking()?;
     let account_id: AccountId = ACC_SENDER.parse().unwrap();
-    let wallet_ffi_handle = new_wallet_from_test_context(&ctx);
+    let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
 
     let balance = unsafe {
         let mut out_balance: [u8; 16] = [0; 16];
-        let ffi_account_id = FfiBytes32::from_bytes(*account_id.value());
-        let result = wallet_ffi_get_balance(
+        let ffi_account_id = FfiBytes32::from(&account_id);
+        let _result = wallet_ffi_get_balance(
             wallet_ffi_handle,
             (&ffi_account_id) as *const FfiBytes32,
             true,
             (&mut out_balance) as *mut [u8; 16],
         );
-        println!("result: {:?}", result);
         out_balance
     };
-    println!("balance: {balance:?}");
+    let balance = u128::from_le_bytes(balance);
+    assert_eq!(balance, 10000);
+
+    info!("Successfully retrieved account balance");
+
+    Ok(())
+}
+
+#[test]
+fn test_wallet_ffi_get_account_public() -> Result<()> {
+    let ctx = TestContext::new_blocking()?;
+    let account_id: AccountId = ACC_SENDER.parse().unwrap();
+    let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
+    let mut out_account = FfiAccount::default();
+
+    let account: Account = unsafe {
+        let ffi_account_id = FfiBytes32::from(&account_id);
+        let _result = wallet_ffi_get_account_public(
+            wallet_ffi_handle,
+            (&ffi_account_id) as *const FfiBytes32,
+            (&mut out_account) as *mut FfiAccount,
+        );
+        (&out_account).try_into().unwrap()
+    };
+
+    assert_eq!(
+        account.program_owner,
+        Program::authenticated_transfer_program().id()
+    );
+    assert_eq!(account.balance, 10000);
+    assert!(account.data.is_empty());
+    assert_eq!(account.nonce, 0);
+
+    unsafe {
+        wallet_ffi_free_account_data((&mut out_account) as *mut FfiAccount);
+    }
+
+    info!("Successfully retrieved account with correct details");
 
     Ok(())
 }

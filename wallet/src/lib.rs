@@ -191,7 +191,6 @@ impl WalletCore {
             config.apply_overrides(config_overrides);
         }
 
-        println!("sequencer url: {}", config.sequencer_addr);
         let sequencer_client = Arc::new(SequencerClient::new_with_auth(
             Url::parse(&config.sequencer_addr)?,
             config.basic_auth.clone(),
