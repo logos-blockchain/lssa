@@ -1,6 +1,6 @@
 use std::{
     collections::HashSet,
-    ffi::{CString, c_char},
+    ffi::{CStr, CString, c_char},
     io::Write,
 };
 
@@ -67,6 +67,15 @@ unsafe extern "C" {
     ) -> error::WalletFfiError;
 
     fn wallet_ffi_free_private_account_keys(keys: *mut FfiPrivateAccountKeys);
+
+    fn wallet_ffi_account_id_to_base58(account_id: *const FfiBytes32) -> *mut std::ffi::c_char;
+
+    fn wallet_ffi_free_string(ptr: *mut c_char);
+
+    fn wallet_ffi_account_id_from_base58(
+        base58_str: *const std::ffi::c_char,
+        out_account_id: *mut FfiBytes32,
+    ) -> error::WalletFfiError;
 }
 
 fn new_wallet_ffi_with_test_context_config(ctx: &TestContext) -> *mut WalletHandle {
@@ -416,4 +425,38 @@ fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
     info!("Successfully retrieved account keys");
 
     Ok(())
+}
+
+#[test]
+fn test_wallet_ffi_account_id_to_base58() {
+    let account_id_str = ACC_SENDER;
+    let account_id: AccountId = account_id_str.parse().unwrap();
+    let ffi_bytes: FfiBytes32 = (&account_id).into();
+    let ptr = unsafe { wallet_ffi_account_id_to_base58((&ffi_bytes) as *const FfiBytes32) };
+
+    let ffi_result = unsafe { CStr::from_ptr(ptr).to_str().unwrap() };
+
+    assert_eq!(account_id_str, ffi_result);
+
+    unsafe {
+        wallet_ffi_free_string(ptr);
+    }
+}
+
+#[test]
+fn test_wallet_ffi_base58_to_account_id() {
+    let account_id_str = ACC_SENDER;
+    let account_id_c_str = CString::new(account_id_str).unwrap();
+    let account_id: AccountId = unsafe {
+        let mut out_account_id_bytes = FfiBytes32::default();
+        wallet_ffi_account_id_from_base58(
+            account_id_c_str.as_ptr(),
+            (&mut out_account_id_bytes) as *mut FfiBytes32,
+        );
+        out_account_id_bytes.into()
+    };
+
+    let expected_account_id = account_id_str.parse().unwrap();
+
+    assert_eq!(account_id, expected_account_id);
 }
