@@ -129,7 +129,7 @@ RUST_LOG=info RISC0_DEV_MODE=1 cargo run $(pwd)/configs/debug all
 
 The sequencer and node can be run locally:
 
- 1. On one terminal go to the ⁨`logos-blockchain/logos-blockchain`⁩ repo and run a local logos blockchain node:
+ 1. On one terminal go to the ⁨`logos-blockchain/logos-blockchain` repo and run a local logos blockchain node:
       - ⁨`git checkout master; git pull`⁩
       - ⁨`cargo clean`⁩
       - ⁨`rm ~/.logos-blockchain-circuits`⁩
@@ -141,7 +141,7 @@ The sequencer and node can be run locally:
       - ⁨`git checkout schouhy/full-bedrock-integration`⁩
       - ⁨`RUST_LOG=info cargo run --release -p indexer_service $(pwd)/integration_tests/configs/indexer/indexer_config.json`⁩
 
- 3. On another terminal go to the ⁨`logos-blockchain/lssa`⁩ repo and run the sequencer:
+ 3. On another terminal go to the ⁨`logos-blockchain/lssa` repo and run the sequencer:
       - ⁨`git checkout schouhy/full-bedrock-integration`⁩
       - ⁨`RUST_LOG=info RISC0_DEV_MODE=1 cargo run --release -p sequencer_runner sequencer_runner/configs/debug`⁩
 
