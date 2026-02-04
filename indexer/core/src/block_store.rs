@@ -5,7 +5,7 @@ use common::{
     block::Block,
     transaction::{NSSATransaction, execute_check_transaction_on_state, transaction_pre_check},
 };
-use nssa::V02State;
+use nssa::{Account, AccountId, V02State};
 use storage::indexer::RocksDBIO;
 
 #[derive(Clone)]
@@ -24,7 +24,9 @@ impl IndexerStore {
     ) -> Result<Self> {
         let dbio = RocksDBIO::open_or_create(location, start_data)?;
 
-        Ok(Self { dbio: Arc::new(dbio) })
+        Ok(Self {
+            dbio: Arc::new(dbio),
+        })
     }
 
     /// Reopening existing database
@@ -34,6 +36,32 @@ impl IndexerStore {
 
     pub fn get_block_at_id(&self, id: u64) -> Result<Block> {
         Ok(self.dbio.get_block(id)?)
+    }
+
+    pub fn get_block_batch(&self, offset: u64, limit: u64) -> Result<Vec<Block>> {
+        Ok(self.dbio.get_block_batch(offset, limit)?)
+    }
+
+    pub fn get_transaction_by_hash(&self, tx_hash: [u8; 32]) -> Result<NSSATransaction> {
+        let block = self.get_block_at_id(self.dbio.get_block_id_by_tx_hash(tx_hash)?)?;
+        let encoded_transaction = block
+            .body
+            .transactions
+            .iter()
+            .find_map(|enc_tx| {
+                if enc_tx.hash() == tx_hash {
+                    Some(enc_tx)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Transaction not found in DB"))?;
+
+        Ok(NSSATransaction::try_from(encoded_transaction)?)
+    }
+
+    pub fn get_block_by_hash(&self, hash: [u8; 32]) -> Result<Block> {
+        Ok(self.get_block_at_id(self.dbio.get_block_id_by_hash(hash)?)?)
     }
 
     pub fn genesis_id(&self) -> u64 {
@@ -54,6 +82,10 @@ impl IndexerStore {
 
     pub fn final_state(&self) -> Result<V02State> {
         Ok(self.dbio.final_state()?)
+    }
+
+    pub fn get_account_final(&self, account_id: &AccountId) -> Result<Account> {
+        Ok(self.final_state()?.get_account_by_id(account_id))
     }
 
     pub fn put_block(&self, block: Block) -> Result<()> {

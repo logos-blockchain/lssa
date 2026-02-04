@@ -41,6 +41,10 @@ pub const CF_BLOCK_NAME: &str = "cf_block";
 pub const CF_META_NAME: &str = "cf_meta";
 /// Name of breakpoint column family
 pub const CF_BREAKPOINT_NAME: &str = "cf_breakpoint";
+/// Name of hash to id map column family
+pub const CF_HASH_TO_ID: &str = "cf_hash_to_id";
+/// Name of tx hash to id map column family
+pub const CF_TX_TO_ID: &str = "cf_tx_to_id";
 
 pub type DbResult<T> = Result<T, DbError>;
 
@@ -60,6 +64,8 @@ impl RocksDBIO {
         let cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
         let cfbreakpoint = ColumnFamilyDescriptor::new(CF_BREAKPOINT_NAME, cf_opts.clone());
+        let cfhti = ColumnFamilyDescriptor::new(CF_HASH_TO_ID, cf_opts.clone());
+        let cftti = ColumnFamilyDescriptor::new(CF_TX_TO_ID, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -67,7 +73,7 @@ impl RocksDBIO {
         let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(
             &db_opts,
             path,
-            vec![cfb, cfmeta, cfbreakpoint],
+            vec![cfb, cfmeta, cfbreakpoint, cfhti, cftti],
         );
 
         let dbio = Self {
@@ -103,6 +109,8 @@ impl RocksDBIO {
         let _cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let _cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
         let _cfsnapshot = ColumnFamilyDescriptor::new(CF_BREAKPOINT_NAME, cf_opts.clone());
+        let _cfhti = ColumnFamilyDescriptor::new(CF_HASH_TO_ID, cf_opts.clone());
+        let _cftti = ColumnFamilyDescriptor::new(CF_TX_TO_ID, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -110,6 +118,8 @@ impl RocksDBIO {
         DBWithThreadMode::<MultiThreaded>::destroy(&db_opts, path)
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))
     }
+
+    // Columns
 
     pub fn meta_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_META_NAME).unwrap()
@@ -122,6 +132,16 @@ impl RocksDBIO {
     pub fn breakpoint_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_BREAKPOINT_NAME).unwrap()
     }
+
+    pub fn hash_to_id_column(&self) -> Arc<BoundColumnFamily<'_>> {
+        self.db.cf_handle(CF_HASH_TO_ID).unwrap()
+    }
+
+    pub fn tx_hash_to_id_column(&self) -> Arc<BoundColumnFamily<'_>> {
+        self.db.cf_handle(CF_TX_TO_ID).unwrap()
+    }
+
+    // Meta
 
     pub fn get_meta_first_block_in_db(&self) -> DbResult<u64> {
         let cf_meta = self.meta_column();
@@ -313,8 +333,12 @@ impl RocksDBIO {
         Ok(())
     }
 
+    // Block
+
     pub fn put_block(&self, block: Block) -> DbResult<()> {
         let cf_block = self.block_column();
+        let cf_hti = self.hash_to_id_column();
+        let cf_tti = self.hash_to_id_column();
 
         self.db
             .put_cf(
@@ -338,6 +362,46 @@ impl RocksDBIO {
 
         if block.header.block_id > last_curr_block {
             self.put_meta_last_block_in_db(block.header.block_id)?;
+        }
+
+        // ToDo: rewrite this with write batching
+
+        self.db
+            .put_cf(
+                &cf_hti,
+                borsh::to_vec(&block.header.hash).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block hash".to_string()),
+                    )
+                })?,
+                borsh::to_vec(&block.header.block_id).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block id".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        for tx in block.body.transactions {
+            self.db
+                .put_cf(
+                    &cf_tti,
+                    borsh::to_vec(&tx.hash()).map_err(|err| {
+                        DbError::borsh_cast_message(
+                            err,
+                            Some("Failed to serialize tx hash".to_string()),
+                        )
+                    })?,
+                    borsh::to_vec(&block.header.block_id).map_err(|err| {
+                        DbError::borsh_cast_message(
+                            err,
+                            Some("Failed to serialize block id".to_string()),
+                        )
+                    })?,
+                )
+                .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
         }
 
         if block.header.block_id.is_multiple_of(BREAKPOINT_INTERVAL) {
@@ -375,6 +439,46 @@ impl RocksDBIO {
             ))
         }
     }
+
+    pub fn get_block_batch(&self, offset: u64, limit: u64) -> DbResult<Vec<Block>> {
+        let cf_block = self.block_column();
+        let mut block_batch = vec![];
+
+        // ToDo: Multi get this
+
+        for block_id in offset..(offset + limit) {
+            let res = self
+                .db
+                .get_cf(
+                    &cf_block,
+                    borsh::to_vec(&block_id).map_err(|err| {
+                        DbError::borsh_cast_message(
+                            err,
+                            Some("Failed to serialize block id".to_string()),
+                        )
+                    })?,
+                )
+                .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+            let block = if let Some(data) = res {
+                Ok(borsh::from_slice::<Block>(&data).map_err(|serr| {
+                    DbError::borsh_cast_message(
+                        serr,
+                        Some("Failed to deserialize block data".to_string()),
+                    )
+                })?)
+            } else {
+                // Block not found, assuming that previous one was the last
+                break;
+            }?;
+
+            block_batch.push(block);
+        }
+
+        Ok(block_batch)
+    }
+
+    // State
 
     pub fn put_breakpoint(&self, br_id: u64, breakpoint: V02State) -> DbResult<()> {
         let cf_br = self.breakpoint_column();
@@ -495,6 +599,66 @@ impl RocksDBIO {
         } else {
             Err(DbError::db_interaction_error(
                 "Breakpoint not yet achieved".to_string(),
+            ))
+        }
+    }
+
+    // Mappings
+
+    pub fn get_block_id_by_hash(&self, hash: [u8; 32]) -> DbResult<u64> {
+        let cf_hti = self.hash_to_id_column();
+        let res = self
+            .db
+            .get_cf(
+                &cf_hti,
+                borsh::to_vec(&hash).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block hash".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(borsh::from_slice::<u64>(&data).map_err(|serr| {
+                DbError::borsh_cast_message(
+                    serr,
+                    Some("Failed to deserialize block id".to_string()),
+                )
+            })?)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Block on this hash not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_block_id_by_tx_hash(&self, tx_hash: [u8; 32]) -> DbResult<u64> {
+        let cf_tti = self.tx_hash_to_id_column();
+        let res = self
+            .db
+            .get_cf(
+                &cf_tti,
+                borsh::to_vec(&tx_hash).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block hash".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(borsh::from_slice::<u64>(&data).map_err(|serr| {
+                DbError::borsh_cast_message(
+                    serr,
+                    Some("Failed to deserialize block id".to_string()),
+                )
+            })?)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Block on this hash not found".to_string(),
             ))
         }
     }

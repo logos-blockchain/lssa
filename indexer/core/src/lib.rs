@@ -2,10 +2,7 @@ use anyhow::Result;
 use bedrock_client::BedrockClient;
 // ToDo: Remove after testnet
 use common::PINATA_BASE58;
-use common::{
-    block::Block,
-    sequencer_client::SequencerClient,
-};
+use common::{block::Block, sequencer_client::SequencerClient};
 use futures::StreamExt;
 use log::info;
 use logos_blockchain_core::mantle::{

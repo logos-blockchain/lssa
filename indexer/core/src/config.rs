@@ -7,7 +7,9 @@ use std::{
 use anyhow::{Context, Result};
 use bedrock_client::BackoffConfig;
 use common::{
-    block::{AccountInitialData, CommitmentsInitialData}, config::BasicAuth};
+    block::{AccountInitialData, CommitmentsInitialData},
+    config::BasicAuth,
+};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;

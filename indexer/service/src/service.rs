@@ -13,11 +13,6 @@ use tokio::sync::{Mutex, mpsc::UnboundedSender};
 
 pub struct IndexerService {
     subscription_service: SubscriptionService,
-
-    #[expect(
-        dead_code,
-        reason = "Will be used in future implementations of RPC methods"
-    )]
     indexer: IndexerCore,
 }
 
@@ -46,24 +41,96 @@ impl indexer_service_rpc::RpcServer for IndexerService {
         Ok(())
     }
 
-    async fn get_block_by_id(&self, _block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
-        todo!()
+    async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
+        self.indexer
+            .store
+            .get_block_at_id(block_id)
+            .map_err(|err| {
+                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            })?
+            .try_into()
+            .map_err(|err| {
+                ErrorObjectOwned::owned(
+                    -32000,
+                    format!("Conversion error"),
+                    Some(format!("{err:#?}")),
+                )
+            })
     }
 
-    async fn get_block_by_hash(&self, _block_hash: Hash) -> Result<Block, ErrorObjectOwned> {
-        todo!()
+    async fn get_block_by_hash(&self, block_hash: Hash) -> Result<Block, ErrorObjectOwned> {
+        self.indexer
+            .store
+            .get_block_by_hash(block_hash.0)
+            .map_err(|err| {
+                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            })?
+            .try_into()
+            .map_err(|err| {
+                ErrorObjectOwned::owned(
+                    -32000,
+                    format!("Conversion error"),
+                    Some(format!("{err:#?}")),
+                )
+            })
     }
 
-    async fn get_account(&self, _account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
-        todo!()
+    async fn get_account(&self, account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
+        self.indexer
+            .store
+            .get_account_final(&account_id.into())
+            .map_err(|err| {
+                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            })?
+            .try_into()
+            .map_err(|err| {
+                ErrorObjectOwned::owned(
+                    -32000,
+                    format!("Conversion error"),
+                    Some(format!("{err:#?}")),
+                )
+            })
     }
 
-    async fn get_transaction(&self, _tx_hash: Hash) -> Result<Transaction, ErrorObjectOwned> {
-        todo!()
+    async fn get_transaction(&self, tx_hash: Hash) -> Result<Transaction, ErrorObjectOwned> {
+        self.indexer
+            .store
+            .get_transaction_by_hash(tx_hash.0)
+            .map_err(|err| {
+                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            })?
+            .try_into()
+            .map_err(|err| {
+                ErrorObjectOwned::owned(
+                    -32000,
+                    format!("Conversion error"),
+                    Some(format!("{err:#?}")),
+                )
+            })
     }
 
-    async fn get_blocks(&self, _offset: u32, _limit: u32) -> Result<Vec<Block>, ErrorObjectOwned> {
-        todo!()
+    async fn get_blocks(&self, offset: u32, limit: u32) -> Result<Vec<Block>, ErrorObjectOwned> {
+        let blocks = self
+            .indexer
+            .store
+            .get_block_batch(offset as u64, limit as u64)
+            .map_err(|err| {
+                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            })?;
+
+        let mut block_res = vec![];
+
+        for block in blocks {
+            block_res.push(block.try_into().map_err(|err| {
+                ErrorObjectOwned::owned(
+                    -32000,
+                    format!("Conversion error"),
+                    Some(format!("{err:#?}")),
+                )
+            })?)
+        }
+
+        Ok(block_res)
     }
 
     async fn get_transactions_by_account(

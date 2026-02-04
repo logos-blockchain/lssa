@@ -26,10 +26,7 @@ pub async fn tps_test() -> Result<()> {
     let target_tps = 12;
 
     let tps_test = TpsTestManager::new(target_tps, num_transactions);
-    let ctx = TestContext::new_with_sequencer_config(
-        tps_test.generate_sequencer_config()
-    )
-    .await?;
+    let ctx = TestContext::new_with_sequencer_config(tps_test.generate_sequencer_config()).await?;
 
     let target_time = tps_test.target_time();
     info!(

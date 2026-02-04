@@ -11,7 +11,15 @@ use common::{
         message::{Message, Request},
         parser::RpcRequest,
         requests::{
-            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse, GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse, GetGenesisBlockRequest, GetGenesisBlockResponse, GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest, GetProofForCommitmentResponse, GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest, SendTxResponse
+            GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
+            GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
+            GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
+            GetBlockRangeDataResponse, GetGenesisBlockRequest, GetGenesisBlockResponse,
+            GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest,
+            GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
+            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
+            GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse,
+            SendTxRequest, SendTxResponse,
         },
     },
     transaction::{
@@ -355,7 +363,8 @@ mod tests {
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
     use common::{
-        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing, transaction::EncodedTransaction
+        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing,
+        transaction::EncodedTransaction,
     };
     use sequencer_core::{
         SequencerCore,
