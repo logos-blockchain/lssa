@@ -18,7 +18,7 @@ To our knowledge, this design is unique to LEZ. Other privacy-focused programmab
 
 ---
 
-## Example: creating and transferring tokens across states
+## Example: Creating and transferring tokens across states
 
 1. Token creation (public execution)
    - Alice submits a transaction that executes the token program `New` function on-chain.
@@ -129,19 +129,19 @@ RUST_LOG=info RISC0_DEV_MODE=1 cargo run $(pwd)/configs/debug all
 
 The sequencer and node can be run locally:
 
- 1. On one terminal go to the ⁨`logos-blockchain/logos-blockchain` repo and run a local logos blockchain node:
-      - ⁨`git checkout master; git pull`⁩
-      - ⁨`cargo clean`⁩
-      - ⁨`rm ~/.logos-blockchain-circuits`⁩
-      - ⁨`./scripts/setup-logos-blockchain-circuits.sh`⁩
-      - ⁨`cargo build --all-features`⁩
-      - ⁨`./target/debug/logos-blockchain-node nodes/node/config-one-node.yaml`⁩
+ 1. On one terminal go to the `logos-blockchain/logos-blockchain` repo and run a local logos blockchain node:
+      - `git checkout master; git pull`
+      - `cargo clean`
+      - `rm ~/.logos-blockchain-circuits`
+      - `./scripts/setup-logos-blockchain-circuits.sh`
+      - `cargo build --all-features`
+      - `./target/debug/logos-blockchain-node nodes/node/config-one-node.yaml`
 
- 2. On another terminal go to the ⁨`logos-blockchain/lssa`⁩ repo and run indexer service:
-      - ⁨`git checkout schouhy/full-bedrock-integration`⁩
-      - ⁨`RUST_LOG=info cargo run --release -p indexer_service $(pwd)/integration_tests/configs/indexer/indexer_config.json`⁩
+ 2. On another terminal go to the `logos-blockchain/lssa` repo and run indexer service:
+      - `git checkout schouhy/full-bedrock-integration`
+      - `RUST_LOG=info cargo run --release -p indexer_service $(pwd)/integration_tests/configs/indexer/indexer_config.json`
 
- 3. On another terminal go to the ⁨`logos-blockchain/lssa` repo and run the sequencer:
-      - ⁨`git checkout schouhy/full-bedrock-integration`⁩
-      - ⁨`RUST_LOG=info RISC0_DEV_MODE=1 cargo run --release -p sequencer_runner sequencer_runner/configs/debug`⁩
+ 3. On another terminal go to the `logos-blockchain/lssa` repo and run the sequencer:
+      - `git checkout schouhy/full-bedrock-integration`
+      - `RUST_LOG=info RISC0_DEV_MODE=1 cargo run --release -p sequencer_runner sequencer_runner/configs/debug`
 
