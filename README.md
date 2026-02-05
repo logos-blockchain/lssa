@@ -161,6 +161,12 @@ Some completion scripts exists, see the [completions](./completions/README.md) f
 
 This tutorial walks you through creating accounts and executing NSSA programs in both public and private contexts.
 
+Before starting, make sure to set the wallet home directory so the CLI can find its configuration:
+
+```bash
+export NSSA_WALLET_HOME_DIR=$(pwd)/wallet/configs/debug
+```
+
 > [!NOTE]
 > The NSSA state is split into two separate but interconnected components: the public state and the private state.
 > The public state is an on-chain, publicly visible record of accounts indexed by their Account IDs
