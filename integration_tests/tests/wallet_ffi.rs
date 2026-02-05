@@ -27,6 +27,8 @@ unsafe extern "C" {
         password: *const c_char,
     ) -> *mut WalletHandle;
 
+    fn wallet_ffi_destroy(handle: *mut WalletHandle);
+
     fn wallet_ffi_create_account_public(
         handle: *mut WalletHandle,
         out_account_id: *mut FfiBytes32,
@@ -191,10 +193,11 @@ fn test_wallet_ffi_create_public_accounts() {
             );
             account_ids.push(out_account_id.data);
         }
+        wallet_ffi_destroy(wallet_ffi_handle);
         account_ids
     };
 
-    assert_eq!(new_public_account_ids_ffi, new_public_account_ids_rust)
+    assert_eq!(new_public_account_ids_ffi, new_public_account_ids_rust);
 }
 
 #[test]
@@ -226,6 +229,7 @@ fn test_wallet_ffi_create_private_accounts() {
             );
             account_ids.push(out_account_id.data);
         }
+        wallet_ffi_destroy(wallet_ffi_handle);
         account_ids
     };
 
@@ -315,7 +319,10 @@ fn test_wallet_ffi_list_accounts() {
         assert_eq!(entry.is_public, is_public_in_rust_wallet);
     }
 
-    unsafe { wallet_ffi_free_account_list((&mut wallet_ffi_account_list) as *mut FfiAccountList) };
+    unsafe {
+        wallet_ffi_free_account_list((&mut wallet_ffi_account_list) as *mut FfiAccountList);
+        wallet_ffi_destroy(wallet_ffi_handle);
+    }
 }
 
 #[test]
@@ -338,6 +345,10 @@ fn test_wallet_ffi_get_balance_public() -> Result<()> {
     assert_eq!(balance, 10000);
 
     info!("Successfully retrieved account balance");
+
+    unsafe {
+        wallet_ffi_destroy(wallet_ffi_handle);
+    }
 
     Ok(())
 }
@@ -369,6 +380,7 @@ fn test_wallet_ffi_get_account_public() -> Result<()> {
 
     unsafe {
         wallet_ffi_free_account_data((&mut out_account) as *mut FfiAccount);
+        wallet_ffi_destroy(wallet_ffi_handle);
     }
 
     info!("Successfully retrieved account with correct details");
@@ -406,6 +418,10 @@ fn test_wallet_ffi_get_public_account_keys() -> Result<()> {
 
     info!("Successfully retrieved account key");
 
+    unsafe {
+        wallet_ffi_destroy(wallet_ffi_handle);
+    }
+
     Ok(())
 }
 
@@ -442,6 +458,7 @@ fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
 
     unsafe {
         wallet_ffi_free_private_account_keys((&mut keys) as *mut FfiPrivateAccountKeys);
+        wallet_ffi_destroy(wallet_ffi_handle);
     }
 
     info!("Successfully retrieved account keys");
@@ -539,6 +556,7 @@ fn test_wallet_ffi_init_public_account_auth_transfer() -> Result<()> {
 
     unsafe {
         wallet_ffi_free_transfer_result((&mut transfer_result) as *mut FfiTransferResult);
+        wallet_ffi_destroy(wallet_ffi_handle);
     }
 
     Ok(())
@@ -593,6 +611,7 @@ fn test_wallet_ffi_transfer_public() -> Result<()> {
 
     unsafe {
         wallet_ffi_free_transfer_result((&mut transfer_result) as *mut FfiTransferResult);
+        wallet_ffi_destroy(wallet_ffi_handle);
     }
 
     Ok(())

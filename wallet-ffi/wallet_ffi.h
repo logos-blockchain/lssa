@@ -98,11 +98,11 @@ typedef enum WalletFfiError {
   /**
    * Invalid conversion from FFI types to NSSA types
    */
-  INVALID_TYPE_CONVERSION,
+  INVALID_TYPE_CONVERSION = 15,
   /**
    * Invalid Key value
    */
-  INVALID_KEY_VALUE,
+  INVALID_KEY_VALUE = 16,
   /**
    * Internal error (catch-all)
    */
