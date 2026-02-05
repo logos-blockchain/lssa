@@ -13,7 +13,7 @@ cargo install --path wallet --force
 ```
 
 # 1. Run the sequencer
-From the project’s root directory, start the sequencer.
+From the project’s root directory, start the sequencer by following [these instructions](https://github.com/logos-blockchain/lssa#run-the-sequencer-and-node).
 
 ## Checking and setting up the wallet
 For sanity let's check that the wallet can connect to it.
