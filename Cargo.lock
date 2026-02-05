@@ -4601,6 +4601,7 @@ name = "program_deployment"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "hex",
  "nssa",
  "nssa_core",
  "tokio",

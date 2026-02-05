@@ -11,3 +11,4 @@ wallet.workspace = true
 
 tokio = { workspace = true, features = ["macros"] }
 clap.workspace = true
+hex.workspace = true
