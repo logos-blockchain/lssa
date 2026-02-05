@@ -2919,10 +2919,12 @@ dependencies = [
  "nssa_core",
  "sequencer_core",
  "sequencer_runner",
+ "serde_json",
  "tempfile",
  "tokio",
  "url",
  "wallet",
+ "wallet-ffi",
 ]
 
 [[package]]
@@ -6696,6 +6698,8 @@ dependencies = [
  "cbindgen",
  "common",
  "nssa",
+ "nssa_core",
+ "tempfile",
  "tokio",
  "wallet",
 ]

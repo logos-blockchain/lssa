@@ -124,6 +124,7 @@ impl TokenHolding {
 
 pub struct WalletCore {
     config_path: PathBuf,
+    config_overrides: Option<WalletConfigOverrides>,
     storage: WalletChainStore,
     storage_path: PathBuf,
     poller: TxPoller,
@@ -186,7 +187,7 @@ impl WalletCore {
     ) -> Result<Self> {
         let mut config = WalletConfig::from_path_or_initialize_default(&config_path)
             .with_context(|| format!("Failed to deserialize wallet config at {config_path:#?}"))?;
-        if let Some(config_overrides) = config_overrides {
+        if let Some(config_overrides) = config_overrides.clone() {
             config.apply_overrides(config_overrides);
         }
 
@@ -205,6 +206,7 @@ impl WalletCore {
             poller: tx_poller,
             sequencer_client,
             last_synced_block,
+            config_overrides,
         })
     }
 
@@ -542,5 +544,17 @@ impl WalletCore {
             self.storage
                 .insert_private_account_data(affected_account_id, new_acc);
         }
+    }
+
+    pub fn config_path(&self) -> &PathBuf {
+        &self.config_path
+    }
+
+    pub fn storage_path(&self) -> &PathBuf {
+        &self.storage_path
+    }
+
+    pub fn config_overrides(&self) -> &Option<WalletConfigOverrides> {
+        &self.config_overrides
     }
 }
