@@ -1,6 +1,7 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::{AccountId, program::Program};
 use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
+use token_core::Instruction;
 
 use crate::{PrivacyPreservingAccount, WalletCore};
 
@@ -11,15 +12,12 @@ impl Token<'_> {
         &self,
         definition_account_id: AccountId,
         supply_account_id: AccountId,
-        name: [u8; 6],
+        name: String,
         total_supply: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![definition_account_id, supply_account_id];
         let program_id = nssa::program::Program::token().id();
-        // Instruction must be: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
-        let mut instruction = vec![0u8; 23];
-        instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
-        instruction[17..].copy_from_slice(&name);
+        let instruction = Instruction::NewFungibleDefinition { name, total_supply };
         let message = nssa::public_transaction::Message::try_new(
             program_id,
             account_ids,
@@ -39,10 +37,10 @@ impl Token<'_> {
         &self,
         definition_account_id: AccountId,
         supply_account_id: AccountId,
-        name: [u8; 6],
+        name: String,
         total_supply: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_definition(name, total_supply);
+        let instruction = Instruction::NewFungibleDefinition { name, total_supply };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -69,10 +67,10 @@ impl Token<'_> {
         &self,
         definition_account_id: AccountId,
         supply_account_id: AccountId,
-        name: [u8; 6],
+        name: String,
         total_supply: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_definition(name, total_supply);
+        let instruction = Instruction::NewFungibleDefinition { name, total_supply };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -99,10 +97,10 @@ impl Token<'_> {
         &self,
         definition_account_id: AccountId,
         supply_account_id: AccountId,
-        name: [u8; 6],
+        name: String,
         total_supply: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let instruction = token_program_preparation_definition(name, total_supply);
+        let instruction = Instruction::NewFungibleDefinition { name, total_supply };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -132,11 +130,9 @@ impl Token<'_> {
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![sender_account_id, recipient_account_id];
         let program_id = nssa::program::Program::token().id();
-        // Instruction must be: [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
-        // 0x00 || 0x00 || 0x00].
-        let mut instruction = vec![0u8; 23];
-        instruction[0] = 0x01;
-        instruction[1..17].copy_from_slice(&amount.to_le_bytes());
+        let instruction = Instruction::Transfer {
+            amount_to_transfer: amount,
+        };
         let Ok(nonces) = self.0.get_accounts_nonces(vec![sender_account_id]).await else {
             return Err(ExecutionFailureKind::SequencerError);
         };
@@ -170,7 +166,9 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let instruction = token_program_preparation_transfer(amount);
+        let instruction = Instruction::Transfer {
+            amount_to_transfer: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -199,7 +197,9 @@ impl Token<'_> {
         recipient_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let instruction = token_program_preparation_transfer(amount);
+        let instruction = Instruction::Transfer {
+            amount_to_transfer: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -230,7 +230,9 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_transfer(amount);
+        let instruction = Instruction::Transfer {
+            amount_to_transfer: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -259,7 +261,9 @@ impl Token<'_> {
         recipient_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_transfer(amount);
+        let instruction = Instruction::Transfer {
+            amount_to_transfer: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -289,7 +293,9 @@ impl Token<'_> {
         recipient_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_transfer(amount);
+        let instruction = Instruction::Transfer {
+            amount_to_transfer: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -322,7 +328,9 @@ impl Token<'_> {
         amount: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![definition_account_id, holder_account_id];
-        let instruction = token_program_preparation_burn(amount);
+        let instruction = Instruction::Burn {
+            amount_to_burn: amount,
+        };
 
         let Ok(nonces) = self.0.get_accounts_nonces(vec![holder_account_id]).await else {
             return Err(ExecutionFailureKind::SequencerError);
@@ -355,7 +363,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let instruction = token_program_preparation_burn(amount);
+        let instruction = Instruction::Burn {
+            amount_to_burn: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -383,7 +393,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_burn(amount);
+        let instruction = Instruction::Burn {
+            amount_to_burn: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -412,7 +424,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_burn(amount);
+        let instruction = Instruction::Burn {
+            amount_to_burn: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -442,7 +456,9 @@ impl Token<'_> {
         amount: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let account_ids = vec![definition_account_id, holder_account_id];
-        let instruction = token_program_preparation_mint(amount);
+        let instruction = Instruction::Mint {
+            amount_to_mint: amount,
+        };
 
         let Ok(nonces) = self
             .0
@@ -481,7 +497,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let instruction = token_program_preparation_mint(amount);
+        let instruction = Instruction::Mint {
+            amount_to_mint: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -510,7 +528,9 @@ impl Token<'_> {
         holder_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
-        let instruction = token_program_preparation_mint(amount);
+        let instruction = Instruction::Mint {
+            amount_to_mint: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -541,7 +561,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_mint(amount);
+        let instruction = Instruction::Mint {
+            amount_to_mint: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -570,7 +592,9 @@ impl Token<'_> {
         holder_account_id: AccountId,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_mint(amount);
+        let instruction = Instruction::Mint {
+            amount_to_mint: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -600,7 +624,9 @@ impl Token<'_> {
         holder_ipk: IncomingViewingPublicKey,
         amount: u128,
     ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
-        let instruction = token_program_preparation_mint(amount);
+        let instruction = Instruction::Mint {
+            amount_to_mint: amount,
+        };
         let instruction_data =
             Program::serialize_instruction(instruction).expect("Instruction should serialize");
 
@@ -625,43 +651,4 @@ impl Token<'_> {
                 (resp, first)
             })
     }
-}
-
-fn token_program_preparation_transfer(amount: u128) -> Vec<u8> {
-    // Instruction must be: [0x01 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
-    // 0x00 || 0x00 || 0x00].
-    let mut instruction = vec![0u8; 23];
-    instruction[0] = 0x01;
-    instruction[1..17].copy_from_slice(&amount.to_le_bytes());
-
-    instruction
-}
-
-fn token_program_preparation_definition(name: [u8; 6], total_supply: u128) -> Vec<u8> {
-    // Instruction must be: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
-    let mut instruction = vec![0u8; 23];
-    instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
-    instruction[17..].copy_from_slice(&name);
-
-    instruction
-}
-
-fn token_program_preparation_burn(amount: u128) -> Vec<u8> {
-    // Instruction must be: [0x03 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
-    // 0x00 || 0x00 || 0x00].
-    let mut instruction = vec![0; 23];
-    instruction[0] = 0x03;
-    instruction[1..17].copy_from_slice(&amount.to_le_bytes());
-
-    instruction
-}
-
-fn token_program_preparation_mint(amount: u128) -> Vec<u8> {
-    // Instruction must be: [0x04 || amount (little-endian 16 bytes) || 0x00 || 0x00 || 0x00 ||
-    // 0x00 || 0x00 || 0x00].
-    let mut instruction = vec![0; 23];
-    instruction[0] = 0x04;
-    instruction[1..17].copy_from_slice(&amount.to_le_bytes());
-
-    instruction
 }

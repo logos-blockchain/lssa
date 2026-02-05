@@ -1,5 +1,5 @@
 [package]
-name = "programs"
+name = "token_program"
 version = "0.1.0"
 edition = "2024"
 license = { workspace = true }
@@ -7,6 +7,3 @@ license = { workspace = true }
 [dependencies]
 nssa_core.workspace = true
 token_core.workspace = true
-token_program.workspace = true
-risc0-zkvm.workspace = true
-serde = { workspace = true, default-features = false }
