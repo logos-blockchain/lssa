@@ -64,6 +64,15 @@ impl IndexerStore {
         Ok(self.get_block_at_id(self.dbio.get_block_id_by_hash(hash)?)?)
     }
 
+    pub fn get_transactions_by_account(
+        &self,
+        acc_id: [u8; 32],
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<NSSATransaction>> {
+        Ok(self.dbio.get_acc_transactions(acc_id, offset, limit)?)
+    }
+
     pub fn genesis_id(&self) -> u64 {
         self.dbio
             .get_meta_first_block_in_db()

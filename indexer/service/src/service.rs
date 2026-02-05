@@ -135,11 +135,31 @@ impl indexer_service_rpc::RpcServer for IndexerService {
 
     async fn get_transactions_by_account(
         &self,
-        _account_id: AccountId,
-        _limit: u32,
-        _offset: u32,
+        account_id: AccountId,
+        limit: u32,
+        offset: u32,
     ) -> Result<Vec<Transaction>, ErrorObjectOwned> {
-        todo!()
+        let transactions = self
+            .indexer
+            .store
+            .get_transactions_by_account(account_id.value, offset as u64, limit as u64)
+            .map_err(|err| {
+                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            })?;
+
+        let mut tx_res = vec![];
+
+        for tx in transactions {
+            tx_res.push(tx.try_into().map_err(|err| {
+                ErrorObjectOwned::owned(
+                    -32000,
+                    format!("Conversion error"),
+                    Some(format!("{err:#?}")),
+                )
+            })?)
+        }
+
+        Ok(tx_res)
     }
 }
 

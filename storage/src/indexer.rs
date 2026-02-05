@@ -1,4 +1,4 @@
-use std::{ops::Div, path::Path, sync::Arc};
+use std::{collections::HashMap, ops::Div, path::Path, sync::Arc};
 
 use common::{
     block::Block,
@@ -6,7 +6,7 @@ use common::{
 };
 use nssa::V02State;
 use rocksdb::{
-    BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
+    BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options, WriteBatch,
 };
 
 use crate::error::DbError;
@@ -45,6 +45,10 @@ pub const CF_BREAKPOINT_NAME: &str = "cf_breakpoint";
 pub const CF_HASH_TO_ID: &str = "cf_hash_to_id";
 /// Name of tx hash to id map column family
 pub const CF_TX_TO_ID: &str = "cf_tx_to_id";
+/// Name of account meta column family
+pub const CF_ACC_META: &str = "cf_acc_meta";
+/// Name of account id to tx hash map column family
+pub const CF_ACC_TO_TX: &str = "cf_acc_to_tx";
 
 pub type DbResult<T> = Result<T, DbError>;
 
@@ -66,6 +70,8 @@ impl RocksDBIO {
         let cfbreakpoint = ColumnFamilyDescriptor::new(CF_BREAKPOINT_NAME, cf_opts.clone());
         let cfhti = ColumnFamilyDescriptor::new(CF_HASH_TO_ID, cf_opts.clone());
         let cftti = ColumnFamilyDescriptor::new(CF_TX_TO_ID, cf_opts.clone());
+        let cfameta = ColumnFamilyDescriptor::new(CF_ACC_META, cf_opts.clone());
+        let cfatt = ColumnFamilyDescriptor::new(CF_ACC_TO_TX, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -73,7 +79,7 @@ impl RocksDBIO {
         let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(
             &db_opts,
             path,
-            vec![cfb, cfmeta, cfbreakpoint, cfhti, cftti],
+            vec![cfb, cfmeta, cfbreakpoint, cfhti, cftti, cfameta, cfatt],
         );
 
         let dbio = Self {
@@ -111,6 +117,8 @@ impl RocksDBIO {
         let _cfsnapshot = ColumnFamilyDescriptor::new(CF_BREAKPOINT_NAME, cf_opts.clone());
         let _cfhti = ColumnFamilyDescriptor::new(CF_HASH_TO_ID, cf_opts.clone());
         let _cftti = ColumnFamilyDescriptor::new(CF_TX_TO_ID, cf_opts.clone());
+        let _cfameta = ColumnFamilyDescriptor::new(CF_ACC_META, cf_opts.clone());
+        let _cfatt = ColumnFamilyDescriptor::new(CF_ACC_TO_TX, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -139,6 +147,14 @@ impl RocksDBIO {
 
     pub fn tx_hash_to_id_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_TX_TO_ID).unwrap()
+    }
+
+    pub fn account_id_to_tx_hash_column(&self) -> Arc<BoundColumnFamily<'_>> {
+        self.db.cf_handle(CF_ACC_TO_TX).unwrap()
+    }
+
+    pub fn account_meta_column(&self) -> Arc<BoundColumnFamily<'_>> {
+        self.db.cf_handle(CF_ACC_META).unwrap()
     }
 
     // Meta
@@ -340,6 +356,8 @@ impl RocksDBIO {
         let cf_hti = self.hash_to_id_column();
         let cf_tti = self.hash_to_id_column();
 
+        // ToDo: rewrite this with write batching
+
         self.db
             .put_cf(
                 &cf_block,
@@ -364,8 +382,6 @@ impl RocksDBIO {
             self.put_meta_last_block_in_db(block.header.block_id)?;
         }
 
-        // ToDo: rewrite this with write batching
-
         self.db
             .put_cf(
                 &cf_hti,
@@ -384,11 +400,15 @@ impl RocksDBIO {
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
+        let mut acc_to_tx_map: HashMap<[u8; 32], Vec<[u8; 32]>> = HashMap::new();
+
         for tx in block.body.transactions {
+            let tx_hash = tx.hash();
+
             self.db
                 .put_cf(
                     &cf_tti,
-                    borsh::to_vec(&tx.hash()).map_err(|err| {
+                    borsh::to_vec(&tx_hash).map_err(|err| {
                         DbError::borsh_cast_message(
                             err,
                             Some("Failed to serialize tx hash".to_string()),
@@ -402,6 +422,29 @@ impl RocksDBIO {
                     })?,
                 )
                 .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+            let acc_ids = NSSATransaction::try_from(&tx)
+                .map_err(|err| {
+                    DbError::db_interaction_error(format!(
+                        "failed to decode transaction in block {} with err {err:?}",
+                        block.header.block_id
+                    ))
+                })?
+                .affected_public_account_ids()
+                .into_iter()
+                .map(|account_id| account_id.into_value())
+                .collect::<Vec<_>>();
+
+            for acc_id in acc_ids {
+                acc_to_tx_map
+                    .entry(acc_id)
+                    .and_modify(|tx_hashes| tx_hashes.push(tx_hash))
+                    .or_insert(vec![tx_hash]);
+            }
+        }
+
+        for (acc_id, tx_hashes) in acc_to_tx_map {
+            self.put_account_transactions(acc_id, tx_hashes)?;
         }
 
         if block.header.block_id.is_multiple_of(BREAKPOINT_INTERVAL) {
@@ -661,5 +704,176 @@ impl RocksDBIO {
                 "Block on this hash not found".to_string(),
             ))
         }
+    }
+
+    // Accounts meta
+
+    fn update_acc_meta_batch(
+        &self,
+        acc_id: [u8; 32],
+        num_tx: u64,
+        write_batch: &mut WriteBatch,
+    ) -> DbResult<()> {
+        let cf_ameta = self.account_meta_column();
+
+        write_batch.put_cf(
+            &cf_ameta,
+            borsh::to_vec(&acc_id).map_err(|err| {
+                DbError::borsh_cast_message(err, Some("Failed to serialize account id".to_string()))
+            })?,
+            borsh::to_vec(&num_tx).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize acc metadata".to_string()),
+                )
+            })?,
+        );
+
+        Ok(())
+    }
+
+    fn get_acc_meta_num_tx(&self, acc_id: [u8; 32]) -> DbResult<Option<u64>> {
+        let cf_ameta = self.account_meta_column();
+        let res = self.db.get_cf(&cf_ameta, acc_id).map_err(|rerr| {
+            DbError::rocksdb_cast_message(rerr, Some("Failed to read from acc meta cf".to_string()))
+        })?;
+
+        res.map(|data| {
+            borsh::from_slice::<u64>(&data).map_err(|serr| {
+                DbError::borsh_cast_message(serr, Some("Failed to deserialize num tx".to_string()))
+            })
+        })
+        .transpose()
+    }
+
+    // Account
+
+    pub fn put_account_transactions(
+        &self,
+        acc_id: [u8; 32],
+        tx_hashes: Vec<[u8; 32]>,
+    ) -> DbResult<()> {
+        let acc_num_tx = self.get_acc_meta_num_tx(acc_id)?.unwrap_or(0);
+        let cf_att = self.account_id_to_tx_hash_column();
+        let mut write_batch = WriteBatch::new();
+
+        for (tx_id, tx_hash) in tx_hashes.iter().enumerate() {
+            let put_id = acc_num_tx + tx_id as u64;
+
+            let mut prefix = borsh::to_vec(&acc_id).map_err(|berr| {
+                DbError::borsh_cast_message(
+                    berr,
+                    Some("Failed to serialize account id".to_string()),
+                )
+            })?;
+            let suffix = borsh::to_vec(&put_id).map_err(|berr| {
+                DbError::borsh_cast_message(berr, Some("Failed to serialize tx id".to_string()))
+            })?;
+
+            prefix.extend_from_slice(&suffix);
+
+            write_batch.put_cf(
+                &cf_att,
+                prefix,
+                borsh::to_vec(tx_hash).map_err(|berr| {
+                    DbError::borsh_cast_message(
+                        berr,
+                        Some("Failed to serialize tx hash".to_string()),
+                    )
+                })?,
+            );
+        }
+
+        self.update_acc_meta_batch(
+            acc_id,
+            acc_num_tx + (tx_hashes.len() as u64),
+            &mut write_batch,
+        )?;
+
+        self.db.write(write_batch).map_err(|rerr| {
+            DbError::rocksdb_cast_message(rerr, Some("Failed to write batch".to_string()))
+        })
+    }
+
+    fn get_acc_transaction_hashes(
+        &self,
+        acc_id: [u8; 32],
+        offset: u64,
+        limit: u64,
+    ) -> DbResult<Vec<[u8; 32]>> {
+        let cf_att = self.account_id_to_tx_hash_column();
+        let mut tx_batch = vec![];
+
+        // ToDo: Multi get this
+
+        for tx_id in offset..(offset + limit) {
+            let mut prefix = borsh::to_vec(&acc_id).map_err(|berr| {
+                DbError::borsh_cast_message(
+                    berr,
+                    Some("Failed to serialize account id".to_string()),
+                )
+            })?;
+            let suffix = borsh::to_vec(&tx_id).map_err(|berr| {
+                DbError::borsh_cast_message(berr, Some("Failed to serialize tx id".to_string()))
+            })?;
+
+            prefix.extend_from_slice(&suffix);
+
+            let res = self
+                .db
+                .get_cf(&cf_att, prefix)
+                .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+            let tx_hash = if let Some(data) = res {
+                Ok(borsh::from_slice::<[u8; 32]>(&data).map_err(|serr| {
+                    DbError::borsh_cast_message(
+                        serr,
+                        Some("Failed to deserialize tx_hash".to_string()),
+                    )
+                })?)
+            } else {
+                // Tx hash not found, assuming that previous one was the last
+                break;
+            }?;
+
+            tx_batch.push(tx_hash);
+        }
+
+        Ok(tx_batch)
+    }
+
+    pub fn get_acc_transactions(
+        &self,
+        acc_id: [u8; 32],
+        offset: u64,
+        limit: u64,
+    ) -> DbResult<Vec<NSSATransaction>> {
+        let mut tx_batch = vec![];
+
+        for tx_hash in self.get_acc_transaction_hashes(acc_id, offset, limit)? {
+            let block_id = self.get_block_id_by_hash(tx_hash)?;
+            let block = self.get_block(block_id)?;
+
+            let enc_tx = block
+                .body
+                .transactions
+                .iter()
+                .find(|tx| tx.hash() == tx_hash)
+                .ok_or(DbError::db_interaction_error(format!(
+                    "Missing transaction in block {} with hash {:#?}",
+                    block.header.block_id, tx_hash
+                )))?;
+
+            let transaction = NSSATransaction::try_from(enc_tx).map_err(|err| {
+                DbError::db_interaction_error(format!(
+                    "failed to decode transaction in block {} with err {err:?}",
+                    block.header.block_id
+                ))
+            })?;
+
+            tx_batch.push(transaction);
+        }
+
+        Ok(tx_batch)
     }
 }

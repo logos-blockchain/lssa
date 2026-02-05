@@ -146,6 +146,16 @@ impl PrivacyPreservingTransaction {
             .map(|(_, public_key)| AccountId::from(public_key))
             .collect()
     }
+
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        let mut acc_set = self
+            .signer_account_ids()
+            .into_iter()
+            .collect::<HashSet<_>>();
+        acc_set.extend(&self.message.public_account_ids);
+
+        acc_set.into_iter().collect()
+    }
 }
 
 fn check_privacy_preserving_circuit_proof_is_valid(
