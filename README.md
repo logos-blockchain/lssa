@@ -218,7 +218,8 @@ You can create both public and private accounts through the CLI. For example:
 wallet account new public
 
 # Output:
-Generated new account with account_id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ
+Generated new account with account_id Public/9ypzv6GGr3fwsgxY7EZezg5rz6zj52DPCkmf1vVujEiJ at path /0
+With pk e4ab7af8cb0b8fdec0e6b5a368a648c5775744cb43c59aa0f7fd562efba07b93
 ```
 
 This id is required when executing any program that interacts with the account.
@@ -302,7 +303,8 @@ Let's try it. For that we need to create another account for the recipient of th
 wallet account new public
 
 # Output:
-Generated new account with account_id Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS
+Generated new account with account_id Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS at path /1
+With pk ef09e2fc601e48fc20e19bc81383d4b238892c6e2d08edce7dc0a077d175171a
 ```
 
 
@@ -360,7 +362,7 @@ Now let’s switch to the private state and create a private account.
 wallet account new private
 
 # Output:
-Generated new account with account_id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
+Generated new account with account_id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL at path /0
 With npk e6366f79d026c8bd64ae6b3d601f0506832ec682ab54897f205fffe64ec0d951
 With ipk 02ddc96d0eb56e00ce14994cfdaec5ae1f76244180a919545983156e3519940a17
 ```
@@ -437,7 +439,7 @@ Let's create a new (uninitialized) private account like before:
 wallet account new private
 
 # Output:
-Generated new account with account_id Private/AukXPRBmrYVqoqEW2HTs7N3hvTn3qdNFDcxDHVr5hMm5
+Generated new account with account_id Private/AukXPRBmrYVqoqEW2HTs7N3hvTn3qdNFDcxDHVr5hMm5 at path /1
 With npk 0c95ebc4b3830f53da77bb0b80a276a776cdcf6410932acc718dcdb3f788a00e
 With ipk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72
 ```
@@ -499,14 +501,16 @@ For example, let's create two new (uninitialized) public accounts and then use t
 wallet account new public
 
 # Output:
-Generated new account with account_id Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7
+Generated new account with account_id Public/4X9kAcnCZ1Ukkbm3nywW9xfCNPK8XaMWCk3zfs1sP4J7 at path /0/0
+With pk 41d2ef101ab98ae4f433ecbd0e2b42e94da27d14c5eaf870464b2aa320a1cbc9
 ```
 
 ```bash
 wallet account new public
 
 # Output:
-Generated new account with account_id Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw
+Generated new account with account_id Public/9RRSMm3w99uCD2Jp2Mqqf6dfc8me2tkFRE9HeU2DFftw at path /2
+With pk 03f991f3fb12f2e6773afeea9799a0c795e6858de10e48d78f76ad008a7e34dd
 ```
 
 Now we use them to create a new token. Let's call it the "Token A"
@@ -547,7 +551,8 @@ Since we can’t reuse the accounts from the previous example, we need to create
 wallet account new public
 
 # Output:
-Generated new account with account_id Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii
+Generated new account with account_id Public/GQ3C8rbprTtQUCvkuVBRu3v9wvUvjafCMFqoSPvTEVii at path /1/0
+With pk 38711326e0028fb893b1367da0b55a77787395e86abd50c545336ccfcd1f5a16
 ```
 
 ```bash
@@ -555,7 +560,7 @@ wallet account new private
 
 
 # Output:
-Generated new account with account_id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
+Generated new account with account_id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF at path /0/0
 With npk 6a2dfe433cf28e525aa0196d719be3c16146f7ee358ca39595323f94fde38f93
 With ipk 03d59abf4bee974cc12ddb44641c19f0b5441fef39191f047c988c29a77252a577
 ```
@@ -604,7 +609,8 @@ Let's create a new public account for the recipient.
 wallet account new public
 
 # Output:
-Generated new account with account_id Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6
+Generated new account with account_id Public/88f2zeTgiv9LUthQwPJbrmufb9SiDfmpCs47B7vw6Gd6 at path /0/1
+With pk 6fe69848a34f21a3b8b58d9b71ce5c8f876ae60a9339166b1e28122e10789e29
 ```
 
 Let's send 1000 B tokens to this new account. We'll debit this from the supply account used in the creation of the token.
@@ -664,7 +670,8 @@ To hold these LP tokens, we first create a new account:
 wallet account new public
 
 # Output:
-Generated new account with account_id Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf
+Generated new account with account_id Public/FHgLW9jW4HXMV6egLWbwpTqVAGiCHw2vkg71KYSuimVf at path /0/0/0
+With pk d26c9bd945d7bae65e6363323ee75e76ef5de9d80bb2047a708c6568736a1c19
 ```
 
 Next, we initialize the liquidity pool by depositing tokens A and B and specifying the account that will receive the LP tokens:
