@@ -152,56 +152,6 @@ impl PoolDefinition {
     }
 }
 
-// TODO: remove repeated code for Token_Definition and TokenHoldling
-
-const TOKEN_HOLDING_TYPE: u8 = 1;
-const TOKEN_HOLDING_DATA_SIZE: usize = 49;
-
-struct TokenHolding {
-    #[cfg_attr(not(test), expect(dead_code, reason = "TODO: fix later"))]
-    account_type: u8,
-    definition_id: AccountId,
-    balance: u128,
-}
-
-impl TokenHolding {
-    fn parse(data: &[u8]) -> Option<Self> {
-        if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
-            None
-        } else {
-            let account_type = data[0];
-            let definition_id = AccountId::new(
-                data[1..33]
-                    .try_into()
-                    .expect("Defintion ID must be 32 bytes long"),
-            );
-            let balance = u128::from_le_bytes(
-                data[33..]
-                    .try_into()
-                    .expect("balance must be 16 bytes little-endian"),
-            );
-            Some(Self {
-                definition_id,
-                balance,
-                account_type,
-            })
-        }
-    }
-
-    #[cfg(test)]
-    fn into_data(self) -> Data {
-        let mut bytes = [0; TOKEN_HOLDING_DATA_SIZE];
-        bytes[0] = self.account_type;
-        bytes[1..33].copy_from_slice(&self.definition_id.to_bytes());
-        bytes[33..].copy_from_slice(&self.balance.to_le_bytes());
-
-        bytes
-            .to_vec()
-            .try_into()
-            .expect("49 bytes should fit into Data")
-    }
-}
-
 type Instruction = Vec<u8>;
 fn main() {
     let (
@@ -412,32 +362,6 @@ fn compute_liquidity_token_pda_seed(pool_id: AccountId) -> PdaSeed {
     )
 }
 
-const TOKEN_PROGRAM_NEW: u8 = 0;
-const TOKEN_PROGRAM_TRANSFER: u8 = 1;
-const TOKEN_PROGRAM_MINT: u8 = 4;
-const TOKEN_PROGRAM_BURN: u8 = 3;
-
-fn initialize_token_transfer_chained_call(
-    token_program_command: u8,
-    sender: AccountWithMetadata,
-    recipient: AccountWithMetadata,
-    amount_to_move: u128,
-    pda_seed: Vec<PdaSeed>,
-) -> ChainedCall {
-    let mut instruction_data = vec![0u8; 23];
-    instruction_data[0] = token_program_command;
-    instruction_data[1..17].copy_from_slice(&amount_to_move.to_le_bytes());
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data)
-        .expect("AMM Program expects valid token transfer instruction data");
-
-    ChainedCall {
-        program_id: sender.account.program_owner,
-        instruction_data,
-        pre_states: vec![sender, recipient],
-        pda_seeds: pda_seed,
-    }
-}
-
 fn new_definition(
     pre_states: &[AccountWithMetadata],
     balance_in: &[u128],
@@ -471,12 +395,12 @@ fn new_definition(
     }
 
     // Verify token_a and token_b are different
-    let definition_token_a_id = TokenHolding::parse(&user_holding_a.account.data)
+    let definition_token_a_id = token_core::TokenHolding::try_from(&user_holding_a.account.data)
         .expect("New definition: AMM Program expects valid Token Holding account for Token A")
-        .definition_id;
-    let definition_token_b_id = TokenHolding::parse(&user_holding_b.account.data)
+        .definition_id();
+    let definition_token_b_id = token_core::TokenHolding::try_from(&user_holding_b.account.data)
         .expect("New definition: AMM Program expects valid Token Holding account for Token B")
-        .definition_id;
+        .definition_id();
 
     // both instances of the same token program
     let token_program = user_holding_a.account.program_owner;
@@ -543,57 +467,48 @@ fn new_definition(
         AccountPostState::new(pool_post.clone())
     };
 
-    let mut chained_calls = Vec::<ChainedCall>::new();
+    let token_program_id = user_holding_a.account.program_owner;
 
     // Chain call for Token A (user_holding_a -> Vault_A)
-    let call_token_a = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        user_holding_a.clone(),
-        vault_a.clone(),
-        amount_a,
-        Vec::<PdaSeed>::new(),
+    let call_token_a = ChainedCall::new(
+        token_program_id,
+        vec![user_holding_a.clone(), vault_a.clone()],
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: amount_a,
+        },
     );
     // Chain call for Token B (user_holding_b -> Vault_B)
-    let call_token_b = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        user_holding_b.clone(),
-        vault_b.clone(),
-        amount_b,
-        Vec::<PdaSeed>::new(),
+    let call_token_b = ChainedCall::new(
+        token_program_id,
+        vec![user_holding_b.clone(), vault_b.clone()],
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: amount_b,
+        },
     );
 
     // Chain call for liquidity token (TokenLP definition -> User LP Holding)
-    let mut instruction_data = vec![0u8; 23];
-    instruction_data[0] = if pool.account == Account::default() {
-        TOKEN_PROGRAM_NEW
+    let instruction = if pool.account == Account::default() {
+        token_core::Instruction::NewFungibleDefinition {
+            name: String::from("LP Token"),
+            total_supply: amount_a,
+        }
     } else {
-        TOKEN_PROGRAM_MINT
-    }; //new or mint
-    let nme = if pool.account == Account::default() {
-        [1u8; 6]
-    } else {
-        [0u8; 6]
+        token_core::Instruction::Mint {
+            amount_to_mint: amount_a,
+        }
     };
-
-    instruction_data[1..17].copy_from_slice(&amount_a.to_le_bytes());
-    instruction_data[17..].copy_from_slice(&nme);
-    let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data)
-        .expect("New definition: AMM Program expects valid instruction_data");
 
     let mut pool_lp_auth = pool_lp.clone();
     pool_lp_auth.is_authorized = true;
 
-    let token_program_id = user_holding_a.account.program_owner;
-    let call_token_lp = ChainedCall {
-        program_id: token_program_id,
-        instruction_data,
-        pre_states: vec![pool_lp_auth.clone(), user_holding_lp.clone()],
-        pda_seeds: vec![compute_liquidity_token_pda_seed(pool.account_id)],
-    };
+    let call_token_lp = ChainedCall::new(
+        token_program_id,
+        vec![pool_lp_auth.clone(), user_holding_lp.clone()],
+        &instruction,
+    )
+    .with_pda_seeds(vec![compute_liquidity_token_pda_seed(pool.account_id)]);
 
-    chained_calls.push(call_token_lp);
-    chained_calls.push(call_token_b);
-    chained_calls.push(call_token_a);
+    let chained_calls = vec![call_token_lp, call_token_b, call_token_a];
 
     let post_states = vec![
         pool_post.clone(),
@@ -645,18 +560,30 @@ fn swap(
 
     // fetch pool reserves
     // validates reserves is at least the vaults' balances
-    if TokenHolding::parse(&vault_a.account.data)
-        .expect("Swap: AMM Program expects a valid Token Holding Account for Vault A")
-        .balance
-        < pool_def_data.reserve_a
-    {
+    let vault_a_token_holding = token_core::TokenHolding::try_from(&vault_a.account.data)
+        .expect("Swap: AMM Program expects a valid Token Holding Account for Vault A");
+    let token_core::TokenHolding::Fungible {
+        definition_id: _,
+        balance: vault_a_balance,
+    } = vault_a_token_holding
+    else {
+        panic!("Swap: AMM Program expects a valid Fungible Token Holding Account for Vault A");
+    };
+    if vault_a_balance < pool_def_data.reserve_a {
         panic!("Reserve for Token A exceeds vault balance");
     }
-    if TokenHolding::parse(&vault_b.account.data)
-        .expect("Swap: AMM Program expects a valid Token Holding Account for Vault B")
-        .balance
-        < pool_def_data.reserve_b
-    {
+
+    let vault_b_token_holding = token_core::TokenHolding::try_from(&vault_b.account.data)
+        .expect("Swap: AMM Program expects a valid Token Holding Account for Vault B");
+    let token_core::TokenHolding::Fungible {
+        definition_id: _,
+        balance: vault_b_balance,
+    } = vault_b_token_holding
+    else {
+        panic!("Swap: AMM Program expects a valid Fungible Token Holding Account for Vault B");
+    };
+
+    if vault_b_balance < pool_def_data.reserve_b {
         panic!("Reserve for Token B exceeds vault balance");
     }
 
@@ -741,30 +668,37 @@ fn swap_logic(
         panic!("Withdraw amount should be nonzero");
     }
 
+    let token_program_id = user_deposit.account.program_owner;
+
     let mut chained_calls = Vec::new();
-    chained_calls.push(initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        user_deposit.clone(),
-        vault_deposit.clone(),
-        deposit_amount,
-        Vec::<PdaSeed>::new(),
+    chained_calls.push(ChainedCall::new(
+        token_program_id,
+        vec![user_deposit, vault_deposit],
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: deposit_amount,
+        },
     ));
 
     let mut vault_withdraw = vault_withdraw.clone();
     vault_withdraw.is_authorized = true;
 
-    chained_calls.push(initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        vault_withdraw.clone(),
-        user_withdraw.clone(),
-        withdraw_amount,
-        vec![compute_vault_pda_seed(
-            pool_id,
-            TokenHolding::parse(&vault_withdraw.account.data)
-                .expect("Swap Logic: AMM Program expects valid token data")
-                .definition_id,
-        )],
-    ));
+    let pda_seed = compute_vault_pda_seed(
+        pool_id,
+        token_core::TokenHolding::try_from(&vault_withdraw.account.data)
+            .expect("Swap Logic: AMM Program expects valid token data")
+            .definition_id(),
+    );
+
+    chained_calls.push(
+        ChainedCall::new(
+            token_program_id,
+            vec![vault_withdraw, user_withdraw],
+            &token_core::Instruction::Transfer {
+                amount_to_transfer: withdraw_amount,
+            },
+        )
+        .with_pda_seeds(vec![pda_seed]),
+    );
 
     (chained_calls, deposit_amount, withdraw_amount)
 }
@@ -816,12 +750,29 @@ fn add_liquidity(
     }
 
     // 2. Determine deposit amount
-    let vault_b_balance = TokenHolding::parse(&vault_b.account.data)
-        .expect("Add liquidity: AMM Program expects valid Token Holding Account for Vault B")
-        .balance;
-    let vault_a_balance = TokenHolding::parse(&vault_a.account.data)
-        .expect("Add liquidity: AMM Program expects valid Token Holding Account for Vault A")
-        .balance;
+    let vault_b_token_holding = token_core::TokenHolding::try_from(&vault_b.account.data)
+        .expect("Add liquidity: AMM Program expects valid Token Holding Account for Vault B");
+    let token_core::TokenHolding::Fungible {
+        definition_id: _,
+        balance: vault_b_balance,
+    } = vault_b_token_holding
+    else {
+        panic!(
+            "Add liquidity: AMM Program expects valid Fungible Token Holding Account for Vault B"
+        );
+    };
+
+    let vault_a_token_holding = token_core::TokenHolding::try_from(&vault_a.account.data)
+        .expect("Add liquidity: AMM Program expects valid Token Holding Account for Vault A");
+    let token_core::TokenHolding::Fungible {
+        definition_id: _,
+        balance: vault_a_balance,
+    } = vault_a_token_holding
+    else {
+        panic!(
+            "Add liquidity: AMM Program expects valid Fungible Token Holding Account for Vault A"
+        );
+    };
 
     if pool_def_data.reserve_a == 0 || pool_def_data.reserve_b == 0 {
         panic!("Reserves must be nonzero");
@@ -879,38 +830,37 @@ fn add_liquidity(
     };
 
     pool_post.data = pool_post_definition.into_data();
-    let mut chained_call = Vec::new();
+    let token_program_id = user_holding_a.account.program_owner;
 
     // Chain call for Token A (UserHoldingA -> Vault_A)
-    let call_token_a = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        user_holding_a.clone(),
-        vault_a.clone(),
-        actual_amount_a,
-        Vec::<PdaSeed>::new(),
+    let call_token_a = ChainedCall::new(
+        token_program_id,
+        vec![user_holding_a.clone(), vault_a.clone()],
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: actual_amount_a,
+        },
     );
     // Chain call for Token B (UserHoldingB -> Vault_B)
-    let call_token_b = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        user_holding_b.clone(),
-        vault_b.clone(),
-        actual_amount_b,
-        Vec::<PdaSeed>::new(),
+    let call_token_b = ChainedCall::new(
+        token_program_id,
+        vec![user_holding_b.clone(), vault_b.clone()],
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: actual_amount_b,
+        },
     );
     // Chain call for LP (mint new tokens for user_holding_lp)
     let mut pool_definition_lp_auth = pool_definition_lp.clone();
     pool_definition_lp_auth.is_authorized = true;
-    let call_token_lp = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_MINT,
-        pool_definition_lp_auth.clone(),
-        user_holding_lp.clone(),
-        delta_lp,
-        vec![compute_liquidity_token_pda_seed(pool.account_id)],
-    );
+    let call_token_lp = ChainedCall::new(
+        token_program_id,
+        vec![pool_definition_lp_auth.clone(), user_holding_lp.clone()],
+        &token_core::Instruction::Mint {
+            amount_to_mint: delta_lp,
+        },
+    )
+    .with_pda_seeds(vec![compute_liquidity_token_pda_seed(pool.account_id)]);
 
-    chained_call.push(call_token_lp);
-    chained_call.push(call_token_b);
-    chained_call.push(call_token_a);
+    let chained_calls = vec![call_token_lp, call_token_b, call_token_a];
 
     let post_states = vec![
         AccountPostState::new(pool_post),
@@ -922,7 +872,7 @@ fn add_liquidity(
         AccountPostState::new(pre_states[6].account.clone()),
     ];
 
-    (post_states, chained_call)
+    (post_states, chained_calls)
 }
 
 fn remove_liquidity(
@@ -986,11 +936,20 @@ fn remove_liquidity(
     }
 
     // 2. Compute withdrawal amounts
-    let user_holding_lp_data = TokenHolding::parse(&user_holding_lp.account.data)
+    let user_holding_lp_data = token_core::TokenHolding::try_from(&user_holding_lp.account.data)
         .expect("Remove liquidity: AMM Program expects a valid Token Account for liquidity token");
+    let token_core::TokenHolding::Fungible {
+        definition_id: _,
+        balance: user_lp_balance,
+    } = user_holding_lp_data
+    else {
+        panic!(
+            "Remove liquidity: AMM Program expects a valid Fungible Token Holding Account for liquidity token"
+        );
+    };
 
-    if user_holding_lp_data.balance > pool_def_data.liquidity_pool_supply
-        || user_holding_lp_data.definition_id != pool_def_data.liquidity_pool_id
+    if user_lp_balance > pool_def_data.liquidity_pool_supply
+        || user_holding_lp_data.definition_id() != pool_def_data.liquidity_pool_id
     {
         panic!("Invalid liquidity account provided");
     }
@@ -1026,44 +985,45 @@ fn remove_liquidity(
 
     pool_post.data = pool_post_definition.into_data();
 
-    let mut chained_calls = Vec::new();
+    let token_program_id = user_holding_a.account.program_owner;
 
     // Chaincall for Token A withdraw
-    let call_token_a = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        running_vault_a,
-        user_holding_a.clone(),
-        withdraw_amount_a,
-        vec![compute_vault_pda_seed(
-            pool.account_id,
-            pool_def_data.definition_token_a_id,
-        )],
-    );
+    let call_token_a = ChainedCall::new(
+        token_program_id,
+        vec![running_vault_a, user_holding_a.clone()],
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: withdraw_amount_a,
+        },
+    )
+    .with_pda_seeds(vec![compute_vault_pda_seed(
+        pool.account_id,
+        pool_def_data.definition_token_a_id,
+    )]);
     // Chaincall for Token B withdraw
-    let call_token_b = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_TRANSFER,
-        running_vault_b,
-        user_holding_b.clone(),
-        withdraw_amount_b,
-        vec![compute_vault_pda_seed(
-            pool.account_id,
-            pool_def_data.definition_token_b_id,
-        )],
-    );
+    let call_token_b = ChainedCall::new(
+        token_program_id,
+        vec![running_vault_b, user_holding_b.clone()],
+        &token_core::Instruction::Transfer {
+            amount_to_transfer: withdraw_amount_b,
+        },
+    )
+    .with_pda_seeds(vec![compute_vault_pda_seed(
+        pool.account_id,
+        pool_def_data.definition_token_b_id,
+    )]);
     // Chaincall for LP adjustment
     let mut pool_definition_lp_auth = pool_definition_lp.clone();
     pool_definition_lp_auth.is_authorized = true;
-    let call_token_lp = initialize_token_transfer_chained_call(
-        TOKEN_PROGRAM_BURN,
-        pool_definition_lp_auth.clone(),
-        user_holding_lp.clone(),
-        delta_lp,
-        vec![compute_liquidity_token_pda_seed(pool.account_id)],
-    );
+    let call_token_lp = ChainedCall::new(
+        token_program_id,
+        vec![pool_definition_lp_auth, user_holding_lp.clone()],
+        &token_core::Instruction::Burn {
+            amount_to_burn: delta_lp,
+        },
+    )
+    .with_pda_seeds(vec![compute_liquidity_token_pda_seed(pool.account_id)]);
 
-    chained_calls.push(call_token_lp);
-    chained_calls.push(call_token_b);
-    chained_calls.push(call_token_a);
+    let chained_calls = vec![call_token_lp, call_token_b, call_token_a];
 
     let post_states = vec![
         AccountPostState::new(pool_post.clone()),
@@ -1082,41 +1042,18 @@ fn remove_liquidity(
 mod tests {
     use nssa_core::{
         account::{Account, AccountId, AccountWithMetadata, Data},
-        program::{ChainedCall, PdaSeed, ProgramId},
+        program::{ChainedCall, ProgramId},
     };
+    use token_core::{TokenDefinition, TokenHolding};
 
     use crate::{
-        PoolDefinition, TokenHolding, add_liquidity, compute_liquidity_token_pda,
+        PoolDefinition, add_liquidity, compute_liquidity_token_pda,
         compute_liquidity_token_pda_seed, compute_pool_pda, compute_vault_pda,
         compute_vault_pda_seed, new_definition, remove_liquidity, swap,
     };
 
     const TOKEN_PROGRAM_ID: ProgramId = [15; 8];
     const AMM_PROGRAM_ID: ProgramId = [42; 8];
-    const TOKEN_DEFINITION_DATA_SIZE: usize = 55;
-
-    struct TokenDefinition {
-        account_type: u8,
-        name: [u8; 6],
-        total_supply: u128,
-        metadata_id: AccountId,
-    }
-
-    impl TokenDefinition {
-        fn into_data(self) -> Data {
-            let mut bytes = Vec::<u8>::new();
-            bytes.extend_from_slice(&[self.account_type]);
-            bytes.extend_from_slice(&self.name);
-            bytes.extend_from_slice(&self.total_supply.to_le_bytes());
-            bytes.extend_from_slice(&self.metadata_id.to_bytes());
-
-            if bytes.len() != TOKEN_DEFINITION_DATA_SIZE {
-                panic!("Invalid Token Definition data");
-            }
-
-            Data::try_from(bytes).expect("Token definition data size must fit into data")
-        }
-    }
 
     struct BalanceForTests;
 
@@ -1250,21 +1187,16 @@ mod tests {
 
     impl ChainedCallForTests {
         fn cc_swap_token_a_test_1() -> ChainedCall {
-            let mut instruction_data = vec![0; 23];
-            instruction_data[0] = 1;
-            instruction_data[1..17]
-                .copy_from_slice(&BalanceForTests::add_max_amount_a().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![
                     AccountForTests::user_holding_a(),
                     AccountForTests::vault_a_init(),
                 ],
-                pda_seeds: Vec::<PdaSeed>::new(),
-            }
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::add_max_amount_a(),
+                },
+            )
         }
 
         fn cc_swap_token_b_test_1() -> ChainedCall {
@@ -1273,20 +1205,17 @@ mod tests {
             let mut vault_b_auth = AccountForTests::vault_b_init();
             vault_b_auth.is_authorized = true;
 
-            let mut instruction = vec![0; 23];
-            instruction[0] = 1;
-            instruction[1..17].copy_from_slice(&swap_amount.to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![vault_b_auth, AccountForTests::user_holding_b()],
-                pda_seeds: vec![compute_vault_pda_seed(
-                    IdForTests::pool_definition_id(),
-                    IdForTests::token_b_definition_id(),
-                )],
-            }
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![vault_b_auth, AccountForTests::user_holding_b()],
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: swap_amount,
+                },
+            )
+            .with_pda_seeds(vec![compute_vault_pda_seed(
+                IdForTests::pool_definition_id(),
+                IdForTests::token_b_definition_id(),
+            )])
         }
 
         fn cc_swap_token_a_test_2() -> ChainedCall {
@@ -1295,214 +1224,164 @@ mod tests {
             let mut vault_a_auth = AccountForTests::vault_a_init();
             vault_a_auth.is_authorized = true;
 
-            let mut instruction_data = vec![0; 23];
-            instruction_data[0] = 1;
-            instruction_data[1..17].copy_from_slice(&swap_amount.to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction_data)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![vault_a_auth, AccountForTests::user_holding_a()],
-                pda_seeds: vec![compute_vault_pda_seed(
-                    IdForTests::pool_definition_id(),
-                    IdForTests::token_a_definition_id(),
-                )],
-            }
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![vault_a_auth, AccountForTests::user_holding_a()],
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: swap_amount,
+                },
+            )
+            .with_pda_seeds(vec![compute_vault_pda_seed(
+                IdForTests::pool_definition_id(),
+                IdForTests::token_a_definition_id(),
+            )])
         }
 
         fn cc_swap_token_b_test_2() -> ChainedCall {
-            let mut instruction = vec![0; 23];
-            instruction[0] = 1;
-            instruction[1..17].copy_from_slice(&BalanceForTests::add_max_amount_b().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![
                     AccountForTests::user_holding_b(),
                     AccountForTests::vault_b_init(),
                 ],
-                pda_seeds: Vec::<PdaSeed>::new(),
-            }
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::add_max_amount_b(),
+                },
+            )
         }
 
         fn cc_add_token_a() -> ChainedCall {
-            let mut instruction = vec![0u8; 23];
-            instruction[0] = 1;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::add_successful_amount_a().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![
                     AccountForTests::user_holding_a(),
                     AccountForTests::vault_a_init(),
                 ],
-                pda_seeds: Vec::<PdaSeed>::new(),
-            }
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::add_successful_amount_a(),
+                },
+            )
         }
 
         fn cc_add_token_b() -> ChainedCall {
-            let mut instruction = vec![0u8; 23];
-            instruction[0] = 1;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::add_successful_amount_b().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("Swap Logic: AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![
                     AccountForTests::user_holding_b(),
                     AccountForTests::vault_b_init(),
                 ],
-                pda_seeds: Vec::<PdaSeed>::new(),
-            }
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::add_successful_amount_b(),
+                },
+            )
         }
 
         fn cc_add_pool_lp() -> ChainedCall {
             let mut pool_lp_auth = AccountForTests::pool_lp_init();
             pool_lp_auth.is_authorized = true;
 
-            let mut instruction = vec![0u8; 23];
-            instruction[0] = 4;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::add_successful_amount_a().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("Swap Logic: AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![pool_lp_auth, AccountForTests::user_holding_lp_init()],
-                pda_seeds: vec![compute_liquidity_token_pda_seed(
-                    IdForTests::pool_definition_id(),
-                )],
-            }
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![pool_lp_auth, AccountForTests::user_holding_lp_init()],
+                &token_core::Instruction::Mint {
+                    amount_to_mint: BalanceForTests::add_successful_amount_a(),
+                },
+            )
+            .with_pda_seeds(vec![compute_liquidity_token_pda_seed(
+                IdForTests::pool_definition_id(),
+            )])
         }
 
         fn cc_remove_token_a() -> ChainedCall {
             let mut vault_a_auth = AccountForTests::vault_a_init();
             vault_a_auth.is_authorized = true;
 
-            let mut instruction = vec![0; 23];
-            instruction[0] = 1;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::remove_actual_a_successful().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![vault_a_auth, AccountForTests::user_holding_a()],
-                pda_seeds: vec![compute_vault_pda_seed(
-                    IdForTests::pool_definition_id(),
-                    IdForTests::token_a_definition_id(),
-                )],
-            }
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![vault_a_auth, AccountForTests::user_holding_a()],
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::remove_actual_a_successful(),
+                },
+            )
+            .with_pda_seeds(vec![compute_vault_pda_seed(
+                IdForTests::pool_definition_id(),
+                IdForTests::token_a_definition_id(),
+            )])
         }
 
         fn cc_remove_token_b() -> ChainedCall {
             let mut vault_b_auth = AccountForTests::vault_b_init();
             vault_b_auth.is_authorized = true;
 
-            let mut instruction = vec![0; 23];
-            instruction[0] = 1;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::remove_min_amount_b_low().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![vault_b_auth, AccountForTests::user_holding_b()],
-                pda_seeds: vec![compute_vault_pda_seed(
-                    IdForTests::pool_definition_id(),
-                    IdForTests::token_b_definition_id(),
-                )],
-            }
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![vault_b_auth, AccountForTests::user_holding_b()],
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::remove_min_amount_b_low(),
+                },
+            )
+            .with_pda_seeds(vec![compute_vault_pda_seed(
+                IdForTests::pool_definition_id(),
+                IdForTests::token_b_definition_id(),
+            )])
         }
 
         fn cc_remove_pool_lp() -> ChainedCall {
             let mut pool_lp_auth = AccountForTests::pool_lp_init();
             pool_lp_auth.is_authorized = true;
 
-            let mut instruction = vec![0; 23];
-            instruction[0] = 3;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::remove_actual_a_successful().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
-                    AccountForTests::pool_lp_init(),
-                    AccountForTests::user_holding_lp_init(),
-                ],
-                pda_seeds: vec![compute_liquidity_token_pda_seed(
-                    IdForTests::pool_definition_id(),
-                )],
-            }
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![pool_lp_auth, AccountForTests::user_holding_lp_init()],
+                &token_core::Instruction::Burn {
+                    amount_to_burn: BalanceForTests::remove_amount_lp(),
+                },
+            )
+            .with_pda_seeds(vec![compute_liquidity_token_pda_seed(
+                IdForTests::pool_definition_id(),
+            )])
         }
 
         fn cc_new_definition_token_a() -> ChainedCall {
-            let mut instruction = vec![0; 23];
-            instruction[0] = 1;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::add_successful_amount_a().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![
                     AccountForTests::user_holding_a(),
                     AccountForTests::vault_a_init(),
                 ],
-                pda_seeds: Vec::<PdaSeed>::new(),
-            }
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::add_successful_amount_a(),
+                },
+            )
         }
 
         fn cc_new_definition_token_b() -> ChainedCall {
-            let mut instruction = vec![0; 23];
-            instruction[0] = 1;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::add_successful_amount_b().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("Swap Logic: AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![
                     AccountForTests::user_holding_b(),
                     AccountForTests::vault_b_init(),
                 ],
-                pda_seeds: Vec::<PdaSeed>::new(),
-            }
+                &token_core::Instruction::Transfer {
+                    amount_to_transfer: BalanceForTests::add_successful_amount_b(),
+                },
+            )
         }
 
         fn cc_new_definition_token_lp() -> ChainedCall {
-            let mut instruction = vec![0; 23];
-            instruction[0] = 1;
-            instruction[1..17]
-                .copy_from_slice(&BalanceForTests::add_successful_amount_a().to_le_bytes());
-            let instruction_data = risc0_zkvm::serde::to_vec(&instruction)
-                .expect("AMM Program expects valid transaction instruction data");
-            ChainedCall {
-                program_id: TOKEN_PROGRAM_ID,
-                instruction_data,
-                pre_states: vec![
+            ChainedCall::new(
+                TOKEN_PROGRAM_ID,
+                vec![
                     AccountForTests::pool_lp_init(),
                     AccountForTests::user_holding_lp_uninit(),
                 ],
-                pda_seeds: vec![compute_liquidity_token_pda_seed(
-                    IdForTests::pool_definition_id(),
-                )],
-            }
+                &token_core::Instruction::Mint {
+                    amount_to_mint: BalanceForTests::add_successful_amount_a(),
+                },
+            )
+            .with_pda_seeds(vec![compute_liquidity_token_pda_seed(
+                IdForTests::pool_definition_id(),
+            )])
         }
     }
 
@@ -1566,8 +1445,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_a_definition_id(),
                         balance: BalanceForTests::user_token_a_balance(),
                     }),
@@ -1583,8 +1461,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_b_definition_id(),
                         balance: BalanceForTests::user_token_b_balance(),
                     }),
@@ -1600,8 +1477,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_a_definition_id(),
                         balance: BalanceForTests::vault_a_reserve_init(),
                     }),
@@ -1617,8 +1493,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_b_definition_id(),
                         balance: BalanceForTests::vault_b_reserve_init(),
                     }),
@@ -1634,8 +1509,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_a_definition_id(),
                         balance: BalanceForTests::vault_a_reserve_high(),
                     }),
@@ -1651,8 +1525,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_b_definition_id(),
                         balance: BalanceForTests::vault_b_reserve_high(),
                     }),
@@ -1668,8 +1541,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_a_definition_id(),
                         balance: BalanceForTests::vault_a_reserve_low(),
                     }),
@@ -1685,8 +1557,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_b_definition_id(),
                         balance: BalanceForTests::vault_b_reserve_low(),
                     }),
@@ -1702,8 +1573,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_a_definition_id(),
                         balance: 0,
                     }),
@@ -1719,8 +1589,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_b_definition_id(),
                         balance: 0,
                     }),
@@ -1736,11 +1605,10 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenDefinition::into_data(TokenDefinition {
-                        account_type: 0u8,
-                        name: [1; 6],
+                    data: Data::from(&TokenDefinition::Fungible {
+                        name: String::from("test"),
                         total_supply: BalanceForTests::vault_a_reserve_init(),
-                        metadata_id: AccountId::new([0; 32]),
+                        metadata_id: None,
                     }),
                     nonce: 0,
                 },
@@ -1754,11 +1622,10 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenDefinition::into_data(TokenDefinition {
-                        account_type: 0u8,
-                        name: [1; 6],
+                    data: Data::from(&TokenDefinition::Fungible {
+                        name: String::from("test"),
                         total_supply: BalanceForTests::vault_a_reserve_init(),
-                        metadata_id: AccountId::new([0; 32]),
+                        metadata_id: None,
                     }),
                     nonce: 0,
                 },
@@ -1772,8 +1639,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_lp_definition_id(),
                         balance: 0,
                     }),
@@ -1789,8 +1655,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_lp_definition_id(),
                         balance: BalanceForTests::user_token_lp_balance(),
                     }),
@@ -2102,8 +1967,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_a_definition_id(),
                         balance: BalanceForTests::vault_a_reserve_init(),
                     }),
@@ -2119,8 +1983,7 @@ mod tests {
                 account: Account {
                     program_owner: TOKEN_PROGRAM_ID,
                     balance: 0u128,
-                    data: TokenHolding::into_data(TokenHolding {
-                        account_type: 1u8,
+                    data: Data::from(&TokenHolding::Fungible {
                         definition_id: IdForTests::token_b_definition_id(),
                         balance: BalanceForTests::vault_b_reserve_init(),
                     }),
@@ -3552,8 +3415,14 @@ mod tests {
         let chained_call_a = chained_calls[0].clone();
         let chained_call_b = chained_calls[1].clone();
 
-        assert!(chained_call_a == ChainedCallForTests::cc_swap_token_a_test_1());
-        assert!(chained_call_b == ChainedCallForTests::cc_swap_token_b_test_1());
+        assert_eq!(
+            chained_call_a,
+            ChainedCallForTests::cc_swap_token_a_test_1()
+        );
+        assert_eq!(
+            chained_call_b,
+            ChainedCallForTests::cc_swap_token_b_test_1()
+        );
     }
 
     #[test]
@@ -3581,7 +3450,13 @@ mod tests {
         let chained_call_a = chained_calls[1].clone();
         let chained_call_b = chained_calls[0].clone();
 
-        assert!(chained_call_a == ChainedCallForTests::cc_swap_token_a_test_2());
-        assert!(chained_call_b == ChainedCallForTests::cc_swap_token_b_test_2());
+        assert_eq!(
+            chained_call_a,
+            ChainedCallForTests::cc_swap_token_a_test_2()
+        );
+        assert_eq!(
+            chained_call_b,
+            ChainedCallForTests::cc_swap_token_b_test_2()
+        );
     }
 }

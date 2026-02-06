@@ -14,7 +14,7 @@ mod state;
 
 pub use nssa_core::{
     SharedSecretKey,
-    account::{Account, AccountId},
+    account::{Account, AccountId, Data},
     encryption::EphemeralPublicKey,
     program::ProgramId,
 };

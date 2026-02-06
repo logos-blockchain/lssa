@@ -1,8 +1,9 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::{AccountId, ProgramId, program::Program};
 use nssa_core::program::PdaSeed;
+use token_core::TokenHolding;
 
-use crate::{TokenHolding, WalletCore};
+use crate::WalletCore;
 
 fn compute_pool_pda(
     amm_program_id: ProgramId,
@@ -123,12 +124,12 @@ impl Amm<'_> {
             .await
             .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
-            .definition_id;
-        let definition_token_b_id = TokenHolding::parse(&user_b_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
-            .definition_id;
+        let definition_token_a_id = TokenHolding::try_from(&user_a_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_a))?
+            .definition_id();
+        let definition_token_b_id = TokenHolding::try_from(&user_b_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_b))?
+            .definition_id();
 
         let amm_pool =
             compute_pool_pda(amm_program_id, definition_token_a_id, definition_token_b_id);
@@ -208,12 +209,12 @@ impl Amm<'_> {
             .await
             .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
-            .definition_id;
-        let definition_token_b_id = TokenHolding::parse(&user_b_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_b))?
-            .definition_id;
+        let definition_token_a_id = TokenHolding::try_from(&user_a_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_a))?
+            .definition_id();
+        let definition_token_b_id = TokenHolding::try_from(&user_b_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_b))?
+            .definition_id();
 
         let amm_pool =
             compute_pool_pda(amm_program_id, definition_token_a_id, definition_token_b_id);
@@ -242,14 +243,14 @@ impl Amm<'_> {
             .await
             .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let token_holder_a = TokenHolding::parse(&token_holder_acc_a.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?;
-        let token_holder_b = TokenHolding::parse(&token_holder_acc_b.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_b))?;
+        let token_holder_a = TokenHolding::try_from(&token_holder_acc_a.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_a))?;
+        let token_holder_b = TokenHolding::try_from(&token_holder_acc_b.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_b))?;
 
-        if token_holder_a.definition_id == token_definition_id {
+        if token_holder_a.definition_id() == token_definition_id {
             account_id_auth = user_holding_a;
-        } else if token_holder_b.definition_id == token_definition_id {
+        } else if token_holder_b.definition_id() == token_definition_id {
             account_id_auth = user_holding_b;
         } else {
             return Err(ExecutionFailureKind::AccountDataError(token_definition_id));
@@ -309,12 +310,12 @@ impl Amm<'_> {
             .await
             .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
-            .definition_id;
-        let definition_token_b_id = TokenHolding::parse(&user_b_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
-            .definition_id;
+        let definition_token_a_id = TokenHolding::try_from(&user_a_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_a))?
+            .definition_id();
+        let definition_token_b_id = TokenHolding::try_from(&user_b_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_b))?
+            .definition_id();
 
         let amm_pool =
             compute_pool_pda(amm_program_id, definition_token_a_id, definition_token_b_id);
@@ -395,12 +396,12 @@ impl Amm<'_> {
             .await
             .map_err(|_| ExecutionFailureKind::SequencerError)?;
 
-        let definition_token_a_id = TokenHolding::parse(&user_a_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
-            .definition_id;
-        let definition_token_b_id = TokenHolding::parse(&user_b_acc.data)
-            .ok_or(ExecutionFailureKind::AccountDataError(user_holding_a))?
-            .definition_id;
+        let definition_token_a_id = TokenHolding::try_from(&user_a_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_a))?
+            .definition_id();
+        let definition_token_b_id = TokenHolding::try_from(&user_b_acc.data)
+            .map_err(|_| ExecutionFailureKind::AccountDataError(user_holding_b))?
+            .definition_id();
 
         let amm_pool =
             compute_pool_pda(amm_program_id, definition_token_a_id, definition_token_b_id);
