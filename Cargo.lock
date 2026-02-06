@@ -4604,6 +4604,7 @@ dependencies = [
  "hex",
  "nssa",
  "nssa_core",
+ "sha2",
  "tokio",
  "wallet",
 ]

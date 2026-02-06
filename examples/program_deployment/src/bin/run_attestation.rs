@@ -4,6 +4,8 @@ use nssa::{
     program::Program,
     public_transaction::{Message, WitnessSet},
 };
+use nssa_core::program::PdaSeed;
+use sha2::{Digest, Sha256};
 use wallet::WalletCore;
 
 // Before running this example, compile the `attestation.rs` guest program with:
@@ -20,11 +22,23 @@ use wallet::WalletCore;
 // Examples:
 //   cargo run --bin run_attestation -- \
 //     methods/guest/target/riscv32im-risc0-zkvm-elf/docker/attestation.bin \
-//     attest <creator_id> <attestation_id> <subject_id> <key_hex> <value_string>
+//     attest <creator_id> <subject_id> <key_hex> <value_string>
 //
 //   cargo run --bin run_attestation -- \
 //     methods/guest/target/riscv32im-risc0-zkvm-elf/docker/attestation.bin \
-//     revoke <creator_id> <attestation_id>
+//     revoke <creator_id> <subject_id> <key_hex>
+//
+// The attestation account ID is derived deterministically from (creator, subject, key).
+
+/// Derive the PDA seed from (creator, subject, key) by hashing the concatenation.
+fn derive_attestation_seed(creator: &AccountId, subject: &AccountId, key: &[u8; 32]) -> PdaSeed {
+    let mut hasher = Sha256::new();
+    hasher.update(creator.value());
+    hasher.update(subject.value());
+    hasher.update(key);
+    let hash: [u8; 32] = hasher.finalize().into();
+    PdaSeed::new(hash)
+}
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -41,8 +55,6 @@ enum Command {
     Attest {
         /// Account ID of the creator (must be a self-owned public account)
         creator_id: String,
-        /// Account ID for the attestation record
-        attestation_id: String,
         /// Account ID of the subject being attested about
         subject_id: String,
         /// 32-byte attestation key as a hex string (64 hex chars)
@@ -54,8 +66,10 @@ enum Command {
     Revoke {
         /// Account ID of the creator (must be a self-owned public account)
         creator_id: String,
-        /// Account ID of the attestation record to revoke
-        attestation_id: String,
+        /// Account ID of the subject
+        subject_id: String,
+        /// 32-byte attestation key as a hex string (64 hex chars)
+        key_hex: String,
     },
 }
 
@@ -73,18 +87,20 @@ async fn main() {
     match cli.command {
         Command::Attest {
             creator_id,
-            attestation_id,
             subject_id,
             key_hex,
             value_string,
         } => {
             let creator_id: AccountId = creator_id.parse().unwrap();
-            let attestation_id: AccountId = attestation_id.parse().unwrap();
             let subject_id: AccountId = subject_id.parse().unwrap();
             let key_bytes: [u8; 32] = hex::decode(&key_hex)
                 .expect("key_hex must be valid hex")
                 .try_into()
                 .expect("key_hex must decode to exactly 32 bytes");
+
+            // Derive attestation account ID from (creator, subject, key)
+            let pda_seed = derive_attestation_seed(&creator_id, &subject_id, &key_bytes);
+            let attestation_id = AccountId::from((&program.id(), &pda_seed));
 
             let signing_key = wallet_core
                 .storage()
@@ -119,13 +135,24 @@ async fn main() {
                 .send_tx_public(tx)
                 .await
                 .unwrap();
+
+            println!("Attestation account ID: {attestation_id}");
         }
         Command::Revoke {
             creator_id,
-            attestation_id,
+            subject_id,
+            key_hex,
         } => {
             let creator_id: AccountId = creator_id.parse().unwrap();
-            let attestation_id: AccountId = attestation_id.parse().unwrap();
+            let subject_id: AccountId = subject_id.parse().unwrap();
+            let key_bytes: [u8; 32] = hex::decode(&key_hex)
+                .expect("key_hex must be valid hex")
+                .try_into()
+                .expect("key_hex must decode to exactly 32 bytes");
+
+            // Derive attestation account ID from (creator, subject, key)
+            let pda_seed = derive_attestation_seed(&creator_id, &subject_id, &key_bytes);
+            let attestation_id = AccountId::from((&program.id(), &pda_seed));
 
             let signing_key = wallet_core
                 .storage()
@@ -156,6 +183,8 @@ async fn main() {
                 .send_tx_public(tx)
                 .await
                 .unwrap();
+
+            println!("Revoked attestation account ID: {attestation_id}");
         }
     }
 }
