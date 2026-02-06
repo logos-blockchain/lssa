@@ -153,7 +153,10 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
     let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
 
     // Create a new private account
-    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private { cci: None }));
+    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
+        cci: None,
+        label: None,
+    }));
 
     let sub_ret = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
     let SubcommandReturnValue::RegisterAccount {
@@ -316,7 +319,10 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
     let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
 
     // Create a new private account
-    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private { cci: None }));
+    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
+        cci: None,
+        label: None,
+    }));
     let sub_ret = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
     let SubcommandReturnValue::RegisterAccount {
@@ -376,7 +382,10 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
 async fn initialize_private_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private { cci: None }));
+    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
+        cci: None,
+        label: None,
+    }));
     let result = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
     let SubcommandReturnValue::RegisterAccount { account_id } = result else {
         anyhow::bail!("Expected RegisterAccount return value");
