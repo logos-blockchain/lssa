@@ -40,6 +40,9 @@ pub struct GetBlockRangeDataRequest {
 pub struct GetGenesisIdRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GetGenesisBlockRequest {}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetLastBlockRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,11 +76,6 @@ pub struct GetProofForCommitmentRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProgramIdsRequest {}
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PostIndexerMessageRequest {
-    pub message: crate::communication::indexer::Message,
-}
-
 parse_request!(HelloRequest);
 parse_request!(RegisterAccountRequest);
 parse_request!(SendTxRequest);
@@ -92,7 +90,7 @@ parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
 parse_request!(GetProgramIdsRequest);
-parse_request!(PostIndexerMessageRequest);
+parse_request!(GetGenesisBlockRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -182,6 +180,11 @@ pub struct GetGenesisIdResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GetGenesisBlockResponse {
+    pub genesis_block_borsh_ser: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetLastBlockResponse {
     pub last_block: u64,
 }
@@ -221,9 +224,4 @@ pub struct GetInitialTestnetAccountsResponse {
     /// Hex encoded account id
     pub account_id: String,
     pub balance: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PostIndexerMessageResponse {
-    pub status: String,
 }

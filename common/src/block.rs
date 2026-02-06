@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, digest::FixedOutput};
 
 use crate::transaction::EncodedTransaction;
@@ -45,7 +46,7 @@ pub enum BedrockStatus {
     Finalized,
 }
 
-#[derive(Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,
@@ -100,6 +101,21 @@ impl From<Block> for HashableBlockData {
             transactions: value.body.transactions,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+/// Helperstruct for account serialization
+pub struct AccountInitialData {
+    /// Hex encoded account id
+    pub account_id: String,
+    pub balance: u128,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+/// Helperstruct to initialize commitments
+pub struct CommitmentsInitialData {
+    pub npk: nssa_core::NullifierPublicKey,
+    pub account: nssa_core::account::Account,
 }
 
 #[cfg(test)]

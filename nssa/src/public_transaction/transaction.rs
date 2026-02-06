@@ -17,8 +17,8 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct PublicTransaction {
-    message: Message,
-    witness_set: WitnessSet,
+    pub message: Message,
+    pub witness_set: WitnessSet,
 }
 
 impl PublicTransaction {
@@ -43,6 +43,16 @@ impl PublicTransaction {
             .iter()
             .map(|(_, public_key)| AccountId::from(public_key))
             .collect()
+    }
+
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        let mut acc_set = self
+            .signer_account_ids()
+            .into_iter()
+            .collect::<HashSet<_>>();
+        acc_set.extend(&self.message.account_ids);
+
+        acc_set.into_iter().collect()
     }
 
     pub fn hash(&self) -> [u8; 32] {

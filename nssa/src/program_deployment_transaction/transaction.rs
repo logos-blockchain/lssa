@@ -1,4 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use nssa_core::account::AccountId;
+use sha2::{Digest as _, digest::FixedOutput as _};
 
 use crate::{
     V02State, error::NssaError, program::Program, program_deployment_transaction::message::Message,
@@ -6,7 +8,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct ProgramDeploymentTransaction {
-    pub(crate) message: Message,
+    pub message: Message,
 }
 
 impl ProgramDeploymentTransaction {
@@ -29,5 +31,16 @@ impl ProgramDeploymentTransaction {
         } else {
             Ok(program)
         }
+    }
+
+    pub fn hash(&self) -> [u8; 32] {
+        let bytes = self.to_bytes();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&bytes);
+        hasher.finalize_fixed().into()
+    }
+
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        vec![]
     }
 }

@@ -5,24 +5,13 @@ use std::{
 };
 
 use anyhow::Result;
-use common::sequencer_client::BasicAuth;
+use common::{
+    block::{AccountInitialData, CommitmentsInitialData},
+    config::BasicAuth,
+};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct for account serialization
-pub struct AccountInitialData {
-    /// Hex encoded account id
-    pub account_id: String,
-    pub balance: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct to initialize commitments
-pub struct CommitmentsInitialData {
-    pub npk: nssa_core::NullifierPublicKey,
-    pub account: nssa_core::account::Account,
-}
+use url::Url;
 
 // TODO: Provide default values
 #[derive(Clone, Serialize, Deserialize)]
@@ -53,6 +42,8 @@ pub struct SequencerConfig {
     pub signing_key: [u8; 32],
     /// Bedrock configuration options
     pub bedrock_config: Option<BedrockConfig>,
+    /// Indexer RPC URL
+    pub indexer_rpc_url: Url,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -60,7 +51,7 @@ pub struct BedrockConfig {
     /// Bedrock channel ID
     pub channel_id: ChannelId,
     /// Bedrock Url
-    pub node_url: String,
+    pub node_url: Url,
     /// Bedrock auth
     pub auth: Option<BasicAuth>,
 }

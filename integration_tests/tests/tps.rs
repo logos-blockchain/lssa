@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use common::block::{AccountInitialData, CommitmentsInitialData};
 use integration_tests::TestContext;
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use log::info;
@@ -15,7 +16,7 @@ use nssa_core::{
     account::{AccountWithMetadata, data::Data},
     encryption::IncomingViewingPublicKey,
 };
-use sequencer_core::config::{AccountInitialData, CommitmentsInitialData, SequencerConfig};
+use sequencer_core::config::SequencerConfig;
 use tokio::test;
 
 // TODO: Make a proper benchmark instead of an ad-hoc test
@@ -25,11 +26,7 @@ pub async fn tps_test() -> Result<()> {
     let target_tps = 12;
 
     let tps_test = TpsTestManager::new(target_tps, num_transactions);
-    let ctx = TestContext::new_with_sequencer_and_maybe_indexer_configs(
-        tps_test.generate_sequencer_config(),
-        None,
-    )
-    .await?;
+    let ctx = TestContext::new_with_sequencer_config(tps_test.generate_sequencer_config()).await?;
 
     let target_time = tps_test.target_time();
     info!(
@@ -191,6 +188,7 @@ impl TpsTestManager {
             signing_key: [37; 32],
             bedrock_config: None,
             retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            indexer_rpc_url: "http://localhost:8779".parse().unwrap(),
         }
     }
 }
