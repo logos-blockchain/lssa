@@ -1,0 +1,13 @@
+# All-in-one docker compose configuration.
+# It runs all services from this repo and the bedrock nodes in a single docker network.
+# This is useful for development and testing purposes.
+
+include:
+  - path:
+      bedrock/docker-compose.yml
+  - path:
+      sequencer_runner/docker-compose.yml
+  - path:
+      indexer/service/docker-compose.yml
+  - path:
+      explorer_service/docker-compose.yml

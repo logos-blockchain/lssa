@@ -8,7 +8,7 @@ use indexer_service_protocol::{Account, AccountId, Block, BlockId, HashType, Tra
 use jsonrpsee::{
     SubscriptionSink,
     core::{Serialize, SubscriptionResult},
-    types::ErrorObjectOwned,
+    types::{ErrorCode, ErrorObject, ErrorObjectOwned},
 };
 use log::{debug, error, info, warn};
 use tokio::sync::mpsc::UnboundedSender;
@@ -54,23 +54,23 @@ impl indexer_service_rpc::RpcServer for IndexerService {
     }
 
     async fn get_block_by_id(&self, _block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
-        todo!()
+        Err(not_yet_implemented_error())
     }
 
     async fn get_block_by_hash(&self, _block_hash: HashType) -> Result<Block, ErrorObjectOwned> {
-        todo!()
+        Err(not_yet_implemented_error())
     }
 
     async fn get_account(&self, _account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
-        todo!()
+        Err(not_yet_implemented_error())
     }
 
     async fn get_transaction(&self, _tx_hash: HashType) -> Result<Transaction, ErrorObjectOwned> {
-        todo!()
+        Err(not_yet_implemented_error())
     }
 
     async fn get_blocks(&self, _offset: u32, _limit: u32) -> Result<Vec<Block>, ErrorObjectOwned> {
-        todo!()
+        Err(not_yet_implemented_error())
     }
 
     async fn get_transactions_by_account(
@@ -79,7 +79,7 @@ impl indexer_service_rpc::RpcServer for IndexerService {
         _limit: u32,
         _offset: u32,
     ) -> Result<Vec<Transaction>, ErrorObjectOwned> {
-        todo!()
+        Err(not_yet_implemented_error())
     }
 }
 
@@ -105,6 +105,7 @@ impl SubscriptionService {
 
             // Respawn the subscription service loop if it has finished (either with error or panic)
             if guard.handle.is_finished() {
+                drop(guard);
                 let new_parts = Self::spawn_respond_subscribers_loop(self.indexer.clone());
                 let old_handle_and_sender = self.parts.swap(Arc::new(new_parts));
                 let old_parts = Arc::into_inner(old_handle_and_sender)
@@ -113,7 +114,7 @@ impl SubscriptionService {
                 match old_parts.handle.await {
                     Ok(Err(err)) => {
                         error!(
-                            "Subscription service loop has unexpectedly finished with err: {err:#}"
+                            "Subscription service loop has unexpectedly finished with error: {err:#}"
                         );
                     }
                     Err(err) => {
@@ -216,4 +217,12 @@ impl<T> Drop for Subscription<T> {
             self.sink.subscription_id()
         );
     }
+}
+
+fn not_yet_implemented_error() -> ErrorObjectOwned {
+    ErrorObject::owned(
+        ErrorCode::InternalError.code(),
+        "Not yet implemented",
+        Option::<String>::None,
+    )
 }

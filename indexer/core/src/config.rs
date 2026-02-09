@@ -12,6 +12,7 @@ pub struct BedrockClientConfig {
     /// For individual RPC requests we use Fibonacci backoff retry strategy.
     pub backoff: BackoffConfig,
     pub addr: Url,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth: Option<BasicAuth>,
 }
 

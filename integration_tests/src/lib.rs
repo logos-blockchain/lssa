@@ -97,7 +97,8 @@ impl TestContext {
 
     async fn setup_bedrock_node() -> Result<(DockerCompose, SocketAddr)> {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let bedrock_compose_path = PathBuf::from(manifest_dir).join("bedrock/docker-compose.yml");
+        let bedrock_compose_path =
+            PathBuf::from(manifest_dir).join("../bedrock/docker-compose.yml");
 
         let mut compose = DockerCompose::with_auto_client(&[bedrock_compose_path])
             .await

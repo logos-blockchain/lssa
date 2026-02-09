@@ -35,7 +35,7 @@ To the best of our knowledge, this approach is unique to Nescience. Other progra
    - Alice submits a transaction to execute the token program `Transfer` function on-chain, specifying Charlie's public account as recipient.
    - The execution is handled on-chain without ZKPs involved.
    - Alice's and Charlie's accounts are modified according to the transaction.
-   
+
 #### Key points:
 - The same token program is used in all executions.
 - The difference lies in execution mode: public executions update visible accounts on-chain, while private executions rely on ZKPs.
@@ -143,6 +143,20 @@ If everything went well you should see an output similar to this:
 [2025-11-13T19:50:39Z INFO  sequencer_runner] Waiting for new transactions
 ```
 
+# Running with Docker
+
+You can run the whole setup with Docker:
+
+```bash
+docker compose up
+```
+
+With that you can send transactions from local wallet to the Sequencer running inside Docker using `wallet/configs/debug` as well as exploring block by opening `http://localhost:8080`.
+
+## Caution for local image builds
+
+If you're going to build sequencer image locally you should better adjust default docker settings and set `defaultKeepStorage` at least `25GB` so that it can keep layers properly cached.
+
 # Try the Wallet CLI
 
 ## Install
@@ -165,9 +179,9 @@ This tutorial walks you through creating accounts and executing NSSA programs in
 > The NSSA state is split into two separate but interconnected components: the public state and the private state.
 > The public state is an on-chain, publicly visible record of accounts indexed by their Account IDs
 > The private state mirrors this, but the actual account values are stored locally by each account owner. On-chain, only a hidden commitment to each private account state is recorded. This allows the chain to enforce freshness (i.e., prevent the reuse of stale private states) while preserving privacy and unlinkability across executions and private accounts.
-> 
+>
 > Every piece of state in NSSA is stored in an account (public or private). Accounts are either uninitialized or are owned by a program, and programs can only modify the accounts they own.
-> 
+>
 > In NSSA, accounts can only be modified through program execution. A program is the sole mechanism that can change an account’s value.
 > Programs run publicly when all involved accounts are public, and privately when at least one private account participates.
 
@@ -429,7 +443,7 @@ This mechanism enables a common use case: transferring funds from any account (p
 
 #### Sending tokens from the public account to a private account owned by someone else
 
-For this tutorial, we’ll simulate that scenario by creating a new private account that we own, but we’ll treat it as if it belonged to someone else. 
+For this tutorial, we’ll simulate that scenario by creating a new private account that we own, but we’ll treat it as if it belonged to someone else.
 
 Let's create a new (uninitialized) private account like before:
 

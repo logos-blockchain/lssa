@@ -244,7 +244,7 @@ pub async fn main_runner() -> Result<()> {
     info!("Sequencer running. Monitoring concurrent tasks...");
 
     let Err(err) = sequencer_handle.run_forever().await;
-    error!("Sequencer failed: {err:?}");
+    error!("Sequencer failed: {err:#}");
 
     info!("Shutting down sequencer...");
 
