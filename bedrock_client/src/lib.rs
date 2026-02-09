@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::{Context as _, Result};
 use common::config::BasicAuth;
 use futures::{Stream, TryFutureExt};
-use log::warn;
+use log::{info, warn};
 pub use logos_blockchain_chain_broadcast_service::BlockInfo;
 pub use logos_blockchain_common_http_client::{CommonHttpClient, Error};
 pub use logos_blockchain_core::{block::Block, header::HeaderId, mantle::SignedMantleTx};
@@ -39,6 +39,7 @@ pub struct BedrockClient {
 
 impl BedrockClient {
     pub fn new(backoff: BackoffConfig, node_url: Url, auth: Option<BasicAuth>) -> Result<Self> {
+        info!("Creating Bedrock client with node URL {node_url}");
         let client = Client::builder()
                 //Add more fields if needed
                 .timeout(std::time::Duration::from_secs(60))
@@ -61,7 +62,7 @@ impl BedrockClient {
         Retry::spawn(self.backoff_strategy(), || {
             self.http_client
                 .post_transaction(self.node_url.clone(), tx.clone())
-                .inspect_err(|err| warn!("Transaction posting failed with err: {err:#?}"))
+                .inspect_err(|err| warn!("Transaction posting failed with error: {err:#}"))
         })
         .await
     }
@@ -77,7 +78,7 @@ impl BedrockClient {
         Retry::spawn(self.backoff_strategy(), || {
             self.http_client
                 .get_block_by_id(self.node_url.clone(), header_id)
-                .inspect_err(|err| warn!("Block fetching failed with err: {err:#?}"))
+                .inspect_err(|err| warn!("Block fetching failed with error: {err:#}"))
         })
         .await
     }

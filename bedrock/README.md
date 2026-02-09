@@ -1,4 +1,4 @@
-# Bedrock Configuration Files for Integration Tests
+# Bedrock Configuration Files for All-in-One run and Integration Tests
 
 ## How to update
 
