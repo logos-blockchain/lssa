@@ -179,6 +179,15 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
         Ok(())
     }
 
+    async fn get_last_finalized_block_id(&self) -> Result<BlockId, ErrorObjectOwned> {
+        self.blocks
+            .last()
+            .map(|bl| bl.header.block_id)
+            .ok_or_else(|| {
+                ErrorObjectOwned::owned(-32001, format!("Last block not found"), None::<()>)
+            })
+    }
+
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
         self.blocks
             .iter()
@@ -266,5 +275,9 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
             .iter()
             .map(|(tx, _)| tx.clone())
             .collect())
+    }
+
+    async fn healthcheck(&self) -> Result<(), ErrorObjectOwned> {
+        Ok(())
     }
 }

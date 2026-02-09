@@ -11,3 +11,4 @@ nssa.workspace = true
 thiserror.workspace = true
 borsh.workspace = true
 rocksdb.workspace = true
+tempfile.workspace = true

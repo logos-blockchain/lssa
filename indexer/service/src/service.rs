@@ -41,6 +41,12 @@ impl indexer_service_rpc::RpcServer for IndexerService {
         Ok(())
     }
 
+    async fn get_last_finalized_block_id(&self) -> Result<BlockId, ErrorObjectOwned> {
+        self.indexer.store.get_last_block_id().map_err(|err| {
+            ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+        })
+    }
+
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
         self.indexer
             .store
@@ -160,6 +166,15 @@ impl indexer_service_rpc::RpcServer for IndexerService {
         }
 
         Ok(tx_res)
+    }
+
+    async fn healthcheck(&self) -> Result<(), ErrorObjectOwned> {
+        // Checking, that indexer can calculate last state
+        let _ = self.indexer.store.final_state().map_err(|err| {
+            ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+        })?;
+
+        Ok(())
     }
 }
 

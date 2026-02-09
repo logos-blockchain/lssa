@@ -34,6 +34,10 @@ impl IndexerStore {
         Self::open_db_with_genesis(location, None)
     }
 
+    pub fn get_last_block_id(&self) -> Result<u64> {
+        Ok(self.dbio.get_meta_last_block_in_db()?)
+    }
+
     pub fn get_block_at_id(&self, id: u64) -> Result<Block> {
         Ok(self.dbio.get_block(id)?)
     }
