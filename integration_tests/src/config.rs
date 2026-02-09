@@ -96,9 +96,9 @@ pub fn wallet_config(
         override_rust_log: None,
         sequencer_addr: addr_to_url(UrlProtocol::Http, sequencer_addr)
             .context("Failed to convert sequencer addr to URL")?,
-        seq_poll_timeout_millis: 12_000,
-        seq_tx_poll_max_blocks: 10,
-        seq_poll_max_retries: 5,
+        seq_poll_timeout_millis: 30_000,
+        seq_tx_poll_max_blocks: 15,
+        seq_poll_max_retries: 10,
         seq_block_poll_max_amount: 100,
         initial_accounts: initial_data.wallet_initial_accounts(),
         basic_auth: None,
