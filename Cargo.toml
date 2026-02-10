@@ -1,3 +1,6 @@
+[workspace.package]
+license = "MIT or Apache-2.0"
+
 [workspace]
 resolver = "3"
 members = [
@@ -16,6 +19,8 @@ members = [
   "indexer_service",
   "indexer_service/protocol",
   "indexer_service/rpc",
+  "programs/token/core",
+  "programs/token",
   "program_methods",
   "program_methods/guest",
   "test_program_methods",
@@ -42,6 +47,8 @@ indexer_service_protocol = { path = "indexer_service/protocol" }
 indexer_service_rpc = { path = "indexer_service/rpc" }
 wallet = { path = "wallet" }
 wallet-ffi = { path = "wallet-ffi" }
+token_core = { path = "programs/token/core" }
+token_program = { path = "programs/token" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
 indexer_core = { path = "indexer_core" }

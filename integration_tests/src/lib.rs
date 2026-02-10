@@ -44,6 +44,7 @@ pub struct TestContext {
     indexer_loop_handle: Option<JoinHandle<Result<()>>>,
     sequencer_client: SequencerClient,
     wallet: WalletCore,
+    wallet_password: String,
     _temp_sequencer_dir: TempDir,
     _temp_wallet_dir: TempDir,
 }
@@ -114,7 +115,7 @@ impl TestContext {
             format!("http://{sequencer_addr}")
         };
 
-        let (wallet, temp_wallet_dir) = Self::setup_wallet(sequencer_addr.clone())
+        let (wallet, temp_wallet_dir, wallet_password) = Self::setup_wallet(sequencer_addr.clone())
             .await
             .context("Failed to setup wallet")?;
 
@@ -142,6 +143,7 @@ impl TestContext {
                 wallet,
                 _temp_sequencer_dir: temp_sequencer_dir,
                 _temp_wallet_dir: temp_wallet_dir,
+                wallet_password,
             })
         } else {
             Ok(Self {
@@ -153,6 +155,7 @@ impl TestContext {
                 wallet,
                 _temp_sequencer_dir: temp_sequencer_dir,
                 _temp_wallet_dir: temp_wallet_dir,
+                wallet_password,
             })
         }
     }
@@ -193,7 +196,7 @@ impl TestContext {
         ))
     }
 
-    async fn setup_wallet(sequencer_addr: String) -> Result<(WalletCore, TempDir)> {
+    async fn setup_wallet(sequencer_addr: String) -> Result<(WalletCore, TempDir, String)> {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let wallet_config_source_path =
             PathBuf::from(manifest_dir).join("configs/wallet/wallet_config.json");
@@ -211,11 +214,12 @@ impl TestContext {
             ..Default::default()
         };
 
+        let wallet_password = "test_pass".to_owned();
         let wallet = WalletCore::new_init_storage(
             config_path,
             storage_path,
             Some(config_overrides),
-            "test_pass".to_owned(),
+            wallet_password.clone(),
         )
         .context("Failed to init wallet")?;
         wallet
@@ -223,12 +227,16 @@ impl TestContext {
             .await
             .context("Failed to store wallet persistent data")?;
 
-        Ok((wallet, temp_wallet_dir))
+        Ok((wallet, temp_wallet_dir, wallet_password))
     }
 
     /// Get reference to the wallet.
     pub fn wallet(&self) -> &WalletCore {
         &self.wallet
+    }
+
+    pub fn wallet_password(&self) -> &str {
+        &self.wallet_password
     }
 
     /// Get mutable reference to the wallet.
@@ -255,6 +263,7 @@ impl Drop for TestContext {
             wallet: _,
             _temp_sequencer_dir,
             _temp_wallet_dir,
+            wallet_password: _,
         } = self;
 
         sequencer_loop_handle.abort();
@@ -265,6 +274,20 @@ impl Drop for TestContext {
 
         // Can't wait here as Drop can't be async, but anyway stop signal should be sent
         sequencer_server_handle.stop(true).now_or_never();
+    }
+}
+
+/// A test context to be used in normal #[test] tests
+pub struct BlockingTestContext {
+    pub ctx: TestContext,
+    pub runtime: tokio::runtime::Runtime,
+}
+
+impl BlockingTestContext {
+    pub fn new() -> Result<Self> {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let ctx = runtime.block_on(TestContext::new())?;
+        Ok(Self { ctx, runtime })
     }
 }
 

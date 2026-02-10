@@ -20,8 +20,7 @@ pub struct ProgramInput<T> {
 /// Each program can derive up to `2^256` unique account IDs by choosing different
 /// seeds. PDAs allow programs to control namespaced account identifiers without
 /// collisions between programs.
-#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
-#[cfg_attr(any(feature = "host", test), derive(Debug))]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct PdaSeed([u8; 32]);
 
 impl PdaSeed {
@@ -65,23 +64,44 @@ impl From<(&ProgramId, &PdaSeed)> for AccountId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[cfg_attr(any(feature = "host", test), derive(Debug,))]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ChainedCall {
     /// The program ID of the program to execute
     pub program_id: ProgramId,
+    pub pre_states: Vec<AccountWithMetadata>,
     /// The instruction data to pass
     pub instruction_data: InstructionData,
-    pub pre_states: Vec<AccountWithMetadata>,
     pub pda_seeds: Vec<PdaSeed>,
+}
+
+impl ChainedCall {
+    /// Creates a new chained call serializing the given instruction.
+    pub fn new<I: Serialize>(
+        program_id: ProgramId,
+        pre_states: Vec<AccountWithMetadata>,
+        instruction: &I,
+    ) -> Self {
+        Self {
+            program_id,
+            pre_states,
+            instruction_data: risc0_zkvm::serde::to_vec(instruction)
+                .expect("Serialization to Vec<u32> should not fail"),
+            pda_seeds: Vec::new(),
+        }
+    }
+
+    pub fn with_pda_seeds(mut self, pda_seeds: Vec<PdaSeed>) -> Self {
+        self.pda_seeds = pda_seeds;
+        self
+    }
 }
 
 /// Represents the final state of an `Account` after a program execution.
 /// A post state may optionally request that the executing program
 /// becomes the owner of the account (a “claim”). This is used to signal
 /// that the program intends to take ownership of the account.
-#[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(any(feature = "host", test), derive(PartialEq, Eq))]
 pub struct AccountPostState {
     account: Account,
     claim: bool,

@@ -1,6 +1,12 @@
 //! C-compatible type definitions for the FFI layer.
 
-use std::ffi::c_char;
+use core::slice;
+use std::{ffi::c_char, ptr};
+
+use nssa::{Account, Data};
+use nssa_core::encryption::shared_key_derivation::Secp256k1Point;
+
+use crate::error::WalletFfiError;
 
 /// Opaque pointer to the Wallet instance.
 ///
@@ -25,6 +31,13 @@ pub struct FfiProgramId {
     pub data: [u32; 8],
 }
 
+/// U128 - 16 bytes little endian
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct FfiU128 {
+    pub data: [u8; 16],
+}
+
 /// Account data structure - C-compatible version of nssa Account.
 ///
 /// Note: `balance` and `nonce` are u128 values represented as little-endian
@@ -33,23 +46,23 @@ pub struct FfiProgramId {
 pub struct FfiAccount {
     pub program_owner: FfiProgramId,
     /// Balance as little-endian [u8; 16]
-    pub balance: [u8; 16],
+    pub balance: FfiU128,
     /// Pointer to account data bytes
     pub data: *const u8,
     /// Length of account data
     pub data_len: usize,
     /// Nonce as little-endian [u8; 16]
-    pub nonce: [u8; 16],
+    pub nonce: FfiU128,
 }
 
 impl Default for FfiAccount {
     fn default() -> Self {
         Self {
             program_owner: FfiProgramId::default(),
-            balance: [0u8; 16],
+            balance: FfiU128::default(),
             data: std::ptr::null(),
             data_len: 0,
-            nonce: [0u8; 16],
+            nonce: FfiU128::default(),
         }
     }
 }
@@ -138,6 +151,40 @@ impl FfiBytes32 {
     }
 }
 
+impl FfiPrivateAccountKeys {
+    pub fn npk(&self) -> nssa_core::NullifierPublicKey {
+        nssa_core::NullifierPublicKey(self.nullifier_public_key.data)
+    }
+
+    pub fn ivk(&self) -> Result<nssa_core::encryption::IncomingViewingPublicKey, WalletFfiError> {
+        if self.incoming_viewing_public_key_len == 33 {
+            let slice = unsafe {
+                slice::from_raw_parts(
+                    self.incoming_viewing_public_key,
+                    self.incoming_viewing_public_key_len,
+                )
+            };
+            Ok(Secp256k1Point(slice.to_vec()))
+        } else {
+            Err(WalletFfiError::InvalidKeyValue)
+        }
+    }
+}
+
+impl From<u128> for FfiU128 {
+    fn from(value: u128) -> Self {
+        Self {
+            data: value.to_le_bytes(),
+        }
+    }
+}
+
+impl From<FfiU128> for u128 {
+    fn from(value: FfiU128) -> Self {
+        u128::from_le_bytes(value.data)
+    }
+}
+
 impl From<&nssa::AccountId> for FfiBytes32 {
     fn from(id: &nssa::AccountId) -> Self {
         Self::from_account_id(id)
@@ -147,5 +194,69 @@ impl From<&nssa::AccountId> for FfiBytes32 {
 impl From<FfiBytes32> for nssa::AccountId {
     fn from(bytes: FfiBytes32) -> Self {
         nssa::AccountId::new(bytes.data)
+    }
+}
+
+impl From<nssa::Account> for FfiAccount {
+    fn from(value: nssa::Account) -> Self {
+        // Convert account data to FFI type
+        let data_vec: Vec<u8> = value.data.into();
+        let data_len = data_vec.len();
+        let data = if data_len > 0 {
+            let data_boxed = data_vec.into_boxed_slice();
+            Box::into_raw(data_boxed) as *const u8
+        } else {
+            ptr::null()
+        };
+
+        let program_owner = FfiProgramId {
+            data: value.program_owner,
+        };
+        FfiAccount {
+            program_owner,
+            balance: value.balance.into(),
+            data,
+            data_len,
+            nonce: value.nonce.into(),
+        }
+    }
+}
+
+impl TryFrom<&FfiAccount> for nssa::Account {
+    type Error = WalletFfiError;
+
+    fn try_from(value: &FfiAccount) -> Result<Self, Self::Error> {
+        let data = if value.data_len > 0 {
+            unsafe {
+                let slice = slice::from_raw_parts(value.data, value.data_len);
+                Data::try_from(slice.to_vec()).map_err(|_| WalletFfiError::InvalidTypeConversion)?
+            }
+        } else {
+            Data::default()
+        };
+        Ok(Account {
+            program_owner: value.program_owner.data,
+            balance: value.balance.into(),
+            data,
+            nonce: value.nonce.into(),
+        })
+    }
+}
+
+impl From<nssa::PublicKey> for FfiPublicAccountKey {
+    fn from(value: nssa::PublicKey) -> Self {
+        Self {
+            public_key: FfiBytes32::from_bytes(*value.value()),
+        }
+    }
+}
+
+impl TryFrom<&FfiPublicAccountKey> for nssa::PublicKey {
+    type Error = WalletFfiError;
+
+    fn try_from(value: &FfiPublicAccountKey) -> Result<Self, Self::Error> {
+        let public_key = nssa::PublicKey::try_new(value.public_key.data)
+            .map_err(|_| WalletFfiError::InvalidTypeConversion)?;
+        Ok(public_key)
     }
 }
