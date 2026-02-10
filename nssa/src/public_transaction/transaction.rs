@@ -17,8 +17,8 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct PublicTransaction {
-    message: Message,
-    witness_set: WitnessSet,
+    pub message: Message,
+    pub witness_set: WitnessSet,
 }
 
 impl PublicTransaction {
