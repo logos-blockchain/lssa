@@ -932,7 +932,7 @@ mod tests {
 
         assert_eq!(last_id, 1);
         assert_eq!(first_id, 1);
-        assert_eq!(is_first_set, true);
+        assert!(is_first_set);
         assert_eq!(last_br_id, 0);
         assert_eq!(last_block.header.hash, genesis_block().header.hash);
         assert_eq!(
@@ -969,7 +969,7 @@ mod tests {
 
         assert_eq!(last_id, 2);
         assert_eq!(first_id, 1);
-        assert_eq!(is_first_set, true);
+        assert!(is_first_set);
         assert_eq!(last_br_id, 0);
         assert_ne!(last_block.header.hash, genesis_block().header.hash);
         assert_eq!(
@@ -1014,7 +1014,7 @@ mod tests {
 
         assert_eq!(last_id, 100);
         assert_eq!(first_id, 1);
-        assert_eq!(is_first_set, true);
+        assert!(is_first_set);
         assert_eq!(last_br_id, 1);
         assert_ne!(last_block.header.hash, genesis_block().header.hash);
         assert_eq!(

@@ -52,20 +52,14 @@ impl IndexerStore {
             .body
             .transactions
             .iter()
-            .find_map(|enc_tx| {
-                if enc_tx.hash().0 == tx_hash {
-                    Some(enc_tx)
-                } else {
-                    None
-                }
-            })
+            .find(|enc_tx| enc_tx.hash().0 == tx_hash)
             .ok_or_else(|| anyhow::anyhow!("Transaction not found in DB"))?;
 
         Ok(transaction.clone())
     }
 
     pub fn get_block_by_hash(&self, hash: [u8; 32]) -> Result<Block> {
-        Ok(self.get_block_at_id(self.dbio.get_block_id_by_hash(hash)?)?)
+        self.get_block_at_id(self.dbio.get_block_id_by_hash(hash)?)
     }
 
     pub fn get_transactions_by_account(

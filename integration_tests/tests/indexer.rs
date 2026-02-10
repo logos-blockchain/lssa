@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use indexer_service_rpc::RpcClient;
-use integration_tests::{TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext, format_private_account_id, format_public_account_id, verify_commitment_is_in_state};
+use integration_tests::{
+    TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext, format_private_account_id,
+    format_public_account_id, verify_commitment_is_in_state,
+};
 use log::info;
 use nssa::AccountId;
 use tokio::test;
@@ -71,7 +74,7 @@ async fn indexer_block_batching() -> Result<()> {
         info!("Block {} chain-consistent", block.header.block_id);
 
         prev_block_hash = block.header.hash;
-    } 
+    }
 
     Ok(())
 }
@@ -143,18 +146,28 @@ async fn indexer_state_consistency() -> Result<()> {
     info!("Waiting for indexer to parse blocks");
     tokio::time::sleep(std::time::Duration::from_millis(L2_TO_L1_TIMEOUT_MILLIS)).await;
 
-    let acc1_ind_state = ctx.indexer_client().get_account(ctx.existing_public_accounts()[0].into()).await.unwrap();
-    let acc2_ind_state = ctx.indexer_client().get_account(ctx.existing_public_accounts()[1].into()).await.unwrap();
+    let acc1_ind_state = ctx
+        .indexer_client()
+        .get_account(ctx.existing_public_accounts()[0].into())
+        .await
+        .unwrap();
+    let acc2_ind_state = ctx
+        .indexer_client()
+        .get_account(ctx.existing_public_accounts()[1].into())
+        .await
+        .unwrap();
 
     info!("Checking correct state transition");
     let acc1_seq_state = ctx
         .sequencer_client()
         .get_account(ctx.existing_public_accounts()[0])
-        .await?.account;
+        .await?
+        .account;
     let acc2_seq_state = ctx
         .sequencer_client()
         .get_account(ctx.existing_public_accounts()[1])
-        .await?.account;
+        .await?
+        .account;
 
     assert_eq!(acc1_ind_state, acc1_seq_state.into());
     assert_eq!(acc2_ind_state, acc2_seq_state.into());

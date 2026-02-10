@@ -50,76 +50,52 @@ impl indexer_service_rpc::RpcServer for IndexerService {
 
     async fn get_last_finalized_block_id(&self) -> Result<BlockId, ErrorObjectOwned> {
         self.indexer.store.get_last_block_id().map_err(|err| {
-            ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
         })
     }
 
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
-        self.indexer
+        Ok(self
+            .indexer
             .store
             .get_block_at_id(block_id)
             .map_err(|err| {
-                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+                ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
             })?
-            .try_into()
-            .map_err(|err| {
-                ErrorObjectOwned::owned(
-                    -32000,
-                    format!("Conversion error"),
-                    Some(format!("{err:#?}")),
-                )
-            })
+            .into())
     }
 
     async fn get_block_by_hash(&self, block_hash: HashType) -> Result<Block, ErrorObjectOwned> {
-        self.indexer
+        Ok(self
+            .indexer
             .store
             .get_block_by_hash(block_hash.0)
             .map_err(|err| {
-                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+                ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
             })?
-            .try_into()
-            .map_err(|err| {
-                ErrorObjectOwned::owned(
-                    -32000,
-                    format!("Conversion error"),
-                    Some(format!("{err:#?}")),
-                )
-            })
+            .into())
     }
 
     async fn get_account(&self, account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
-        self.indexer
+        Ok(self
+            .indexer
             .store
             .get_account_final(&account_id.into())
             .map_err(|err| {
-                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+                ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
             })?
-            .try_into()
-            .map_err(|err| {
-                ErrorObjectOwned::owned(
-                    -32000,
-                    format!("Conversion error"),
-                    Some(format!("{err:#?}")),
-                )
-            })
+            .into())
     }
 
     async fn get_transaction(&self, tx_hash: HashType) -> Result<Transaction, ErrorObjectOwned> {
-        self.indexer
+        Ok(self
+            .indexer
             .store
             .get_transaction_by_hash(tx_hash.0)
             .map_err(|err| {
-                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+                ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
             })?
-            .try_into()
-            .map_err(|err| {
-                ErrorObjectOwned::owned(
-                    -32000,
-                    format!("Conversion error"),
-                    Some(format!("{err:#?}")),
-                )
-            })
+            .into())
     }
 
     async fn get_blocks(&self, offset: u32, limit: u32) -> Result<Vec<Block>, ErrorObjectOwned> {
@@ -128,19 +104,13 @@ impl indexer_service_rpc::RpcServer for IndexerService {
             .store
             .get_block_batch(offset as u64, limit as u64)
             .map_err(|err| {
-                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+                ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
             })?;
 
         let mut block_res = vec![];
 
         for block in blocks {
-            block_res.push(block.try_into().map_err(|err| {
-                ErrorObjectOwned::owned(
-                    -32000,
-                    format!("Conversion error"),
-                    Some(format!("{err:#?}")),
-                )
-            })?)
+            block_res.push(block.into())
         }
 
         Ok(block_res)
@@ -157,19 +127,13 @@ impl indexer_service_rpc::RpcServer for IndexerService {
             .store
             .get_transactions_by_account(account_id.value, offset as u64, limit as u64)
             .map_err(|err| {
-                ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+                ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
             })?;
 
         let mut tx_res = vec![];
 
         for tx in transactions {
-            tx_res.push(tx.try_into().map_err(|err| {
-                ErrorObjectOwned::owned(
-                    -32000,
-                    format!("Conversion error"),
-                    Some(format!("{err:#?}")),
-                )
-            })?)
+            tx_res.push(tx.into())
         }
 
         Ok(tx_res)
@@ -178,7 +142,7 @@ impl indexer_service_rpc::RpcServer for IndexerService {
     async fn healthcheck(&self) -> Result<(), ErrorObjectOwned> {
         // Checking, that indexer can calculate last state
         let _ = self.indexer.store.final_state().map_err(|err| {
-            ErrorObjectOwned::owned(-32001, format!("DBError"), Some(format!("{err:#?}")))
+            ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
         })?;
 
         Ok(())

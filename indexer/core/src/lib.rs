@@ -68,7 +68,7 @@ impl IndexerCore {
             bedrock_client: BedrockClient::new(
                 config.bedrock_client_config.backoff,
                 config.bedrock_client_config.addr.clone(),
-                config.bedrock_client_config.auth.clone().map(Into::into),
+                config.bedrock_client_config.auth.clone(),
             )?,
             config,
             // ToDo: Implement restarts

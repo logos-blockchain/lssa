@@ -38,10 +38,10 @@ impl From<nssa::PrivacyPreservingTransaction> for NSSATransaction {
 
 impl NSSATransaction {
     pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
-        match &self {
-            &NSSATransaction::ProgramDeployment(tx) => tx.affected_public_account_ids(),
-            &NSSATransaction::Public(tx) => tx.affected_public_account_ids(),
-            &NSSATransaction::PrivacyPreserving(tx) => tx.affected_public_account_ids(),
+        match self {
+            NSSATransaction::ProgramDeployment(tx) => tx.affected_public_account_ids(),
+            NSSATransaction::Public(tx) => tx.affected_public_account_ids(),
+            NSSATransaction::PrivacyPreserving(tx) => tx.affected_public_account_ids(),
         }
     }
 }

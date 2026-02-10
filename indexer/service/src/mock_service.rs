@@ -185,7 +185,7 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
             .last()
             .map(|bl| bl.header.block_id)
             .ok_or_else(|| {
-                ErrorObjectOwned::owned(-32001, format!("Last block not found"), None::<()>)
+                ErrorObjectOwned::owned(-32001, "Last block not found".to_string(), None::<()>)
             })
     }
 

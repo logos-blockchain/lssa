@@ -3360,7 +3360,6 @@ dependencies = [
  "indexer_service_rpc",
  "jsonrpsee",
  "log",
- "serde",
  "serde_json",
  "tokio",
  "tokio-util",
@@ -3371,7 +3370,6 @@ name = "indexer_service_protocol"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "borsh",
  "common",
  "nssa",
  "nssa_core",
@@ -3439,7 +3437,6 @@ dependencies = [
 name = "integration_tests"
 version = "0.1.0"
 dependencies = [
- "actix-web",
  "anyhow",
  "base64 0.22.1",
  "borsh",
@@ -3447,14 +3444,12 @@ dependencies = [
  "env_logger",
  "futures",
  "hex",
- "indexer_core",
  "indexer_service",
  "indexer_service_rpc",
  "key_protocol",
  "log",
  "nssa",
  "nssa_core",
- "rand 0.8.5",
  "sequencer_core",
  "sequencer_runner",
  "serde_json",
@@ -3464,7 +3459,6 @@ dependencies = [
  "tokio",
  "url",
  "wallet",
- "wallet-ffi",
 ]
 
 [[package]]
@@ -5016,7 +5010,6 @@ dependencies = [
 name = "nssa_core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "base58",
  "borsh",
  "bytemuck",
@@ -6674,7 +6667,6 @@ dependencies = [
  "nssa",
  "nssa_core",
  "rand 0.8.5",
- "reqwest",
  "serde",
  "serde_json",
  "storage",
@@ -6719,7 +6711,6 @@ dependencies = [
  "common",
  "env_logger",
  "futures",
- "indexer_service_protocol",
  "indexer_service_rpc",
  "log",
  "sequencer_core",
