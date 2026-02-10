@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{HashType, block::Block, transaction::EncodedTransaction};
+use common::{HashType, block::Block, transaction::NSSATransaction};
 use nssa::V02State;
 use storage::sequencer::RocksDBIO;
 
@@ -55,7 +55,7 @@ impl SequencerStore {
     }
 
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
-    pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<EncodedTransaction> {
+    pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<NSSATransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
         let block = block_id.map(|&id| self.get_block_at_id(id));
         if let Some(Ok(block)) = block {
@@ -68,7 +68,7 @@ impl SequencerStore {
         None
     }
 
-    pub fn insert(&mut self, tx: &EncodedTransaction, block_id: u64) {
+    pub fn insert(&mut self, tx: &NSSATransaction, block_id: u64) {
         self.tx_hash_to_block_map.insert(tx.hash(), block_id);
     }
 
@@ -121,7 +121,7 @@ mod tests {
 
         let genesis_block_hashable_data = HashableBlockData {
             block_id: 0,
-            prev_block_hash: [0; 32],
+            prev_block_hash: HashType([0; 32]),
             timestamp: 0,
             transactions: vec![],
         };

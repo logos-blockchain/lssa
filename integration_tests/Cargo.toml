@@ -7,7 +7,7 @@ license = { workspace = true }
 [dependencies]
 nssa_core = { workspace = true, features = ["host"] }
 nssa.workspace = true
-sequencer_core = { workspace = true, features = ["testnet"] }
+sequencer_core = { workspace = true, features = ["default", "testnet"] }
 sequencer_runner.workspace = true
 wallet.workspace = true
 common.workspace = true
@@ -17,8 +17,8 @@ indexer_core.workspace = true
 wallet-ffi.workspace = true
 serde_json.workspace = true
 token_core.workspace = true
-
 url.workspace = true
+
 anyhow.workspace = true
 env_logger.workspace = true
 log.workspace = true
@@ -29,3 +29,5 @@ hex.workspace = true
 tempfile.workspace = true
 borsh.workspace = true
 futures.workspace = true
+rand.workspace = true
+testcontainers = { version = "0.26.3", features = ["docker-compose"] }

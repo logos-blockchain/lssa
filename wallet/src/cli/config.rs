@@ -95,7 +95,7 @@ impl WalletSubcommand for ConfigSubcommand {
                         wallet_core.storage.wallet_config.override_rust_log = Some(value);
                     }
                     "sequencer_addr" => {
-                        wallet_core.storage.wallet_config.sequencer_addr = value;
+                        wallet_core.storage.wallet_config.sequencer_addr = value.parse()?;
                     }
                     "seq_poll_timeout_millis" => {
                         wallet_core.storage.wallet_config.seq_poll_timeout_millis =

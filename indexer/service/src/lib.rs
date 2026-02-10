@@ -35,6 +35,12 @@ impl IndexerHandle {
 
         handle.stopped().await
     }
+
+    pub fn is_stopped(&self) -> bool {
+        self.server_handle
+            .as_ref()
+            .is_none_or(|handle| handle.is_stopped())
+    }
 }
 
 impl Drop for IndexerHandle {

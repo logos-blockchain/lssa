@@ -5,6 +5,8 @@ edition = "2024"
 license = { workspace = true }
 
 [dependencies]
+common.workspace = true
+
 reqwest.workspace = true
 anyhow.workspace = true
 tokio-retry.workspace = true

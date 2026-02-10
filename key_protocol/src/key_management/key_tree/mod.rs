@@ -272,7 +272,7 @@ impl KeyTree<ChildKeysPublic> {
         while let Some(curr_id) = id_stack.pop() {
             if let Some(node) = self.key_map.get(&curr_id) {
                 let address = node.account_id();
-                let node_acc = client.get_account(address.to_string()).await?.account;
+                let node_acc = client.get_account(address).await?.account;
 
                 if node_acc == nssa::Account::default() && curr_id != ChainIndex::root() {
                     self.remove(address);
@@ -307,7 +307,7 @@ impl KeyTree<ChildKeysPublic> {
             for id in ChainIndex::chain_ids_at_depth(i) {
                 if let Some(node) = self.key_map.get(&id) {
                     let address = node.account_id();
-                    let node_acc = client.get_account(address.to_string()).await?.account;
+                    let node_acc = client.get_account(address).await?.account;
 
                     if node_acc == nssa::Account::default() {
                         let addr = node.account_id();

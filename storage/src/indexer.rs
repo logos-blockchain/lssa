@@ -423,13 +423,7 @@ impl RocksDBIO {
                 )
                 .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
-            let acc_ids = NSSATransaction::try_from(&tx)
-                .map_err(|err| {
-                    DbError::db_interaction_error(format!(
-                        "failed to decode transaction in block {} with err {err:?}",
-                        block.header.block_id
-                    ))
-                })?
+            let acc_ids = tx
                 .affected_public_account_ids()
                 .into_iter()
                 .map(|account_id| account_id.into_value())
@@ -438,8 +432,8 @@ impl RocksDBIO {
             for acc_id in acc_ids {
                 acc_to_tx_map
                     .entry(acc_id)
-                    .and_modify(|tx_hashes| tx_hashes.push(tx_hash))
-                    .or_insert(vec![tx_hash]);
+                    .and_modify(|tx_hashes| tx_hashes.push(tx_hash.into()))
+                    .or_insert(vec![tx_hash.into()]);
             }
         }
 
@@ -592,15 +586,7 @@ impl RocksDBIO {
             for id in start..=block_id {
                 let block = self.get_block(id)?;
 
-                for encoded_transaction in block.body.transactions {
-                    let transaction =
-                        NSSATransaction::try_from(&encoded_transaction).map_err(|err| {
-                            DbError::db_interaction_error(format!(
-                                "failed to decode transaction in block {} with err {err:?}",
-                                block.header.block_id
-                            ))
-                        })?;
-
+                for transaction in block.body.transactions {
                     execute_check_transaction_on_state(
                         &mut breakpoint,
                         transaction_pre_check(transaction).map_err(|err| {
@@ -854,24 +840,17 @@ impl RocksDBIO {
             let block_id = self.get_block_id_by_tx_hash(tx_hash)?;
             let block = self.get_block(block_id)?;
 
-            let enc_tx = block
+            let transaction = block
                 .body
                 .transactions
                 .iter()
-                .find(|tx| tx.hash() == tx_hash)
+                .find(|tx| tx.hash().0 == tx_hash)
                 .ok_or(DbError::db_interaction_error(format!(
                     "Missing transaction in block {} with hash {:#?}",
                     block.header.block_id, tx_hash
                 )))?;
 
-            let transaction = NSSATransaction::try_from(enc_tx).map_err(|err| {
-                DbError::db_interaction_error(format!(
-                    "failed to decode transaction in block {} with err {err:?}",
-                    block.header.block_id
-                ))
-            })?;
-
-            tx_batch.push(transaction);
+            tx_batch.push(transaction.clone());
         }
 
         Ok(tx_batch)
@@ -880,7 +859,6 @@ impl RocksDBIO {
 
 #[cfg(test)]
 mod tests {
-    use common::transaction::EncodedTransaction;
     use nssa::AccountId;
     use tempfile::tempdir;
 
@@ -916,7 +894,7 @@ mod tests {
         nssa::V02State::new_with_genesis_accounts(&[(acc1(), 10000), (acc2(), 20000)], &[])
     }
 
-    fn transfer(amount: u128, nonce: u128, direction: bool) -> EncodedTransaction {
+    fn transfer(amount: u128, nonce: u128, direction: bool) -> NSSATransaction {
         let from;
         let to;
         let sign_key;
@@ -932,11 +910,7 @@ mod tests {
         }
 
         common::test_utils::create_transaction_native_token_transfer(
-            *from.value(),
-            nonce,
-            *to.value(),
-            amount,
-            sign_key,
+            from, nonce, to, amount, sign_key,
         )
     }
 
@@ -962,12 +936,12 @@ mod tests {
         assert_eq!(last_br_id, 0);
         assert_eq!(last_block.header.hash, genesis_block().header.hash);
         assert_eq!(
-            breakpoint.get_account_by_id(&acc1()),
-            final_state.get_account_by_id(&acc1())
+            breakpoint.get_account_by_id(acc1()),
+            final_state.get_account_by_id(acc1())
         );
         assert_eq!(
-            breakpoint.get_account_by_id(&acc2()),
-            final_state.get_account_by_id(&acc2())
+            breakpoint.get_account_by_id(acc2()),
+            final_state.get_account_by_id(acc2())
         );
     }
 
@@ -999,13 +973,13 @@ mod tests {
         assert_eq!(last_br_id, 0);
         assert_ne!(last_block.header.hash, genesis_block().header.hash);
         assert_eq!(
-            breakpoint.get_account_by_id(&acc1()).balance
-                - final_state.get_account_by_id(&acc1()).balance,
+            breakpoint.get_account_by_id(acc1()).balance
+                - final_state.get_account_by_id(acc1()).balance,
             1
         );
         assert_eq!(
-            final_state.get_account_by_id(&acc2()).balance
-                - breakpoint.get_account_by_id(&acc2()).balance,
+            final_state.get_account_by_id(acc2()).balance
+                - breakpoint.get_account_by_id(acc2()).balance,
             1
         );
     }
@@ -1044,22 +1018,22 @@ mod tests {
         assert_eq!(last_br_id, 1);
         assert_ne!(last_block.header.hash, genesis_block().header.hash);
         assert_eq!(
-            prev_breakpoint.get_account_by_id(&acc1()).balance
-                - final_state.get_account_by_id(&acc1()).balance,
+            prev_breakpoint.get_account_by_id(acc1()).balance
+                - final_state.get_account_by_id(acc1()).balance,
             99
         );
         assert_eq!(
-            final_state.get_account_by_id(&acc2()).balance
-                - prev_breakpoint.get_account_by_id(&acc2()).balance,
+            final_state.get_account_by_id(acc2()).balance
+                - prev_breakpoint.get_account_by_id(acc2()).balance,
             99
         );
         assert_eq!(
-            breakpoint.get_account_by_id(&acc1()),
-            final_state.get_account_by_id(&acc1())
+            breakpoint.get_account_by_id(acc1()),
+            final_state.get_account_by_id(acc1())
         );
         assert_eq!(
-            breakpoint.get_account_by_id(&acc2()),
-            final_state.get_account_by_id(&acc2())
+            breakpoint.get_account_by_id(acc2()),
+            final_state.get_account_by_id(acc2())
         );
     }
 
@@ -1115,10 +1089,10 @@ mod tests {
         let block = common::test_utils::produce_dummy_block(5, Some(prev_hash), vec![transfer_tx]);
         dbio.put_block(block).unwrap();
 
-        let control_block_id1 = dbio.get_block_id_by_hash(control_hash1).unwrap();
-        let control_block_id2 = dbio.get_block_id_by_hash(control_hash2).unwrap();
-        let control_block_id3 = dbio.get_block_id_by_tx_hash(control_tx_hash1).unwrap();
-        let control_block_id4 = dbio.get_block_id_by_tx_hash(control_tx_hash2).unwrap();
+        let control_block_id1 = dbio.get_block_id_by_hash(control_hash1.0).unwrap();
+        let control_block_id2 = dbio.get_block_id_by_hash(control_hash2.0).unwrap();
+        let control_block_id3 = dbio.get_block_id_by_tx_hash(control_tx_hash1.0).unwrap();
+        let control_block_id4 = dbio.get_block_id_by_tx_hash(control_tx_hash2.0).unwrap();
 
         assert_eq!(control_block_id1, 2);
         assert_eq!(control_block_id2, 3);
@@ -1177,12 +1151,12 @@ mod tests {
         dbio.put_block(block).unwrap();
 
         let block_hashes_mem: Vec<[u8; 32]> =
-            block_res.into_iter().map(|bl| bl.header.hash).collect();
+            block_res.into_iter().map(|bl| bl.header.hash.0).collect();
 
         let batch_res = dbio.get_block_batch(2, 4).unwrap();
 
         let block_hashes_db: Vec<[u8; 32]> =
-            batch_res.into_iter().map(|bl| bl.header.hash).collect();
+            batch_res.into_iter().map(|bl| bl.header.hash.0).collect();
 
         assert_eq!(block_hashes_mem, block_hashes_db);
 
@@ -1192,7 +1166,7 @@ mod tests {
 
         let block_hashes_db_limited: Vec<[u8; 32]> = batch_res_limited
             .into_iter()
-            .map(|bl| bl.header.hash)
+            .map(|bl| bl.header.hash.0)
             .collect();
 
         assert_eq!(block_hashes_mem_limited, block_hashes_db_limited.as_slice());
@@ -1214,7 +1188,7 @@ mod tests {
         let prev_hash = last_block.header.hash;
         let transfer_tx = transfer(1, 0, true);
 
-        tx_hash_res.push(transfer_tx.hash());
+        tx_hash_res.push(transfer_tx.hash().0);
 
         let block = common::test_utils::produce_dummy_block(2, Some(prev_hash), vec![transfer_tx]);
 
@@ -1226,7 +1200,7 @@ mod tests {
         let prev_hash = last_block.header.hash;
         let transfer_tx = transfer(1, 1, true);
 
-        tx_hash_res.push(transfer_tx.hash());
+        tx_hash_res.push(transfer_tx.hash().0);
 
         let block = common::test_utils::produce_dummy_block(3, Some(prev_hash), vec![transfer_tx]);
 
@@ -1238,7 +1212,7 @@ mod tests {
         let prev_hash = last_block.header.hash;
         let transfer_tx = transfer(1, 2, true);
 
-        tx_hash_res.push(transfer_tx.hash());
+        tx_hash_res.push(transfer_tx.hash().0);
 
         let block = common::test_utils::produce_dummy_block(4, Some(prev_hash), vec![transfer_tx]);
 
@@ -1250,25 +1224,20 @@ mod tests {
         let prev_hash = last_block.header.hash;
         let transfer_tx = transfer(1, 3, true);
 
-        tx_hash_res.push(transfer_tx.hash());
+        tx_hash_res.push(transfer_tx.hash().0);
 
         let block = common::test_utils::produce_dummy_block(5, Some(prev_hash), vec![transfer_tx]);
 
         dbio.put_block(block).unwrap();
 
         let acc1_tx = dbio.get_acc_transactions(*acc1().value(), 0, 4).unwrap();
-        let acc1_tx_hashes: Vec<[u8; 32]> = acc1_tx
-            .into_iter()
-            .map(|tx| EncodedTransaction::from(tx).hash())
-            .collect();
+        let acc1_tx_hashes: Vec<[u8; 32]> = acc1_tx.into_iter().map(|tx| tx.hash().0).collect();
 
         assert_eq!(acc1_tx_hashes, tx_hash_res);
 
         let acc1_tx_limited = dbio.get_acc_transactions(*acc1().value(), 1, 4).unwrap();
-        let acc1_tx_limited_hashes: Vec<[u8; 32]> = acc1_tx_limited
-            .into_iter()
-            .map(|tx| EncodedTransaction::from(tx).hash())
-            .collect();
+        let acc1_tx_limited_hashes: Vec<[u8; 32]> =
+            acc1_tx_limited.into_iter().map(|tx| tx.hash().0).collect();
 
         assert_eq!(acc1_tx_limited_hashes.as_slice(), &tx_hash_res[1..])
     }

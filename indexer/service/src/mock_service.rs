@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use indexer_service_protocol::{
     Account, AccountId, BedrockStatus, Block, BlockBody, BlockHeader, BlockId, Commitment,
-    CommitmentSetDigest, Data, EncryptedAccountData, Hash, MantleMsgId, PrivacyPreservingMessage,
-    PrivacyPreservingTransaction, ProgramDeploymentMessage, ProgramDeploymentTransaction,
-    PublicMessage, PublicTransaction, Signature, Transaction, WitnessSet,
+    CommitmentSetDigest, Data, EncryptedAccountData, HashType, MantleMsgId,
+    PrivacyPreservingMessage, PrivacyPreservingTransaction, ProgramDeploymentMessage,
+    ProgramDeploymentTransaction, PublicMessage, PublicTransaction, Signature, Transaction,
+    WitnessSet,
 };
 use jsonrpsee::{core::SubscriptionResult, types::ErrorObjectOwned};
 
@@ -12,7 +13,7 @@ use jsonrpsee::{core::SubscriptionResult, types::ErrorObjectOwned};
 pub struct MockIndexerService {
     blocks: Vec<Block>,
     accounts: HashMap<AccountId, Account>,
-    transactions: HashMap<Hash, (Transaction, BlockId)>,
+    transactions: HashMap<HashType, (Transaction, BlockId)>,
 }
 
 impl MockIndexerService {
@@ -43,14 +44,14 @@ impl MockIndexerService {
         }
 
         // Create 10 blocks with transactions
-        let mut prev_hash = Hash([0u8; 32]);
+        let mut prev_hash = HashType([0u8; 32]);
 
         for block_id in 0..10 {
             let block_hash = {
                 let mut hash = [0u8; 32];
                 hash[0] = block_id as u8;
                 hash[1] = 0xff;
-                Hash(hash)
+                HashType(hash)
             };
 
             // Create 2-4 transactions per block (mix of Public, PrivacyPreserving, and
@@ -63,7 +64,7 @@ impl MockIndexerService {
                     let mut hash = [0u8; 32];
                     hash[0] = block_id as u8;
                     hash[1] = tx_idx as u8;
-                    Hash(hash)
+                    HashType(hash)
                 };
 
                 // Vary transaction types: Public, PrivacyPreserving, or ProgramDeployment
@@ -202,7 +203,7 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
             })
     }
 
-    async fn get_block_by_hash(&self, block_hash: Hash) -> Result<Block, ErrorObjectOwned> {
+    async fn get_block_by_hash(&self, block_hash: HashType) -> Result<Block, ErrorObjectOwned> {
         self.blocks
             .iter()
             .find(|b| b.header.hash == block_hash)
@@ -217,7 +218,7 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
             .ok_or_else(|| ErrorObjectOwned::owned(-32001, "Account not found", None::<()>))
     }
 
-    async fn get_transaction(&self, tx_hash: Hash) -> Result<Transaction, ErrorObjectOwned> {
+    async fn get_transaction(&self, tx_hash: HashType) -> Result<Transaction, ErrorObjectOwned> {
         self.transactions
             .get(&tx_hash)
             .map(|(tx, _)| tx.clone())

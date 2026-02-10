@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use bedrock_client::BackoffConfig;
 use common::{
     block::{AccountInitialData, CommitmentsInitialData},
     config::BasicAuth,
@@ -41,13 +42,16 @@ pub struct SequencerConfig {
     /// Sequencer own signing key
     pub signing_key: [u8; 32],
     /// Bedrock configuration options
-    pub bedrock_config: Option<BedrockConfig>,
+    pub bedrock_config: BedrockConfig,
     /// Indexer RPC URL
     pub indexer_rpc_url: Url,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BedrockConfig {
+    /// Fibonacci backoff retry strategy configuration
+    #[serde(default)]
+    pub backoff: BackoffConfig,
     /// Bedrock channel ID
     pub channel_id: ChannelId,
     /// Bedrock Url

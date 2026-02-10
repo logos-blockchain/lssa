@@ -42,8 +42,8 @@ pub struct Block {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct BlockHeader {
     pub block_id: BlockId,
-    pub prev_block_hash: Hash,
-    pub hash: Hash,
+    pub prev_block_hash: HashType,
+    pub hash: HashType,
     pub timestamp: TimeStamp,
     pub signature: Signature,
 }
@@ -69,7 +69,7 @@ pub enum Transaction {
 
 impl Transaction {
     /// Get the hash of the transaction
-    pub fn hash(&self) -> &self::Hash {
+    pub fn hash(&self) -> &self::HashType {
         match self {
             Transaction::Public(tx) => &tx.hash,
             Transaction::PrivacyPreserving(tx) => &tx.hash,
@@ -80,14 +80,14 @@ impl Transaction {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct PublicTransaction {
-    pub hash: Hash,
+    pub hash: HashType,
     pub message: PublicMessage,
     pub witness_set: WitnessSet,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct PrivacyPreservingTransaction {
-    pub hash: Hash,
+    pub hash: HashType,
     pub message: PrivacyPreservingMessage,
     pub witness_set: WitnessSet,
 }
@@ -134,7 +134,7 @@ pub struct EncryptedAccountData {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ProgramDeploymentTransaction {
-    pub hash: Hash,
+    pub hash: HashType,
     pub message: ProgramDeploymentMessage,
 }
 
@@ -197,7 +197,7 @@ pub struct Data(
 );
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub struct Hash(
+pub struct HashType(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded hash")]
     pub [u8; 32],

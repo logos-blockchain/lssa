@@ -36,7 +36,9 @@ RUN strip /indexer_service/target/release/indexer_service
 FROM debian:trixie-slim
 
 # Create non-root user for security
-RUN useradd -m -u 1000 -s /bin/bash indexer_service_user
+RUN useradd -m -u 1000 -s /bin/bash indexer_service_user && \
+    mkdir -p /indexer_service /etc/indexer_service && \
+    chown -R indexer_service_user:indexer_service_user /indexer_service /etc/indexer_service
 
 # Copy binary from builder
 COPY --from=builder --chown=indexer_service_user:indexer_service_user /indexer_service/target/release/indexer_service /usr/local/bin/indexer_service
@@ -61,4 +63,4 @@ ENV RUST_LOG=info
 USER indexer_service_user
 
 WORKDIR /indexer_service
-CMD ["indexer_service"]
+CMD ["indexer_service", "/etc/indexer_service/indexer_config.json"]

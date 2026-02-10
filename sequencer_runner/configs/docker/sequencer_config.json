@@ -7,6 +7,16 @@
     "mempool_max_size": 10000,
     "block_create_timeout_millis": 10000,
     "port": 3040,
+    "retry_pending_blocks_timeout_millis": 7000,
+    "bedrock_config": {
+        "backoff": {
+            "start_delay_millis": 100,
+            "max_retries": 5
+        },
+        "channel_id": "0101010101010101010101010101010101010101010101010101010101010101",
+        "node_url": "http://localhost:18080"
+    },
+    "indexer_rpc_url": "ws://localhost:8779",
     "initial_accounts": [
         {
             "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",

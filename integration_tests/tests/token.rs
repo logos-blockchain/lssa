@@ -63,10 +63,10 @@ async fn create_and_transfer_public_token() -> Result<()> {
     let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
-        name: name.clone(),
-        total_supply,
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_public_account_id(supply_account_id),
+        name: "A NAME".to_string(),
+        total_supply: 37,
     };
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
 
@@ -76,7 +76,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token definition account
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
     let token_definition = TokenDefinition::try_from(&definition_acc.data)?;
@@ -94,7 +94,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token holding account with the total supply
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
 
@@ -112,8 +112,8 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Transfer 7 tokens from supply_acc to recipient_account_id
     let transfer_amount = 7;
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id.to_string()),
-        to: Some(format_public_account_id(&recipient_account_id.to_string())),
+        from: format_public_account_id(supply_account_id),
+        to: Some(format_public_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: transfer_amount,
@@ -127,7 +127,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the supply account after transfer
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
     assert_eq!(supply_acc.program_owner, Program::token().id());
@@ -143,7 +143,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the recipient account after transfer
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
     assert_eq!(recipient_acc.program_owner, Program::token().id());
@@ -159,9 +159,9 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Burn 3 tokens from recipient_acc
     let burn_amount = 3;
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: format_public_account_id(&recipient_account_id.to_string()),
-        amount: burn_amount,
+        definition: format_public_account_id(definition_account_id),
+        holder: format_public_account_id(recipient_account_id),
+        amount: 3,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -172,7 +172,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token definition account after burn
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
     let token_definition = TokenDefinition::try_from(&definition_acc.data)?;
@@ -189,7 +189,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the recipient account after burn
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
@@ -205,8 +205,8 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Mint 10 tokens at recipient_acc
     let mint_amount = 10;
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: Some(format_public_account_id(&recipient_account_id.to_string())),
+        definition: format_public_account_id(definition_account_id),
+        holder: Some(format_public_account_id(recipient_account_id)),
         holder_npk: None,
         holder_ipk: None,
         amount: mint_amount,
@@ -220,7 +220,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the token definition account after mint
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
     let token_definition = TokenDefinition::try_from(&definition_acc.data)?;
@@ -237,7 +237,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     // Check the status of the recipient account after mint
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
@@ -302,10 +302,10 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
-        name: name.clone(),
-        total_supply,
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
+        name: "A NAME".to_string(),
+        total_supply: 37,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -316,7 +316,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     // Check the status of the token definition account
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
     let token_definition = TokenDefinition::try_from(&definition_acc.data)?;
@@ -340,8 +340,8 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     // Transfer 7 tokens from supply_acc to recipient_account_id
     let transfer_amount = 7;
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
+        from: format_private_account_id(supply_account_id),
+        to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: transfer_amount,
@@ -367,9 +367,9 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     // Burn 3 tokens from recipient_acc
     let burn_amount = 3;
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
-        definition: format_public_account_id(&definition_account_id.to_string()),
-        holder: format_private_account_id(&recipient_account_id.to_string()),
-        amount: burn_amount,
+        definition: format_public_account_id(definition_account_id),
+        holder: format_private_account_id(recipient_account_id),
+        amount: 3,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -380,7 +380,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     // Check the token definition account after burn
     let definition_acc = ctx
         .sequencer_client()
-        .get_account(definition_account_id.to_string())
+        .get_account(definition_account_id)
         .await?
         .account;
     let token_definition = TokenDefinition::try_from(&definition_acc.data)?;
@@ -458,10 +458,10 @@ async fn create_token_with_private_definition() -> Result<()> {
     let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
-        name: name.clone(),
-        total_supply,
+        definition_account_id: format_private_account_id(definition_account_id),
+        supply_account_id: format_public_account_id(supply_account_id),
+        name: "A NAME".to_string(),
+        total_supply: 37,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -479,7 +479,7 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Verify supply account
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
 
@@ -522,10 +522,8 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Mint to public account
     let mint_amount_public = 10;
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
-        holder: Some(format_public_account_id(
-            &recipient_account_id_public.to_string(),
-        )),
+        definition: format_private_account_id(definition_account_id),
+        holder: Some(format_public_account_id(recipient_account_id_public)),
         holder_npk: None,
         holder_ipk: None,
         amount: mint_amount_public,
@@ -555,7 +553,7 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Verify public recipient received tokens
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id_public.to_string())
+        .get_account(recipient_account_id_public)
         .await?
         .account;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
@@ -571,10 +569,8 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Mint to private account
     let mint_amount_private = 5;
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
-        holder: Some(format_private_account_id(
-            &recipient_account_id_private.to_string(),
-        )),
+        definition: format_private_account_id(definition_account_id),
+        holder: Some(format_private_account_id(recipient_account_id_private)),
         holder_npk: None,
         holder_ipk: None,
         amount: mint_amount_private,
@@ -646,10 +642,10 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
     let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
-        name,
-        total_supply,
+        definition_account_id: format_private_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
+        name: "A NAME".to_string(),
+        total_supply: 37,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -702,8 +698,8 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
     // Transfer tokens
     let transfer_amount = 7;
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
+        from: format_private_account_id(supply_account_id),
+        to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: transfer_amount,
@@ -806,10 +802,10 @@ async fn shielded_token_transfer() -> Result<()> {
     let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_public_account_id(&supply_account_id.to_string()),
-        name,
-        total_supply,
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_public_account_id(supply_account_id),
+        name: "A NAME".to_string(),
+        total_supply: 37,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -820,8 +816,8 @@ async fn shielded_token_transfer() -> Result<()> {
     // Perform shielded transfer: public supply -> private recipient
     let transfer_amount = 7;
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_public_account_id(&supply_account_id.to_string()),
-        to: Some(format_private_account_id(&recipient_account_id.to_string())),
+        from: format_public_account_id(supply_account_id),
+        to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: transfer_amount,
@@ -835,7 +831,7 @@ async fn shielded_token_transfer() -> Result<()> {
     // Verify supply account balance
     let supply_acc = ctx
         .sequencer_client()
-        .get_account(supply_account_id.to_string())
+        .get_account(supply_account_id)
         .await?
         .account;
     let token_holding = TokenHolding::try_from(&supply_acc.data)?;
@@ -920,10 +916,10 @@ async fn deshielded_token_transfer() -> Result<()> {
     let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_public_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
-        name,
-        total_supply,
+        definition_account_id: format_public_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
+        name: "A NAME".to_string(),
+        total_supply: 37,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -934,8 +930,8 @@ async fn deshielded_token_transfer() -> Result<()> {
     // Perform deshielded transfer: private supply -> public recipient
     let transfer_amount = 7;
     let subcommand = TokenProgramAgnosticSubcommand::Send {
-        from: format_private_account_id(&supply_account_id.to_string()),
-        to: Some(format_public_account_id(&recipient_account_id.to_string())),
+        from: format_private_account_id(supply_account_id),
+        to: Some(format_public_account_id(recipient_account_id)),
         to_npk: None,
         to_ipk: None,
         amount: transfer_amount,
@@ -970,7 +966,7 @@ async fn deshielded_token_transfer() -> Result<()> {
     // Verify recipient balance
     let recipient_acc = ctx
         .sequencer_client()
-        .get_account(recipient_account_id.to_string())
+        .get_account(recipient_account_id)
         .await?
         .account;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
@@ -1021,10 +1017,10 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
     let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
-        definition_account_id: format_private_account_id(&definition_account_id.to_string()),
-        supply_account_id: format_private_account_id(&supply_account_id.to_string()),
-        name,
-        total_supply,
+        definition_account_id: format_private_account_id(definition_account_id),
+        supply_account_id: format_private_account_id(supply_account_id),
+        name: "A NAME".to_string(),
+        total_supply: 37,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -1057,7 +1053,7 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
     // Mint using claiming path (foreign account)
     let mint_amount = 9;
     let subcommand = TokenProgramAgnosticSubcommand::Mint {
-        definition: format_private_account_id(&definition_account_id.to_string()),
+        definition: format_private_account_id(definition_account_id),
         holder: None,
         holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
         holder_ipk: Some(hex::encode(holder_keys.incoming_viewing_public_key.0)),

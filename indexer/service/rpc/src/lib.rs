@@ -1,4 +1,4 @@
-use indexer_service_protocol::{Account, AccountId, Block, BlockId, Hash, Transaction};
+use indexer_service_protocol::{Account, AccountId, Block, BlockId, HashType, Transaction};
 use jsonrpsee::proc_macros::rpc;
 #[cfg(feature = "server")]
 use jsonrpsee::{core::SubscriptionResult, types::ErrorObjectOwned};
@@ -33,13 +33,13 @@ pub trait Rpc {
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned>;
 
     #[method(name = "getBlockByHash")]
-    async fn get_block_by_hash(&self, block_hash: Hash) -> Result<Block, ErrorObjectOwned>;
+    async fn get_block_by_hash(&self, block_hash: HashType) -> Result<Block, ErrorObjectOwned>;
 
     #[method(name = "getAccount")]
     async fn get_account(&self, account_id: AccountId) -> Result<Account, ErrorObjectOwned>;
 
     #[method(name = "getTransaction")]
-    async fn get_transaction(&self, tx_hash: Hash) -> Result<Transaction, ErrorObjectOwned>;
+    async fn get_transaction(&self, tx_hash: HashType) -> Result<Transaction, ErrorObjectOwned>;
 
     #[method(name = "getBlocks")]
     async fn get_blocks(&self, offset: u32, limit: u32) -> Result<Vec<Block>, ErrorObjectOwned>;

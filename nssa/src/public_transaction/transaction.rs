@@ -93,7 +93,7 @@ impl PublicTransaction {
         let signer_account_ids = self.signer_account_ids();
         // Check nonces corresponds to the current nonces on the public state.
         for (account_id, nonce) in signer_account_ids.iter().zip(&message.nonces) {
-            let current_nonce = state.get_account_by_id(account_id).nonce;
+            let current_nonce = state.get_account_by_id(*account_id).nonce;
             if current_nonce != *nonce {
                 return Err(NssaError::InvalidInput("Nonce mismatch".into()));
             }
@@ -105,7 +105,7 @@ impl PublicTransaction {
             .iter()
             .map(|account_id| {
                 AccountWithMetadata::new(
-                    state.get_account_by_id(account_id),
+                    state.get_account_by_id(*account_id),
                     signer_account_ids.contains(account_id),
                     *account_id,
                 )
@@ -157,7 +157,7 @@ impl PublicTransaction {
                 let expected_pre = state_diff
                     .get(&account_id)
                     .cloned()
-                    .unwrap_or_else(|| state.get_account_by_id(&account_id));
+                    .unwrap_or_else(|| state.get_account_by_id(account_id));
                 if pre.account != expected_pre {
                     return Err(NssaError::InvalidProgramBehavior);
                 }
@@ -212,7 +212,7 @@ impl PublicTransaction {
 
         // Check that all modified uninitialized accounts where claimed
         for post in state_diff.iter().filter_map(|(account_id, post)| {
-            let pre = state.get_account_by_id(account_id);
+            let pre = state.get_account_by_id(*account_id);
             if pre.program_owner != DEFAULT_PROGRAM_ID {
                 return None;
             }

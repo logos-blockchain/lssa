@@ -254,7 +254,7 @@ pub unsafe extern "C" fn wallet_ffi_get_sequencer_addr(handle: *mut WalletHandle
         }
     };
 
-    let addr = wallet.config().sequencer_addr.clone();
+    let addr = wallet.config().sequencer_addr.clone().to_string();
 
     match std::ffi::CString::new(addr) {
         Ok(s) => s.into_raw(),

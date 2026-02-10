@@ -50,7 +50,7 @@ impl IndexerCore {
         let init_accs: Vec<(nssa::AccountId, u128)> = config
             .initial_accounts
             .iter()
-            .map(|acc_data| (acc_data.account_id.parse().unwrap(), acc_data.balance))
+            .map(|acc_data| (acc_data.account_id, acc_data.balance))
             .collect();
 
         let mut state = nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments);
@@ -62,8 +62,9 @@ impl IndexerCore {
 
         Ok(Self {
             bedrock_client: BedrockClient::new(
-                config.bedrock_client_config.auth.clone().map(Into::into),
+                config.bedrock_client_config.backoff,
                 config.bedrock_client_config.addr.clone(),
+                config.bedrock_client_config.auth.clone().map(Into::into),
             )?,
             sequencer_client,
             config,
@@ -86,7 +87,7 @@ impl IndexerCore {
 
                 if let Some(l1_block) = self
                     .bedrock_client
-                    .get_block_by_id(header_id, &self.config.backoff)
+                    .get_block_by_id(header_id)
                     .await?
                 {
                     info!("Extracted L1 block at height {}", block_info.height);

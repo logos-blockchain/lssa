@@ -1,18 +1,30 @@
-use anyhow::Result;
+use std::time::Duration;
+
+use anyhow::{Context as _, Result};
+use common::config::BasicAuth;
 use futures::{Stream, TryFutureExt};
-use log::warn;
+use log::{info, warn};
 pub use logos_blockchain_chain_broadcast_service::BlockInfo;
-pub use logos_blockchain_common_http_client::{BasicAuthCredentials, CommonHttpClient, Error};
+pub use logos_blockchain_common_http_client::{CommonHttpClient, Error};
 pub use logos_blockchain_core::{block::Block, header::HeaderId, mantle::SignedMantleTx};
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use tokio_retry::Retry;
 
 /// Fibonacci backoff retry strategy configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BackoffConfig {
     pub start_delay_millis: u64,
     pub max_retries: usize,
+}
+
+impl Default for BackoffConfig {
+    fn default() -> Self {
+        Self {
+            start_delay_millis: 100,
+            max_retries: 5,
+        }
+    }
 }
 
 // Simple wrapper
@@ -22,26 +34,37 @@ pub struct BackoffConfig {
 pub struct BedrockClient {
     http_client: CommonHttpClient,
     node_url: Url,
+    backoff: BackoffConfig,
 }
 
 impl BedrockClient {
-    pub fn new(auth: Option<BasicAuthCredentials>, node_url: Url) -> Result<Self> {
+    pub fn new(backoff: BackoffConfig, node_url: Url, auth: Option<BasicAuth>) -> Result<Self> {
+        info!("Creating Bedrock client with node URL {node_url}");
         let client = Client::builder()
                 //Add more fields if needed
                 .timeout(std::time::Duration::from_secs(60))
-                .build()?;
+                .build()
+                .context("Failed to build HTTP client")?;
+
+        let auth = auth.map(|a| {
+            logos_blockchain_common_http_client::BasicAuthCredentials::new(a.username, a.password)
+        });
 
         let http_client = CommonHttpClient::new_with_client(client, auth);
         Ok(Self {
             http_client,
             node_url,
+            backoff,
         })
     }
 
     pub async fn post_transaction(&self, tx: SignedMantleTx) -> Result<(), Error> {
-        self.http_client
-            .post_transaction(self.node_url.clone(), tx)
-            .await
+        Retry::spawn(self.backoff_strategy(), || {
+            self.http_client
+                .post_transaction(self.node_url.clone(), tx.clone())
+                .inspect_err(|err| warn!("Transaction posting failed with error: {err:#}"))
+        })
+        .await
     }
 
     pub async fn get_lib_stream(&self) -> Result<impl Stream<Item = BlockInfo>, Error> {
@@ -51,17 +74,17 @@ impl BedrockClient {
     pub async fn get_block_by_id(
         &self,
         header_id: HeaderId,
-        backoff: &BackoffConfig,
     ) -> Result<Option<Block<SignedMantleTx>>, Error> {
-        let strategy =
-            tokio_retry::strategy::FibonacciBackoff::from_millis(backoff.start_delay_millis)
-                .take(backoff.max_retries);
-
-        Retry::spawn(strategy, || {
+        Retry::spawn(self.backoff_strategy(), || {
             self.http_client
                 .get_block_by_id(self.node_url.clone(), header_id)
-                .inspect_err(|err| warn!("Block fetching failed with err: {err:#?}"))
+                .inspect_err(|err| warn!("Block fetching failed with error: {err:#}"))
         })
         .await
+    }
+
+    fn backoff_strategy(&self) -> impl Iterator<Item = Duration> {
+        tokio_retry::strategy::FibonacciBackoff::from_millis(self.backoff.start_delay_millis)
+            .take(self.backoff.max_retries)
     }
 }

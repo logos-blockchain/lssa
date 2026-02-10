@@ -1,6 +1,9 @@
+use nssa::AccountId;
+
 use crate::{
+    HashType,
     block::{Block, HashableBlockData},
-    transaction::{EncodedTransaction, NSSATransaction},
+    transaction::NSSATransaction,
 };
 
 // Helpers
@@ -20,8 +23,8 @@ pub fn sequencer_sign_key_for_testing() -> nssa::PrivateKey {
 /// `transactions` - vector of `EncodedTransaction` objects
 pub fn produce_dummy_block(
     id: u64,
-    prev_hash: Option<[u8; 32]>,
-    transactions: Vec<EncodedTransaction>,
+    prev_hash: Option<HashType>,
+    transactions: Vec<NSSATransaction>,
 ) -> Block {
     let block_data = HashableBlockData {
         block_id: id,
@@ -33,7 +36,7 @@ pub fn produce_dummy_block(
     block_data.into_pending_block(&sequencer_sign_key_for_testing(), [0; 32])
 }
 
-pub fn produce_dummy_empty_transaction() -> EncodedTransaction {
+pub fn produce_dummy_empty_transaction() -> NSSATransaction {
     let program_id = nssa::program::Program::authenticated_transfer_program().id();
     let account_ids = vec![];
     let nonces = vec![];
@@ -50,17 +53,17 @@ pub fn produce_dummy_empty_transaction() -> EncodedTransaction {
 
     let nssa_tx = nssa::PublicTransaction::new(message, witness_set);
 
-    EncodedTransaction::from(NSSATransaction::Public(nssa_tx))
+    NSSATransaction::Public(nssa_tx)
 }
 
 pub fn create_transaction_native_token_transfer(
-    from: [u8; 32],
+    from: AccountId,
     nonce: u128,
-    to: [u8; 32],
+    to: AccountId,
     balance_to_move: u128,
     signing_key: nssa::PrivateKey,
-) -> EncodedTransaction {
-    let account_ids = vec![nssa::AccountId::new(from), nssa::AccountId::new(to)];
+) -> NSSATransaction {
+    let account_ids = vec![from, to];
     let nonces = vec![nonce];
     let program_id = nssa::program::Program::authenticated_transfer_program().id();
     let message = nssa::public_transaction::Message::try_new(
@@ -74,5 +77,5 @@ pub fn create_transaction_native_token_transfer(
 
     let nssa_tx = nssa::PublicTransaction::new(message, witness_set);
 
-    EncodedTransaction::from(NSSATransaction::Public(nssa_tx))
+    NSSATransaction::Public(nssa_tx)
 }

@@ -54,7 +54,7 @@ pub unsafe extern "C" fn wallet_ffi_get_public_account_key(
 
     let account_id = AccountId::new(unsafe { (*account_id).data });
 
-    let private_key = match wallet.get_account_public_signing_key(&account_id) {
+    let private_key = match wallet.get_account_public_signing_key(account_id) {
         Some(k) => k,
         None => {
             print_error("Public account key not found in wallet");

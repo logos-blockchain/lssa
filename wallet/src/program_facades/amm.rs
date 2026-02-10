@@ -157,14 +157,14 @@ impl Amm<'_> {
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&user_holding_a)
+            .get_pub_account_signing_key(user_holding_a)
             .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let signing_key_b = self
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&user_holding_b)
+            .get_pub_account_signing_key(user_holding_b)
             .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(
@@ -266,7 +266,7 @@ impl Amm<'_> {
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&account_id_auth)
+            .get_pub_account_signing_key(account_id_auth)
             .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(
@@ -343,14 +343,14 @@ impl Amm<'_> {
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&user_holding_a)
+            .get_pub_account_signing_key(user_holding_a)
             .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let signing_key_b = self
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&user_holding_b)
+            .get_pub_account_signing_key(user_holding_b)
             .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(
@@ -429,7 +429,7 @@ impl Amm<'_> {
             .0
             .storage
             .user_data
-            .get_pub_account_signing_key(&user_holding_lp)
+            .get_pub_account_signing_key(user_holding_lp)
             .ok_or(ExecutionFailureKind::KeyNotFoundError)?;
 
         let message = nssa::public_transaction::Message::try_new(

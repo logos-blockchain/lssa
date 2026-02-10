@@ -2,8 +2,8 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Result;
 use integration_tests::{
-    ACC_SENDER, ACC_SENDER_PRIVATE, TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext,
-    format_private_account_id, format_public_account_id, verify_commitment_is_in_state,
+    TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext, format_private_account_id,
+    format_public_account_id, verify_commitment_is_in_state,
 };
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use log::info;
@@ -19,7 +19,7 @@ use wallet::cli::{
 async fn restore_keys_from_seed() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
+    let from: AccountId = ctx.existing_private_accounts()[0];
 
     // Create first private account at root
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
@@ -47,8 +47,8 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Send to first private account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to_account_id1.to_string())),
+        from: format_private_account_id(from),
+        to: Some(format_private_account_id(to_account_id1)),
         to_npk: None,
         to_ipk: None,
         amount: 100,
@@ -57,15 +57,15 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Send to second private account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to_account_id2.to_string())),
+        from: format_private_account_id(from),
+        to: Some(format_private_account_id(to_account_id2)),
         to_npk: None,
         to_ipk: None,
         amount: 101,
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
-    let from: AccountId = ACC_SENDER.parse()?;
+    let from: AccountId = ctx.existing_public_accounts()[0];
 
     // Create first public account at root
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {
@@ -93,8 +93,8 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Send to first public account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
-        to: Some(format_public_account_id(&to_account_id3.to_string())),
+        from: format_public_account_id(from),
+        to: Some(format_public_account_id(to_account_id3)),
         to_npk: None,
         to_ipk: None,
         amount: 102,
@@ -103,8 +103,8 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Send to second public account
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
-        to: Some(format_public_account_id(&to_account_id4.to_string())),
+        from: format_public_account_id(from),
+        to: Some(format_public_account_id(to_account_id4)),
         to_npk: None,
         to_ipk: None,
         amount: 103,
@@ -166,8 +166,8 @@ async fn restore_keys_from_seed() -> Result<()> {
 
     // Test that restored accounts can send transactions
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&to_account_id1.to_string()),
-        to: Some(format_private_account_id(&to_account_id2.to_string())),
+        from: format_private_account_id(to_account_id1),
+        to: Some(format_private_account_id(to_account_id2)),
         to_npk: None,
         to_ipk: None,
         amount: 10,
@@ -175,8 +175,8 @@ async fn restore_keys_from_seed() -> Result<()> {
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&to_account_id3.to_string()),
-        to: Some(format_public_account_id(&to_account_id4.to_string())),
+        from: format_public_account_id(to_account_id3),
+        to: Some(format_public_account_id(to_account_id4)),
         to_npk: None,
         to_ipk: None,
         amount: 11,
@@ -201,11 +201,11 @@ async fn restore_keys_from_seed() -> Result<()> {
     // Verify public account balances
     let acc3 = ctx
         .sequencer_client()
-        .get_account_balance(to_account_id3.to_string())
+        .get_account_balance(to_account_id3)
         .await?;
     let acc4 = ctx
         .sequencer_client()
-        .get_account_balance(to_account_id4.to_string())
+        .get_account_balance(to_account_id4)
         .await?;
 
     assert_eq!(acc3.balance, 91); // 102 - 11

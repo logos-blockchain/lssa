@@ -48,12 +48,12 @@ impl IndexerStore {
 
     pub fn get_transaction_by_hash(&self, tx_hash: [u8; 32]) -> Result<NSSATransaction> {
         let block = self.get_block_at_id(self.dbio.get_block_id_by_tx_hash(tx_hash)?)?;
-        let encoded_transaction = block
+        let transaction = block
             .body
             .transactions
             .iter()
             .find_map(|enc_tx| {
-                if enc_tx.hash() == tx_hash {
+                if enc_tx.hash().0 == tx_hash {
                     Some(enc_tx)
                 } else {
                     None
@@ -61,7 +61,7 @@ impl IndexerStore {
             })
             .ok_or_else(|| anyhow::anyhow!("Transaction not found in DB"))?;
 
-        Ok(NSSATransaction::try_from(encoded_transaction)?)
+        Ok(transaction.clone())
     }
 
     pub fn get_block_by_hash(&self, hash: [u8; 32]) -> Result<Block> {
@@ -98,17 +98,16 @@ impl IndexerStore {
     }
 
     pub fn get_account_final(&self, account_id: &AccountId) -> Result<Account> {
-        Ok(self.final_state()?.get_account_by_id(account_id))
+        Ok(self.final_state()?.get_account_by_id(*account_id))
     }
 
     pub fn put_block(&self, block: Block) -> Result<()> {
         let mut final_state = self.dbio.final_state()?;
 
-        for encoded_transaction in &block.body.transactions {
-            let transaction = NSSATransaction::try_from(encoded_transaction)?;
+        for transaction in &block.body.transactions {
             execute_check_transaction_on_state(
                 &mut final_state,
-                transaction_pre_check(transaction)?,
+                transaction_pre_check(transaction.clone())?,
             )?;
         }
 

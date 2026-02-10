@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use nssa::AccountId;
 use nssa_core::program::ProgramId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -8,7 +9,7 @@ use super::{
     errors::RpcParseError,
     parser::{RpcRequest, parse_params},
 };
-use crate::parse_request;
+use crate::{HashType, parse_request};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloRequest {}
@@ -50,22 +51,22 @@ pub struct GetInitialTestnetAccountsRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountBalanceRequest {
-    pub account_id: String,
+    pub account_id: AccountId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetTransactionByHashRequest {
-    pub hash: String,
+    pub hash: HashType,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountsNoncesRequest {
-    pub account_ids: Vec<String>,
+    pub account_ids: Vec<AccountId>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountRequest {
-    pub account_id: String,
+    pub account_id: AccountId,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -105,7 +106,7 @@ pub struct RegisterAccountResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendTxResponse {
     pub status: String,
-    pub tx_hash: String,
+    pub tx_hash: HashType,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -381,7 +381,7 @@ impl TryFrom<WitnessSet> for nssa::privacy_preserving_transaction::witness_set::
 
 impl From<nssa::PublicTransaction> for PublicTransaction {
     fn from(value: nssa::PublicTransaction) -> Self {
-        let hash = Hash(value.hash());
+        let hash = HashType(value.hash());
         let nssa::PublicTransaction {
             message,
             witness_set,
@@ -430,7 +430,7 @@ impl TryFrom<PublicTransaction> for nssa::PublicTransaction {
 
 impl From<nssa::PrivacyPreservingTransaction> for PrivacyPreservingTransaction {
     fn from(value: nssa::PrivacyPreservingTransaction) -> Self {
-        let hash = Hash(value.hash());
+        let hash = HashType(value.hash());
         let nssa::PrivacyPreservingTransaction {
             message,
             witness_set,
@@ -467,7 +467,7 @@ impl TryFrom<PrivacyPreservingTransaction> for nssa::PrivacyPreservingTransactio
 
 impl From<nssa::ProgramDeploymentTransaction> for ProgramDeploymentTransaction {
     fn from(value: nssa::ProgramDeploymentTransaction) -> Self {
-        let hash = Hash(value.hash());
+        let hash = HashType(value.hash());
         let nssa::ProgramDeploymentTransaction { message } = value;
 
         Self {
@@ -531,8 +531,8 @@ impl From<common::block::BlockHeader> for BlockHeader {
         } = value;
         Self {
             block_id,
-            prev_block_hash: Hash(prev_block_hash),
-            hash: Hash(hash),
+            prev_block_hash: prev_block_hash.into(),
+            hash: hash.into(),
             timestamp,
             signature: signature.into(),
         }
@@ -552,47 +552,32 @@ impl TryFrom<BlockHeader> for common::block::BlockHeader {
         } = value;
         Ok(Self {
             block_id,
-            prev_block_hash: prev_block_hash.0,
-            hash: hash.0,
+            prev_block_hash: prev_block_hash.into(),
+            hash: hash.into(),
             timestamp,
             signature: signature.into(),
         })
     }
 }
 
-impl TryFrom<common::block::BlockBody> for BlockBody {
-    type Error = std::io::Error;
-
-    fn try_from(value: common::block::BlockBody) -> Result<Self, Self::Error> {
-        // Note: EncodedTransaction doesn't have a direct conversion to NSSATransaction
-        // This conversion will decode and re-encode the transactions
-        use borsh::BorshDeserialize as _;
-
+impl From<common::block::BlockBody> for BlockBody {
+    fn from(value: common::block::BlockBody) -> Self {
         let common::block::BlockBody { transactions } = value;
 
         let transactions = transactions
             .into_iter()
-            .map(|encoded_tx| match encoded_tx.tx_kind {
-                common::transaction::TxKind::Public => {
-                    nssa::PublicTransaction::try_from_slice(&encoded_tx.encoded_transaction_data)
-                        .map(|tx| Transaction::Public(tx.into()))
+            .map(|tx| match tx {
+                common::transaction::NSSATransaction::Public(tx) => Transaction::Public(tx.into()),
+                common::transaction::NSSATransaction::PrivacyPreserving(tx) => {
+                    Transaction::PrivacyPreserving(tx.into())
                 }
-                common::transaction::TxKind::PrivacyPreserving => {
-                    nssa::PrivacyPreservingTransaction::try_from_slice(
-                        &encoded_tx.encoded_transaction_data,
-                    )
-                    .map(|tx| Transaction::PrivacyPreserving(tx.into()))
-                }
-                common::transaction::TxKind::ProgramDeployment => {
-                    nssa::ProgramDeploymentTransaction::try_from_slice(
-                        &encoded_tx.encoded_transaction_data,
-                    )
-                    .map(|tx| Transaction::ProgramDeployment(tx.into()))
+                common::transaction::NSSATransaction::ProgramDeployment(tx) => {
+                    Transaction::ProgramDeployment(tx.into())
                 }
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect();
 
-        Ok(Self { transactions })
+        Self { transactions }
     }
 }
 
@@ -606,7 +591,7 @@ impl TryFrom<BlockBody> for common::block::BlockBody {
             .into_iter()
             .map(|tx| {
                 let nssa_tx: common::transaction::NSSATransaction = tx.try_into()?;
-                Ok::<_, nssa::error::NssaError>(nssa_tx.into())
+                Ok::<_, nssa::error::NssaError>(nssa_tx)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -614,10 +599,8 @@ impl TryFrom<BlockBody> for common::block::BlockBody {
     }
 }
 
-impl TryFrom<common::block::Block> for Block {
-    type Error = std::io::Error;
-
-    fn try_from(value: common::block::Block) -> Result<Self, Self::Error> {
+impl From<common::block::Block> for Block {
+    fn from(value: common::block::Block) -> Self {
         let common::block::Block {
             header,
             body,
@@ -625,12 +608,12 @@ impl TryFrom<common::block::Block> for Block {
             bedrock_parent_id,
         } = value;
 
-        Ok(Self {
+        Self {
             header: header.into(),
-            body: body.try_into()?,
+            body: body.into(),
             bedrock_status: bedrock_status.into(),
             bedrock_parent_id: MantleMsgId(bedrock_parent_id),
-        })
+        }
     }
 }
 
@@ -671,5 +654,17 @@ impl From<BedrockStatus> for common::block::BedrockStatus {
             BedrockStatus::Safe => Self::Safe,
             BedrockStatus::Finalized => Self::Finalized,
         }
+    }
+}
+
+impl From<common::HashType> for HashType {
+    fn from(value: common::HashType) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<HashType> for common::HashType {
+    fn from(value: HashType) -> Self {
+        common::HashType(value.0)
     }
 }

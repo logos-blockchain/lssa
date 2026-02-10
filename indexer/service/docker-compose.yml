@@ -2,8 +2,11 @@ services:
   indexer_service:
     image: lssa/indexer_service
     build:
-      context: ..
-      dockerfile: indexer_service/Dockerfile
+      context: ../..
+      dockerfile: indexer/service/Dockerfile
     container_name: indexer_service
     ports:
       - "8779:8779"
+    volumes:
+      # Mount configuration
+      - ./configs/indexer_config.json:/etc/indexer_service/indexer_config.json

@@ -19,6 +19,7 @@ serde.workspace = true
 serde_json.workspace = true
 futures.workspace = true
 async-trait = "0.1.89"
+arc-swap = "1.8.1"
 
 [features]
 # Return mock responses with generated data for testing purposes

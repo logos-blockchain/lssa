@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ops::RangeInclusive};
 
 use anyhow::Result;
+use nssa::AccountId;
 use nssa_core::program::ProgramId;
 use reqwest::Client;
 use serde::Deserialize;
@@ -12,6 +13,7 @@ use super::rpc_primitives::requests::{
     GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest,
 };
 use crate::{
+    HashType,
     block::Block,
     config::BasicAuth,
     error::{SequencerClientError, SequencerRpcError},
@@ -27,7 +29,7 @@ use crate::{
             SendTxResponse,
         },
     },
-    transaction::{EncodedTransaction, NSSATransaction},
+    transaction::NSSATransaction,
 };
 
 #[derive(Clone)]
@@ -148,7 +150,7 @@ impl SequencerClient {
     /// bytes.
     pub async fn get_account_balance(
         &self,
-        account_id: String,
+        account_id: AccountId,
     ) -> Result<GetAccountBalanceResponse, SequencerClientError> {
         let block_req = GetAccountBalanceRequest { account_id };
 
@@ -167,7 +169,7 @@ impl SequencerClient {
     /// 32 bytes.
     pub async fn get_accounts_nonces(
         &self,
-        account_ids: Vec<String>,
+        account_ids: Vec<AccountId>,
     ) -> Result<GetAccountsNoncesResponse, SequencerClientError> {
         let block_req = GetAccountsNoncesRequest { account_ids };
 
@@ -184,7 +186,7 @@ impl SequencerClient {
 
     pub async fn get_account(
         &self,
-        account_id: String,
+        account_id: AccountId,
     ) -> Result<GetAccountResponse, SequencerClientError> {
         let block_req = GetAccountRequest { account_id };
 
@@ -200,7 +202,7 @@ impl SequencerClient {
     /// Get transaction details for `hash`.
     pub async fn get_transaction_by_hash(
         &self,
-        hash: String,
+        hash: HashType,
     ) -> Result<GetTransactionByHashResponse, SequencerClientError> {
         let block_req = GetTransactionByHashRequest { hash };
 
@@ -220,7 +222,7 @@ impl SequencerClient {
         &self,
         transaction: nssa::PublicTransaction,
     ) -> Result<SendTxResponse, SequencerClientError> {
-        let transaction = EncodedTransaction::from(NSSATransaction::Public(transaction));
+        let transaction = NSSATransaction::Public(transaction);
 
         let tx_req = SendTxRequest {
             transaction: borsh::to_vec(&transaction).unwrap(),
@@ -240,7 +242,7 @@ impl SequencerClient {
         &self,
         transaction: nssa::PrivacyPreservingTransaction,
     ) -> Result<SendTxResponse, SequencerClientError> {
-        let transaction = EncodedTransaction::from(NSSATransaction::PrivacyPreserving(transaction));
+        let transaction = NSSATransaction::PrivacyPreserving(transaction);
 
         let tx_req = SendTxRequest {
             transaction: borsh::to_vec(&transaction).unwrap(),
@@ -332,7 +334,7 @@ impl SequencerClient {
         &self,
         transaction: nssa::ProgramDeploymentTransaction,
     ) -> Result<SendTxResponse, SequencerClientError> {
-        let transaction = EncodedTransaction::from(NSSATransaction::ProgramDeployment(transaction));
+        let transaction = NSSATransaction::ProgramDeployment(transaction);
 
         let tx_req = SendTxRequest {
             transaction: borsh::to_vec(&transaction).unwrap(),

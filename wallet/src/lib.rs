@@ -4,10 +4,8 @@ use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chain_storage::WalletChainStore;
 use common::{
-    error::ExecutionFailureKind,
-    rpc_primitives::requests::SendTxResponse,
-    sequencer_client::SequencerClient,
-    transaction::{EncodedTransaction, NSSATransaction},
+    HashType, error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse,
+    sequencer_client::SequencerClient, transaction::NSSATransaction,
 };
 use config::WalletConfig;
 use key_protocol::key_management::key_tree::{chain_index::ChainIndex, traits::KeyNode as _};
@@ -21,7 +19,6 @@ use nssa::{
 use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
 pub use privacy_preserving_tx::PrivacyPreservingAccount;
 use tokio::io::AsyncWriteExt;
-use url::Url;
 
 use crate::{
     config::{PersistentStorage, WalletConfigOverrides},
@@ -114,7 +111,7 @@ impl WalletCore {
         }
 
         let sequencer_client = Arc::new(SequencerClient::new_with_auth(
-            Url::parse(&config.sequencer_addr)?,
+            config.sequencer_addr.clone(),
             config.basic_auth.clone(),
         )?);
         let tx_poller = TxPoller::new(config.clone(), Arc::clone(&sequencer_client));
@@ -199,7 +196,7 @@ impl WalletCore {
     pub async fn get_account_balance(&self, acc: AccountId) -> Result<u128> {
         Ok(self
             .sequencer_client
-            .get_account_balance(acc.to_string())
+            .get_account_balance(acc)
             .await?
             .balance)
     }
@@ -208,23 +205,20 @@ impl WalletCore {
     pub async fn get_accounts_nonces(&self, accs: Vec<AccountId>) -> Result<Vec<u128>> {
         Ok(self
             .sequencer_client
-            .get_accounts_nonces(accs.into_iter().map(|acc| acc.to_string()).collect())
+            .get_accounts_nonces(accs)
             .await?
             .nonces)
     }
 
     /// Get account
     pub async fn get_account_public(&self, account_id: AccountId) -> Result<Account> {
-        let response = self
-            .sequencer_client
-            .get_account(account_id.to_string())
-            .await?;
+        let response = self.sequencer_client.get_account(account_id).await?;
         Ok(response.account)
     }
 
     pub fn get_account_public_signing_key(
         &self,
-        account_id: &AccountId,
+        account_id: AccountId,
     ) -> Option<&nssa::PrivateKey> {
         self.storage
             .user_data
@@ -244,12 +238,12 @@ impl WalletCore {
     }
 
     /// Poll transactions
-    pub async fn poll_native_token_transfer(&self, hash: String) -> Result<NSSATransaction> {
+    pub async fn poll_native_token_transfer(&self, hash: HashType) -> Result<NSSATransaction> {
         let transaction_encoded = self.poller.poll_tx(hash).await?;
         let tx_base64_decode = BASE64.decode(transaction_encoded)?;
-        let pub_tx = borsh::from_slice::<EncodedTransaction>(&tx_base64_decode).unwrap();
+        let pub_tx = borsh::from_slice::<NSSATransaction>(&tx_base64_decode).unwrap();
 
-        Ok(NSSATransaction::try_from(&pub_tx)?)
+        Ok(pub_tx)
     }
 
     pub async fn check_private_account_initialized(
@@ -392,8 +386,7 @@ impl WalletCore {
         let bar = indicatif::ProgressBar::new(num_of_blocks);
         while let Some(block) = blocks.try_next().await? {
             for tx in block.transactions {
-                let nssa_tx = NSSATransaction::try_from(&tx)?;
-                self.sync_private_accounts_with_tx(nssa_tx);
+                self.sync_private_accounts_with_tx(tx);
             }
 
             self.last_synced_block = block.block_id;

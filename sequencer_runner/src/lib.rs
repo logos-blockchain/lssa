@@ -6,7 +6,10 @@ use clap::Parser;
 use common::rpc_primitives::RpcConfig;
 use futures::{FutureExt as _, never::Never};
 use log::{error, info, warn};
-use sequencer_core::{SequencerCore, config::SequencerConfig};
+use sequencer_core::{
+    SequencerCore, block_settlement_client::BlockSettlementClientTrait as _,
+    config::SequencerConfig,
+};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -23,6 +26,7 @@ struct Args {
 ///
 /// Implements `Drop` to ensure all tasks are aborted and the HTTP server is stopped when dropped.
 pub struct SequencerHandle {
+    addr: SocketAddr,
     http_server_handle: ServerHandle,
     main_loop_handle: JoinHandle<Result<Never>>,
     retry_pending_blocks_loop_handle: JoinHandle<Result<Never>>,
@@ -33,8 +37,9 @@ impl SequencerHandle {
     /// Runs the sequencer indefinitely, monitoring its tasks.
     ///
     /// If no error occurs, this function will never return.
-    async fn run_forever(&mut self) -> Result<Never> {
+    pub async fn run_forever(&mut self) -> Result<Never> {
         let Self {
+            addr: _,
             http_server_handle: _,
             main_loop_handle,
             retry_pending_blocks_loop_handle,
@@ -59,11 +64,22 @@ impl SequencerHandle {
             }
         }
     }
+
+    pub fn is_finished(&self) -> bool {
+        self.main_loop_handle.is_finished()
+            || self.retry_pending_blocks_loop_handle.is_finished()
+            || self.listen_for_bedrock_blocks_loop_handle.is_finished()
+    }
+
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
+    }
 }
 
 impl Drop for SequencerHandle {
     fn drop(&mut self) {
         let Self {
+            addr: _,
             http_server_handle,
             main_loop_handle,
             retry_pending_blocks_loop_handle,
@@ -79,9 +95,7 @@ impl Drop for SequencerHandle {
     }
 }
 
-pub async fn startup_sequencer(
-    app_config: SequencerConfig,
-) -> Result<(SequencerHandle, SocketAddr)> {
+pub async fn startup_sequencer(app_config: SequencerConfig) -> Result<SequencerHandle> {
     let block_timeout = Duration::from_millis(app_config.block_create_timeout_millis);
     let retry_pending_blocks_timeout =
         Duration::from_millis(app_config.retry_pending_blocks_timeout_millis);
@@ -115,15 +129,13 @@ pub async fn startup_sequencer(
     let listen_for_bedrock_blocks_loop_handle =
         tokio::spawn(listen_for_bedrock_blocks_loop(seq_core_wrapped));
 
-    Ok((
-        SequencerHandle {
-            http_server_handle,
-            main_loop_handle,
-            retry_pending_blocks_loop_handle,
-            listen_for_bedrock_blocks_loop_handle,
-        },
+    Ok(SequencerHandle {
         addr,
-    ))
+        http_server_handle,
+        main_loop_handle,
+        retry_pending_blocks_loop_handle,
+        listen_for_bedrock_blocks_loop_handle,
+    })
 }
 
 async fn main_loop(seq_core: Arc<Mutex<SequencerCore>>, block_timeout: Duration) -> Result<Never> {
@@ -162,13 +174,9 @@ async fn retry_pending_blocks_loop(
             (pending_blocks, client)
         };
 
-        let Some(client) = block_settlement_client else {
-            continue;
-        };
-
         info!("Resubmitting {} pending blocks", pending_blocks.len());
         for block in &pending_blocks {
-            if let Err(e) = client.submit_block_to_bedrock(block).await {
+            if let Err(e) = block_settlement_client.submit_block_to_bedrock(block).await {
                 warn!(
                     "Failed to resubmit block with id {} with error {}",
                     block.header.block_id, e
@@ -182,6 +190,8 @@ async fn listen_for_bedrock_blocks_loop(seq_core: Arc<Mutex<SequencerCore>>) -> 
     use indexer_service_rpc::RpcClient as _;
 
     let indexer_client = seq_core.lock().await.indexer_client();
+
+    let retry_delay = Duration::from_secs(5);
 
     loop {
         // TODO: Subscribe from the first pending block ID?
@@ -205,9 +215,10 @@ async fn listen_for_bedrock_blocks_loop(seq_core: Arc<Mutex<SequencerCore>>) -> 
         }
 
         warn!(
-            "Block subscription closed unexpectedly, reason: {:?}",
+            "Block subscription closed unexpectedly, reason: {:?}, retrying after {retry_delay:?}",
             subscription.close_reason()
         );
+        tokio::time::sleep(retry_delay).await;
     }
 }
 
@@ -228,12 +239,12 @@ pub async fn main_runner() -> Result<()> {
     }
 
     // ToDo: Add restart on failures
-    let (mut sequencer_handle, _addr) = startup_sequencer(app_config).await?;
+    let mut sequencer_handle = startup_sequencer(app_config).await?;
 
     info!("Sequencer running. Monitoring concurrent tasks...");
 
     let Err(err) = sequencer_handle.run_forever().await;
-    error!("Sequencer failed: {err:?}");
+    error!("Sequencer failed: {err:#}");
 
     info!("Shutting down sequencer...");
 

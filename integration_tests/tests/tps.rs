@@ -1,9 +1,11 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use common::block::{AccountInitialData, CommitmentsInitialData};
-use integration_tests::TestContext;
-use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
+use integration_tests::{
+    TestContext,
+    config::{InitialData, SequencerPartialConfig},
+};
+use key_protocol::key_management::{KeyChain, ephemeral_key_holder::EphemeralKeyHolder};
 use log::info;
 use nssa::{
     Account, AccountId, PrivacyPreservingTransaction, PrivateKey, PublicKey, PublicTransaction,
@@ -16,17 +18,20 @@ use nssa_core::{
     account::{AccountWithMetadata, data::Data},
     encryption::IncomingViewingPublicKey,
 };
-use sequencer_core::config::SequencerConfig;
 use tokio::test;
 
 // TODO: Make a proper benchmark instead of an ad-hoc test
 #[test]
 pub async fn tps_test() -> Result<()> {
     let num_transactions = 300 * 5;
-    let target_tps = 12;
+    let target_tps = 8;
 
     let tps_test = TpsTestManager::new(target_tps, num_transactions);
-    let ctx = TestContext::new_with_sequencer_config(tps_test.generate_sequencer_config()).await?;
+    let ctx = TestContext::builder()
+        .with_sequencer_partial_config(TpsTestManager::generate_sequencer_partial_config())
+        .with_initial_data(tps_test.generate_initial_data())
+        .build()
+        .await?;
 
     let target_time = tps_test.target_time();
     info!(
@@ -56,12 +61,10 @@ pub async fn tps_test() -> Result<()> {
 
             let tx_obj = ctx
                 .sequencer_client()
-                .get_transaction_by_hash(tx_hash.clone())
+                .get_transaction_by_hash(*tx_hash)
                 .await
                 .inspect_err(|err| {
-                    log::warn!(
-                        "Failed to get transaction by hash {tx_hash:#?} with error: {err:#?}"
-                    )
+                    log::warn!("Failed to get transaction by hash {tx_hash} with error: {err:#?}")
                 });
 
             if let Ok(tx_obj) = tx_obj
@@ -148,47 +151,35 @@ impl TpsTestManager {
     /// Generates a sequencer configuration with initial balance in a number of public accounts.
     /// The transactions generated with the function `build_public_txs` will be valid in a node
     /// started with the config from this method.
-    pub(crate) fn generate_sequencer_config(&self) -> SequencerConfig {
+    fn generate_initial_data(&self) -> InitialData {
         // Create public public keypairs
-        let initial_public_accounts = self
+        let public_accounts = self
             .public_keypairs
             .iter()
-            .map(|(_, account_id)| AccountInitialData {
-                account_id: account_id.to_string(),
-                balance: 10,
-            })
+            .map(|(key, _)| (key.clone(), 10))
             .collect();
 
         // Generate an initial commitment to be used with the privacy preserving transaction
         // created with the `build_privacy_transaction` function.
-        let sender_nsk = [1; 32];
-        let sender_npk = NullifierPublicKey::from(&sender_nsk);
+        let key_chain = KeyChain::new_os_random();
         let account = Account {
             balance: 100,
             nonce: 0xdeadbeef,
             program_owner: Program::authenticated_transfer_program().id(),
             data: Data::default(),
         };
-        let initial_commitment = CommitmentsInitialData {
-            npk: sender_npk,
-            account,
-        };
 
-        SequencerConfig {
-            home: ".".into(),
-            override_rust_log: None,
-            genesis_id: 1,
-            is_genesis_random: true,
+        InitialData {
+            public_accounts,
+            private_accounts: vec![(key_chain, account)],
+        }
+    }
+
+    fn generate_sequencer_partial_config() -> SequencerPartialConfig {
+        SequencerPartialConfig {
             max_num_tx_in_block: 300,
-            mempool_max_size: 10000,
-            block_create_timeout_millis: 12000,
-            port: 3040,
-            initial_accounts: initial_public_accounts,
-            initial_commitments: vec![initial_commitment],
-            signing_key: [37; 32],
-            bedrock_config: None,
-            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
-            indexer_rpc_url: "http://localhost:8779".parse().unwrap(),
+            mempool_max_size: 10_000,
+            block_create_timeout_millis: 12_000,
         }
     }
 }

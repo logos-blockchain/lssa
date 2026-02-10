@@ -26,11 +26,13 @@ rand.workspace = true
 reqwest.workspace = true
 borsh.workspace = true
 url.workspace = true
-jsonrpsee = { workspace = true, features = ["http-client"] }
+jsonrpsee = { workspace = true, features = ["ws-client"] }
 
 [features]
 default = []
 testnet = []
+# Generate mock external clients implementations for testing
+mock = []
 
 [dev-dependencies]
 futures.workspace = true
