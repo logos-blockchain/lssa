@@ -72,8 +72,8 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let channel_genesis_msg_id = [0; 32];
-        let genesis_block = hashable_data.into_pending_block(&signing_key, channel_genesis_msg_id);
+        let genesis_parent_msg_id = [0; 32];
+        let genesis_block = hashable_data.into_pending_block(&signing_key, genesis_parent_msg_id);
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
@@ -129,11 +129,6 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
         let block_settlement_client = BC::new(&config.bedrock_config, bedrock_signing_key)
             .expect("Failed to initialize Block Settlement Client");
 
-        let (_, msg_id) = block_settlement_client
-            .create_inscribe_tx(&genesis_block)
-            .expect("Inscription transaction with genesis block should be constructible");
-        let last_bedrock_msg_id = msg_id.into();
-
         let indexer_client = IC::new(&config.indexer_rpc_url)
             .await
             .expect("Failed to create Indexer Client");
@@ -146,7 +141,7 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
             sequencer_config: config,
             block_settlement_client,
             indexer_client,
-            last_bedrock_msg_id,
+            last_bedrock_msg_id: genesis_parent_msg_id,
         };
 
         (sequencer_core, mempool_handle)
