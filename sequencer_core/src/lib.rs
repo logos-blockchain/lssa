@@ -129,10 +129,10 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
         let block_settlement_client = BC::new(&config.bedrock_config, bedrock_signing_key)
             .expect("Failed to initialize Block Settlement Client");
 
-        let (_, msg_id) = block_settlement_client
-            .create_inscribe_tx(&genesis_block)
-            .expect("Inscription transaction with genesis block should be constructible");
-        let last_bedrock_msg_id = msg_id.into();
+        // let (_, msg_id) = block_settlement_client
+        //     .create_inscribe_tx(&genesis_block)
+        //     .expect("Inscription transaction with genesis block should be constructible");
+        // let last_bedrock_msg_id = msg_id.into();
 
         let indexer_client = IC::new(&config.indexer_rpc_url)
             .await
@@ -146,7 +146,7 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
             sequencer_config: config,
             block_settlement_client,
             indexer_client,
-            last_bedrock_msg_id,
+            last_bedrock_msg_id: channel_genesis_msg_id,
         };
 
         (sequencer_core, mempool_handle)

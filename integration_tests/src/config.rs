@@ -12,8 +12,13 @@ use wallet::config::{
     InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic, WalletConfig,
 };
 
-pub fn indexer_config(bedrock_addr: SocketAddr) -> Result<IndexerConfig> {
+pub fn indexer_config(
+    bedrock_addr: SocketAddr,
+    home: PathBuf,
+    initial_data: &InitialData,
+) -> Result<IndexerConfig> {
     Ok(IndexerConfig {
+        home,
         resubscribe_interval_millis: 1000,
         bedrock_client_config: ClientConfig {
             addr: addr_to_url(UrlProtocol::Http, bedrock_addr)
@@ -24,6 +29,9 @@ pub fn indexer_config(bedrock_addr: SocketAddr) -> Result<IndexerConfig> {
                 max_retries: 10,
             },
         },
+        initial_accounts: initial_data.sequencer_initial_accounts(),
+        initial_commitments: initial_data.sequencer_initial_commitments(),
+        signing_key: [37; 32],
         channel_id: bedrock_channel_id(),
     })
 }

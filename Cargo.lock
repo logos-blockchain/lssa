@@ -3449,6 +3449,7 @@ dependencies = [
  "hex",
  "indexer_core",
  "indexer_service",
+ "indexer_service_rpc",
  "key_protocol",
  "log",
  "nssa",

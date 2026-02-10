@@ -1,8 +1,8 @@
 use anyhow::Result;
 use bedrock_client::BedrockClient;
+use common::block::{Block, HashableBlockData};
 // ToDo: Remove after testnet
-use common::PINATA_BASE58;
-use common::{block::Block, sequencer_client::SequencerClient};
+use common::{HashType, PINATA_BASE58};
 use futures::StreamExt;
 use log::info;
 use logos_blockchain_core::mantle::{
@@ -19,19 +19,23 @@ pub mod state;
 #[derive(Clone)]
 pub struct IndexerCore {
     pub bedrock_client: BedrockClient,
-    pub sequencer_client: SequencerClient,
     pub config: IndexerConfig,
     pub store: IndexerStore,
 }
 
 impl IndexerCore {
     pub async fn new(config: IndexerConfig) -> Result<Self> {
-        let sequencer_client = SequencerClient::new_with_auth(
-            config.sequencer_client_config.addr.clone(),
-            config.sequencer_client_config.auth.clone(),
-        )?;
+        // ToDo: replace with correct startup
+        let hashable_data = HashableBlockData {
+            block_id: 1,
+            transactions: vec![],
+            prev_block_hash: HashType([0; 32]),
+            timestamp: 0,
+        };
 
-        let start_block = sequencer_client.get_genesis_block().await?;
+        let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
+        let channel_genesis_msg_id = [0; 32];
+        let start_block = hashable_data.into_pending_block(&signing_key, channel_genesis_msg_id);
 
         let initial_commitments: Vec<nssa_core::Commitment> = config
             .initial_commitments
@@ -66,7 +70,6 @@ impl IndexerCore {
                 config.bedrock_client_config.addr.clone(),
                 config.bedrock_client_config.auth.clone().map(Into::into),
             )?,
-            sequencer_client,
             config,
             // ToDo: Implement restarts
             store: IndexerStore::open_db_with_genesis(&home, Some((start_block, state)))?,

@@ -14,7 +14,6 @@ use super::rpc_primitives::requests::{
 };
 use crate::{
     HashType,
-    block::Block,
     config::BasicAuth,
     error::{SequencerClientError, SequencerRpcError},
     rpc_primitives::{
@@ -22,11 +21,10 @@ use crate::{
         requests::{
             GetAccountRequest, GetAccountResponse, GetAccountsNoncesRequest,
             GetAccountsNoncesResponse, GetBlockRangeDataRequest, GetBlockRangeDataResponse,
-            GetGenesisBlockRequest, GetGenesisBlockResponse, GetInitialTestnetAccountsResponse,
-            GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
-            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
-            GetTransactionByHashRequest, GetTransactionByHashResponse, SendTxRequest,
-            SendTxResponse,
+            GetInitialTestnetAccountsResponse, GetLastBlockRequest, GetLastBlockResponse,
+            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse, SendTxRequest, SendTxResponse,
         },
     },
     transaction::NSSATransaction,
@@ -271,24 +269,6 @@ impl SequencerClient {
         let resp_deser = serde_json::from_value(resp).unwrap();
 
         Ok(resp_deser)
-    }
-
-    /// Get genesis block from sequencer
-    ///
-    /// ToDo: Error handling
-    pub async fn get_genesis_block(&self) -> Result<Block, SequencerClientError> {
-        let genesis_req = GetGenesisBlockRequest {};
-
-        let req = serde_json::to_value(genesis_req).unwrap();
-
-        let resp = self
-            .call_method_with_payload("get_genesis_block", req)
-            .await
-            .unwrap();
-
-        let resp_deser = serde_json::from_value::<GetGenesisBlockResponse>(resp).unwrap();
-
-        Ok(borsh::from_slice(&resp_deser.genesis_block_borsh_ser).unwrap())
     }
 
     /// Get initial testnet accounts from sequencer

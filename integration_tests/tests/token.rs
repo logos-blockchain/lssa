@@ -639,7 +639,6 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
     };
 
     // Create token with both private definition and supply
-    let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_private_account_id(definition_account_id),
@@ -799,7 +798,6 @@ async fn shielded_token_transfer() -> Result<()> {
     };
 
     // Create token
-    let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_public_account_id(definition_account_id),
@@ -913,7 +911,6 @@ async fn deshielded_token_transfer() -> Result<()> {
     };
 
     // Create token with private supply
-    let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_public_account_id(definition_account_id),
@@ -1014,8 +1011,6 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
     };
 
     // Create token
-    let name = "A NAME".to_string();
-    let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_private_account_id(definition_account_id),
         supply_account_id: format_private_account_id(supply_account_id),

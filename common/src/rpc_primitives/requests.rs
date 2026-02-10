@@ -41,9 +41,6 @@ pub struct GetBlockRangeDataRequest {
 pub struct GetGenesisIdRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GetGenesisBlockRequest {}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct GetLastBlockRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -91,7 +88,6 @@ parse_request!(GetAccountsNoncesRequest);
 parse_request!(GetProofForCommitmentRequest);
 parse_request!(GetAccountRequest);
 parse_request!(GetProgramIdsRequest);
-parse_request!(GetGenesisBlockRequest);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloResponse {
@@ -178,11 +174,6 @@ mod base64_deser {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetGenesisIdResponse {
     pub genesis_id: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetGenesisBlockResponse {
-    pub genesis_block_borsh_ser: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

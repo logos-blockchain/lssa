@@ -12,12 +12,12 @@ use common::{
             GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
             GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
             GetBlockDataRequest, GetBlockDataResponse, GetBlockRangeDataRequest,
-            GetBlockRangeDataResponse, GetGenesisBlockRequest, GetGenesisBlockResponse,
-            GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest,
-            GetLastBlockRequest, GetLastBlockResponse, GetProgramIdsRequest, GetProgramIdsResponse,
-            GetProofForCommitmentRequest, GetProofForCommitmentResponse,
-            GetTransactionByHashRequest, GetTransactionByHashResponse, HelloRequest, HelloResponse,
-            SendTxRequest, SendTxResponse,
+            GetBlockRangeDataResponse, GetGenesisIdRequest, GetGenesisIdResponse,
+            GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
+            GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest,
+            SendTxResponse,
         },
     },
     transaction::{NSSATransaction, transaction_pre_check},
@@ -37,7 +37,6 @@ pub const SEND_TX: &str = "send_tx";
 pub const GET_BLOCK: &str = "get_block";
 pub const GET_BLOCK_RANGE: &str = "get_block_range";
 pub const GET_GENESIS: &str = "get_genesis";
-pub const GET_GENESIS_BLOCK: &str = "get_genesis_block";
 pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
 pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
@@ -160,25 +159,6 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         };
 
         let response = GetGenesisIdResponse { genesis_id };
-
-        respond(response)
-    }
-
-    async fn process_get_genesis_block(&self, request: Request) -> Result<Value, RpcErr> {
-        let _get_genesis_req = GetGenesisBlockRequest::parse(Some(request.params))?;
-
-        let genesis_block = {
-            let state = self.sequencer_state.lock().await;
-
-            let gen_id = state.block_store().genesis_id();
-
-            state.block_store().get_block_at_id(gen_id)?
-        };
-
-        let response = GetGenesisBlockResponse {
-            genesis_block_borsh_ser: borsh::to_vec(&genesis_block)
-                .expect("Block must serialize correctly"),
-        };
 
         respond(response)
     }
@@ -326,7 +306,6 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
             GET_BLOCK => self.process_get_block_data(request).await,
             GET_BLOCK_RANGE => self.process_get_block_range_data(request).await,
             GET_GENESIS => self.process_get_genesis(request).await,
-            GET_GENESIS_BLOCK => self.process_get_genesis_block(request).await,
             GET_LAST_BLOCK => self.process_get_last_block(request).await,
             GET_INITIAL_TESTNET_ACCOUNTS => self.get_initial_testnet_accounts(request).await,
             GET_ACCOUNT_BALANCE => self.process_get_account_balance(request).await,
