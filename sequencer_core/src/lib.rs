@@ -5,15 +5,15 @@ use anyhow::Result;
 use common::PINATA_BASE58;
 use common::{
     HashType,
-    block::HashableBlockData,
+    block::{BedrockStatus, Block, HashableBlockData, MantleMsgId},
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::SequencerConfig;
-use log::warn;
+use log::{info, warn};
 use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
 
-use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerBlockStore};
+use crate::{block_settlement_client::BlockSettlementClient, block_store::SequencerStore};
 
 mod block_settlement_client;
 pub mod block_store;
@@ -21,11 +21,12 @@ pub mod config;
 
 pub struct SequencerCore {
     state: nssa::V02State,
-    block_store: SequencerBlockStore,
+    store: SequencerStore,
     mempool: MemPool<EncodedTransaction>,
     sequencer_config: SequencerConfig,
     chain_height: u64,
     block_settlement_client: Option<BlockSettlementClient>,
+    last_bedrock_msg_id: MantleMsgId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -43,7 +44,11 @@ impl Display for TransactionMalformationError {
 impl std::error::Error for TransactionMalformationError {}
 
 impl SequencerCore {
-    /// Start Sequencer from configuration and construct transaction sender
+    /// Starts the sequencer using the provided configuration.
+    /// If an existing database is found, the sequencer state is loaded from it and
+    /// assumed to represent the correct latest state consistent with Bedrock-finalized data.
+    /// If no database is found, the sequencer performs a fresh start from genesis,
+    /// initializing its state with the accounts defined in the configuration file.
     pub fn start_from_config(config: SequencerConfig) -> (Self, MemPoolHandle<EncodedTransaction>) {
         let hashable_data = HashableBlockData {
             block_id: config.genesis_id,
@@ -53,37 +58,51 @@ impl SequencerCore {
         };
 
         let signing_key = nssa::PrivateKey::try_new(config.signing_key).unwrap();
-        let genesis_block = hashable_data.into_pending_block(&signing_key);
+        let channel_genesis_msg_id = [0; 32];
+        let genesis_block = hashable_data.into_pending_block(&signing_key, channel_genesis_msg_id);
 
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
-        let block_store = SequencerBlockStore::open_db_with_genesis(
+        let store = SequencerStore::open_db_with_genesis(
             &config.home.join("rocksdb"),
             Some(genesis_block),
             signing_key,
         )
         .unwrap();
-        let mut initial_commitments = vec![];
 
-        for init_comm_data in config.initial_commitments.clone() {
-            let npk = init_comm_data.npk;
+        let mut state = match store.get_nssa_state() {
+            Some(state) => {
+                info!("Found local database. Loading state and pending blocks from it.");
+                state
+            }
+            None => {
+                info!(
+                    "No database found when starting the sequencer. Creating a fresh new with the initial data in config"
+                );
+                let initial_commitments: Vec<nssa_core::Commitment> = config
+                    .initial_commitments
+                    .iter()
+                    .map(|init_comm_data| {
+                        let npk = &init_comm_data.npk;
 
-            let mut acc = init_comm_data.account;
+                        let mut acc = init_comm_data.account.clone();
 
-            acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
+                        acc.program_owner =
+                            nssa::program::Program::authenticated_transfer_program().id();
 
-            let comm = nssa_core::Commitment::new(&npk, &acc);
+                        nssa_core::Commitment::new(npk, &acc)
+                    })
+                    .collect();
 
-            initial_commitments.push(comm);
-        }
+                let init_accs: Vec<(nssa::AccountId, u128)> = config
+                    .initial_accounts
+                    .iter()
+                    .map(|acc_data| (acc_data.account_id.parse().unwrap(), acc_data.balance))
+                    .collect();
 
-        let init_accs: Vec<(nssa::AccountId, u128)> = config
-            .initial_accounts
-            .iter()
-            .map(|acc_data| (acc_data.account_id.parse().unwrap(), acc_data.balance))
-            .collect();
-
-        let mut state = nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments);
+                nssa::V02State::new_with_genesis_accounts(&init_accs, &initial_commitments)
+            }
+        };
 
         #[cfg(feature = "testnet")]
         state.add_pinata_program(PINATA_BASE58.parse().unwrap());
@@ -94,37 +113,17 @@ impl SequencerCore {
                 .expect("Block settlement client should be constructible")
         });
 
-        let mut this = Self {
+        let sequencer_core = Self {
             state,
-            block_store,
+            store,
             mempool,
             chain_height: config.genesis_id,
             sequencer_config: config,
             block_settlement_client,
+            last_bedrock_msg_id: channel_genesis_msg_id,
         };
 
-        this.sync_state_with_stored_blocks();
-
-        (this, mempool_handle)
-    }
-
-    /// If there are stored blocks ahead of the current height, this method will load and process
-    /// all transaction in them in the order they are stored. The NSSA state will be updated
-    /// accordingly.
-    fn sync_state_with_stored_blocks(&mut self) {
-        let mut next_block_id = self.sequencer_config.genesis_id + 1;
-        while let Ok(block) = self.block_store.get_block_at_id(next_block_id) {
-            for encoded_transaction in block.body.transactions {
-                let transaction = NSSATransaction::try_from(&encoded_transaction).unwrap();
-                // Process transaction and update state
-                self.execute_check_transaction_on_state(transaction)
-                    .unwrap();
-                // Update the tx hash to block id map.
-                self.block_store.insert(&encoded_transaction, next_block_id);
-            }
-            self.chain_height = next_block_id;
-            next_block_id += 1;
-        }
+        (sequencer_core, mempool_handle)
     }
 
     fn execute_check_transaction_on_state(
@@ -148,8 +147,11 @@ impl SequencerCore {
     pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
         let block_data = self.produce_new_block_with_mempool_transactions()?;
 
-        if let Some(block_settlement) = self.block_settlement_client.as_mut() {
-            block_settlement.post_and_wait(&block_data).await?;
+        if let Some(client) = self.block_settlement_client.as_mut() {
+            let block =
+                block_data.into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
+            let msg_id = client.submit_block_to_bedrock(&block).await?;
+            self.last_bedrock_msg_id = msg_id.into();
             log::info!("Posted block data to Bedrock");
         }
 
@@ -179,11 +181,7 @@ impl SequencerCore {
             }
         }
 
-        let prev_block_hash = self
-            .block_store
-            .get_block_at_id(self.chain_height)?
-            .header
-            .hash;
+        let prev_block_hash = self.store.get_block_at_id(self.chain_height)?.header.hash;
 
         let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
@@ -196,9 +194,9 @@ impl SequencerCore {
 
         let block = hashable_data
             .clone()
-            .into_pending_block(self.block_store.signing_key());
+            .into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
 
-        self.block_store.put_block_at_id(block)?;
+        self.store.update(block, &self.state)?;
 
         self.chain_height = new_block_height;
 
@@ -224,8 +222,8 @@ impl SequencerCore {
         &self.state
     }
 
-    pub fn block_store(&self) -> &SequencerBlockStore {
-        &self.block_store
+    pub fn block_store(&self) -> &SequencerStore {
+        &self.store
     }
 
     pub fn chain_height(&self) -> u64 {
@@ -234,6 +232,39 @@ impl SequencerCore {
 
     pub fn sequencer_config(&self) -> &SequencerConfig {
         &self.sequencer_config
+    }
+
+    /// Deletes finalized blocks from the sequencer's pending block list.
+    /// This method must be called when new blocks are finalized on Bedrock.
+    /// All pending blocks with an ID less than or equal to `last_finalized_block_id`
+    /// are removed from the database.
+    pub fn clean_finalized_blocks_from_db(&mut self, last_finalized_block_id: u64) -> Result<()> {
+        if let Some(first_pending_block_id) = self
+            .get_pending_blocks()?
+            .iter()
+            .map(|block| block.header.block_id)
+            .min()
+        {
+            (first_pending_block_id..=last_finalized_block_id)
+                .try_for_each(|id| self.store.delete_block_at_id(id))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Returns the list of stored pending blocks.
+    pub fn get_pending_blocks(&self) -> Result<Vec<Block>> {
+        Ok(self
+            .store
+            .get_all_blocks()
+            .collect::<Result<Vec<Block>>>()?
+            .into_iter()
+            .filter(|block| matches!(block.bedrock_status, BedrockStatus::Pending))
+            .collect())
+    }
+
+    pub fn block_settlement_client(&self) -> Option<BlockSettlementClient> {
+        self.block_settlement_client.clone()
     }
 }
 
@@ -297,6 +328,7 @@ mod tests {
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
             bedrock_config: None,
+            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
         }
     }
 
@@ -680,10 +712,7 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap()
             .block_id;
-        let block = sequencer
-            .block_store
-            .get_block_at_id(current_height)
-            .unwrap();
+        let block = sequencer.store.get_block_at_id(current_height).unwrap();
 
         // Only one should be included in the block
         assert_eq!(block.body.transactions, vec![tx.clone()]);
@@ -720,10 +749,7 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap()
             .block_id;
-        let block = sequencer
-            .block_store
-            .get_block_at_id(current_height)
-            .unwrap();
+        let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert_eq!(block.body.transactions, vec![tx.clone()]);
 
         // Add same transaction should fail
@@ -732,10 +758,7 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap()
             .block_id;
-        let block = sequencer
-            .block_store
-            .get_block_at_id(current_height)
-            .unwrap();
+        let block = sequencer.store.get_block_at_id(current_height).unwrap();
         assert!(block.body.transactions.is_empty());
     }
 
@@ -768,10 +791,7 @@ mod tests {
                 .produce_new_block_with_mempool_transactions()
                 .unwrap()
                 .block_id;
-            let block = sequencer
-                .block_store
-                .get_block_at_id(current_height)
-                .unwrap();
+            let block = sequencer.store.get_block_at_id(current_height).unwrap();
             assert_eq!(block.body.transactions, vec![tx.clone()]);
         }
 
@@ -790,5 +810,43 @@ mod tests {
             balance_acc_2,
             config.initial_accounts[1].balance + balance_to_move
         );
+    }
+
+    #[test]
+    fn test_get_pending_blocks() {
+        let config = setup_sequencer_config();
+        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config);
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn test_delete_blocks() {
+        let config = setup_sequencer_config();
+        let (mut sequencer, _mempool_handle) = SequencerCore::start_from_config(config);
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+
+        let last_finalized_block = 3;
+        sequencer
+            .clean_finalized_blocks_from_db(last_finalized_block)
+            .unwrap();
+
+        assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 1);
     }
 }

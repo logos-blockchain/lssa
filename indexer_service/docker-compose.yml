@@ -1,0 +1,9 @@
+services:
+  indexer_service:
+    image: lssa/indexer_service
+    build:
+      context: ..
+      dockerfile: indexer_service/Dockerfile
+    container_name: indexer_service
+    ports:
+      - "8779:8779"

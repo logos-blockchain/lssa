@@ -1,17 +1,26 @@
+[workspace.package]
+license = "MIT or Apache-2.0"
+
 [workspace]
 resolver = "3"
 members = [
   "integration_tests",
-  "sequencer_runner",
   "storage",
   "key_protocol",
-  "sequencer_rpc",
   "mempool",
   "wallet",
-  "sequencer_core",
+  "wallet-ffi",
   "common",
   "nssa",
   "nssa/core",
+  "sequencer_core",
+  "sequencer_rpc",
+  "sequencer_runner",
+  "indexer_service",
+  "indexer_service/protocol",
+  "indexer_service/rpc",
+  "programs/token/core",
+  "programs/token",
   "program_methods",
   "program_methods/guest",
   "test_program_methods",
@@ -20,6 +29,7 @@ members = [
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
   "bedrock_client",
+  "indexer_core",
 ]
 
 [workspace.dependencies]
@@ -32,9 +42,16 @@ key_protocol = { path = "key_protocol" }
 sequencer_core = { path = "sequencer_core" }
 sequencer_rpc = { path = "sequencer_rpc" }
 sequencer_runner = { path = "sequencer_runner" }
+indexer_service = { path = "indexer_service" }
+indexer_service_protocol = { path = "indexer_service/protocol" }
+indexer_service_rpc = { path = "indexer_service/rpc" }
 wallet = { path = "wallet" }
+wallet-ffi = { path = "wallet-ffi" }
+token_core = { path = "programs/token/core" }
+token_program = { path = "programs/token" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
+indexer_core = { path = "indexer_core" }
 
 tokio = { version = "1.28.2", features = [
   "net",
@@ -42,6 +59,7 @@ tokio = { version = "1.28.2", features = [
   "sync",
   "fs",
 ] }
+tokio-util = "0.7.18"
 risc0-zkvm = { version = "3.0.3", features = ['std'] }
 risc0-build = "3.0.3"
 anyhow = "1.0.98"
@@ -52,6 +70,7 @@ serde = { version = "1.0.60", default-features = false, features = ["derive"] }
 serde_json = "1.0.81"
 actix = "0.13.0"
 actix-cors = "0.6.1"
+jsonrpsee = "0.26.0"
 futures = "0.3"
 actix-rt = "*"
 lazy_static = "1.5.0"
@@ -77,11 +96,14 @@ chrono = "0.4.41"
 borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
-url = "2.5.4"
+url = { version = "2.5.4", features = ["serde"] }
+tokio-retry = "0.3.0"
+schemars = "1.2.0"
 
 logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-chain-broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",

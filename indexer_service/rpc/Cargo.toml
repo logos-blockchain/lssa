@@ -1,0 +1,16 @@
+[package]
+name = "indexer_service_rpc"
+version = "0.1.0"
+edition = "2024"
+license = { workspace = true }
+
+[dependencies]
+indexer_service_protocol = { workspace = true }
+
+jsonrpsee = { workspace = true, features = ["macros"] }
+serde_json.workspace = true
+schemars.workspace = true
+
+[features]
+client = ["jsonrpsee/client"]
+server = ["jsonrpsee/server"]

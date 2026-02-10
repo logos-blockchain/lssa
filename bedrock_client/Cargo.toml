@@ -2,9 +2,15 @@
 name = "bedrock_client"
 version = "0.1.0"
 edition = "2024"
+license = { workspace = true }
 
 [dependencies]
 reqwest.workspace = true
 anyhow.workspace = true
+tokio-retry.workspace = true
+futures.workspace = true
+log.workspace = true
+serde.workspace = true
 logos-blockchain-common-http-client.workspace = true
 logos-blockchain-core.workspace = true
+logos-blockchain-chain-broadcast-service.workspace = true

@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256, digest::FixedOutput};
 use crate::transaction::EncodedTransaction;
 
 pub type HashType = [u8; 32];
+pub type MantleMsgId = [u8; 32];
 
 #[derive(Debug, Clone)]
 /// Our own hasher.
@@ -49,6 +50,7 @@ pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,
     pub bedrock_status: BedrockStatus,
+    pub bedrock_parent_id: MantleMsgId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -60,7 +62,11 @@ pub struct HashableBlockData {
 }
 
 impl HashableBlockData {
-    pub fn into_pending_block(self, signing_key: &nssa::PrivateKey) -> Block {
+    pub fn into_pending_block(
+        self,
+        signing_key: &nssa::PrivateKey,
+        bedrock_parent_id: MantleMsgId,
+    ) -> Block {
         let data_bytes = borsh::to_vec(&self).unwrap();
         let signature = nssa::Signature::new(signing_key, &data_bytes);
         let hash = OwnHasher::hash(&data_bytes);
@@ -76,7 +82,12 @@ impl HashableBlockData {
                 transactions: self.transactions,
             },
             bedrock_status: BedrockStatus::Pending,
+            bedrock_parent_id,
         }
+    }
+
+    pub fn block_hash(&self) -> BlockHash {
+        OwnHasher::hash(&borsh::to_vec(&self).unwrap())
     }
 }
 

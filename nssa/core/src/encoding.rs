@@ -70,6 +70,11 @@ impl Commitment {
     }
 
     #[cfg(feature = "host")]
+    pub fn from_byte_array(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    #[cfg(feature = "host")]
     pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
         let mut bytes = [0u8; 32];
         cursor.read_exact(&mut bytes)?;
@@ -89,6 +94,11 @@ impl Nullifier {
         self.0
     }
 
+    #[cfg(feature = "host")]
+    pub fn from_byte_array(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
     pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
         let mut bytes = [0u8; 32];
         cursor.read_exact(&mut bytes)?;
@@ -104,6 +114,16 @@ impl Ciphertext {
         bytes.extend_from_slice(&self.0);
 
         bytes
+    }
+
+    #[cfg(feature = "host")]
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
+
+    #[cfg(feature = "host")]
+    pub fn from_inner(inner: Vec<u8>) -> Self {
+        Self(inner)
     }
 
     #[cfg(feature = "host")]

@@ -1,8 +1,8 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, str::FromStr};
 
 use anyhow::{Context, Result, anyhow};
 use bedrock_client::BedrockClient;
-use common::block::HashableBlockData;
+use common::block::Block;
 use logos_blockchain_core::mantle::{
     MantleTx, Op, OpProof, SignedMantleTx, Transaction, TxHash, ledger,
     ops::channel::{ChannelId, MsgId, inscribe::InscriptionOp},
@@ -10,43 +10,44 @@ use logos_blockchain_core::mantle::{
 use logos_blockchain_key_management_system_service::keys::{
     ED25519_SECRET_KEY_SIZE, Ed25519Key, Ed25519PublicKey,
 };
+use reqwest::Url;
 
 use crate::config::BedrockConfig;
 
 /// A component that posts block data to logos blockchain
+#[derive(Clone)]
 pub struct BlockSettlementClient {
     bedrock_client: BedrockClient,
     bedrock_signing_key: Ed25519Key,
     bedrock_channel_id: ChannelId,
-    last_message_id: MsgId,
 }
 
 impl BlockSettlementClient {
     pub fn try_new(home: &Path, config: &BedrockConfig) -> Result<Self> {
         let bedrock_signing_key = load_or_create_signing_key(&home.join("bedrock_signing_key"))
             .context("Failed to load or create signing key")?;
-        let bedrock_channel_id = ChannelId::from(config.channel_id);
-        let bedrock_client = BedrockClient::new(None, config.node_url.clone())
-            .context("Failed to initialize bedrock client")?;
-        let channel_genesis_msg = MsgId::from([0; 32]);
+        let bedrock_url = Url::from_str(config.node_url.as_ref())
+            .context("Bedrock node address is not a valid url")?;
+        let bedrock_client =
+            BedrockClient::new(None, bedrock_url).context("Failed to initialize bedrock client")?;
         Ok(Self {
             bedrock_client,
             bedrock_signing_key,
-            bedrock_channel_id,
-            last_message_id: channel_genesis_msg,
+            bedrock_channel_id: config.channel_id,
         })
     }
 
     /// Create and sign a transaction for inscribing data
-    pub fn create_inscribe_tx(&self, data: Vec<u8>) -> (SignedMantleTx, MsgId) {
+    pub fn create_inscribe_tx(&self, block: &Block) -> Result<(SignedMantleTx, MsgId)> {
+        let inscription_data = borsh::to_vec(block)?;
         let verifying_key_bytes = self.bedrock_signing_key.public_key().to_bytes();
         let verifying_key =
             Ed25519PublicKey::from_bytes(&verifying_key_bytes).expect("valid ed25519 public key");
 
         let inscribe_op = InscriptionOp {
             channel_id: self.bedrock_channel_id,
-            inscription: data,
-            parent: self.last_message_id,
+            inscription: inscription_data,
+            parent: block.bedrock_parent_id.into(),
             signer: verifying_key,
         };
         let inscribe_op_id = inscribe_op.id();
@@ -76,20 +77,17 @@ impl BlockSettlementClient {
             ledger_tx_proof: empty_ledger_signature(&tx_hash),
             mantle_tx: inscribe_tx,
         };
-        (signed_mantle_tx, inscribe_op_id)
+        Ok((signed_mantle_tx, inscribe_op_id))
     }
 
-    /// Post a transaction to the node and wait for inclusion
-    pub async fn post_and_wait(&mut self, block_data: &HashableBlockData) -> Result<u64> {
-        let inscription_data = borsh::to_vec(&block_data)?;
-        let (tx, new_msg_id) = self.create_inscribe_tx(inscription_data);
+    /// Post a transaction to the node
+    pub async fn submit_block_to_bedrock(&self, block: &Block) -> Result<MsgId> {
+        let (tx, new_msg_id) = self.create_inscribe_tx(block)?;
 
         // Post the transaction
         self.bedrock_client.post_transaction(tx).await?;
 
-        self.last_message_id = new_msg_id;
-
-        Ok(block_data.block_id)
+        Ok(new_msg_id)
     }
 }
 
