@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct SearchResults {
     pub blocks: Vec<Block>,
     pub transactions: Vec<Transaction>,
-    pub accounts: Vec<(AccountId, Account)>,
+    pub accounts: Vec<(AccountId, Option<Account>)>,
 }
 
 /// RPC client type
@@ -60,8 +60,14 @@ pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
 
         // Try as account ID
         let account_id = AccountId { value: hash_array };
-        if let Ok(account) = client.get_account(account_id).await {
-            accounts.push((account_id, account));
+        match client.get_account(account_id).await {
+            Ok(account) => {
+                accounts.push((account_id, Some(account)));
+            }
+            Err(_) => {
+                // Account might not exist yet, still add it to results
+                accounts.push((account_id, None));
+            }
         }
     }
 
