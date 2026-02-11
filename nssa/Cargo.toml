@@ -16,7 +16,6 @@ borsh.workspace = true
 hex.workspace = true
 secp256k1 = "0.31.1"
 risc0-binfmt = "3.0.2"
-bytemuck = "1.24.0"
 log.workspace = true
 
 [build-dependencies]

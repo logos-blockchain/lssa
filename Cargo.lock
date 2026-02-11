@@ -4828,7 +4828,6 @@ version = "0.1.0"
 dependencies = [
  "amm_core",
  "borsh",
- "bytemuck",
  "env_logger",
  "hex",
  "hex-literal 1.1.0",
@@ -4843,7 +4842,6 @@ dependencies = [
  "sha2",
  "test-case",
  "test_program_methods",
- "token_core",
  "thiserror 2.0.17",
  "token_core",
 ]
@@ -7796,7 +7794,6 @@ dependencies = [
  "nssa_core",
  "optfield",
  "rand 0.8.5",
- "risc0-zkvm",
  "serde",
  "serde_json",
  "sha2",
