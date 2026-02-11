@@ -73,7 +73,7 @@ pub unsafe extern "C" fn wallet_ffi_get_public_account_key(
 
 /// Get keys for a private account.
 ///
-/// Returns the nullifier public key (NPK) and incoming viewing public key (IPK)
+/// Returns the nullifier public key (NPK) and viewing public key (VPK)
 /// for the specified private account. These keys are safe to share publicly.
 ///
 /// # Parameters
@@ -130,17 +130,17 @@ pub unsafe extern "C" fn wallet_ffi_get_private_account_keys(
     // NPK is a 32-byte array
     let npk_bytes = key_chain.nullifer_public_key.0;
 
-    // IPK is a compressed secp256k1 point (33 bytes)
-    let ipk_bytes = key_chain.incoming_viewing_public_key.to_bytes();
-    let ipk_len = ipk_bytes.len();
-    let ipk_vec = ipk_bytes.to_vec();
-    let ipk_boxed = ipk_vec.into_boxed_slice();
-    let ipk_ptr = Box::into_raw(ipk_boxed) as *const u8;
+    // VPK is a compressed secp256k1 point (33 bytes)
+    let vpk_bytes = key_chain.viewing_public_key.to_bytes();
+    let vpk_len = vpk_bytes.len();
+    let vpk_vec = vpk_bytes.to_vec();
+    let vpk_boxed = vpk_vec.into_boxed_slice();
+    let vpk_ptr = Box::into_raw(vpk_boxed) as *const u8;
 
     unsafe {
         (*out_keys).nullifier_public_key.data = npk_bytes;
-        (*out_keys).incoming_viewing_public_key = ipk_ptr;
-        (*out_keys).incoming_viewing_public_key_len = ipk_len;
+        (*out_keys).viewing_public_key = vpk_ptr;
+        (*out_keys).viewing_public_key_len = vpk_len;
     }
 
     WalletFfiError::Success
@@ -159,10 +159,10 @@ pub unsafe extern "C" fn wallet_ffi_free_private_account_keys(keys: *mut FfiPriv
 
     unsafe {
         let keys = &*keys;
-        if !keys.incoming_viewing_public_key.is_null() && keys.incoming_viewing_public_key_len > 0 {
+        if !keys.viewing_public_key.is_null() && keys.viewing_public_key_len > 0 {
             let slice = std::slice::from_raw_parts_mut(
-                keys.incoming_viewing_public_key as *mut u8,
-                keys.incoming_viewing_public_key_len,
+                keys.viewing_public_key as *mut u8,
+                keys.viewing_public_key_len,
             );
             drop(Box::from_raw(slice as *mut [u8]));
         }

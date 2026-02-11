@@ -1,6 +1,6 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::{AccountId, program::Program};
-use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::IncomingViewingPublicKey};
+use nssa_core::{NullifierPublicKey, SharedSecretKey, encryption::ViewingPublicKey};
 use token_core::Instruction;
 
 use crate::{PrivacyPreservingAccount, WalletCore};

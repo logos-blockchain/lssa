@@ -72,18 +72,18 @@ impl Default for FfiAccount {
 pub struct FfiPrivateAccountKeys {
     /// Nullifier public key (32 bytes)
     pub nullifier_public_key: FfiBytes32,
-    /// Incoming viewing public key (compressed secp256k1 point)
-    pub incoming_viewing_public_key: *const u8,
-    /// Length of incoming viewing public key (typically 33 bytes)
-    pub incoming_viewing_public_key_len: usize,
+    /// viewing public key (compressed secp256k1 point)
+    pub viewing_public_key: *const u8,
+    /// Length of viewing public key (typically 33 bytes)
+    pub viewing_public_key_len: usize,
 }
 
 impl Default for FfiPrivateAccountKeys {
     fn default() -> Self {
         Self {
             nullifier_public_key: FfiBytes32::default(),
-            incoming_viewing_public_key: std::ptr::null(),
-            incoming_viewing_public_key_len: 0,
+            viewing_public_key: std::ptr::null(),
+            viewing_public_key_len: 0,
         }
     }
 }
@@ -156,12 +156,12 @@ impl FfiPrivateAccountKeys {
         nssa_core::NullifierPublicKey(self.nullifier_public_key.data)
     }
 
-    pub fn ivk(&self) -> Result<nssa_core::encryption::IncomingViewingPublicKey, WalletFfiError> {
-        if self.incoming_viewing_public_key_len == 33 {
+    pub fn ivk(&self) -> Result<nssa_core::encryption::ViewingPublicKey, WalletFfiError> {
+        if self.viewing_public_key_len == 33 {
             let slice = unsafe {
                 slice::from_raw_parts(
-                    self.incoming_viewing_public_key,
-                    self.incoming_viewing_public_key_len,
+                    self.viewing_public_key,
+                    self.viewing_public_key_len,
                 )
             };
             Ok(Secp256k1Point(slice.to_vec()))
