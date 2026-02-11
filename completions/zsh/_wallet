@@ -150,10 +150,11 @@ _wallet_account() {
         subcommand)
             subcommands=(
                 'get:Get account data'
-                'list:List all accounts'
+                'list:List all accounts owned by the wallet'
                 'ls:List all accounts (alias for list)'
                 'new:Produce new public or private account'
                 'sync-private:Sync private accounts'
+                'label:Set a label for an account'
                 'help:Print this message or the help of the given subcommand(s)'
             )
             _describe -t subcommands 'account subcommands' subcommands
@@ -183,6 +184,11 @@ _wallet_account() {
                                 '--cci[Chain index of a parent node]:chain_index:'
                             ;;
                     esac
+                    ;;
+                label)
+                    _arguments \
+                        '(-a --account-id)'{-a,--account-id}'[Account ID to label]:account_id:_wallet_account_ids' \
+                        '(-l --label)'{-l,--label}'[The label to assign to the account]:label:'
                     ;;
             esac
             ;;

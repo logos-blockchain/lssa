@@ -6,14 +6,15 @@
     "max_num_tx_in_block": 20,
     "mempool_max_size": 10000,
     "block_create_timeout_millis": 10000,
+    "retry_pending_blocks_timeout_millis": 240000,
     "port": 0,
     "initial_accounts": [
         {
-            "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+            "account_id": "6iArKUXxhUJqS7kCaPNhwMWt3ro71PDyBj7jwAyE2VQV",
             "balance": 10000
         },
         {
-            "account_id": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+            "account_id": "7wHg9sbJwc6h3NP1S9bekfAzB8CHifEcxKswCKUt3YQo",
             "balance": 20000
         }
     ],

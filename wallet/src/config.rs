@@ -1,10 +1,11 @@
 use std::{
+    collections::HashMap,
     io::{BufReader, Write as _},
     path::Path,
-    str::FromStr,
 };
 
 use anyhow::{Context as _, Result};
+use common::sequencer_client::BasicAuth;
 use key_protocol::key_management::{
     KeyChain,
     key_tree::{
@@ -13,49 +14,6 @@ use key_protocol::key_management::{
 };
 use log::warn;
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicAuth {
-    pub username: String,
-    pub password: Option<String>,
-}
-
-impl std::fmt::Display for BasicAuth {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.username)?;
-        if let Some(password) = &self.password {
-            write!(f, ":{password}")?;
-        }
-
-        Ok(())
-    }
-}
-
-impl FromStr for BasicAuth {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parse = || {
-            let mut parts = s.splitn(2, ':');
-            let username = parts.next()?;
-            let password = parts.next().filter(|p| !p.is_empty());
-            if parts.next().is_some() {
-                return None;
-            }
-
-            Some((username, password))
-        };
-
-        let (username, password) = parse().ok_or_else(|| {
-            anyhow::anyhow!("Invalid auth format. Expected 'user' or 'user:password'")
-        })?;
-
-        Ok(Self {
-            username: username.to_string(),
-            password: password.map(|p| p.to_string()),
-        })
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPublic {
@@ -105,10 +63,30 @@ pub enum PersistentAccountData {
     Preconfigured(InitialAccountData),
 }
 
+/// A human-readable label for an account.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Label(String);
+
+impl Label {
+    pub fn new(label: String) -> Self {
+        Self(label)
+    }
+}
+
+impl std::fmt::Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistentStorage {
     pub accounts: Vec<PersistentAccountData>,
     pub last_synced_block: u64,
+    /// Account labels keyed by account ID string (e.g.,
+    /// "2rnKprXqWGWJTkDZKsQbFXa4ctKRbapsdoTKQFnaVGG8")
+    #[serde(default)]
+    pub labels: HashMap<String, Label>,
 }
 
 impl PersistentStorage {
@@ -197,7 +175,7 @@ pub struct GasConfig {
     pub gas_limit_runtime: u64,
 }
 
-#[optfield::optfield(pub WalletConfigOverrides, rewrap, attrs = (derive(Debug, Default)))]
+#[optfield::optfield(pub WalletConfigOverrides, rewrap, attrs = (derive(Debug, Default, Clone)))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletConfig {
     /// Override rust log (env var logging level)
@@ -235,7 +213,7 @@ impl Default for WalletConfig {
                 [
         {
             "Public": {
-                "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+                "account_id": "6iArKUXxhUJqS7kCaPNhwMWt3ro71PDyBj7jwAyE2VQV",
                 "pub_sign_key": [
                     16,
                     162,
@@ -274,7 +252,7 @@ impl Default for WalletConfig {
         },
         {
             "Public": {
-                "account_id": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+                "account_id": "7wHg9sbJwc6h3NP1S9bekfAzB8CHifEcxKswCKUt3YQo",
                 "pub_sign_key": [
                     113,
                     121,

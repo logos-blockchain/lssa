@@ -56,6 +56,19 @@ jobs:
       - name: Check for unused dependencies
         run: cargo machete
 
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny
+
+      - name: Check licenses and advisories
+        run: cargo deny check
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -69,6 +82,10 @@ jobs:
       - uses: ./.github/actions/install-system-deps
 
       - uses: ./.github/actions/install-risc0
+
+      - uses: ./.github/actions/install-logos-blockchain-circuits
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install active toolchain
         run: rustup install
@@ -95,6 +112,10 @@ jobs:
 
       - uses: ./.github/actions/install-risc0
 
+      - uses: ./.github/actions/install-logos-blockchain-circuits
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install active toolchain
         run: rustup install
 
@@ -118,6 +139,10 @@ jobs:
       - uses: ./.github/actions/install-system-deps
 
       - uses: ./.github/actions/install-risc0
+
+      - uses: ./.github/actions/install-logos-blockchain-circuits
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install active toolchain
         run: rustup install

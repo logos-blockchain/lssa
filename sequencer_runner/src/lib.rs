@@ -4,7 +4,7 @@ use actix_web::dev::ServerHandle;
 use anyhow::Result;
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
-use log::info;
+use log::{info, warn};
 use sequencer_core::{SequencerCore, config::SequencerConfig};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -20,8 +20,14 @@ struct Args {
 
 pub async fn startup_sequencer(
     app_config: SequencerConfig,
-) -> Result<(ServerHandle, SocketAddr, JoinHandle<Result<()>>)> {
+) -> Result<(
+    ServerHandle,
+    SocketAddr,
+    JoinHandle<Result<()>>,
+    JoinHandle<Result<()>>,
+)> {
     let block_timeout = app_config.block_create_timeout_millis;
+    let retry_pending_blocks_timeout = app_config.retry_pending_blocks_timeout_millis;
     let port = app_config.port;
 
     let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config);
@@ -39,8 +45,41 @@ pub async fn startup_sequencer(
     let http_server_handle = http_server.handle();
     tokio::spawn(http_server);
 
-    info!("Starting main sequencer loop");
+    info!("Starting pending block retry loop");
+    let seq_core_wrapped_for_block_retry = seq_core_wrapped.clone();
+    let retry_pending_blocks_handle = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(
+                retry_pending_blocks_timeout,
+            ))
+            .await;
 
+            let (pending_blocks, block_settlement_client) = {
+                let sequencer_core = seq_core_wrapped_for_block_retry.lock().await;
+                let client = sequencer_core.block_settlement_client();
+                let pending_blocks = sequencer_core
+                    .get_pending_blocks()
+                    .expect("Sequencer should be able to retrieve pending blocks");
+                (pending_blocks, client)
+            };
+
+            let Some(client) = block_settlement_client else {
+                continue;
+            };
+
+            info!("Resubmitting {} pending blocks", pending_blocks.len());
+            for block in &pending_blocks {
+                if let Err(e) = client.submit_block_to_bedrock(block).await {
+                    warn!(
+                        "Failed to resubmit block with id {} with error {}",
+                        block.header.block_id, e
+                    );
+                }
+            }
+        }
+    });
+
+    info!("Starting main sequencer loop");
     let main_loop_handle = tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(block_timeout)).await;
@@ -61,7 +100,12 @@ pub async fn startup_sequencer(
         }
     });
 
-    Ok((http_server_handle, addr, main_loop_handle))
+    Ok((
+        http_server_handle,
+        addr,
+        main_loop_handle,
+        retry_pending_blocks_handle,
+    ))
 }
 
 pub async fn main_runner() -> Result<()> {
@@ -81,9 +125,26 @@ pub async fn main_runner() -> Result<()> {
     }
 
     // ToDo: Add restart on failures
-    let (_, _, main_loop_handle) = startup_sequencer(app_config).await?;
+    let (_, _, main_loop_handle, retry_loop_handle) = startup_sequencer(app_config).await?;
 
-    main_loop_handle.await??;
+    info!("Sequencer running. Monitoring concurrent tasks...");
+
+    tokio::select! {
+        res = main_loop_handle => {
+            match res {
+                Ok(inner_res) => warn!("Main loop exited unexpectedly: {:?}", inner_res),
+                Err(e) => warn!("Main loop task panicked: {:?}", e),
+            }
+        }
+        res = retry_loop_handle => {
+            match res {
+                Ok(inner_res) => warn!("Retry loop exited unexpectedly: {:?}", inner_res),
+                Err(e) => warn!("Retry loop task panicked: {:?}", e),
+            }
+        }
+    }
+
+    info!("Shutting down sequencer...");
 
     Ok(())
 }

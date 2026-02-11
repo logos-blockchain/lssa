@@ -1,0 +1,102 @@
+use leptos::prelude::*;
+use leptos_meta::{Meta, Stylesheet, Title, provide_meta_context};
+use leptos_router::{
+    ParamSegment, StaticSegment,
+    components::{Route, Router, Routes},
+};
+use pages::{AccountPage, BlockPage, MainPage, TransactionPage};
+
+pub mod api;
+mod components;
+mod format_utils;
+mod pages;
+
+/// Main application component with routing setup.
+///
+/// # Routes
+///
+/// - `/` - Main page with search and recent blocks
+/// - `/block/:id` - Block detail page (`:id` is the numeric block ID)
+/// - `/transaction/:hash` - Transaction detail page (`:hash` is the hex-encoded transaction hash)
+/// - `/account/:id` - Account detail page (`:id` is the hex-encoded account ID)
+///
+/// All other routes will show a 404 Not Found page.
+#[component]
+pub fn App() -> impl IntoView {
+    // Provides context that manages stylesheets, titles, meta tags, etc.
+    provide_meta_context();
+
+    view! {
+        <Stylesheet id="leptos" href="/explorer.css" />
+        <Title text="LEE Blockchain Explorer" />
+        <Meta name="description" content="Explore the blockchain - view blocks, transactions, and accounts" />
+
+        <Router>
+            <div class="app">
+                <header class="app-header">
+                    <nav class="app-nav">
+                        <a href="/" class="nav-logo">
+                            "LEE Blockchain Explorer"
+                        </a>
+                    </nav>
+                </header>
+
+                <main class="app-main">
+                    // Route definitions:
+                    // - MainPage: Home with search and recent blocks
+                    // - BlockPage: Detailed block view with all transactions
+                    // - TransactionPage: Detailed transaction view
+                    // - AccountPage: Account state and transaction history
+                    <Routes fallback=|| view! { <NotFound /> }>
+                        // Main page - search and recent blocks
+                        <Route path=StaticSegment("") view=MainPage />
+
+                        // Block detail page - /block/123
+                        <Route path=(StaticSegment("block"), ParamSegment("id")) view=BlockPage />
+
+                        // Transaction detail page - /transaction/0abc123...
+                        <Route
+                            path=(StaticSegment("transaction"), ParamSegment("hash"))
+                            view=TransactionPage
+                        />
+
+                        // Account detail page - /account/0def456...
+                        <Route
+                            path=(StaticSegment("account"), ParamSegment("id"))
+                            view=AccountPage
+                        />
+                    </Routes>
+                </main>
+
+                <footer class="app-footer">
+                    <p>"LEE Blockchain Explorer © 2026"</p>
+                </footer>
+            </div>
+        </Router>
+    }
+}
+
+/// 404 Not Found page component.
+///
+/// Displayed when a user navigates to a route that doesn't exist.
+#[component]
+fn NotFound() -> impl IntoView {
+    view! {
+        <div class="not-found-page">
+            <h1>"404"</h1>
+            <p>"Page not found"</p>
+            <a href="/">"Go back to home"</a>
+        </div>
+    }
+}
+
+#[cfg(feature = "hydrate")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn hydrate() {
+    use leptos::mount::hydrate_body;
+
+    console_error_panic_hook::set_once();
+    console_log::init_with_level(log::Level::Debug).expect("error initializing logger");
+
+    hydrate_body(App);
+}

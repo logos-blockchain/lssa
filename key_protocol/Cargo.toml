@@ -2,8 +2,11 @@
 name = "key_protocol"
 version = "0.1.0"
 edition = "2024"
+license = { workspace = true }
 
 [dependencies]
+secp256k1 = "0.31.1"
+
 nssa.workspace = true
 nssa_core.workspace = true
 common.workspace = true

@@ -11,17 +11,19 @@ use key_protocol::{
 use log::debug;
 use nssa::program::Program;
 
-use crate::config::{InitialAccountData, PersistentAccountData, WalletConfig};
+use crate::config::{InitialAccountData, Label, PersistentAccountData, WalletConfig};
 
 pub struct WalletChainStore {
     pub user_data: NSSAUserData,
     pub wallet_config: WalletConfig,
+    pub labels: HashMap<String, Label>,
 }
 
 impl WalletChainStore {
     pub fn new(
         config: WalletConfig,
         persistent_accounts: Vec<PersistentAccountData>,
+        labels: HashMap<String, Label>,
     ) -> Result<Self> {
         if persistent_accounts.is_empty() {
             anyhow::bail!("Roots not found; please run setup beforehand");
@@ -85,6 +87,7 @@ impl WalletChainStore {
                 private_tree,
             )?,
             wallet_config: config,
+            labels,
         })
     }
 
@@ -120,6 +123,7 @@ impl WalletChainStore {
                 private_tree,
             )?,
             wallet_config: config,
+            labels: HashMap::new(),
         })
     }
 
@@ -167,7 +171,7 @@ mod tests {
         let initial_acc1 = serde_json::from_str(
             r#"{
             "Public": {
-                "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+                "account_id": "6iArKUXxhUJqS7kCaPNhwMWt3ro71PDyBj7jwAyE2VQV",
                 "pub_sign_key": [
                     16,
                     162,
@@ -210,7 +214,7 @@ mod tests {
         let initial_acc2 = serde_json::from_str(
             r#"{
             "Public": {
-                "account_id": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+                "account_id": "7wHg9sbJwc6h3NP1S9bekfAzB8CHifEcxKswCKUt3YQo",
                 "pub_sign_key": [
                     113,
                     121,
@@ -291,6 +295,6 @@ mod tests {
         let config = create_sample_wallet_config();
         let accs = create_sample_persistent_accounts();
 
-        let _ = WalletChainStore::new(config.clone(), accs).unwrap();
+        let _ = WalletChainStore::new(config.clone(), accs, HashMap::new()).unwrap();
     }
 }

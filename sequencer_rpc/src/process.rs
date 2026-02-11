@@ -18,8 +18,8 @@ use common::{
             GetInitialTestnetAccountsRequest, GetLastBlockRequest, GetLastBlockResponse,
             GetProgramIdsRequest, GetProgramIdsResponse, GetProofForCommitmentRequest,
             GetProofForCommitmentResponse, GetTransactionByHashRequest,
-            GetTransactionByHashResponse, HelloRequest, HelloResponse, SendTxRequest,
-            SendTxResponse,
+            GetTransactionByHashResponse, HelloRequest, HelloResponse, PostIndexerMessageRequest,
+            PostIndexerMessageResponse, SendTxRequest, SendTxResponse,
         },
     },
     transaction::{EncodedTransaction, NSSATransaction},
@@ -44,6 +44,7 @@ pub const GET_ACCOUNTS_NONCES: &str = "get_accounts_nonces";
 pub const GET_ACCOUNT: &str = "get_account";
 pub const GET_PROOF_FOR_COMMITMENT: &str = "get_proof_for_commitment";
 pub const GET_PROGRAM_IDS: &str = "get_program_ids";
+pub const POST_INDEXER_MESSAGE: &str = "post_indexer_message";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -314,6 +315,18 @@ impl JsonHandler {
         respond(response)
     }
 
+    async fn process_indexer_message(&self, request: Request) -> Result<Value, RpcErr> {
+        let _indexer_post_req = PostIndexerMessageRequest::parse(Some(request.params))?;
+
+        // ToDo: Add indexer messages handling
+
+        let response = PostIndexerMessageResponse {
+            status: "Success".to_string(),
+        };
+
+        respond(response)
+    }
+
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             HELLO => self.process_temp_hello(request).await,
@@ -329,6 +342,7 @@ impl JsonHandler {
             GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             GET_PROOF_FOR_COMMITMENT => self.process_get_proof_by_commitment(request).await,
             GET_PROGRAM_IDS => self.process_get_program_ids(request).await,
+            POST_INDEXER_MESSAGE => self.process_indexer_message(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
@@ -340,10 +354,13 @@ mod tests {
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
-    use common::{test_utils::sequencer_sign_key_for_testing, transaction::EncodedTransaction};
+    use common::{
+        sequencer_client::BasicAuth, test_utils::sequencer_sign_key_for_testing,
+        transaction::EncodedTransaction,
+    };
     use sequencer_core::{
         SequencerCore,
-        config::{AccountInitialData, SequencerConfig},
+        config::{AccountInitialData, BedrockConfig, SequencerConfig},
     };
     use serde_json::Value;
     use tempfile::tempdir;
@@ -355,13 +372,13 @@ mod tests {
         let tempdir = tempdir().unwrap();
         let home = tempdir.path().to_path_buf();
         let acc1_id: Vec<u8> = vec![
-            208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202, 9, 115,
-            84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
+            148, 179, 206, 253, 199, 51, 82, 86, 232, 2, 152, 122, 80, 243, 54, 207, 237, 112, 83,
+            153, 44, 59, 204, 49, 128, 84, 160, 227, 216, 149, 97, 102,
         ];
 
         let acc2_id: Vec<u8> = vec![
-            231, 174, 119, 197, 239, 26, 5, 153, 147, 68, 175, 73, 159, 199, 138, 23, 5, 57, 141,
-            98, 237, 6, 207, 46, 20, 121, 246, 222, 248, 154, 57, 188,
+            30, 145, 107, 3, 207, 73, 192, 230, 160, 63, 238, 207, 18, 69, 54, 216, 103, 244, 92,
+            94, 124, 248, 42, 16, 141, 19, 119, 18, 14, 226, 140, 204,
         ];
 
         let initial_acc1 = AccountInitialData {
@@ -388,12 +405,21 @@ mod tests {
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
-            bedrock_config: None,
+            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            bedrock_config: Some(BedrockConfig {
+                channel_id: [42; 32].into(),
+                node_url: "http://localhost:8080".to_string(),
+                auth: Some(BasicAuth {
+                    username: "user".to_string(),
+                    password: None,
+                }),
+            }),
         }
     }
 
     async fn components_for_tests() -> (JsonHandler, Vec<AccountInitialData>, EncodedTransaction) {
         let config = sequencer_config_for_tests();
+
         let (mut sequencer_core, mempool_handle) = SequencerCore::start_from_config(config);
         let initial_accounts = sequencer_core.sequencer_config().initial_accounts.clone();
 
@@ -401,8 +427,8 @@ mod tests {
         let balance_to_move = 10;
         let tx = common::test_utils::create_transaction_native_token_transfer(
             [
-                208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202, 9,
-                115, 84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
+                148, 179, 206, 253, 199, 51, 82, 86, 232, 2, 152, 122, 80, 243, 54, 207, 237, 112,
+                83, 153, 44, 59, 204, 49, 128, 84, 160, 227, 216, 149, 97, 102,
             ],
             0,
             [2; 32],
