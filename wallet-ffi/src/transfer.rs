@@ -104,7 +104,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_public(
 
 /// Send a shielded token transfer.
 ///
-/// Transfers tokens from one private account to another on the network.
+/// Transfers tokens from a public account to a private account.
 ///
 /// # Parameters
 /// - `handle`: Valid wallet handle
@@ -201,7 +201,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_shielded(
 
 /// Send a deshielded token transfer.
 ///
-/// Transfers tokens from one private account to another on the network.
+/// Transfers tokens from a private account to a public account.
 ///
 /// # Parameters
 /// - `handle`: Valid wallet handle
@@ -258,6 +258,102 @@ pub unsafe extern "C" fn wallet_ffi_transfer_deshielded(
     let transfer = NativeTokenTransfer(&wallet);
 
     match block_on(transfer.send_deshielded_transfer(from_id, to_id, amount)) {
+        Ok(Ok((response, _shared_key))) => {
+            let tx_hash = CString::new(response.tx_hash)
+                .map(|s| s.into_raw())
+                .unwrap_or(ptr::null_mut());
+
+            unsafe {
+                (*out_result).tx_hash = tx_hash;
+                (*out_result).success = true;
+            }
+            WalletFfiError::Success
+        }
+        Ok(Err(e)) => {
+            print_error(format!("Transfer failed: {:?}", e));
+            unsafe {
+                (*out_result).tx_hash = ptr::null_mut();
+                (*out_result).success = false;
+            }
+            match e {
+                ExecutionFailureKind::InsufficientFundsError => WalletFfiError::InsufficientFunds,
+                ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
+                ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
+                ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
+                _ => WalletFfiError::InternalError,
+            }
+        }
+        Err(e) => e,
+    }
+}
+
+/// Send a private token transfer.
+///
+/// Transfers tokens from a private account to another private account.
+///
+/// # Parameters
+/// - `handle`: Valid wallet handle
+/// - `from`: Source account ID (must be owned by this wallet)
+/// - `to_keys`: Destination account keys
+/// - `amount`: Amount to transfer as little-endian [u8; 16]
+/// - `out_result`: Output pointer for transfer result
+///
+/// # Returns
+/// - `Success` if the transfer was submitted successfully
+/// - `InsufficientFunds` if the source account doesn't have enough balance
+/// - `KeyNotFound` if the source account's signing key is not in this wallet
+/// - Error code on other failures
+///
+/// # Memory
+/// The result must be freed with `wallet_ffi_free_transfer_result()`.
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `from` must be a valid pointer to a `FfiBytes32` struct
+/// - `to_keys` must be a valid pointer to a `FfiPrivateAccountKeys` struct
+/// - `amount` must be a valid pointer to a `[u8; 16]` array
+/// - `out_result` must be a valid pointer to a `FfiTransferResult` struct
+#[no_mangle]
+pub unsafe extern "C" fn wallet_ffi_transfer_private(
+    handle: *mut WalletHandle,
+    from: *const FfiBytes32,
+    to_keys: *const FfiPrivateAccountKeys,
+    amount: *const [u8; 16],
+    out_result: *mut FfiTransferResult,
+) -> WalletFfiError {
+    let wrapper = match get_wallet(handle) {
+        Ok(w) => w,
+        Err(e) => return e,
+    };
+
+    if from.is_null() || to_keys.is_null() || amount.is_null() || out_result.is_null() {
+        print_error("Null pointer argument");
+        return WalletFfiError::NullPointer;
+    }
+
+    let wallet = match wrapper.core.lock() {
+        Ok(w) => w,
+        Err(e) => {
+            print_error(format!("Failed to lock wallet: {}", e));
+            return WalletFfiError::InternalError;
+        }
+    };
+
+    let from_id = AccountId::new(unsafe { (*from).data });
+    let to_npk = (*to_keys).npk();
+    let to_ipk = match (*to_keys).ivk() {
+        Ok(ipk) => ipk,
+        Err(e) => {
+            print_error("Invalid viewing key");
+            return e;
+        }
+    };
+    let amount = u128::from_le_bytes(unsafe { *amount });
+
+    let transfer = NativeTokenTransfer(&wallet);
+
+    match block_on(transfer.send_private_transfer_to_outer_account(from_id, to_npk, to_ipk, amount))
+    {
         Ok(Ok((response, _shared_key))) => {
             let tx_hash = CString::new(response.tx_hash)
                 .map(|s| s.into_raw())
