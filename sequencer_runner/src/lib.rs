@@ -176,10 +176,19 @@ async fn retry_pending_blocks_loop(
 
         info!("Resubmitting {} pending blocks", pending_blocks.len());
         for block in &pending_blocks {
-            if let Err(e) = block_settlement_client.submit_block_to_bedrock(block).await {
+            // TODO: We could cache the inscribe tx for each pending block to avoid re-creating it
+            // on every retry.
+            let (tx, _msg_id) = block_settlement_client
+                .create_inscribe_tx(block)
+                .context("Failed to create inscribe tx for pending block")?;
+
+            if let Err(e) = block_settlement_client
+                .submit_inscribe_tx_to_bedrock(tx)
+                .await
+            {
                 warn!(
-                    "Failed to resubmit block with id {} with error {}",
-                    block.header.block_id, e
+                    "Failed to resubmit block with id {} with error {e:#}",
+                    block.header.block_id
                 );
             }
         }

@@ -167,14 +167,25 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
 
     pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
         {
-            let block = self.produce_new_block_with_mempool_transactions()?;
+            let block = self
+                .produce_new_block_with_mempool_transactions()
+                .context("Failed to produce new block with mempool transactions")?;
+            let (tx, msg_id) = self
+                .block_settlement_client
+                .create_inscribe_tx(&block)
+                .with_context(|| {
+                    format!(
+                        "Failed to create inscribe transaction for block with id {}",
+                        block.header.block_id
+                    )
+                })?;
+            self.last_bedrock_msg_id = msg_id.into();
             match self
                 .block_settlement_client
-                .submit_block_to_bedrock(&block)
+                .submit_inscribe_tx_to_bedrock(tx)
                 .await
             {
-                Ok(msg_id) => {
-                    self.last_bedrock_msg_id = msg_id.into();
+                Ok(()) => {
                     info!("Posted block data to Bedrock, msg_id: {msg_id:?}");
                 }
                 Err(err) => {
@@ -800,5 +811,36 @@ mod tests {
             .unwrap();
 
         assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_last_bedrock_msg_id_updated_even_when_posting_fails() {
+        use crate::mock::{MockBlockSettlementClientWithError, MockIndexerClient};
+
+        let config = setup_sequencer_config();
+        let (mut sequencer, mempool_handle) = crate::SequencerCore::<
+            MockBlockSettlementClientWithError,
+            MockIndexerClient,
+        >::start_from_config(config)
+        .await;
+
+        // Store the initial last_bedrock_msg_id (should be genesis parent msg id)
+        let initial_msg_id = sequencer.last_bedrock_msg_id;
+        assert_eq!(initial_msg_id, [0; 32]);
+
+        // Add a transaction to the mempool
+        let tx = common::test_utils::produce_dummy_empty_transaction();
+        mempool_handle.push(tx).await.unwrap();
+
+        // Produce a block and post to settlement layer (which will fail)
+        let result = sequencer
+            .produce_new_block_and_post_to_settlement_layer()
+            .await;
+
+        // The method should succeed even though posting to Bedrock failed
+        assert!(result.is_ok());
+
+        // Verify that last_bedrock_msg_id was updated despite the posting failure
+        assert_ne!(sequencer.last_bedrock_msg_id, initial_msg_id);
     }
 }
