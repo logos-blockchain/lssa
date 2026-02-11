@@ -8,7 +8,6 @@ license = { workspace = true }
 common.workspace = true
 sequencer_core = { workspace = true, features = ["testnet"] }
 sequencer_rpc.workspace = true
-indexer_service_protocol.workspace = true
 indexer_service_rpc = { workspace = true, features = ["client"] }
 
 clap = { workspace = true, features = ["derive", "env"] }

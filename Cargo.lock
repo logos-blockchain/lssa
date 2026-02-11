@@ -1207,9 +1207,9 @@ dependencies = [
 
 [[package]]
 name = "bollard"
-version = "0.19.4"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87a52479c9237eb04047ddb94788c41ca0d26eaff8b697ecfbb4c32f7fdc3b1b"
+checksum = "227aa051deec8d16bd9c34605e7aaf153f240e35483dd42f6f78903847934738"
 dependencies = [
  "async-stream",
  "base64 0.22.1",
@@ -1217,7 +1217,6 @@ dependencies = [
  "bollard-buildkit-proto",
  "bollard-stubs",
  "bytes",
- "chrono",
  "futures-core",
  "futures-util",
  "hex",
@@ -1235,14 +1234,13 @@ dependencies = [
  "rand 0.9.2",
  "rustls",
  "rustls-native-certs",
- "rustls-pemfile",
  "rustls-pki-types",
  "serde",
  "serde_derive",
  "serde_json",
- "serde_repr",
  "serde_urlencoded",
  "thiserror 2.0.17",
+ "time",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -1267,19 +1265,18 @@ dependencies = [
 
 [[package]]
 name = "bollard-stubs"
-version = "1.49.1-rc.28.4.0"
+version = "1.52.1-rc.29.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5731fe885755e92beff1950774068e0cae67ea6ec7587381536fca84f1779623"
+checksum = "0f0a8ca8799131c1837d1282c3f81f31e76ceb0ce426e04a7fe1ccee3287c066"
 dependencies = [
  "base64 0.22.1",
  "bollard-buildkit-proto",
  "bytes",
- "chrono",
  "prost 0.14.3",
  "serde",
  "serde_json",
  "serde_repr",
- "serde_with",
+ "time",
 ]
 
 [[package]]
@@ -1361,9 +1358,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
+checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 dependencies = [
  "serde",
 ]
@@ -3421,7 +3418,6 @@ dependencies = [
  "indexer_service_rpc",
  "jsonrpsee",
  "log",
- "serde",
  "serde_json",
  "tokio",
  "tokio-util",
@@ -3432,7 +3428,6 @@ name = "indexer_service_protocol"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "borsh",
  "common",
  "nssa",
  "nssa_core",
@@ -3500,7 +3495,6 @@ dependencies = [
 name = "integration_tests"
 version = "0.1.0"
 dependencies = [
- "actix-web",
  "anyhow",
  "base64 0.22.1",
  "borsh",
@@ -3513,7 +3507,6 @@ dependencies = [
  "log",
  "nssa",
  "nssa_core",
- "rand 0.8.5",
  "sequencer_core",
  "sequencer_runner",
  "serde_json",
@@ -5077,7 +5070,6 @@ dependencies = [
 name = "nssa_core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "base58",
  "borsh",
  "bytemuck",
@@ -5141,9 +5133,9 @@ dependencies = [
 
 [[package]]
 name = "num-conv"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
+checksum = "cf97ec579c3c42f953ef76dbf8d55ac91fb219dde70e49aa4a6b7d74e9919050"
 
 [[package]]
 name = "num-integer"
@@ -6422,9 +6414,9 @@ dependencies = [
 
 [[package]]
 name = "ruint"
-version = "1.17.0"
+version = "1.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a68df0380e5c9d20ce49534f292a36a7514ae21350726efe1865bdb1fa91d278"
+checksum = "c141e807189ad38a07276942c6623032d3753c8859c146104ac2e4d68865945a"
 dependencies = [
  "borsh",
  "proptest",
@@ -6495,15 +6487,6 @@ dependencies = [
  "rustls-pki-types",
  "schannel",
  "security-framework 3.5.1",
-]
-
-[[package]]
-name = "rustls-pemfile"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
-dependencies = [
- "rustls-pki-types",
 ]
 
 [[package]]
@@ -6761,7 +6744,6 @@ dependencies = [
  "nssa",
  "nssa_core",
  "rand 0.8.5",
- "reqwest",
  "serde",
  "serde_json",
  "storage",
@@ -6805,7 +6787,6 @@ dependencies = [
  "common",
  "env_logger",
  "futures",
- "indexer_service_protocol",
  "indexer_service_rpc",
  "log",
  "sequencer_core",
@@ -7477,9 +7458,9 @@ dependencies = [
 
 [[package]]
 name = "testcontainers"
-version = "0.26.3"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a81ec0158db5fbb9831e09d1813fe5ea9023a2b5e6e8e0a5fe67e2a820733629"
+checksum = "c3fdcea723c64cc08dbc533b3761e345a15bf1222cbe6cb611de09b43f17a168"
 dependencies = [
  "astral-tokio-tar",
  "async-trait",
@@ -7491,6 +7472,7 @@ dependencies = [
  "etcetera",
  "ferroid",
  "futures",
+ "http 1.4.0",
  "itertools 0.14.0",
  "log",
  "memchr",
@@ -7558,30 +7540,30 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.44"
+version = "0.3.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
+checksum = "743bd48c283afc0388f9b8827b976905fb217ad9e647fae3a379a9283c4def2c"
 dependencies = [
  "deranged",
  "itoa",
  "num-conv",
  "powerfmt",
- "serde",
+ "serde_core",
  "time-core",
  "time-macros",
 ]
 
 [[package]]
 name = "time-core"
-version = "0.1.6"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40868e7c1d2f0b8d73e4a8c7f0ff63af4f6d19be117e90bd73eb1d62cf831c6b"
+checksum = "7694e1cfe791f8d31026952abf09c69ca6f6fa4e1a1229e18988f06a04a12dca"
 
 [[package]]
 name = "time-macros"
-version = "0.2.24"
+version = "0.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30cfb0125f12d9c277f35663a0a33f8c30190f4e4574868a330595412d34ebf3"
+checksum = "2e70e4c5a0e0a8a4823ad65dfe1a6930e4f4d756dcd9dd7939022b5e8c501215"
 dependencies = [
  "num-conv",
  "time-core",
