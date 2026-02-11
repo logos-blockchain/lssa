@@ -5,6 +5,7 @@ use nssa_core::{
     Commitment, CommitmentSetDigest, Nullifier, PrivacyPreservingCircuitOutput,
     account::{Account, AccountWithMetadata},
 };
+use sha2::{Digest as _, digest::FixedOutput as _};
 
 use super::{message::Message, witness_set::WitnessSet};
 use crate::{
@@ -129,6 +130,13 @@ impl PrivacyPreservingTransaction {
 
     pub fn witness_set(&self) -> &WitnessSet {
         &self.witness_set
+    }
+
+    pub fn hash(&self) -> [u8; 32] {
+        let bytes = self.to_bytes();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&bytes);
+        hasher.finalize_fixed().into()
     }
 
     pub(crate) fn signer_account_ids(&self) -> Vec<AccountId> {

@@ -1,3 +1,6 @@
+[workspace.package]
+license = "MIT or Apache-2.0"
+
 [workspace]
 resolver = "3"
 members = [
@@ -6,6 +9,7 @@ members = [
   "key_protocol",
   "mempool",
   "wallet",
+  "wallet-ffi",
   "common",
   "nssa",
   "nssa/core",
@@ -19,6 +23,9 @@ members = [
   "indexer_service",
   "indexer_service/protocol",
   "indexer_service/rpc",
+  "explorer_service",
+  "programs/token/core",
+  "programs/token",
   "program_methods",
   "program_methods/guest",
   "test_program_methods",
@@ -27,6 +34,7 @@ members = [
   "examples/program_deployment/methods",
   "examples/program_deployment/methods/guest",
   "bedrock_client",
+  "indexer_core",
 ]
 
 [workspace.dependencies]
@@ -43,12 +51,14 @@ indexer_service = { path = "indexer_service" }
 indexer_service_protocol = { path = "indexer_service/protocol" }
 indexer_service_rpc = { path = "indexer_service/rpc" }
 wallet = { path = "wallet" }
+wallet-ffi = { path = "wallet-ffi" }
 token_core = { path = "programs/token/core" }
 token_program = { path = "programs/token" }
 amm_core = { path = "programs/amm/core" }
 amm_program = { path = "programs/amm" }
 test_program_methods = { path = "test_program_methods" }
 bedrock_client = { path = "bedrock_client" }
+indexer_core = { path = "indexer_core" }
 
 tokio = { version = "1.28.2", features = [
   "net",
@@ -93,12 +103,14 @@ chrono = "0.4.41"
 borsh = "1.5.7"
 base58 = "0.2.0"
 itertools = "0.14.0"
-url = "2.5.4"
+url = { version = "2.5.4", features = ["serde"] }
+tokio-retry = "0.3.0"
 schemars = "1.2.0"
 
 logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-chain-broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",
@@ -118,3 +130,10 @@ actix-web = { version = "=4.1.0", default-features = false, features = [
 ] }
 clap = { version = "4.5.42", features = ["derive", "env"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
+
+# Profile for leptos WASM release builds
+[profile.wasm-release]
+inherits = "release"
+opt-level = 'z'
+lto = true
+codegen-units = 1

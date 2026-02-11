@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     Commitment, CommitmentSetDigest, DUMMY_COMMITMENT, MembershipProof, Nullifier,
     account::{Account, AccountId},
@@ -15,6 +16,8 @@ use crate::{
 
 pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
     commitments: HashMap<Commitment, usize>,
@@ -60,8 +63,49 @@ impl CommitmentSet {
     }
 }
 
-type NullifierSet = HashSet<Nullifier>;
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+struct NullifierSet(BTreeSet<Nullifier>);
 
+impl NullifierSet {
+    fn new() -> Self {
+        Self(BTreeSet::new())
+    }
+
+    fn extend(&mut self, new_nullifiers: Vec<Nullifier>) {
+        self.0.extend(new_nullifiers);
+    }
+
+    fn contains(&self, nullifier: &Nullifier) -> bool {
+        self.0.contains(nullifier)
+    }
+}
+
+impl BorshSerialize for NullifierSet {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        self.0.iter().collect::<Vec<_>>().serialize(writer)
+    }
+}
+
+impl BorshDeserialize for NullifierSet {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let vec = Vec::<Nullifier>::deserialize_reader(reader)?;
+
+        let mut set = BTreeSet::new();
+        for n in vec {
+            if !set.insert(n) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "duplicate nullifier in NullifierSet",
+                ));
+            }
+        }
+
+        Ok(Self(set))
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct V02State {
     public_state: HashMap<AccountId, Account>,
     private_state: (CommitmentSet, NullifierSet),
@@ -4308,5 +4352,16 @@ pub mod tests {
 
         // Assert - should fail because the malicious program tries to manipulate is_authorized
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
+
+    #[test]
+    fn test_state_serialization_roundtrip() {
+        let account_id_1 = AccountId::new([1; 32]);
+        let account_id_2 = AccountId::new([2; 32]);
+        let initial_data = [(account_id_1, 100u128), (account_id_2, 151u128)];
+        let state = V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let bytes = borsh::to_vec(&state).unwrap();
+        let state_from_bytes: V02State = borsh::from_slice(&bytes).unwrap();
+        assert_eq!(state, state_from_bytes);
     }
 }

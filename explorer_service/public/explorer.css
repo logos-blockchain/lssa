@@ -1,0 +1,516 @@
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #f5f7fa;
+  color: #2c3e50;
+  line-height: 1.6;
+}
+
+/* App layout */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  background-color: #2c3e50;
+  color: white;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.app-nav {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.nav-logo {
+  color: white;
+  text-decoration: none;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.nav-logo:hover {
+  color: #3498db;
+}
+
+.app-main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.app-footer {
+  background-color: #34495e;
+  color: white;
+  text-align: center;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+/* Page headers */
+.page-header h1 {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: #2c3e50;
+}
+
+/* Search section */
+.search-section {
+  margin-bottom: 3rem;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid #dde4ed;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.search-button {
+  padding: 0.75rem 2rem;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.search-button:hover {
+  background-color: #2980b9;
+}
+
+/* Block preview */
+.block-preview {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.block-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.block-preview-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.block-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.block-id .label {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.block-id .value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.block-status {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-safe {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-finalized {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.block-preview-body {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.block-field {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.field-label {
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.field-value {
+  color: #2c3e50;
+}
+
+.hash {
+  font-family: "Courier New", monospace;
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+/* Transaction preview */
+.transaction-preview {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.transaction-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.transaction-preview-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.transaction-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #eee;
+}
+
+.tx-type {
+  padding: 0.4rem 0.8rem;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 2px solid;
+}
+
+.tx-type-public {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border-color: #1976d2;
+  border-style: solid;
+}
+
+.tx-type-private {
+  background-color: #ffe0f0;
+  color: #880e4f;
+  border-color: #c2185b;
+  border-style: dashed;
+  font-style: italic;
+}
+
+.tx-type-deployment {
+  background-color: #fff3e0;
+  color: #e65100;
+  border-color: #ff9800;
+  border-style: dotted;
+}
+
+.tx-hash {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.transaction-preview-body {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+/* Account preview */
+.account-preview {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.account-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.account-preview-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.account-preview-header {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.account-id .label {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.account-id .value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.account-preview-body {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.account-field {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.account-not-found {
+  color: #e74c3c;
+  font-style: italic;
+}
+
+/* Detail pages */
+.block-detail,
+.transaction-detail,
+.account-detail {
+  background-color: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.block-info,
+.transaction-info,
+.account-info,
+.transaction-details {
+  margin-bottom: 2rem;
+}
+
+.block-info h2,
+.transaction-info h2,
+.account-info h2,
+.transaction-details h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.info-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.info-row {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.info-label {
+  color: #7f8c8d;
+  font-weight: 600;
+  min-width: 150px;
+}
+
+.info-value {
+  color: #2c3e50;
+  word-break: break-all;
+}
+
+.signature {
+  font-size: 0.75rem;
+}
+
+/* Transactions list */
+.block-transactions,
+.account-transactions {
+  margin-top: 2rem;
+}
+
+.block-transactions h2,
+.account-transactions h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.transactions-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.no-transactions {
+  padding: 2rem;
+  text-align: center;
+  color: #7f8c8d;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+/* Accounts list */
+.accounts-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.account-item {
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.account-item a {
+  color: #3498db;
+  text-decoration: none;
+}
+
+.account-item a:hover {
+  text-decoration: underline;
+}
+
+.nonce {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-left: 0.5rem;
+}
+
+/* Loading and error states */
+.loading,
+.loading-more {
+  text-align: center;
+  padding: 2rem;
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.error,
+.error-page {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.not-found,
+.not-found-page {
+  text-align: center;
+  padding: 3rem;
+  color: #7f8c8d;
+}
+
+.not-found-page h1 {
+  font-size: 4rem;
+  color: #e74c3c;
+  margin-bottom: 1rem;
+}
+
+.not-found-page a {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.not-found-page a:hover {
+  text-decoration: underline;
+}
+
+/* Load more button */
+.load-more-button {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  margin-top: 1rem;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.load-more-button:hover {
+  background-color: #2980b9;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .app-main {
+    padding: 1rem;
+  }
+
+  .search-form {
+    flex-direction: column;
+  }
+
+  .search-button {
+    width: 100%;
+  }
+
+  .block-preview-header,
+  .transaction-preview-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .info-row {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .info-label {
+    min-width: auto;
+  }
+}

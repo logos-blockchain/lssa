@@ -1,0 +1,21 @@
+[package]
+name = "wallet-ffi"
+version = "0.1.0"
+edition = "2021"
+license = { workspace = true }
+
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[dependencies]
+wallet.workspace = true
+nssa.workspace = true
+common.workspace = true
+nssa_core.workspace = true
+tokio.workspace = true
+
+[build-dependencies]
+cbindgen = "0.29"
+
+[dev-dependencies]
+tempfile = "3"

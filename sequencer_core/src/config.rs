@@ -5,7 +5,8 @@ use std::{
 };
 
 use anyhow::Result;
-use reqwest::Url;
+use common::sequencer_client::BasicAuth;
+use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,6 +41,8 @@ pub struct SequencerConfig {
     pub mempool_max_size: usize,
     /// Interval in which blocks produced
     pub block_create_timeout_millis: u64,
+    /// Interval in which pending blocks are retried
+    pub retry_pending_blocks_timeout_millis: u64,
     /// Port to listen
     pub port: u16,
     /// List of initial accounts data
@@ -55,9 +58,11 @@ pub struct SequencerConfig {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BedrockConfig {
     /// Bedrock channel ID
-    pub channel_id: [u8; 32],
+    pub channel_id: ChannelId,
     /// Bedrock Url
-    pub node_url: Url,
+    pub node_url: String,
+    /// Bedrock auth
+    pub auth: Option<BasicAuth>,
 }
 
 impl SequencerConfig {

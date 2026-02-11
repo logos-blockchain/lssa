@@ -9,6 +9,7 @@ use token_core::{TokenDefinition, TokenHolding};
 use crate::{
     WalletCore,
     cli::{SubcommandReturnValue, WalletSubcommand},
+    config::Label,
     helperfunctions::{AccountPrivacyKind, HumanReadableAccount, parse_addr_with_privacy_prefix},
 };
 
@@ -38,6 +39,15 @@ pub enum AccountSubcommand {
         /// Show detailed account information (like `account get`)
         #[arg(short, long)]
         long: bool,
+    },
+    /// Set a label for an account
+    Label {
+        /// Valid 32 byte base58 string with privacy prefix
+        #[arg(short, long)]
+        account_id: String,
+        /// The label to assign to the account
+        #[arg(short, long)]
+        label: String,
     },
 }
 
@@ -161,9 +171,13 @@ impl WalletSubcommand for AccountSubcommand {
                 keys,
                 account_id,
             } => {
-                let (account_id, addr_kind) = parse_addr_with_privacy_prefix(&account_id)?;
+                let (account_id_str, addr_kind) = parse_addr_with_privacy_prefix(&account_id)?;
 
-                let account_id = account_id.parse()?;
+                let account_id: nssa::AccountId = account_id_str.parse()?;
+
+                if let Some(label) = wallet_core.storage.labels.get(&account_id_str) {
+                    println!("Label: {label}");
+                }
 
                 let account = match addr_kind {
                     AccountPrivacyKind::Public => {
@@ -259,32 +273,35 @@ impl WalletSubcommand for AccountSubcommand {
             }
             AccountSubcommand::List { long } => {
                 let user_data = &wallet_core.storage.user_data;
+                let labels = &wallet_core.storage.labels;
+
+                let format_with_label = |prefix: &str, id: &nssa::AccountId| {
+                    let id_str = id.to_string();
+                    if let Some(label) = labels.get(&id_str) {
+                        format!("{prefix} [{label}]")
+                    } else {
+                        prefix.to_string()
+                    }
+                };
 
                 if !long {
                     let accounts = user_data
                         .default_pub_account_signing_keys
                         .keys()
-                        .map(|id| format!("Preconfigured Public/{id}"))
-                        .chain(
-                            user_data
-                                .default_user_private_accounts
-                                .keys()
-                                .map(|id| format!("Preconfigured Private/{id}")),
-                        )
-                        .chain(
-                            user_data
-                                .public_key_tree
-                                .account_id_map
-                                .iter()
-                                .map(|(id, chain_index)| format!("{chain_index} Public/{id}")),
-                        )
-                        .chain(
-                            user_data
-                                .private_key_tree
-                                .account_id_map
-                                .iter()
-                                .map(|(id, chain_index)| format!("{chain_index} Private/{id}")),
-                        )
+                        .map(|id| format_with_label(&format!("Preconfigured Public/{id}"), id))
+                        .chain(user_data.default_user_private_accounts.keys().map(|id| {
+                            format_with_label(&format!("Preconfigured Private/{id}"), id)
+                        }))
+                        .chain(user_data.public_key_tree.account_id_map.iter().map(
+                            |(id, chain_index)| {
+                                format_with_label(&format!("{chain_index} Public/{id}"), id)
+                            },
+                        ))
+                        .chain(user_data.private_key_tree.account_id_map.iter().map(
+                            |(id, chain_index)| {
+                                format_with_label(&format!("{chain_index} Private/{id}"), id)
+                            },
+                        ))
                         .format("\n");
 
                     println!("{accounts}");
@@ -294,7 +311,10 @@ impl WalletSubcommand for AccountSubcommand {
                 // Detailed listing with --long flag
                 // Preconfigured public accounts
                 for id in user_data.default_pub_account_signing_keys.keys() {
-                    println!("Preconfigured Public/{id}");
+                    println!(
+                        "{}",
+                        format_with_label(&format!("Preconfigured Public/{id}"), id)
+                    );
                     match wallet_core.get_account_public(*id).await {
                         Ok(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
@@ -308,7 +328,10 @@ impl WalletSubcommand for AccountSubcommand {
 
                 // Preconfigured private accounts
                 for id in user_data.default_user_private_accounts.keys() {
-                    println!("Preconfigured Private/{id}");
+                    println!(
+                        "{}",
+                        format_with_label(&format!("Preconfigured Private/{id}"), id)
+                    );
                     match wallet_core.get_account_private(id) {
                         Some(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
@@ -322,7 +345,10 @@ impl WalletSubcommand for AccountSubcommand {
 
                 // Public key tree accounts
                 for (id, chain_index) in user_data.public_key_tree.account_id_map.iter() {
-                    println!("{chain_index} Public/{id}");
+                    println!(
+                        "{}",
+                        format_with_label(&format!("{chain_index} Public/{id}"), id)
+                    );
                     match wallet_core.get_account_public(*id).await {
                         Ok(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
@@ -336,7 +362,10 @@ impl WalletSubcommand for AccountSubcommand {
 
                 // Private key tree accounts
                 for (id, chain_index) in user_data.private_key_tree.account_id_map.iter() {
-                    println!("{chain_index} Private/{id}");
+                    println!(
+                        "{}",
+                        format_with_label(&format!("{chain_index} Private/{id}"), id)
+                    );
                     match wallet_core.get_account_private(id) {
                         Some(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
@@ -347,6 +376,23 @@ impl WalletSubcommand for AccountSubcommand {
                         None => println!("  Not found in local storage"),
                     }
                 }
+
+                Ok(SubcommandReturnValue::Empty)
+            }
+            AccountSubcommand::Label { account_id, label } => {
+                let (account_id_str, _) = parse_addr_with_privacy_prefix(&account_id)?;
+
+                let old_label = wallet_core
+                    .storage
+                    .labels
+                    .insert(account_id_str.clone(), Label::new(label.clone()));
+
+                wallet_core.store_persistent_data().await?;
+
+                if let Some(old) = old_label {
+                    eprintln!("Warning: overriding existing label '{old}'");
+                }
+                println!("Label '{label}' set for account {account_id_str}");
 
                 Ok(SubcommandReturnValue::Empty)
             }

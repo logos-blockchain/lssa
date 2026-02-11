@@ -1,0 +1,63 @@
+//! NSSA Wallet FFI Library
+//!
+//! This crate provides C-compatible bindings for the NSSA wallet functionality.
+//!
+//! # Usage
+//!
+//! 1. Initialize the runtime with `wallet_ffi_init_runtime()`
+//! 2. Create or open a wallet with `wallet_ffi_create_new()` or `wallet_ffi_open()`
+//! 3. Use the wallet functions to manage accounts and transfers
+//! 4. Destroy the wallet with `wallet_ffi_destroy()` when done
+//!
+//! # Thread Safety
+//!
+//! All functions are thread-safe. The wallet handle uses internal locking
+//! to ensure safe concurrent access.
+//!
+//! # Memory Management
+//!
+//! - Functions returning pointers allocate memory that must be freed
+//! - Use the corresponding `wallet_ffi_free_*` function to free memory
+//! - Never free memory returned by FFI using standard C `free()`
+
+pub mod account;
+pub mod error;
+pub mod keys;
+pub mod sync;
+pub mod transfer;
+pub mod types;
+pub mod wallet;
+
+use std::sync::OnceLock;
+
+// Re-export public types for cbindgen
+pub use error::WalletFfiError as FfiError;
+use tokio::runtime::Handle;
+pub use types::*;
+
+use crate::error::{print_error, WalletFfiError};
+
+static TOKIO_RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+
+/// Get a reference to the global runtime.
+pub(crate) fn get_runtime() -> Result<&'static Handle, WalletFfiError> {
+    let runtime = TOKIO_RUNTIME.get_or_init(|| {
+        match tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => runtime,
+            Err(e) => {
+                print_error(format!("{e}"));
+                panic!("Error initializing tokio runtime");
+            }
+        }
+    });
+    Ok(runtime.handle())
+}
+
+/// Run an async future on the global runtime, blocking until completion.
+pub(crate) fn block_on<F: std::future::Future>(future: F) -> Result<F::Output, WalletFfiError> {
+    let runtime = get_runtime()?;
+    Ok(runtime.block_on(future))
+}

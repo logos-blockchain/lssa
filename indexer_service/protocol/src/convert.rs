@@ -381,11 +381,17 @@ impl TryFrom<WitnessSet> for nssa::privacy_preserving_transaction::witness_set::
 
 impl From<nssa::PublicTransaction> for PublicTransaction {
     fn from(value: nssa::PublicTransaction) -> Self {
+        let hash = Hash(value.hash());
+        let nssa::PublicTransaction {
+            message,
+            witness_set,
+        } = value;
+
         Self {
-            message: value.message().clone().into(),
+            hash,
+            message: message.into(),
             witness_set: WitnessSet {
-                signatures_and_public_keys: value
-                    .witness_set()
+                signatures_and_public_keys: witness_set
                     .signatures_and_public_keys()
                     .iter()
                     .map(|(sig, pk)| (sig.clone().into(), pk.clone().into()))
@@ -401,6 +407,7 @@ impl TryFrom<PublicTransaction> for nssa::PublicTransaction {
 
     fn try_from(value: PublicTransaction) -> Result<Self, Self::Error> {
         let PublicTransaction {
+            hash: _,
             message,
             witness_set,
         } = value;
@@ -408,6 +415,7 @@ impl TryFrom<PublicTransaction> for nssa::PublicTransaction {
             signatures_and_public_keys,
             proof: _,
         } = witness_set;
+
         Ok(Self::new(
             message.into(),
             nssa::public_transaction::WitnessSet::from_raw_parts(
@@ -422,9 +430,16 @@ impl TryFrom<PublicTransaction> for nssa::PublicTransaction {
 
 impl From<nssa::PrivacyPreservingTransaction> for PrivacyPreservingTransaction {
     fn from(value: nssa::PrivacyPreservingTransaction) -> Self {
+        let hash = Hash(value.hash());
+        let nssa::PrivacyPreservingTransaction {
+            message,
+            witness_set,
+        } = value;
+
         Self {
-            message: value.message().clone().into(),
-            witness_set: value.witness_set().clone().into(),
+            hash,
+            message: message.into(),
+            witness_set: witness_set.into(),
         }
     }
 }
@@ -434,13 +449,17 @@ impl TryFrom<PrivacyPreservingTransaction> for nssa::PrivacyPreservingTransactio
 
     fn try_from(value: PrivacyPreservingTransaction) -> Result<Self, Self::Error> {
         let PrivacyPreservingTransaction {
+            hash: _,
             message,
             witness_set,
         } = value;
+
         Ok(Self::new(
-            message.try_into().map_err(|_| {
-                nssa::error::NssaError::InvalidInput("Data too big error".to_string())
-            })?,
+            message
+                .try_into()
+                .map_err(|err: nssa_core::account::data::DataTooBigError| {
+                    nssa::error::NssaError::InvalidInput(err.to_string())
+                })?,
             witness_set.try_into()?,
         ))
     }
@@ -448,15 +467,19 @@ impl TryFrom<PrivacyPreservingTransaction> for nssa::PrivacyPreservingTransactio
 
 impl From<nssa::ProgramDeploymentTransaction> for ProgramDeploymentTransaction {
     fn from(value: nssa::ProgramDeploymentTransaction) -> Self {
+        let hash = Hash(value.hash());
+        let nssa::ProgramDeploymentTransaction { message } = value;
+
         Self {
-            message: value.into_message().into(),
+            hash,
+            message: message.into(),
         }
     }
 }
 
 impl From<ProgramDeploymentTransaction> for nssa::ProgramDeploymentTransaction {
     fn from(value: ProgramDeploymentTransaction) -> Self {
-        let ProgramDeploymentTransaction { message } = value;
+        let ProgramDeploymentTransaction { hash: _, message } = value;
         Self::new(message.into())
     }
 }
@@ -599,12 +622,14 @@ impl TryFrom<common::block::Block> for Block {
             header,
             body,
             bedrock_status,
+            bedrock_parent_id,
         } = value;
 
         Ok(Self {
             header: header.into(),
             body: body.try_into()?,
             bedrock_status: bedrock_status.into(),
+            bedrock_parent_id: MantleMsgId(bedrock_parent_id),
         })
     }
 }
@@ -617,12 +642,14 @@ impl TryFrom<Block> for common::block::Block {
             header,
             body,
             bedrock_status,
+            bedrock_parent_id,
         } = value;
 
         Ok(Self {
             header: header.try_into()?,
             body: body.try_into()?,
             bedrock_status: bedrock_status.into(),
+            bedrock_parent_id: bedrock_parent_id.0,
         })
     }
 }
