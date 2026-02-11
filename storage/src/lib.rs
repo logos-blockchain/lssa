@@ -29,6 +29,8 @@ pub const DB_META_LAST_BLOCK_IN_DB_KEY: &str = "last_block_in_db";
 pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
 /// Key base for storing metainformation about the last finalized block on Bedrock
 pub const DB_META_LAST_FINALIZED_BLOCK_ID: &str = "last_finalized_block_id";
+/// Key base for storing metainformation about the latest block hash
+pub const DB_META_LATEST_BLOCK_HASH_KEY: &str = "latest_block_hash";
 
 /// Key base for storing the NSSA state
 pub const DB_NSSA_STATE_KEY: &str = "nssa_state";
@@ -79,6 +81,7 @@ impl RocksDBIO {
             dbio.put_meta_is_first_block_set()?;
             dbio.put_meta_last_block_in_db(block_id)?;
             dbio.put_meta_last_finalized_block_id(None)?;
+            dbio.put_meta_latest_block_hash(block.header.hash)?;
 
             Ok(dbio)
         } else {
@@ -262,6 +265,30 @@ impl RocksDBIO {
         Ok(())
     }
 
+    fn put_meta_last_block_in_db_batch(
+        &self,
+        block_id: u64,
+        batch: &mut WriteBatch,
+    ) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        batch.put_cf(
+            &cf_meta,
+            borsh::to_vec(&DB_META_LAST_BLOCK_IN_DB_KEY).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize DB_META_LAST_BLOCK_IN_DB_KEY".to_string()),
+                )
+            })?,
+            borsh::to_vec(&block_id).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize last block id".to_string()),
+                )
+            })?,
+        );
+        Ok(())
+    }
+
     pub fn put_meta_last_finalized_block_id(&self, block_id: Option<u64>) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
@@ -301,6 +328,81 @@ impl RocksDBIO {
         Ok(())
     }
 
+    fn put_meta_latest_block_hash(&self, block_hash: common::HashType) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        self.db
+            .put_cf(
+                &cf_meta,
+                borsh::to_vec(&DB_META_LATEST_BLOCK_HASH_KEY).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize DB_META_LATEST_BLOCK_HASH_KEY".to_string()),
+                    )
+                })?,
+                borsh::to_vec(&block_hash).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize latest block hash".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
+    fn put_meta_latest_block_hash_batch(
+        &self,
+        block_hash: common::HashType,
+        batch: &mut WriteBatch,
+    ) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        batch.put_cf(
+            &cf_meta,
+            borsh::to_vec(&DB_META_LATEST_BLOCK_HASH_KEY).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize DB_META_LATEST_BLOCK_HASH_KEY".to_string()),
+                )
+            })?,
+            borsh::to_vec(&block_hash).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize latest block hash".to_string()),
+                )
+            })?,
+        );
+        Ok(())
+    }
+
+    pub fn latest_block_hash(&self) -> DbResult<common::HashType> {
+        let cf_meta = self.meta_column();
+        let res = self
+            .db
+            .get_cf(
+                &cf_meta,
+                borsh::to_vec(&DB_META_LATEST_BLOCK_HASH_KEY).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize DB_META_LATEST_BLOCK_HASH_KEY".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(borsh::from_slice::<common::HashType>(&data).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to deserialize latest block hash".to_string()),
+                )
+            })?)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Latest block hash not found".to_string(),
+            ))
+        }
+    }
+
     pub fn put_block(&self, block: &Block, first: bool, batch: &mut WriteBatch) -> DbResult<()> {
         let cf_block = self.block_column();
 
@@ -308,7 +410,8 @@ impl RocksDBIO {
             let last_curr_block = self.get_meta_last_block_in_db()?;
 
             if block.header.block_id > last_curr_block {
-                self.put_meta_last_block_in_db(block.header.block_id)?;
+                self.put_meta_last_block_in_db_batch(block.header.block_id, batch)?;
+                self.put_meta_latest_block_hash_batch(block.header.hash, batch)?;
             }
         }
 

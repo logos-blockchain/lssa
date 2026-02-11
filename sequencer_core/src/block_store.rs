@@ -68,8 +68,8 @@ impl SequencerStore {
         None
     }
 
-    pub fn insert(&mut self, tx: &NSSATransaction, block_id: u64) {
-        self.tx_hash_to_block_map.insert(tx.hash(), block_id);
+    pub fn latest_block_hash(&self) -> Result<HashType> {
+        Ok(self.dbio.latest_block_hash()?)
     }
 
     pub fn genesis_id(&self) -> u64 {
@@ -143,5 +143,61 @@ mod tests {
         // Try again
         let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(Some(tx), retrieved_tx);
+    }
+
+    #[test]
+    fn test_latest_block_hash_returns_genesis_hash_initially() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let signing_key = sequencer_sign_key_for_testing();
+
+        let genesis_block_hashable_data = HashableBlockData {
+            block_id: 0,
+            prev_block_hash: HashType([0; 32]),
+            timestamp: 0,
+            transactions: vec![],
+        };
+
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
+        let genesis_hash = genesis_block.header.hash;
+
+        let node_store =
+            SequencerStore::open_db_with_genesis(path, Some(&genesis_block), signing_key).unwrap();
+
+        // Verify that initially the latest block hash equals genesis hash
+        let latest_hash = node_store.latest_block_hash().unwrap();
+        assert_eq!(latest_hash, genesis_hash);
+    }
+
+    #[test]
+    fn test_latest_block_hash_updates_after_new_block() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let signing_key = sequencer_sign_key_for_testing();
+
+        let genesis_block_hashable_data = HashableBlockData {
+            block_id: 0,
+            prev_block_hash: HashType([0; 32]),
+            timestamp: 0,
+            transactions: vec![],
+        };
+
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
+        let mut node_store =
+            SequencerStore::open_db_with_genesis(path, Some(&genesis_block), signing_key).unwrap();
+
+        // Add a new block
+        let tx = common::test_utils::produce_dummy_empty_transaction();
+        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
+        let block_hash = block.header.hash;
+
+        let dummy_state = V02State::new_with_genesis_accounts(&[], &[]);
+        node_store.update(&block, &dummy_state).unwrap();
+
+        // Verify that the latest block hash now equals the new block's hash
+        let latest_hash = node_store.latest_block_hash().unwrap();
+        assert_eq!(latest_hash, block_hash);
     }
 }

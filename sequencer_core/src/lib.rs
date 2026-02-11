@@ -1,6 +1,6 @@
 use std::{fmt::Display, path::Path, time::Instant};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context as _, Result, anyhow};
 #[cfg(feature = "testnet")]
 use common::PINATA_BASE58;
 use common::{
@@ -214,7 +214,10 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
             }
         }
 
-        let prev_block_hash = self.store.get_block_at_id(self.chain_height)?.header.hash;
+        let prev_block_hash = self
+            .store
+            .latest_block_hash()
+            .context("Failed to get latest block hash from store")?;
 
         let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
@@ -233,16 +236,6 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
 
         self.chain_height = new_block_height;
 
-        // TODO: Consider switching to `tracing` crate to have more structured and consistent logs
-        // e.g.
-        //
-        // ```
-        // info!(
-        //     num_txs = num_txs_in_block,
-        //     time = now.elapsed(),
-        //     "Created block"
-        // );
-        // ```
         log::info!(
             "Created block with {} transactions in {} seconds",
             hashable_data.transactions.len(),
