@@ -67,14 +67,27 @@ pub enum Transaction {
     ProgramDeployment(ProgramDeploymentTransaction),
 }
 
+impl Transaction {
+    /// Get the hash of the transaction
+    pub fn hash(&self) -> &self::Hash {
+        match self {
+            Transaction::Public(tx) => &tx.hash,
+            Transaction::PrivacyPreserving(tx) => &tx.hash,
+            Transaction::ProgramDeployment(tx) => &tx.hash,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct PublicTransaction {
+    pub hash: Hash,
     pub message: PublicMessage,
     pub witness_set: WitnessSet,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct PrivacyPreservingTransaction {
+    pub hash: Hash,
     pub message: PrivacyPreservingMessage,
     pub witness_set: WitnessSet,
 }
@@ -121,6 +134,7 @@ pub struct EncryptedAccountData {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ProgramDeploymentTransaction {
+    pub hash: Hash,
     pub message: ProgramDeploymentMessage,
 }
 
@@ -133,7 +147,7 @@ pub struct Ciphertext(
     pub Vec<u8>,
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct PublicKey(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded public key")]
@@ -147,21 +161,21 @@ pub struct EphemeralPublicKey(
     pub Vec<u8>,
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Commitment(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded commitment")]
     pub [u8; 32],
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Nullifier(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded nullifier")]
     pub [u8; 32],
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct CommitmentSetDigest(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded commitment set digest")]
@@ -182,7 +196,7 @@ pub struct Data(
     pub Vec<u8>,
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Hash(
     #[serde(with = "base64::arr")]
     #[schemars(with = "String", description = "base64-encoded hash")]

@@ -33,4 +33,17 @@ impl indexer_service_rpc::RpcServer for IndexerService {
     async fn get_transaction(&self, _tx_hash: Hash) -> Result<Transaction, ErrorObjectOwned> {
         todo!()
     }
+
+    async fn get_blocks(&self, _offset: u32, _limit: u32) -> Result<Vec<Block>, ErrorObjectOwned> {
+        todo!()
+    }
+
+    async fn get_transactions_by_account(
+        &self,
+        _account_id: AccountId,
+        _limit: u32,
+        _offset: u32,
+    ) -> Result<Vec<Transaction>, ErrorObjectOwned> {
+        todo!()
+    }
 }

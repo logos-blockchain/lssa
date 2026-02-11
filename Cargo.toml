@@ -19,6 +19,7 @@ members = [
   "indexer_service",
   "indexer_service/protocol",
   "indexer_service/rpc",
+  "explorer_service",
   "programs/token/core",
   "programs/token",
   "program_methods",
@@ -123,3 +124,10 @@ actix-web = { version = "=4.1.0", default-features = false, features = [
 ] }
 clap = { version = "4.5.42", features = ["derive", "env"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
+
+# Profile for leptos WASM release builds
+[profile.wasm-release]
+inherits = "release"
+opt-level = 'z'
+lto = true
+codegen-units = 1
