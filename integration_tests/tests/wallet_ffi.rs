@@ -109,6 +109,14 @@ unsafe extern "C" {
         out_result: *mut FfiTransferResult,
     ) -> error::WalletFfiError;
 
+    fn wallet_ffi_transfer_deshielded(
+        handle: *mut WalletHandle,
+        from: *const FfiBytes32,
+        to: *const FfiBytes32,
+        amount: *const [u8; 16],
+        out_result: *mut FfiTransferResult,
+    ) -> error::WalletFfiError;
+
     fn wallet_ffi_free_transfer_result(result: *mut FfiTransferResult);
 
     fn wallet_ffi_register_public_account(
@@ -886,6 +894,69 @@ fn test_wallet_ffi_transfer_shielded() -> Result<()> {
             wallet_ffi_handle,
             (&to) as *const FfiBytes32,
             false,
+            (&mut out_balance) as *mut [u8; 16],
+        );
+        u128::from_le_bytes(out_balance)
+    };
+
+    assert_eq!(from_balance, 9900);
+    assert_eq!(to_balance, 100);
+
+    unsafe {
+        wallet_ffi_free_transfer_result((&mut transfer_result) as *mut FfiTransferResult);
+        wallet_ffi_destroy(wallet_ffi_handle);
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_wallet_ffi_transfer_deshielded() -> Result<()> {
+    let ctx = BlockingTestContext::new().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx, home.path());
+    let from: FfiBytes32 = (&ACC_SENDER_PRIVATE.parse::<AccountId>().unwrap()).into();
+    let to = FfiBytes32::from_bytes([37; 32]);
+    let amount: [u8; 16] = 100u128.to_le_bytes();
+
+    let mut transfer_result = FfiTransferResult::default();
+    unsafe {
+        wallet_ffi_transfer_deshielded(
+            wallet_ffi_handle,
+            (&from) as *const FfiBytes32,
+            (&to) as *const FfiBytes32,
+            (&amount) as *const [u8; 16],
+            (&mut transfer_result) as *mut FfiTransferResult,
+        );
+    }
+
+    info!("Waiting for next block creation");
+    std::thread::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS));
+
+    // Sync private account local storage with onchain encrypted state
+    unsafe {
+        let mut current_height = 0;
+        wallet_ffi_get_current_block_height(wallet_ffi_handle, (&mut current_height) as *mut u64);
+        wallet_ffi_sync_to_block(wallet_ffi_handle, current_height);
+    };
+
+    let from_balance = unsafe {
+        let mut out_balance: [u8; 16] = [0; 16];
+        let _result = wallet_ffi_get_balance(
+            wallet_ffi_handle,
+            (&from) as *const FfiBytes32,
+            false,
+            (&mut out_balance) as *mut [u8; 16],
+        );
+        u128::from_le_bytes(out_balance)
+    };
+
+    let to_balance = unsafe {
+        let mut out_balance: [u8; 16] = [0; 16];
+        let _result = wallet_ffi_get_balance(
+            wallet_ffi_handle,
+            (&to) as *const FfiBytes32,
+            true,
             (&mut out_balance) as *mut [u8; 16],
         );
         u128::from_le_bytes(out_balance)
