@@ -122,6 +122,13 @@ jobs:
       - name: Install nextest
         run: cargo install --locked cargo-nextest
 
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          df -h
+
       - name: Run tests
         env:
           RISC0_DEV_MODE: "1"
