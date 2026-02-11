@@ -156,13 +156,10 @@ impl FfiPrivateAccountKeys {
         nssa_core::NullifierPublicKey(self.nullifier_public_key.data)
     }
 
-    pub fn ivk(&self) -> Result<nssa_core::encryption::ViewingPublicKey, WalletFfiError> {
+    pub fn vpk(&self) -> Result<nssa_core::encryption::ViewingPublicKey, WalletFfiError> {
         if self.viewing_public_key_len == 33 {
             let slice = unsafe {
-                slice::from_raw_parts(
-                    self.viewing_public_key,
-                    self.viewing_public_key_len,
-                )
+                slice::from_raw_parts(self.viewing_public_key, self.viewing_public_key_len)
             };
             Ok(Secp256k1Point(slice.to_vec()))
         } else {
