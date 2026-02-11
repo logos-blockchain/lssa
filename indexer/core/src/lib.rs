@@ -1,5 +1,5 @@
 use anyhow::Result;
-use bedrock_client::BedrockClient;
+use bedrock_client::{BedrockClient, HeaderId};
 use common::block::{Block, HashableBlockData};
 // ToDo: Remove after testnet
 use common::{HashType, PINATA_BASE58};
@@ -7,7 +7,7 @@ use futures::StreamExt;
 use log::info;
 use logos_blockchain_core::mantle::{
     Op, SignedMantleTx,
-    ops::channel::{ChannelId, inscribe::InscriptionOp},
+    ops::channel::{ChannelId, MsgId, inscribe::InscriptionOp},
 };
 
 use crate::{block_store::IndexerStore, config::IndexerConfig};
@@ -119,6 +119,53 @@ impl IndexerCore {
             .await;
         }
         }
+    }
+
+    async fn wait_last_finalized_block_header(&self) -> Result<HeaderId> {
+        let mut stream_pinned = Box::pin(self.bedrock_client.get_lib_stream().await?);
+        stream_pinned
+            .next()
+            .await
+            .ok_or(anyhow::anyhow!("Stream failure"))
+            .map(|info| info.header_id)
+    }
+
+    pub async fn search_for_channel_start(
+        &self,
+        channel_id_to_search: &ChannelId,
+    ) -> Result<HeaderId> {
+        let mut curr_last_header = self.wait_last_finalized_block_header().await?;
+
+        let first_header = loop {
+            let Some(curr_last_block) = self
+                .bedrock_client
+                .get_block_by_id(curr_last_header)
+                .await?
+            else {
+                return Err(anyhow::anyhow!("Chain inconsistency"));
+            };
+
+            if let Some(search_res) = curr_last_block.transactions().find_map(|tx| {
+                tx.mantle_tx.ops.iter().find_map(|op| match op {
+                    Op::ChannelInscribe(InscriptionOp {
+                        channel_id, parent, ..
+                    }) => {
+                        if (channel_id == channel_id_to_search) && (parent == &MsgId::root()) {
+                            Some(curr_last_block.header().id())
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                })
+            }) {
+                break search_res;
+            } else {
+                curr_last_header = curr_last_block.header().parent();
+            };
+        };
+
+        Ok(first_header)
     }
 }
 
