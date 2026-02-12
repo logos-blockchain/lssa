@@ -2,34 +2,27 @@
 
 use std::{net::SocketAddr, path::PathBuf, sync::LazyLock};
 
-use actix_web::dev::ServerHandle;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use common::{
-    sequencer_client::SequencerClient,
-    transaction::{EncodedTransaction, NSSATransaction},
-};
+use common::{HashType, sequencer_client::SequencerClient, transaction::NSSATransaction};
 use futures::FutureExt as _;
-use indexer_core::{IndexerCore, config::IndexerConfig};
-use log::debug;
-use nssa::PrivacyPreservingTransaction;
+use indexer_service::IndexerHandle;
+use log::{debug, error, warn};
+use nssa::{AccountId, PrivacyPreservingTransaction};
 use nssa_core::Commitment;
-use sequencer_core::config::SequencerConfig;
+use sequencer_runner::SequencerHandle;
 use tempfile::TempDir;
-use tokio::task::JoinHandle;
-use url::Url;
+use testcontainers::compose::DockerCompose;
 use wallet::{WalletCore, config::WalletConfigOverrides};
+
+pub mod config;
 
 // TODO: Remove this and control time from tests
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
-
-pub const ACC_SENDER: &str = "6iArKUXxhUJqS7kCaPNhwMWt3ro71PDyBj7jwAyE2VQV";
-pub const ACC_RECEIVER: &str = "7wHg9sbJwc6h3NP1S9bekfAzB8CHifEcxKswCKUt3YQo";
-
-pub const ACC_SENDER_PRIVATE: &str = "3oCG8gqdKLMegw4rRfyaMQvuPHpcASt7xwttsmnZLSkw";
-pub const ACC_RECEIVER_PRIVATE: &str = "AKTcXgJ1xoynta1Ec7y6Jso1z1JQtHqd7aPQ1h9er6xX";
-
 pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &str = "data_changer.bin";
+
+const BEDROCK_SERVICE_WITH_OPEN_PORT: &str = "logos-blockchain-node-0";
+const BEDROCK_SERVICE_PORT: u16 = 18080;
 
 static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 
@@ -37,138 +30,152 @@ static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 ///
 /// It's memory and logically safe to create multiple instances of this struct in parallel tests,
 /// as each instance uses its own temporary directories for sequencer and wallet data.
+// NOTE: Order of fields is important for proper drop order.
 pub struct TestContext {
-    sequencer_server_handle: ServerHandle,
-    sequencer_loop_handle: JoinHandle<Result<()>>,
-    sequencer_retry_pending_blocks_handle: JoinHandle<Result<()>>,
-    indexer_loop_handle: Option<JoinHandle<Result<()>>>,
     sequencer_client: SequencerClient,
     wallet: WalletCore,
     wallet_password: String,
+    sequencer_handle: SequencerHandle,
+    indexer_handle: IndexerHandle,
+    bedrock_compose: DockerCompose,
     _temp_sequencer_dir: TempDir,
     _temp_wallet_dir: TempDir,
 }
 
 impl TestContext {
-    /// Create new test context in detached mode. Default.
+    /// Create new test context.
     pub async fn new() -> Result<Self> {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-
-        let sequencer_config_path =
-            PathBuf::from(manifest_dir).join("configs/sequencer/detached/sequencer_config.json");
-
-        let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
-            .context("Failed to create sequencer config from file")?;
-
-        Self::new_with_sequencer_and_maybe_indexer_configs(sequencer_config, None).await
+        Self::builder().build().await
     }
 
-    /// Create new test context in local bedrock node attached mode.
-    pub async fn new_bedrock_local_attached() -> Result<Self> {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-
-        let sequencer_config_path = PathBuf::from(manifest_dir)
-            .join("configs/sequencer/bedrock_local_attached/sequencer_config.json");
-
-        let sequencer_config = SequencerConfig::from_path(&sequencer_config_path)
-            .context("Failed to create sequencer config from file")?;
-
-        let indexer_config_path =
-            PathBuf::from(manifest_dir).join("configs/indexer/indexer_config.json");
-
-        let indexer_config = IndexerConfig::from_path(&indexer_config_path)
-            .context("Failed to create indexer config from file")?;
-
-        Self::new_with_sequencer_and_maybe_indexer_configs(sequencer_config, Some(indexer_config))
-            .await
+    pub fn builder() -> TestContextBuilder {
+        TestContextBuilder::new()
     }
 
-    /// Create new test context with custom sequencer config and maybe indexer config.
-    ///
-    /// `home` and `port` fields of the provided config will be overridden to meet tests parallelism
-    /// requirements.
-    pub async fn new_with_sequencer_and_maybe_indexer_configs(
-        sequencer_config: SequencerConfig,
-        indexer_config: Option<IndexerConfig>,
+    async fn new_configured(
+        sequencer_partial_config: config::SequencerPartialConfig,
+        initial_data: config::InitialData,
     ) -> Result<Self> {
         // Ensure logger is initialized only once
         *LOGGER;
 
         debug!("Test context setup");
 
-        let (
-            sequencer_server_handle,
-            sequencer_addr,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-            temp_sequencer_dir,
-        ) = Self::setup_sequencer(sequencer_config)
-            .await
-            .context("Failed to setup sequencer")?;
+        let (bedrock_compose, bedrock_addr) = Self::setup_bedrock_node().await?;
 
-        // Convert 0.0.0.0 to 127.0.0.1 for client connections
-        // When binding to port 0, the server binds to 0.0.0.0:<random_port>
-        // but clients need to connect to 127.0.0.1:<port> to work reliably
-        let sequencer_addr = if sequencer_addr.ip().is_unspecified() {
-            format!("http://127.0.0.1:{}", sequencer_addr.port())
-        } else {
-            format!("http://{sequencer_addr}")
+        let indexer_handle = Self::setup_indexer(bedrock_addr)
+            .await
+            .context("Failed to setup Indexer")?;
+
+        let (sequencer_handle, temp_sequencer_dir) = Self::setup_sequencer(
+            sequencer_partial_config,
+            bedrock_addr,
+            indexer_handle.addr(),
+            &initial_data,
+        )
+        .await
+        .context("Failed to setup Sequencer")?;
+
+        let (wallet, temp_wallet_dir, wallet_password) =
+            Self::setup_wallet(sequencer_handle.addr(), &initial_data)
+                .await
+                .context("Failed to setup wallet")?;
+
+        let sequencer_url = config::addr_to_url(config::UrlProtocol::Http, sequencer_handle.addr())
+            .context("Failed to convert sequencer addr to URL")?;
+        let sequencer_client =
+            SequencerClient::new(sequencer_url).context("Failed to create sequencer client")?;
+
+        Ok(Self {
+            sequencer_client,
+            wallet,
+            wallet_password,
+            bedrock_compose,
+            sequencer_handle,
+            indexer_handle,
+            _temp_sequencer_dir: temp_sequencer_dir,
+            _temp_wallet_dir: temp_wallet_dir,
+        })
+    }
+
+    async fn setup_bedrock_node() -> Result<(DockerCompose, SocketAddr)> {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let bedrock_compose_path =
+            PathBuf::from(manifest_dir).join("../bedrock/docker-compose.yml");
+
+        let mut compose = DockerCompose::with_auto_client(&[bedrock_compose_path])
+            .await
+            .context("Failed to setup docker compose for Bedrock")?;
+
+        async fn up_and_retrieve_port(compose: &mut DockerCompose) -> Result<u16> {
+            compose
+                .up()
+                .await
+                .context("Failed to bring up Bedrock services")?;
+            let container = compose
+                .service(BEDROCK_SERVICE_WITH_OPEN_PORT)
+                .with_context(|| {
+                    format!(
+                        "Failed to get Bedrock service container `{BEDROCK_SERVICE_WITH_OPEN_PORT}`"
+                    )
+                })?;
+
+            let ports = container.ports().await.with_context(|| {
+                format!(
+                    "Failed to get ports for Bedrock service container `{}`",
+                    container.id()
+                )
+            })?;
+            ports
+                .map_to_host_port_ipv4(BEDROCK_SERVICE_PORT)
+                .with_context(|| {
+                    format!(
+                        "Failed to retrieve host port of {BEDROCK_SERVICE_PORT} container \
+                        port for container `{}`, existing ports: {ports:?}",
+                        container.id()
+                    )
+                })
+        }
+
+        let mut port = None;
+        let mut attempt = 0;
+        let max_attempts = 5;
+        while port.is_none() && attempt < max_attempts {
+            attempt += 1;
+            match up_and_retrieve_port(&mut compose).await {
+                Ok(p) => {
+                    port = Some(p);
+                }
+                Err(err) => {
+                    warn!(
+                        "Failed to bring up Bedrock services: {err:?}, attempt {attempt}/{max_attempts}"
+                    );
+                }
+            }
+        }
+        let Some(port) = port else {
+            bail!("Failed to bring up Bedrock services after {max_attempts} attempts");
         };
 
-        let (wallet, temp_wallet_dir, wallet_password) = Self::setup_wallet(sequencer_addr.clone())
+        let addr = SocketAddr::from(([127, 0, 0, 1], port));
+        Ok((compose, addr))
+    }
+
+    async fn setup_indexer(bedrock_addr: SocketAddr) -> Result<IndexerHandle> {
+        let indexer_config =
+            config::indexer_config(bedrock_addr).context("Failed to create Indexer config")?;
+
+        indexer_service::run_server(indexer_config, 0)
             .await
-            .context("Failed to setup wallet")?;
-
-        let sequencer_client = SequencerClient::new(
-            Url::parse(&sequencer_addr).context("Failed to parse sequencer addr")?,
-        )
-        .context("Failed to create sequencer client")?;
-
-        if let Some(mut indexer_config) = indexer_config {
-            indexer_config.sequencer_client_config.addr =
-                Url::parse(&sequencer_addr).context("Failed to parse sequencer addr")?;
-
-            let indexer_core = IndexerCore::new(indexer_config)?;
-
-            let indexer_loop_handle = Some(tokio::spawn(async move {
-                indexer_core.subscribe_parse_block_stream().await
-            }));
-
-            Ok(Self {
-                sequencer_server_handle,
-                sequencer_loop_handle,
-                sequencer_retry_pending_blocks_handle,
-                indexer_loop_handle,
-                sequencer_client,
-                wallet,
-                _temp_sequencer_dir: temp_sequencer_dir,
-                _temp_wallet_dir: temp_wallet_dir,
-                wallet_password,
-            })
-        } else {
-            Ok(Self {
-                sequencer_server_handle,
-                sequencer_loop_handle,
-                sequencer_retry_pending_blocks_handle,
-                indexer_loop_handle: None,
-                sequencer_client,
-                wallet,
-                _temp_sequencer_dir: temp_sequencer_dir,
-                _temp_wallet_dir: temp_wallet_dir,
-                wallet_password,
-            })
-        }
+            .context("Failed to run Indexer Service")
     }
 
     async fn setup_sequencer(
-        mut config: SequencerConfig,
-    ) -> Result<(
-        ServerHandle,
-        SocketAddr,
-        JoinHandle<Result<()>>,
-        JoinHandle<Result<()>>,
-        TempDir,
-    )> {
+        partial: config::SequencerPartialConfig,
+        bedrock_addr: SocketAddr,
+        indexer_addr: SocketAddr,
+        initial_data: &config::InitialData,
+    ) -> Result<(SequencerHandle, TempDir)> {
         let temp_sequencer_dir =
             tempfile::tempdir().context("Failed to create temp dir for sequencer home")?;
 
@@ -176,43 +183,39 @@ impl TestContext {
             "Using temp sequencer home at {:?}",
             temp_sequencer_dir.path()
         );
-        config.home = temp_sequencer_dir.path().to_owned();
-        // Setting port to 0 lets the OS choose a free port for us
-        config.port = 0;
 
-        let (
-            sequencer_server_handle,
-            sequencer_addr,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-        ) = sequencer_runner::startup_sequencer(config).await?;
+        let config = config::sequencer_config(
+            partial,
+            temp_sequencer_dir.path().to_owned(),
+            bedrock_addr,
+            indexer_addr,
+            initial_data,
+        )
+        .context("Failed to create Sequencer config")?;
 
-        Ok((
-            sequencer_server_handle,
-            sequencer_addr,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-            temp_sequencer_dir,
-        ))
+        let sequencer_handle = sequencer_runner::startup_sequencer(config).await?;
+
+        Ok((sequencer_handle, temp_sequencer_dir))
     }
 
-    async fn setup_wallet(sequencer_addr: String) -> Result<(WalletCore, TempDir, String)> {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let wallet_config_source_path =
-            PathBuf::from(manifest_dir).join("configs/wallet/wallet_config.json");
+    async fn setup_wallet(
+        sequencer_addr: SocketAddr,
+        initial_data: &config::InitialData,
+    ) -> Result<(WalletCore, TempDir, String)> {
+        let config = config::wallet_config(sequencer_addr, initial_data)
+            .context("Failed to create Wallet config")?;
+        let config_serialized =
+            serde_json::to_string_pretty(&config).context("Failed to serialize Wallet config")?;
 
         let temp_wallet_dir =
             tempfile::tempdir().context("Failed to create temp dir for wallet home")?;
 
         let config_path = temp_wallet_dir.path().join("wallet_config.json");
-        std::fs::copy(&wallet_config_source_path, &config_path)
-            .context("Failed to copy wallet config to temp dir")?;
+        std::fs::write(&config_path, config_serialized)
+            .context("Failed to write wallet config in temp dir")?;
 
         let storage_path = temp_wallet_dir.path().join("storage.json");
-        let config_overrides = WalletConfigOverrides {
-            sequencer_addr: Some(sequencer_addr),
-            ..Default::default()
-        };
+        let config_overrides = WalletConfigOverrides::default();
 
         let wallet_password = "test_pass".to_owned();
         let wallet = WalletCore::new_init_storage(
@@ -248,32 +251,71 @@ impl TestContext {
     pub fn sequencer_client(&self) -> &SequencerClient {
         &self.sequencer_client
     }
+
+    /// Get existing public account IDs in the wallet.
+    pub fn existing_public_accounts(&self) -> Vec<AccountId> {
+        self.wallet
+            .storage()
+            .user_data
+            .public_account_ids()
+            .collect()
+    }
+
+    /// Get existing private account IDs in the wallet.
+    pub fn existing_private_accounts(&self) -> Vec<AccountId> {
+        self.wallet
+            .storage()
+            .user_data
+            .private_account_ids()
+            .collect()
+    }
 }
 
 impl Drop for TestContext {
     fn drop(&mut self) {
-        debug!("Test context cleanup");
-
         let Self {
-            sequencer_server_handle,
-            sequencer_loop_handle,
-            sequencer_retry_pending_blocks_handle,
-            indexer_loop_handle,
+            sequencer_handle,
+            indexer_handle,
+            bedrock_compose,
+            _temp_sequencer_dir: _,
+            _temp_wallet_dir: _,
             sequencer_client: _,
             wallet: _,
-            _temp_sequencer_dir,
-            _temp_wallet_dir,
             wallet_password: _,
         } = self;
 
-        sequencer_loop_handle.abort();
-        sequencer_retry_pending_blocks_handle.abort();
-        if let Some(indexer_loop_handle) = indexer_loop_handle {
-            indexer_loop_handle.abort();
+        if sequencer_handle.is_finished() {
+            let Err(err) = self
+                .sequencer_handle
+                .run_forever()
+                .now_or_never()
+                .expect("Future is finished and should be ready");
+            error!(
+                "Sequencer handle has unexpectedly finished before TestContext drop with error: {err:#}"
+            );
         }
 
-        // Can't wait here as Drop can't be async, but anyway stop signal should be sent
-        sequencer_server_handle.stop(true).now_or_never();
+        if indexer_handle.is_stopped() {
+            error!("Indexer handle has unexpectedly stopped before TestContext drop");
+        }
+
+        let container = bedrock_compose
+            .service(BEDROCK_SERVICE_WITH_OPEN_PORT)
+            .unwrap_or_else(|| {
+                panic!("Failed to get Bedrock service container `{BEDROCK_SERVICE_WITH_OPEN_PORT}`")
+            });
+        let output = std::process::Command::new("docker")
+            .args(["inspect", "-f",  "{{.State.Running}}", container.id()])
+            .output()
+            .expect("Failed to execute docker inspect command to check if Bedrock container is still running");
+        let stdout = String::from_utf8(output.stdout)
+            .expect("Failed to parse docker inspect output as String");
+        if stdout.trim() != "true" {
+            error!(
+                "Bedrock container `{}` is not running during TestContext drop, docker inspect output: {stdout}",
+                container.id()
+            );
+        }
     }
 }
 
@@ -291,31 +333,65 @@ impl BlockingTestContext {
     }
 }
 
-pub fn format_public_account_id(account_id: &str) -> String {
+pub struct TestContextBuilder {
+    initial_data: Option<config::InitialData>,
+    sequencer_partial_config: Option<config::SequencerPartialConfig>,
+}
+
+impl TestContextBuilder {
+    fn new() -> Self {
+        Self {
+            initial_data: None,
+            sequencer_partial_config: None,
+        }
+    }
+
+    pub fn with_initial_data(mut self, initial_data: config::InitialData) -> Self {
+        self.initial_data = Some(initial_data);
+        self
+    }
+
+    pub fn with_sequencer_partial_config(
+        mut self,
+        sequencer_partial_config: config::SequencerPartialConfig,
+    ) -> Self {
+        self.sequencer_partial_config = Some(sequencer_partial_config);
+        self
+    }
+
+    pub async fn build(self) -> Result<TestContext> {
+        TestContext::new_configured(
+            self.sequencer_partial_config.unwrap_or_default(),
+            self.initial_data.unwrap_or_else(|| {
+                config::InitialData::with_two_public_and_two_private_initialized_accounts()
+            }),
+        )
+        .await
+    }
+}
+
+pub fn format_public_account_id(account_id: AccountId) -> String {
     format!("Public/{account_id}")
 }
 
-pub fn format_private_account_id(account_id: &str) -> String {
+pub fn format_private_account_id(account_id: AccountId) -> String {
     format!("Private/{account_id}")
 }
 
 pub async fn fetch_privacy_preserving_tx(
     seq_client: &SequencerClient,
-    tx_hash: String,
+    tx_hash: HashType,
 ) -> PrivacyPreservingTransaction {
     let transaction_encoded = seq_client
-        .get_transaction_by_hash(tx_hash.clone())
+        .get_transaction_by_hash(tx_hash)
         .await
         .unwrap()
         .transaction
         .unwrap();
 
-    let tx_base64_decode = BASE64.decode(transaction_encoded).unwrap();
-    match NSSATransaction::try_from(
-        &borsh::from_slice::<EncodedTransaction>(&tx_base64_decode).unwrap(),
-    )
-    .unwrap()
-    {
+    let tx_bytes = BASE64.decode(transaction_encoded).unwrap();
+    let tx = borsh::from_slice(&tx_bytes).unwrap();
+    match tx {
         NSSATransaction::PrivacyPreserving(privacy_preserving_transaction) => {
             privacy_preserving_transaction
         }
@@ -331,21 +407,4 @@ pub async fn verify_commitment_is_in_state(
         seq_client.get_proof_for_commitment(commitment).await,
         Ok(Some(_))
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{format_private_account_id, format_public_account_id};
-
-    #[test]
-    fn correct_account_id_from_prefix() {
-        let account_id1 = "cafecafe";
-        let account_id2 = "deadbeaf";
-
-        let account_id1_pub = format_public_account_id(account_id1);
-        let account_id2_priv = format_private_account_id(account_id2);
-
-        assert_eq!(account_id1_pub, "Public/cafecafe".to_string());
-        assert_eq!(account_id2_priv, "Private/deadbeaf".to_string());
-    }
 }

@@ -221,9 +221,9 @@ impl V02State {
         self.public_state.entry(account_id).or_default()
     }
 
-    pub fn get_account_by_id(&self, account_id: &AccountId) -> Account {
+    pub fn get_account_by_id(&self, account_id: AccountId) -> Account {
         self.public_state
-            .get(account_id)
+            .get(&account_id)
             .cloned()
             .unwrap_or(Account::default())
     }
@@ -417,7 +417,7 @@ pub mod tests {
         let state = V02State::new_with_genesis_accounts(&initial_data, &[]);
         let expected_account = state.public_state.get(&account_id).unwrap();
 
-        let account = state.get_account_by_id(&account_id);
+        let account = state.get_account_by_id(account_id);
 
         assert_eq!(&account, expected_account);
     }
@@ -428,7 +428,7 @@ pub mod tests {
         let state = V02State::new_with_genesis_accounts(&[], &[]);
         let expected_account = Account::default();
 
-        let account = state.get_account_by_id(&addr2);
+        let account = state.get_account_by_id(addr2);
 
         assert_eq!(account, expected_account);
     }
@@ -450,16 +450,16 @@ pub mod tests {
         let mut state = V02State::new_with_genesis_accounts(&initial_data, &[]);
         let from = account_id;
         let to = AccountId::new([2; 32]);
-        assert_eq!(state.get_account_by_id(&to), Account::default());
+        assert_eq!(state.get_account_by_id(to), Account::default());
         let balance_to_move = 5;
 
         let tx = transfer_transaction(from, key, 0, to, balance_to_move);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        assert_eq!(state.get_account_by_id(&from).balance, 95);
-        assert_eq!(state.get_account_by_id(&to).balance, 5);
-        assert_eq!(state.get_account_by_id(&from).nonce, 1);
-        assert_eq!(state.get_account_by_id(&to).nonce, 0);
+        assert_eq!(state.get_account_by_id(from).balance, 95);
+        assert_eq!(state.get_account_by_id(to).balance, 5);
+        assert_eq!(state.get_account_by_id(from).nonce, 1);
+        assert_eq!(state.get_account_by_id(to).nonce, 0);
     }
 
     #[test]
@@ -472,16 +472,16 @@ pub mod tests {
         let from_key = key;
         let to = AccountId::new([2; 32]);
         let balance_to_move = 101;
-        assert!(state.get_account_by_id(&from).balance < balance_to_move);
+        assert!(state.get_account_by_id(from).balance < balance_to_move);
 
         let tx = transfer_transaction(from, from_key, 0, to, balance_to_move);
         let result = state.transition_from_public_transaction(&tx);
 
         assert!(matches!(result, Err(NssaError::ProgramExecutionFailed(_))));
-        assert_eq!(state.get_account_by_id(&from).balance, 100);
-        assert_eq!(state.get_account_by_id(&to).balance, 0);
-        assert_eq!(state.get_account_by_id(&from).nonce, 0);
-        assert_eq!(state.get_account_by_id(&to).nonce, 0);
+        assert_eq!(state.get_account_by_id(from).balance, 100);
+        assert_eq!(state.get_account_by_id(to).balance, 0);
+        assert_eq!(state.get_account_by_id(from).nonce, 0);
+        assert_eq!(state.get_account_by_id(to).nonce, 0);
     }
 
     #[test]
@@ -495,16 +495,16 @@ pub mod tests {
         let from = account_id2;
         let from_key = key2;
         let to = account_id1;
-        assert_ne!(state.get_account_by_id(&to), Account::default());
+        assert_ne!(state.get_account_by_id(to), Account::default());
         let balance_to_move = 8;
 
         let tx = transfer_transaction(from, from_key, 0, to, balance_to_move);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        assert_eq!(state.get_account_by_id(&from).balance, 192);
-        assert_eq!(state.get_account_by_id(&to).balance, 108);
-        assert_eq!(state.get_account_by_id(&from).nonce, 1);
-        assert_eq!(state.get_account_by_id(&to).nonce, 0);
+        assert_eq!(state.get_account_by_id(from).balance, 192);
+        assert_eq!(state.get_account_by_id(to).balance, 108);
+        assert_eq!(state.get_account_by_id(from).nonce, 1);
+        assert_eq!(state.get_account_by_id(to).nonce, 0);
     }
 
     #[test]
@@ -524,12 +524,12 @@ pub mod tests {
         let tx = transfer_transaction(account_id2, key2, 0, account_id3, balance_to_move);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        assert_eq!(state.get_account_by_id(&account_id1).balance, 95);
-        assert_eq!(state.get_account_by_id(&account_id2).balance, 2);
-        assert_eq!(state.get_account_by_id(&account_id3).balance, 3);
-        assert_eq!(state.get_account_by_id(&account_id1).nonce, 1);
-        assert_eq!(state.get_account_by_id(&account_id2).nonce, 1);
-        assert_eq!(state.get_account_by_id(&account_id3).nonce, 0);
+        assert_eq!(state.get_account_by_id(account_id1).balance, 95);
+        assert_eq!(state.get_account_by_id(account_id2).balance, 2);
+        assert_eq!(state.get_account_by_id(account_id3).balance, 3);
+        assert_eq!(state.get_account_by_id(account_id1).nonce, 1);
+        assert_eq!(state.get_account_by_id(account_id2).nonce, 1);
+        assert_eq!(state.get_account_by_id(account_id3).nonce, 0);
     }
 
     impl V02State {
@@ -656,7 +656,7 @@ pub mod tests {
         let mut state =
             V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
         let account_id = AccountId::new([1; 32]);
-        let account = state.get_account_by_id(&account_id);
+        let account = state.get_account_by_id(account_id);
         // Assert the target account only differs from the default account in the program owner
         // field
         assert_ne!(account.program_owner, Account::default().program_owner);
@@ -681,7 +681,7 @@ pub mod tests {
             .with_test_programs()
             .with_non_default_accounts_but_default_program_owners();
         let account_id = AccountId::new([255; 32]);
-        let account = state.get_account_by_id(&account_id);
+        let account = state.get_account_by_id(account_id);
         // Assert the target account only differs from the default account in balance field
         assert_eq!(account.program_owner, Account::default().program_owner);
         assert_ne!(account.balance, Account::default().balance);
@@ -705,7 +705,7 @@ pub mod tests {
             .with_test_programs()
             .with_non_default_accounts_but_default_program_owners();
         let account_id = AccountId::new([254; 32]);
-        let account = state.get_account_by_id(&account_id);
+        let account = state.get_account_by_id(account_id);
         // Assert the target account only differs from the default account in nonce field
         assert_eq!(account.program_owner, Account::default().program_owner);
         assert_eq!(account.balance, Account::default().balance);
@@ -729,7 +729,7 @@ pub mod tests {
             .with_test_programs()
             .with_non_default_accounts_but_default_program_owners();
         let account_id = AccountId::new([253; 32]);
-        let account = state.get_account_by_id(&account_id);
+        let account = state.get_account_by_id(account_id);
         // Assert the target account only differs from the default account in data field
         assert_eq!(account.program_owner, Account::default().program_owner);
         assert_eq!(account.balance, Account::default().balance);
@@ -756,7 +756,7 @@ pub mod tests {
         let balance_to_move: u128 = 1;
         let program_id = Program::simple_balance_transfer().id();
         assert_ne!(
-            state.get_account_by_id(&sender_account_id).program_owner,
+            state.get_account_by_id(sender_account_id).program_owner,
             program_id
         );
         let message = public_transaction::Message::try_new(
@@ -783,9 +783,9 @@ pub mod tests {
         let account_id = AccountId::new([255; 32]);
         let program_id = Program::data_changer().id();
 
-        assert_ne!(state.get_account_by_id(&account_id), Account::default());
+        assert_ne!(state.get_account_by_id(account_id), Account::default());
         assert_ne!(
-            state.get_account_by_id(&account_id).program_owner,
+            state.get_account_by_id(account_id).program_owner,
             program_id
         );
         let message =
@@ -826,11 +826,11 @@ pub mod tests {
         let program_id = Program::burner().id();
         let account_id = AccountId::new([252; 32]);
         assert_eq!(
-            state.get_account_by_id(&account_id).program_owner,
+            state.get_account_by_id(account_id).program_owner,
             program_id
         );
         let balance_to_burn: u128 = 1;
-        assert!(state.get_account_by_id(&account_id).balance > balance_to_burn);
+        assert!(state.get_account_by_id(account_id).balance > balance_to_burn);
 
         let message = public_transaction::Message::try_new(
             program_id,
@@ -898,7 +898,7 @@ pub mod tests {
         state: &V02State,
     ) -> PrivacyPreservingTransaction {
         let sender = AccountWithMetadata::new(
-            state.get_account_by_id(&sender_keys.account_id()),
+            state.get_account_by_id(sender_keys.account_id()),
             true,
             sender_keys.account_id(),
         );
@@ -1002,7 +1002,7 @@ pub mod tests {
         let sender_pre =
             AccountWithMetadata::new(sender_private_account.clone(), true, &sender_keys.npk());
         let recipient_pre = AccountWithMetadata::new(
-            state.get_account_by_id(recipient_account_id),
+            state.get_account_by_id(*recipient_account_id),
             false,
             *recipient_account_id,
         );
@@ -1054,7 +1054,7 @@ pub mod tests {
         );
 
         let expected_sender_post = {
-            let mut this = state.get_account_by_id(&sender_keys.account_id());
+            let mut this = state.get_account_by_id(sender_keys.account_id());
             this.balance -= balance_to_move;
             this.nonce += 1;
             this
@@ -1067,12 +1067,12 @@ pub mod tests {
             .transition_from_privacy_preserving_transaction(&tx)
             .unwrap();
 
-        let sender_post = state.get_account_by_id(&sender_keys.account_id());
+        let sender_post = state.get_account_by_id(sender_keys.account_id());
         assert_eq!(sender_post, expected_sender_post);
         assert!(state.private_state.0.contains(&expected_new_commitment));
 
         assert_eq!(
-            state.get_account_by_id(&sender_keys.account_id()).balance,
+            state.get_account_by_id(sender_keys.account_id()).balance,
             200 - balance_to_move
         );
     }
@@ -1163,7 +1163,7 @@ pub mod tests {
         let balance_to_move = 37;
 
         let expected_recipient_post = {
-            let mut this = state.get_account_by_id(&recipient_keys.account_id());
+            let mut this = state.get_account_by_id(recipient_keys.account_id());
             this.balance += balance_to_move;
             this
         };
@@ -1199,15 +1199,13 @@ pub mod tests {
             .transition_from_privacy_preserving_transaction(&tx)
             .unwrap();
 
-        let recipient_post = state.get_account_by_id(&recipient_keys.account_id());
+        let recipient_post = state.get_account_by_id(recipient_keys.account_id());
         assert_eq!(recipient_post, expected_recipient_post);
         assert!(state.private_state.0.contains(&sender_pre_commitment));
         assert!(state.private_state.0.contains(&expected_new_commitment));
         assert!(state.private_state.1.contains(&expected_new_nullifier));
         assert_eq!(
-            state
-                .get_account_by_id(&recipient_keys.account_id())
-                .balance,
+            state.get_account_by_id(recipient_keys.account_id()).balance,
             recipient_initial_balance + balance_to_move
         );
     }
@@ -2227,7 +2225,7 @@ pub mod tests {
         let amount: u128 = 37;
 
         // Check the recipient is an uninitialized account
-        assert_eq!(state.get_account_by_id(&to), Account::default());
+        assert_eq!(state.get_account_by_id(to), Account::default());
 
         let expected_recipient_post = Account {
             program_owner: program.id(),
@@ -2243,7 +2241,7 @@ pub mod tests {
 
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let recipient_post = state.get_account_by_id(&to);
+        let recipient_post = state.get_account_by_id(to);
 
         assert_eq!(recipient_post, expected_recipient_post);
     }
@@ -2286,8 +2284,8 @@ pub mod tests {
 
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let from_post = state.get_account_by_id(&from);
-        let to_post = state.get_account_by_id(&to);
+        let from_post = state.get_account_by_id(from);
+        let to_post = state.get_account_by_id(to);
         // The `chain_caller` program calls the program twice
         assert_eq!(from_post.balance, initial_balance - 2 * amount);
         assert_eq!(to_post, expected_to_post);
@@ -3245,13 +3243,13 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let pool_post = state.get_account_by_id(&IdForTests::pool_definition_id());
-        let vault_a_post = state.get_account_by_id(&IdForTests::vault_a_id());
-        let vault_b_post = state.get_account_by_id(&IdForTests::vault_b_id());
-        let token_lp_post = state.get_account_by_id(&IdForTests::token_lp_definition_id());
-        let user_token_a_post = state.get_account_by_id(&IdForTests::user_token_a_id());
-        let user_token_b_post = state.get_account_by_id(&IdForTests::user_token_b_id());
-        let user_token_lp_post = state.get_account_by_id(&IdForTests::user_token_lp_id());
+        let pool_post = state.get_account_by_id(IdForTests::pool_definition_id());
+        let vault_a_post = state.get_account_by_id(IdForTests::vault_a_id());
+        let vault_b_post = state.get_account_by_id(IdForTests::vault_b_id());
+        let token_lp_post = state.get_account_by_id(IdForTests::token_lp_definition_id());
+        let user_token_a_post = state.get_account_by_id(IdForTests::user_token_a_id());
+        let user_token_b_post = state.get_account_by_id(IdForTests::user_token_b_id());
+        let user_token_lp_post = state.get_account_by_id(IdForTests::user_token_lp_id());
 
         let expected_pool = AccountForTests::pool_definition_remove();
         let expected_vault_a = AccountForTests::vault_a_remove();
@@ -3325,13 +3323,13 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let pool_post = state.get_account_by_id(&IdForTests::pool_definition_id());
-        let vault_a_post = state.get_account_by_id(&IdForTests::vault_a_id());
-        let vault_b_post = state.get_account_by_id(&IdForTests::vault_b_id());
-        let token_lp_post = state.get_account_by_id(&IdForTests::token_lp_definition_id());
-        let user_token_a_post = state.get_account_by_id(&IdForTests::user_token_a_id());
-        let user_token_b_post = state.get_account_by_id(&IdForTests::user_token_b_id());
-        let user_token_lp_post = state.get_account_by_id(&IdForTests::user_token_lp_id());
+        let pool_post = state.get_account_by_id(IdForTests::pool_definition_id());
+        let vault_a_post = state.get_account_by_id(IdForTests::vault_a_id());
+        let vault_b_post = state.get_account_by_id(IdForTests::vault_b_id());
+        let token_lp_post = state.get_account_by_id(IdForTests::token_lp_definition_id());
+        let user_token_a_post = state.get_account_by_id(IdForTests::user_token_a_id());
+        let user_token_b_post = state.get_account_by_id(IdForTests::user_token_b_id());
+        let user_token_lp_post = state.get_account_by_id(IdForTests::user_token_lp_id());
 
         let expected_pool = AccountForTests::pool_definition_new_init();
         let expected_vault_a = AccountForTests::vault_a_init();
@@ -3409,13 +3407,13 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let pool_post = state.get_account_by_id(&IdForTests::pool_definition_id());
-        let vault_a_post = state.get_account_by_id(&IdForTests::vault_a_id());
-        let vault_b_post = state.get_account_by_id(&IdForTests::vault_b_id());
-        let token_lp_post = state.get_account_by_id(&IdForTests::token_lp_definition_id());
-        let user_token_a_post = state.get_account_by_id(&IdForTests::user_token_a_id());
-        let user_token_b_post = state.get_account_by_id(&IdForTests::user_token_b_id());
-        let user_token_lp_post = state.get_account_by_id(&IdForTests::user_token_lp_id());
+        let pool_post = state.get_account_by_id(IdForTests::pool_definition_id());
+        let vault_a_post = state.get_account_by_id(IdForTests::vault_a_id());
+        let vault_b_post = state.get_account_by_id(IdForTests::vault_b_id());
+        let token_lp_post = state.get_account_by_id(IdForTests::token_lp_definition_id());
+        let user_token_a_post = state.get_account_by_id(IdForTests::user_token_a_id());
+        let user_token_b_post = state.get_account_by_id(IdForTests::user_token_b_id());
+        let user_token_lp_post = state.get_account_by_id(IdForTests::user_token_lp_id());
 
         let expected_pool = AccountForTests::pool_definition_init();
         let expected_vault_a = AccountForTests::vault_a_init();
@@ -3481,13 +3479,13 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let pool_post = state.get_account_by_id(&IdForTests::pool_definition_id());
-        let vault_a_post = state.get_account_by_id(&IdForTests::vault_a_id());
-        let vault_b_post = state.get_account_by_id(&IdForTests::vault_b_id());
-        let token_lp_post = state.get_account_by_id(&IdForTests::token_lp_definition_id());
-        let user_token_a_post = state.get_account_by_id(&IdForTests::user_token_a_id());
-        let user_token_b_post = state.get_account_by_id(&IdForTests::user_token_b_id());
-        let user_token_lp_post = state.get_account_by_id(&IdForTests::user_token_lp_id());
+        let pool_post = state.get_account_by_id(IdForTests::pool_definition_id());
+        let vault_a_post = state.get_account_by_id(IdForTests::vault_a_id());
+        let vault_b_post = state.get_account_by_id(IdForTests::vault_b_id());
+        let token_lp_post = state.get_account_by_id(IdForTests::token_lp_definition_id());
+        let user_token_a_post = state.get_account_by_id(IdForTests::user_token_a_id());
+        let user_token_b_post = state.get_account_by_id(IdForTests::user_token_b_id());
+        let user_token_lp_post = state.get_account_by_id(IdForTests::user_token_lp_id());
 
         let expected_pool = AccountForTests::pool_definition_new_init();
         let expected_vault_a = AccountForTests::vault_a_init();
@@ -3544,13 +3542,13 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let pool_post = state.get_account_by_id(&IdForTests::pool_definition_id());
-        let vault_a_post = state.get_account_by_id(&IdForTests::vault_a_id());
-        let vault_b_post = state.get_account_by_id(&IdForTests::vault_b_id());
-        let token_lp_post = state.get_account_by_id(&IdForTests::token_lp_definition_id());
-        let user_token_a_post = state.get_account_by_id(&IdForTests::user_token_a_id());
-        let user_token_b_post = state.get_account_by_id(&IdForTests::user_token_b_id());
-        let user_token_lp_post = state.get_account_by_id(&IdForTests::user_token_lp_id());
+        let pool_post = state.get_account_by_id(IdForTests::pool_definition_id());
+        let vault_a_post = state.get_account_by_id(IdForTests::vault_a_id());
+        let vault_b_post = state.get_account_by_id(IdForTests::vault_b_id());
+        let token_lp_post = state.get_account_by_id(IdForTests::token_lp_definition_id());
+        let user_token_a_post = state.get_account_by_id(IdForTests::user_token_a_id());
+        let user_token_b_post = state.get_account_by_id(IdForTests::user_token_b_id());
+        let user_token_lp_post = state.get_account_by_id(IdForTests::user_token_lp_id());
 
         let expected_pool = AccountForTests::pool_definition_add();
         let expected_vault_a = AccountForTests::vault_a_add();
@@ -3601,11 +3599,11 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let pool_post = state.get_account_by_id(&IdForTests::pool_definition_id());
-        let vault_a_post = state.get_account_by_id(&IdForTests::vault_a_id());
-        let vault_b_post = state.get_account_by_id(&IdForTests::vault_b_id());
-        let user_token_a_post = state.get_account_by_id(&IdForTests::user_token_a_id());
-        let user_token_b_post = state.get_account_by_id(&IdForTests::user_token_b_id());
+        let pool_post = state.get_account_by_id(IdForTests::pool_definition_id());
+        let vault_a_post = state.get_account_by_id(IdForTests::vault_a_id());
+        let vault_b_post = state.get_account_by_id(IdForTests::vault_b_id());
+        let user_token_a_post = state.get_account_by_id(IdForTests::user_token_a_id());
+        let user_token_b_post = state.get_account_by_id(IdForTests::user_token_b_id());
 
         let expected_pool = AccountForTests::pool_definition_swap_1();
         let expected_vault_a = AccountForTests::vault_a_swap_1();
@@ -3651,11 +3649,11 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let pool_post = state.get_account_by_id(&IdForTests::pool_definition_id());
-        let vault_a_post = state.get_account_by_id(&IdForTests::vault_a_id());
-        let vault_b_post = state.get_account_by_id(&IdForTests::vault_b_id());
-        let user_token_a_post = state.get_account_by_id(&IdForTests::user_token_a_id());
-        let user_token_b_post = state.get_account_by_id(&IdForTests::user_token_b_id());
+        let pool_post = state.get_account_by_id(IdForTests::pool_definition_id());
+        let vault_a_post = state.get_account_by_id(IdForTests::vault_a_id());
+        let vault_b_post = state.get_account_by_id(IdForTests::vault_b_id());
+        let user_token_a_post = state.get_account_by_id(IdForTests::user_token_a_id());
+        let user_token_b_post = state.get_account_by_id(IdForTests::user_token_b_id());
 
         let expected_pool = AccountForTests::pool_definition_swap_2();
         let expected_vault_a = AccountForTests::vault_a_swap_2();
@@ -3706,8 +3704,8 @@ pub mod tests {
 
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let from_post = state.get_account_by_id(&from);
-        let to_post = state.get_account_by_id(&to);
+        let from_post = state.get_account_by_id(from);
+        let to_post = state.get_account_by_id(to);
         assert_eq!(from_post.balance, initial_balance - amount);
         assert_eq!(to_post, expected_to_post);
     }
@@ -3732,7 +3730,7 @@ pub mod tests {
         let amount: u128 = 37;
 
         // Check the recipient is an uninitialized account
-        assert_eq!(state.get_account_by_id(&to), Account::default());
+        assert_eq!(state.get_account_by_id(to), Account::default());
 
         let expected_to_post = Account {
             // The expected program owner is the authenticated transfer program
@@ -3762,8 +3760,8 @@ pub mod tests {
 
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let from_post = state.get_account_by_id(&from);
-        let to_post = state.get_account_by_id(&to);
+        let from_post = state.get_account_by_id(from);
+        let to_post = state.get_account_by_id(to);
         assert_eq!(from_post.balance, initial_balance - amount);
         assert_eq!(to_post, expected_to_post);
     }
@@ -3958,7 +3956,7 @@ pub mod tests {
         let tx = PublicTransaction::new(message, witness_set);
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let winner_token_holding_post = state.get_account_by_id(&winner_token_holding_id);
+        let winner_token_holding_post = state.get_account_by_id(winner_token_holding_id);
         assert_eq!(
             winner_token_holding_post,
             expected_winner_token_holding_post
@@ -4015,13 +4013,12 @@ pub mod tests {
 
         let balance_to_move: u128 = 4;
 
-        let sender =
-            AccountWithMetadata::new(state.get_account_by_id(&sender_id.clone()), true, sender_id);
+        let sender = AccountWithMetadata::new(state.get_account_by_id(sender_id), true, sender_id);
 
         let sender_nonce = sender.account.nonce;
 
         let _recipient =
-            AccountWithMetadata::new(state.get_account_by_id(&recipient_id), false, sender_id);
+            AccountWithMetadata::new(state.get_account_by_id(recipient_id), false, sender_id);
 
         let message = public_transaction::Message::try_new(
             Program::modified_transfer_program().id(),
@@ -4036,18 +4033,18 @@ pub mod tests {
         let res = state.transition_from_public_transaction(&tx);
         assert!(matches!(res, Err(NssaError::InvalidProgramBehavior)));
 
-        let sender_post = state.get_account_by_id(&sender_id);
-        let recipient_post = state.get_account_by_id(&recipient_id);
+        let sender_post = state.get_account_by_id(sender_id);
+        let recipient_post = state.get_account_by_id(recipient_id);
 
         let expected_sender_post = {
-            let mut this = state.get_account_by_id(&sender_id);
+            let mut this = state.get_account_by_id(sender_id);
             this.balance = sender_init_balance;
             this.nonce = 0;
             this
         };
 
         let expected_recipient_post = {
-            let mut this = state.get_account_by_id(&sender_id);
+            let mut this = state.get_account_by_id(sender_id);
             this.balance = recipient_init_balance;
             this.nonce = 0;
             this
@@ -4217,7 +4214,7 @@ pub mod tests {
         // Should succeed - no changes made, no claim needed
         assert!(result.is_ok());
         // Account should remain default/unclaimed
-        assert_eq!(state.get_account_by_id(&account_id), Account::default());
+        assert_eq!(state.get_account_by_id(account_id), Account::default());
     }
 
     #[test]

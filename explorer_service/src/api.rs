@@ -1,4 +1,4 @@
-use indexer_service_protocol::{Account, AccountId, Block, BlockId, Hash, Transaction};
+use indexer_service_protocol::{Account, AccountId, Block, BlockId, HashType, Transaction};
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct SearchResults {
     pub blocks: Vec<Block>,
     pub transactions: Vec<Transaction>,
-    pub accounts: Vec<(AccountId, Option<Account>)>,
+    pub accounts: Vec<(AccountId, Account)>,
 }
 
 /// RPC client type
@@ -46,7 +46,7 @@ pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
     if let Some(bytes) = parse_hex(&query)
         && let Ok(hash_array) = <[u8; 32]>::try_from(bytes)
     {
-        let hash = Hash(hash_array);
+        let hash = HashType(hash_array);
 
         // Try as block hash
         if let Ok(block) = client.get_block_by_hash(hash).await {
@@ -60,14 +60,8 @@ pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
 
         // Try as account ID
         let account_id = AccountId { value: hash_array };
-        match client.get_account(account_id).await {
-            Ok(account) => {
-                accounts.push((account_id, Some(account)));
-            }
-            Err(_) => {
-                // Account might not exist yet, still add it to results
-                accounts.push((account_id, None));
-            }
+        if let Ok(account) = client.get_account(account_id).await {
+            accounts.push((account_id, account));
         }
     }
 
@@ -98,7 +92,7 @@ pub async fn get_block_by_id(block_id: BlockId) -> Result<Block, ServerFnError> 
 
 /// Get block by hash
 #[server]
-pub async fn get_block_by_hash(block_hash: Hash) -> Result<Block, ServerFnError> {
+pub async fn get_block_by_hash(block_hash: HashType) -> Result<Block, ServerFnError> {
     use indexer_service_rpc::RpcClient as _;
     let client = expect_context::<IndexerRpcClient>();
     client
@@ -109,7 +103,7 @@ pub async fn get_block_by_hash(block_hash: Hash) -> Result<Block, ServerFnError>
 
 /// Get transaction by hash
 #[server]
-pub async fn get_transaction(tx_hash: Hash) -> Result<Transaction, ServerFnError> {
+pub async fn get_transaction(tx_hash: HashType) -> Result<Transaction, ServerFnError> {
     use indexer_service_rpc::RpcClient as _;
     let client = expect_context::<IndexerRpcClient>();
     client

@@ -3,8 +3,8 @@ use std::time::Duration;
 use anyhow::{Context as _, Result};
 use common::PINATA_BASE58;
 use integration_tests::{
-    ACC_SENDER, ACC_SENDER_PRIVATE, TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext,
-    format_private_account_id, format_public_account_id, verify_commitment_is_in_state,
+    TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext, format_private_account_id,
+    format_public_account_id, verify_commitment_is_in_state,
 };
 use log::info;
 use tokio::test;
@@ -22,12 +22,12 @@ async fn claim_pinata_to_existing_public_account() -> Result<()> {
 
     let pinata_prize = 150;
     let command = Command::Pinata(PinataProgramAgnosticSubcommand::Claim {
-        to: format_public_account_id(ACC_SENDER),
+        to: format_public_account_id(ctx.existing_public_accounts()[0]),
     });
 
     let pinata_balance_pre = ctx
         .sequencer_client()
-        .get_account_balance(PINATA_BASE58.to_string())
+        .get_account_balance(PINATA_BASE58.parse().unwrap())
         .await?
         .balance;
 
@@ -39,13 +39,13 @@ async fn claim_pinata_to_existing_public_account() -> Result<()> {
     info!("Checking correct balance move");
     let pinata_balance_post = ctx
         .sequencer_client()
-        .get_account_balance(PINATA_BASE58.to_string())
+        .get_account_balance(PINATA_BASE58.parse().unwrap())
         .await?
         .balance;
 
     let winner_balance_post = ctx
         .sequencer_client()
-        .get_account_balance(ACC_SENDER.to_string())
+        .get_account_balance(ctx.existing_public_accounts()[0])
         .await?
         .balance;
 
@@ -63,12 +63,12 @@ async fn claim_pinata_to_existing_private_account() -> Result<()> {
 
     let pinata_prize = 150;
     let command = Command::Pinata(PinataProgramAgnosticSubcommand::Claim {
-        to: format_private_account_id(ACC_SENDER_PRIVATE),
+        to: format_private_account_id(ctx.existing_private_accounts()[0]),
     });
 
     let pinata_balance_pre = ctx
         .sequencer_client()
-        .get_account_balance(PINATA_BASE58.to_string())
+        .get_account_balance(PINATA_BASE58.parse().unwrap())
         .await?
         .balance;
 
@@ -86,13 +86,13 @@ async fn claim_pinata_to_existing_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&ACC_SENDER_PRIVATE.parse()?)
+        .get_private_account_commitment(ctx.existing_private_accounts()[0])
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
     let pinata_balance_post = ctx
         .sequencer_client()
-        .get_account_balance(PINATA_BASE58.to_string())
+        .get_account_balance(PINATA_BASE58.parse().unwrap())
         .await?
         .balance;
 
@@ -122,7 +122,7 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
         anyhow::bail!("Expected RegisterAccount return value");
     };
 
-    let winner_account_id_formatted = format_private_account_id(&winner_account_id.to_string());
+    let winner_account_id_formatted = format_private_account_id(winner_account_id);
 
     // Initialize account under auth transfer program
     let command = Command::AuthTransfer(AuthTransferSubcommand::Init {
@@ -135,7 +135,7 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&winner_account_id)
+        .get_private_account_commitment(winner_account_id)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
@@ -146,7 +146,7 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
 
     let pinata_balance_pre = ctx
         .sequencer_client()
-        .get_account_balance(PINATA_BASE58.to_string())
+        .get_account_balance(PINATA_BASE58.parse().unwrap())
         .await?
         .balance;
 
@@ -157,13 +157,13 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&winner_account_id)
+        .get_private_account_commitment(winner_account_id)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
     let pinata_balance_post = ctx
         .sequencer_client()
-        .get_account_balance(PINATA_BASE58.to_string())
+        .get_account_balance(PINATA_BASE58.parse().unwrap())
         .await?
         .balance;
 

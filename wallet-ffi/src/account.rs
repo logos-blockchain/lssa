@@ -278,7 +278,7 @@ pub unsafe extern "C" fn wallet_ffi_get_balance(
             Err(e) => return e,
         }
     } else {
-        match wallet.get_account_private(&account_id) {
+        match wallet.get_account_private(account_id) {
             Some(account) => account.balance,
             None => {
                 print_error("Private account not found");

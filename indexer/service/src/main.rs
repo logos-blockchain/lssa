@@ -1,0 +1,56 @@
+use std::path::PathBuf;
+
+use anyhow::Result;
+use clap::Parser;
+use log::{error, info};
+use tokio_util::sync::CancellationToken;
+
+#[derive(Debug, Parser)]
+#[clap(version)]
+struct Args {
+    #[clap(name = "config")]
+    config_path: PathBuf,
+    #[clap(short, long, default_value = "8779")]
+    port: u16,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    env_logger::init();
+
+    let Args { config_path, port } = Args::parse();
+
+    let cancellation_token = listen_for_shutdown_signal();
+
+    let config = indexer_service::IndexerConfig::from_path(&config_path)?;
+    let indexer_handle = indexer_service::run_server(config, port).await?;
+
+    tokio::select! {
+        _ = cancellation_token.cancelled() => {
+            info!("Shutting down server...");
+        }
+        _ = indexer_handle.stopped() => {
+            error!("Server stopped unexpectedly");
+        }
+    }
+
+    info!("Server shutdown complete");
+
+    Ok(())
+}
+
+fn listen_for_shutdown_signal() -> CancellationToken {
+    let cancellation_token = CancellationToken::new();
+    let cancellation_token_clone = cancellation_token.clone();
+
+    tokio::spawn(async move {
+        if let Err(err) = tokio::signal::ctrl_c().await {
+            error!("Failed to listen for Ctrl-C signal: {err}");
+            return;
+        }
+        info!("Received Ctrl-C signal");
+        cancellation_token_clone.cancel();
+    });
+
+    cancellation_token
+}

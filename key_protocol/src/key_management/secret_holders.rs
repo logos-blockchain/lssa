@@ -66,11 +66,11 @@ impl SeedHolder {
         }
 
         // Safe unwrap
-        *hash.first_chunk::<32>().unwrap()
+        HashType(*hash.first_chunk::<32>().unwrap())
     }
 
     pub fn produce_top_secret_key_holder(&self) -> SecretSpendingKey {
-        SecretSpendingKey(self.generate_secret_spending_key_hash())
+        SecretSpendingKey(self.generate_secret_spending_key_hash().into())
     }
 }
 
@@ -94,7 +94,7 @@ impl SecretSpendingKey {
         hasher.update([2u8]);
         hasher.update([0u8; 22]);
 
-        <HashType>::from(hasher.finalize_fixed())
+        hasher.finalize_fixed().into()
     }
 
     pub fn generate_outgoing_viewing_secret_key(&self) -> OutgoingViewingSecretKey {
@@ -105,7 +105,7 @@ impl SecretSpendingKey {
         hasher.update([3u8]);
         hasher.update([0u8; 22]);
 
-        <HashType>::from(hasher.finalize_fixed())
+        hasher.finalize_fixed().into()
     }
 
     pub fn produce_private_key_holder(&self) -> PrivateKeyHolder {

@@ -43,7 +43,7 @@ To our knowledge, this design is unique to LEZ. Other privacy-focused programmab
    - Execution is handled fully on-chain without ZKPs.
    - Alice’s and Charlie’s public balances are updated.
 
-   
+
 ### Key points:
 - The same token program is used in every execution.
 - The only difference is execution mode: public execution updates visible state on-chain, while private execution relies on ZKPs.
@@ -127,6 +127,9 @@ RUST_LOG=info RISC0_DEV_MODE=1 cargo run $(pwd)/configs/debug all
 
 # Run the sequencer and node
 
+
+## Running Manually
+
 The sequencer and node can be run locally:
 
  1. On one terminal go to the `logos-blockchain/logos-blockchain` repo and run a local logos blockchain node:
@@ -138,10 +141,22 @@ The sequencer and node can be run locally:
       - `./target/debug/logos-blockchain-node nodes/node/config-one-node.yaml`
 
  2. On another terminal go to the `logos-blockchain/lssa` repo and run indexer service:
-      - `git checkout schouhy/full-bedrock-integration`
-      - `RUST_LOG=info cargo run --release -p indexer_service $(pwd)/integration_tests/configs/indexer/indexer_config.json`
+      - `RUST_LOG=info cargo run --release -p indexer_service indexer/service/configs/indexer_config.json`
 
  3. On another terminal go to the `logos-blockchain/lssa` repo and run the sequencer:
-      - `git checkout schouhy/full-bedrock-integration`
       - `RUST_LOG=info RISC0_DEV_MODE=1 cargo run --release -p sequencer_runner sequencer_runner/configs/debug`
+
+## Running with Docker
+
+You can run the whole setup with Docker:
+
+```bash
+docker compose up
+```
+
+With that you can send transactions from local wallet to the Sequencer running inside Docker using `wallet/configs/debug` as well as exploring blocks by opening `http://localhost:8080`.
+
+## Caution for local image builds
+
+If you're going to build sequencer image locally you should better adjust default docker settings and set `defaultKeepStorage` at least `25GB` so that it can keep layers properly cached.
 

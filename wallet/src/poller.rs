@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use common::{block::HashableBlockData, sequencer_client::SequencerClient};
+use common::{HashType, block::HashableBlockData, sequencer_client::SequencerClient};
 use log::{info, warn};
 
 use crate::config::WalletConfig;
@@ -28,10 +28,11 @@ impl TxPoller {
         }
     }
 
-    pub async fn poll_tx(&self, tx_hash: String) -> Result<String> {
+    // TODO: this polling is not based on blocks, but on timeouts, need to fix this.
+    pub async fn poll_tx(&self, tx_hash: HashType) -> Result<String> {
         let max_blocks_to_query = self.polling_max_blocks_to_query;
 
-        info!("Starting poll for transaction {tx_hash:#?}");
+        info!("Starting poll for transaction {tx_hash}");
         for poll_id in 1..max_blocks_to_query {
             info!("Poll {poll_id}");
 
@@ -40,10 +41,10 @@ impl TxPoller {
             let tx_obj = loop {
                 let tx_obj = self
                     .client
-                    .get_transaction_by_hash(tx_hash.clone())
+                    .get_transaction_by_hash(tx_hash)
                     .await
                     .inspect_err(|err| {
-                        warn!("Failed to get transaction by hash {tx_hash:#?} with error: {err:#?}")
+                        warn!("Failed to get transaction by hash {tx_hash} with error: {err:#?}")
                     });
 
                 if let Ok(tx_obj) = tx_obj {
@@ -57,8 +58,8 @@ impl TxPoller {
                 }
             };
 
-            if tx_obj.transaction.is_some() {
-                return Ok(tx_obj.transaction.unwrap());
+            if let Some(tx) = tx_obj.transaction {
+                return Ok(tx);
             }
 
             tokio::time::sleep(std::time::Duration::from_millis(self.polling_delay_millis)).await;
