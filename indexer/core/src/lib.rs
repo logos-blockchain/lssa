@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use anyhow::Result;
 use bedrock_client::{BedrockClient, HeaderId};
 use common::block::{Block, HashableBlockData};
@@ -78,22 +80,51 @@ impl IndexerCore {
 
     pub async fn subscribe_parse_block_stream(&self) -> impl futures::Stream<Item = Result<Block>> {
         async_stream::stream! {
-        loop {
-            let mut stream_pinned = Box::pin(self.bedrock_client.get_lib_stream().await?);
+            let last_l1_header = self.store.last_observed_l1_header()?;
 
-            info!("Block stream joined");
+            let mut last_fin_header = match last_l1_header {
+                Some(last_l1_header) => {
+                    last_l1_header
+                },
+                None => {
+                    info!("Searching for the start of a channel");
 
-            while let Some(block_info) = stream_pinned.next().await {
-                let header_id = block_info.header_id;
+                    let start_buff = self.search_for_channel_start().await?;
 
-                info!("Observed L1 block at height {}", block_info.height);
+                    let last_l1_header = start_buff.back().ok_or(anyhow::anyhow!("Failure: Chain is empty"))?.header().id();
 
-                if let Some(l1_block) = self
-                    .bedrock_client
-                    .get_block_by_id(header_id)
-                    .await?
-                {
-                    info!("Extracted L1 block at height {}", block_info.height);
+                    for l1_block in start_buff {
+                        info!("Observed L1 block at height {}", l1_block.header().slot().into_inner());
+
+                        let curr_l1_header = l1_block.header().id();
+
+                        let l2_blocks_parsed = parse_blocks(
+                            l1_block.into_transactions().into_iter(),
+                            &self.config.channel_id,
+                        ).collect::<Vec<_>>();
+
+                        info!("Parsed {} L2 blocks", l2_blocks_parsed.len());
+
+                        for l2_block in l2_blocks_parsed {
+                            self.store.put_block(l2_block.clone(), curr_l1_header)?;
+
+                            yield Ok(l2_block);
+                        }
+                    }
+
+                    last_l1_header
+                },
+            };
+
+            loop {
+                let buff = self.rollback_to_last_known_finalized_l1_id(last_fin_header).await?;
+
+                last_fin_header = buff.back().ok_or(anyhow::anyhow!("Failure: Chain is empty"))?.header().id();
+
+                for l1_block in buff {
+                    info!("Observed L1 block at height {}", l1_block.header().slot().into_inner());
+
+                    let curr_l1_header = l1_block.header().id();
 
                     let l2_blocks_parsed = parse_blocks(
                         l1_block.into_transactions().into_iter(),
@@ -105,19 +136,12 @@ impl IndexerCore {
                     info!("Parsed {} L2 blocks with ids {:?}", l2_blocks_parsed.len(), l2_blocks_parsed_ids);
 
                     for l2_block in l2_blocks_parsed {
-                        self.store.put_block(l2_block.clone())?;
+                        self.store.put_block(l2_block.clone(), curr_l1_header)?;
 
                         yield Ok(l2_block);
                     }
                 }
             }
-
-            // Refetch stream after delay
-            tokio::time::sleep(std::time::Duration::from_millis(
-                self.config.resubscribe_interval_millis,
-            ))
-            .await;
-        }
         }
     }
 
@@ -132,11 +156,13 @@ impl IndexerCore {
 
     pub async fn search_for_channel_start(
         &self,
-        channel_id_to_search: &ChannelId,
-    ) -> Result<HeaderId> {
+    ) -> Result<VecDeque<bedrock_client::Block<SignedMantleTx>>> {
         let mut curr_last_header = self.wait_last_finalized_block_header().await?;
+        // ToDo: Not scalable, initial buffer should be stored in DB to not run out of memory
+        // Don't want to complicate DB even more right now.
+        let mut initial_block_buffer = VecDeque::new();
 
-        let first_header = loop {
+        loop {
             let Some(curr_last_block) = self
                 .bedrock_client
                 .get_block_by_id(curr_last_header)
@@ -145,12 +171,14 @@ impl IndexerCore {
                 return Err(anyhow::anyhow!("Chain inconsistency"));
             };
 
-            if let Some(search_res) = curr_last_block.transactions().find_map(|tx| {
+            initial_block_buffer.push_front(curr_last_block.clone());
+
+            if let Some(_) = curr_last_block.transactions().find_map(|tx| {
                 tx.mantle_tx.ops.iter().find_map(|op| match op {
                     Op::ChannelInscribe(InscriptionOp {
                         channel_id, parent, ..
                     }) => {
-                        if (channel_id == channel_id_to_search) && (parent == &MsgId::root()) {
+                        if (channel_id == &self.config.channel_id) && (parent == &MsgId::root()) {
                             Some(curr_last_block.header().id())
                         } else {
                             None
@@ -159,13 +187,45 @@ impl IndexerCore {
                     _ => None,
                 })
             }) {
-                break search_res;
+                break;
             } else {
+                // Step back to parent
                 curr_last_header = curr_last_block.header().parent();
             };
-        };
+        }
 
-        Ok(first_header)
+        Ok(initial_block_buffer)
+    }
+
+    pub async fn rollback_to_last_known_finalized_l1_id(
+        &self,
+        last_fin_header: HeaderId,
+    ) -> Result<VecDeque<bedrock_client::Block<SignedMantleTx>>> {
+        let mut curr_last_header = self.wait_last_finalized_block_header().await?;
+        // ToDo: Not scalable, buffer should be stored in DB to not run out of memory
+        // Don't want to complicate DB even more right now.
+        let mut block_buffer = VecDeque::new();
+
+        loop {
+            let Some(curr_last_block) = self
+                .bedrock_client
+                .get_block_by_id(curr_last_header)
+                .await?
+            else {
+                return Err(anyhow::anyhow!("Chain inconsistency"));
+            };
+
+            if curr_last_block.header().id() == last_fin_header {
+                break;
+            } else {
+                // Step back to parent
+                curr_last_header = curr_last_block.header().parent();
+            }
+
+            block_buffer.push_front(curr_last_block.clone());
+        }
+
+        Ok(block_buffer)
     }
 }
 

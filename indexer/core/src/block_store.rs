@@ -1,6 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
+use bedrock_client::HeaderId;
 use common::{
     block::Block,
     transaction::{NSSATransaction, execute_check_transaction_on_state, transaction_pre_check},
@@ -32,6 +33,13 @@ impl IndexerStore {
     /// Reopening existing database
     pub fn open_db_restart(location: &Path) -> Result<Self> {
         Self::open_db_with_genesis(location, None)
+    }
+
+    pub fn last_observed_l1_header(&self) -> Result<Option<HeaderId>> {
+        Ok(self
+            .dbio
+            .get_meta_last_observed_l1_block_in_db()?
+            .map(|raw_id| HeaderId::from(raw_id)))
     }
 
     pub fn get_last_block_id(&self) -> Result<u64> {
@@ -95,7 +103,7 @@ impl IndexerStore {
         Ok(self.final_state()?.get_account_by_id(*account_id))
     }
 
-    pub fn put_block(&self, block: Block) -> Result<()> {
+    pub fn put_block(&self, block: Block, l1_header: HeaderId) -> Result<()> {
         let mut final_state = self.dbio.final_state()?;
 
         for transaction in &block.body.transactions {
@@ -105,6 +113,6 @@ impl IndexerStore {
             )?;
         }
 
-        Ok(self.dbio.put_block(block)?)
+        Ok(self.dbio.put_block(block, l1_header.into())?)
     }
 }
