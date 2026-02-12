@@ -135,10 +135,10 @@ The sequencer and node can be run locally:
  1. On one terminal go to the `logos-blockchain/logos-blockchain` repo and run a local logos blockchain node:
       - `git checkout master; git pull`
       - `cargo clean`
-      - `rm ~/.logos-blockchain-circuits`
+      - `rm -r ~/.logos-blockchain-circuits`
       - `./scripts/setup-logos-blockchain-circuits.sh`
       - `cargo build --all-features`
-      - `./target/debug/logos-blockchain-node nodes/node/config-one-node.yaml`
+      - `./target/debug/logos-blockchain-node --deployment nodes/node/standalone-deployment-config.yaml nodes/node/standalone-node-config.yaml`
 
  2. On another terminal go to the `logos-blockchain/lssa` repo and run indexer service:
       - `RUST_LOG=info cargo run --release -p indexer_service indexer/service/configs/indexer_config.json`
