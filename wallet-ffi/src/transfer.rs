@@ -73,7 +73,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_public(
 
     match block_on(transfer.send_public_transfer(from_id, to_id, amount)) {
         Ok(Ok(response)) => {
-            let tx_hash = CString::new(response.tx_hash)
+            let tx_hash = CString::new(response.tx_hash.to_string())
                 .map(|s| s.into_raw())
                 .unwrap_or(ptr::null_mut());
 
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn wallet_ffi_register_public_account(
 
     match block_on(transfer.register_account(account_id)) {
         Ok(Ok(response)) => {
-            let tx_hash = CString::new(response.tx_hash)
+            let tx_hash = CString::new(response.tx_hash.to_string())
                 .map(|s| s.into_raw())
                 .unwrap_or(ptr::null_mut());
 

@@ -64,11 +64,11 @@ impl SeedHolder {
         }
 
         // Safe unwrap
-        *hash.first_chunk::<32>().unwrap()
+        HashType(*hash.first_chunk::<32>().unwrap())
     }
 
     pub fn produce_top_secret_key_holder(&self) -> SecretSpendingKey {
-        SecretSpendingKey(self.generate_secret_spending_key_hash())
+        SecretSpendingKey(self.generate_secret_spending_key_hash().into())
     }
 }
 
@@ -109,10 +109,9 @@ impl SecretSpendingKey {
         hasher.update(index.to_le_bytes());
         hasher.update(SUFFIX_2);
 
-        <HashType>::from(hasher.finalize_fixed())
+        hasher.finalize_fixed().into()
     }
 
-    // TODO: this should use index
     pub fn produce_private_key_holder(&self, index: Option<u32>) -> PrivateKeyHolder {
         PrivateKeyHolder {
             nullifier_secret_key: self.generate_nullifier_secret_key(index),

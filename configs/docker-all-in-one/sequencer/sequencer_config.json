@@ -1,0 +1,102 @@
+{
+    "home": "/var/lib/sequencer_runner",
+    "override_rust_log": null,
+    "genesis_id": 1,
+    "is_genesis_random": true,
+    "max_num_tx_in_block": 20,
+    "mempool_max_size": 10000,
+    "block_create_timeout_millis": 10000,
+    "retry_pending_blocks_timeout_millis": 7000,
+    "port": 3040,
+    "bedrock_config": {
+        "backoff": {
+            "start_delay_millis": 100,
+            "max_retries": 5
+        },
+        "channel_id": "0101010101010101010101010101010101010101010101010101010101010101",
+        "node_url": "http://logos-blockchain-node-0:18080"
+    },
+    "indexer_rpc_url": "ws://indexer_service:8779",
+    "initial_accounts": [
+        {
+            "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+            "balance": 10000
+        },
+        {
+            "account_id": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+            "balance": 20000
+        }
+    ],
+    "initial_commitments": [
+        {
+            "npk": [13, 25, 40, 5, 198, 248, 210, 248, 237, 121, 124, 145, 186, 142, 253, 216, 236, 69, 193, 32, 166, 167, 49, 133, 172, 111, 159, 46, 84, 17, 157, 23],
+            "account": {
+                "program_owner": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "balance": 10000,
+                "data": [],
+                "nonce": 0
+            }
+        },
+        {
+            "npk": [32, 67, 72, 164, 106, 53, 66, 239, 141, 15, 52, 230, 136, 177, 2, 236, 207, 243, 134, 135, 210, 143, 87, 232, 215, 128, 194, 120, 113, 224, 4, 165],
+            "account": {
+                "program_owner": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "balance": 20000,
+                "data": [],
+                "nonce": 0
+            }
+        }
+    ],
+    "signing_key": [
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37,
+        37
+    ]
+}

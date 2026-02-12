@@ -122,6 +122,7 @@ impl Default for FfiAccountList {
 /// Result of a transfer operation.
 #[repr(C)]
 pub struct FfiTransferResult {
+    // TODO: Replace with HashType FFI representation
     /// Transaction hash (null-terminated string, or null on failure)
     pub tx_hash: *mut c_char,
     /// Whether the transfer succeeded

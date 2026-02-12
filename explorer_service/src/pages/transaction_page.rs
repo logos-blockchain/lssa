@@ -1,5 +1,5 @@
 use indexer_service_protocol::{
-    Hash, PrivacyPreservingMessage, PrivacyPreservingTransaction, ProgramDeploymentMessage,
+    HashType, PrivacyPreservingMessage, PrivacyPreservingTransaction, ProgramDeploymentMessage,
     ProgramDeploymentTransaction, PublicMessage, PublicTransaction, Transaction, WitnessSet,
 };
 use leptos::prelude::*;
@@ -18,7 +18,7 @@ pub fn TransactionPage() -> impl IntoView {
             format_utils::parse_hex(&tx_hash_str).and_then(|bytes| {
                 if bytes.len() == 32 {
                     let hash_array: [u8; 32] = bytes.try_into().ok()?;
-                    Some(Hash(hash_array))
+                    Some(HashType(hash_array))
                 } else {
                     None
                 }

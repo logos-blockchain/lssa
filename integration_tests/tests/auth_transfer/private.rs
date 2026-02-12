@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use anyhow::{Context as _, Result};
 use integration_tests::{
-    ACC_RECEIVER, ACC_RECEIVER_PRIVATE, ACC_SENDER, ACC_SENDER_PRIVATE,
     TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext, fetch_privacy_preserving_tx,
     format_private_account_id, format_public_account_id, verify_commitment_is_in_state,
 };
@@ -20,12 +19,12 @@ use wallet::cli::{
 async fn private_transfer_to_owned_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
-    let to: AccountId = ACC_RECEIVER_PRIVATE.parse()?;
+    let from: AccountId = ctx.existing_private_accounts()[0];
+    let to: AccountId = ctx.existing_private_accounts()[1];
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to.to_string())),
+        from: format_private_account_id(from),
+        to: Some(format_private_account_id(to)),
         to_npk: None,
         to_vpk: None,
         amount: 100,
@@ -38,13 +37,13 @@ async fn private_transfer_to_owned_account() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment for sender")?;
     assert!(verify_commitment_is_in_state(new_commitment1, ctx.sequencer_client()).await);
 
     let new_commitment2 = ctx
         .wallet()
-        .get_private_account_commitment(&to)
+        .get_private_account_commitment(to)
         .context("Failed to get private account commitment for receiver")?;
     assert!(verify_commitment_is_in_state(new_commitment2, ctx.sequencer_client()).await);
 
@@ -57,13 +56,13 @@ async fn private_transfer_to_owned_account() -> Result<()> {
 async fn private_transfer_to_foreign_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
+    let from: AccountId = ctx.existing_private_accounts()[0];
     let to_npk = NullifierPublicKey([42; 32]);
     let to_npk_string = hex::encode(to_npk.0);
     let to_vpk = Secp256k1Point::from_scalar(to_npk.0);
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
+        from: format_private_account_id(from),
         to: None,
         to_npk: Some(to_npk_string),
         to_vpk: Some(hex::encode(to_vpk.0)),
@@ -80,10 +79,10 @@ async fn private_transfer_to_foreign_account() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment for sender")?;
 
-    let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash.clone()).await;
+    let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash).await;
     assert_eq!(tx.message.new_commitments[0], new_commitment1);
 
     assert_eq!(tx.message.new_commitments.len(), 2);
@@ -100,19 +99,19 @@ async fn private_transfer_to_foreign_account() -> Result<()> {
 async fn deshielded_transfer_to_public_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
-    let to: AccountId = ACC_RECEIVER.parse()?;
+    let from: AccountId = ctx.existing_private_accounts()[0];
+    let to: AccountId = ctx.existing_public_accounts()[1];
 
     // Check initial balance of the private sender
     let from_acc = ctx
         .wallet()
-        .get_account_private(&from)
+        .get_account_private(from)
         .context("Failed to get sender's private account")?;
     assert_eq!(from_acc.balance, 10000);
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
-        to: Some(format_public_account_id(&to.to_string())),
+        from: format_private_account_id(from),
+        to: Some(format_public_account_id(to)),
         to_npk: None,
         to_vpk: None,
         amount: 100,
@@ -125,18 +124,15 @@ async fn deshielded_transfer_to_public_account() -> Result<()> {
 
     let from_acc = ctx
         .wallet()
-        .get_account_private(&from)
+        .get_account_private(from)
         .context("Failed to get sender's private account")?;
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
-    let acc_2_balance = ctx
-        .sequencer_client()
-        .get_account_balance(to.to_string())
-        .await?;
+    let acc_2_balance = ctx.sequencer_client().get_account_balance(to).await?;
 
     assert_eq!(from_acc.balance, 9900);
     assert_eq!(acc_2_balance.balance, 20100);
@@ -150,7 +146,7 @@ async fn deshielded_transfer_to_public_account() -> Result<()> {
 async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
+    let from: AccountId = ctx.existing_private_accounts()[0];
 
     // Create a new private account
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private { cci: None }));
@@ -168,13 +164,13 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
         .wallet()
         .storage()
         .user_data
-        .get_private_account(&to_account_id)
+        .get_private_account(to_account_id)
         .cloned()
         .context("Failed to get private account")?;
 
     // Send to this account using claiming path (using npk and vpk instead of account ID)
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
+        from: format_private_account_id(from),
         to: None,
         to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
         to_vpk: Some(hex::encode(to_keys.viewing_public_key.0)),
@@ -186,7 +182,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
         anyhow::bail!("Expected PrivacyPreservingTransfer return value");
     };
 
-    let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash.clone()).await;
+    let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash).await;
 
     // Sync the wallet to claim the new account
     let command = Command::Account(AccountSubcommand::SyncPrivate {});
@@ -194,7 +190,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment for sender")?;
     assert_eq!(tx.message.new_commitments[0], new_commitment1);
 
@@ -205,7 +201,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
 
     let to_res_acc = ctx
         .wallet()
-        .get_account_private(&to_account_id)
+        .get_account_private(to_account_id)
         .context("Failed to get recipient's private account")?;
     assert_eq!(to_res_acc.balance, 100);
 
@@ -218,12 +214,12 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
 async fn shielded_transfer_to_owned_private_account() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let from: AccountId = ACC_SENDER.parse()?;
-    let to: AccountId = ACC_RECEIVER_PRIVATE.parse()?;
+    let from: AccountId = ctx.existing_public_accounts()[0];
+    let to: AccountId = ctx.existing_private_accounts()[1];
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
-        to: Some(format_private_account_id(&to.to_string())),
+        from: format_public_account_id(from),
+        to: Some(format_private_account_id(to)),
         to_npk: None,
         to_vpk: None,
         amount: 100,
@@ -236,18 +232,15 @@ async fn shielded_transfer_to_owned_private_account() -> Result<()> {
 
     let acc_to = ctx
         .wallet()
-        .get_account_private(&to)
+        .get_account_private(to)
         .context("Failed to get receiver's private account")?;
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&to)
+        .get_private_account_commitment(to)
         .context("Failed to get receiver's commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
-    let acc_from_balance = ctx
-        .sequencer_client()
-        .get_account_balance(from.to_string())
-        .await?;
+    let acc_from_balance = ctx.sequencer_client().get_account_balance(from).await?;
 
     assert_eq!(acc_from_balance.balance, 9900);
     assert_eq!(acc_to.balance, 20100);
@@ -264,10 +257,10 @@ async fn shielded_transfer_to_foreign_account() -> Result<()> {
     let to_npk = NullifierPublicKey([42; 32]);
     let to_npk_string = hex::encode(to_npk.0);
     let to_vpk = Secp256k1Point::from_scalar(to_npk.0);
-    let from: AccountId = ACC_SENDER.parse()?;
+    let from: AccountId = ctx.existing_public_accounts()[0];
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_public_account_id(&from.to_string()),
+        from: format_public_account_id(from),
         to: None,
         to_npk: Some(to_npk_string),
         to_vpk: Some(hex::encode(to_vpk.0)),
@@ -284,10 +277,7 @@ async fn shielded_transfer_to_foreign_account() -> Result<()> {
 
     let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash).await;
 
-    let acc_1_balance = ctx
-        .sequencer_client()
-        .get_account_balance(from.to_string())
-        .await?;
+    let acc_1_balance = ctx.sequencer_client().get_account_balance(from).await?;
 
     assert!(
         verify_commitment_is_in_state(
@@ -313,7 +303,7 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
     // The original implementation spawned wallet::cli::execute_continuous_run() in background
     // but this conflicts with TestContext's wallet management
 
-    let from: AccountId = ACC_SENDER_PRIVATE.parse()?;
+    let from: AccountId = ctx.existing_private_accounts()[0];
 
     // Create a new private account
     let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private { cci: None }));
@@ -331,13 +321,13 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
         .wallet()
         .storage()
         .user_data
-        .get_private_account(&to_account_id)
+        .get_private_account(to_account_id)
         .cloned()
         .context("Failed to get private account")?;
 
     // Send transfer using nullifier and  viewing public keys
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
-        from: format_private_account_id(&from.to_string()),
+        from: format_private_account_id(from),
         to: None,
         to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
         to_vpk: Some(hex::encode(to_keys.viewing_public_key.0)),
@@ -349,7 +339,7 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
         anyhow::bail!("Failed to send transaction");
     };
 
-    let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash.clone()).await;
+    let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash).await;
 
     info!("Waiting for next blocks to check if continuous run fetches account");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
@@ -364,7 +354,7 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
     // Verify receiver account balance
     let to_res_acc = ctx
         .wallet()
-        .get_account_private(&to_account_id)
+        .get_account_private(to_account_id)
         .context("Failed to get receiver account")?;
 
     assert_eq!(to_res_acc.balance, 100);
@@ -383,7 +373,7 @@ async fn initialize_private_account() -> Result<()> {
     };
 
     let command = Command::AuthTransfer(AuthTransferSubcommand::Init {
-        account_id: format_private_account_id(&account_id.to_string()),
+        account_id: format_private_account_id(account_id),
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
@@ -395,13 +385,13 @@ async fn initialize_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&account_id)
+        .get_private_account_commitment(account_id)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
     let account = ctx
         .wallet()
-        .get_account_private(&account_id)
+        .get_account_private(account_id)
         .context("Failed to get private account")?;
 
     assert_eq!(

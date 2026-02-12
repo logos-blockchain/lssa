@@ -1,4 +1,4 @@
-name: Publish Sequencer Runner Image
+name: Publish Docker Images
 
 on:
   workflow_dispatch:
@@ -6,6 +6,15 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: sequencer_runner
+            dockerfile: ./sequencer_runner/Dockerfile
+          - name: indexer_service
+            dockerfile: ./indexer/service/Dockerfile
+          - name: explorer_service
+            dockerfile: ./explorer_service/Dockerfile
     steps:
       - uses: actions/checkout@v5
 
@@ -23,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}/sequencer_runner
+          images: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}/${{ matrix.name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -36,7 +45,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./sequencer_runner/Dockerfile
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

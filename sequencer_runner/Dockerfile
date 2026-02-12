@@ -1,14 +1,33 @@
 # Chef stage - uses pre-built cargo-chef image
 FROM lukemathwalker/cargo-chef:latest-rust-1.91.1-slim-trixie AS chef
 
-# Install build dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
+    build-essential \
     pkg-config \
     libssl-dev \
     libclang-dev \
     clang \
+    cmake \
+    ninja-build \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# Install r0vm (manual build as it's portable across different host platforms)
+RUN git clone --depth 1 --branch release-3.0 https://github.com/risc0/risc0.git
+RUN git clone --depth 1 --branch r0.1.91.1 https://github.com/risc0/rust.git
+WORKDIR /risc0
+RUN cargo install --path rzup
+RUN rzup build --path /rust rust --verbose
+RUN cargo install --path risc0/cargo-risczero
+ENV PATH="/root/.cargo/bin:/root/.risc0/bin:${PATH}"
+RUN cp "$(which r0vm)" /usr/local/bin/r0vm
+RUN test -x /usr/local/bin/r0vm
+RUN r0vm --version
+
+# Install logos blockchain circuits
+RUN curl -sSL https://raw.githubusercontent.com/logos-blockchain/logos-blockchain/main/scripts/setup-logos-blockchain-circuits.sh | bash
 
 WORKDIR /sequencer_runner
 
@@ -32,14 +51,6 @@ RUN cargo build --release --bin sequencer_runner
 # Strip debug symbols to reduce binary size
 RUN strip /sequencer_runner/target/release/sequencer_runner
 
-# Install r0vm
-RUN curl -L https://risczero.com/install | bash
-ENV PATH="/root/.cargo/bin:/root/.risc0/bin:${PATH}"
-RUN rzup install
-RUN cp "$(which r0vm)" /usr/local/bin/r0vm
-RUN test -x /usr/local/bin/r0vm
-RUN r0vm --version
-
 # Runtime stage - minimal image
 FROM debian:trixie-slim
 
@@ -59,12 +70,12 @@ COPY --from=builder --chown=sequencer_user:sequencer_user /sequencer_runner/targ
 # Copy r0vm binary from builder
 COPY --from=builder --chown=sequencer_user:sequencer_user /usr/local/bin/r0vm /usr/local/bin/r0vm
 
+# Copy logos blockchain circuits from builder
+COPY --from=builder --chown=sequencer_user:sequencer_user /root/.logos-blockchain-circuits /home/sequencer_user/.logos-blockchain-circuits
+
 # Copy entrypoint script
 COPY sequencer_runner/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
-
-# Volume for configuration directory
-VOLUME ["/etc/sequencer_runner"]
 
 # Expose default port
 EXPOSE 3040
