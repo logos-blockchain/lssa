@@ -85,6 +85,7 @@ impl RocksDBIO {
             dbio.put_meta_last_block_in_db(block_id)?;
             dbio.put_meta_last_finalized_block_id(None)?;
             dbio.put_meta_latest_block_meta(&BlockMeta {
+                id: block.header.block_id,
                 hash: block.header.hash,
                 msg_id,
             })?;
@@ -425,6 +426,7 @@ impl RocksDBIO {
                 self.put_meta_last_block_in_db_batch(block.header.block_id, batch)?;
                 self.put_meta_latest_block_meta_batch(
                     &BlockMeta {
+                        id: block.header.block_id,
                         hash: block.header.hash,
                         msg_id,
                     },

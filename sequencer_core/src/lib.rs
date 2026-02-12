@@ -98,6 +98,9 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
             signing_key,
         )
         .unwrap();
+        let latest_block_meta = store
+            .latest_block_meta()
+            .expect("Failed to read latest block meta from store");
 
         #[cfg_attr(not(feature = "testnet"), allow(unused_mut))]
         let mut state = match store.get_nssa_state() {
@@ -143,7 +146,7 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
             state,
             store,
             mempool,
-            chain_height: config.genesis_id,
+            chain_height: latest_block_meta.id,
             sequencer_config: config,
             block_settlement_client,
             indexer_client,
@@ -900,6 +903,55 @@ mod tests {
             new_block.body.transactions,
             vec![tx],
             "New block should contain the submitted transaction"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_start_from_config_uses_db_height_not_config_genesis() {
+        let mut config = setup_sequencer_config();
+        let original_genesis_id = config.genesis_id;
+
+        // Step 1: Create initial database and produce some blocks
+        let expected_chain_height = {
+            let (mut sequencer, mempool_handle) =
+                SequencerCoreWithMockClients::start_from_config(config.clone()).await;
+
+            // Verify we start with the genesis_id from config
+            assert_eq!(sequencer.chain_height, original_genesis_id);
+
+            // Produce multiple blocks to advance chain height
+            let tx = common::test_utils::produce_dummy_empty_transaction();
+            mempool_handle.push(tx).await.unwrap();
+            sequencer
+                .produce_new_block_with_mempool_transactions()
+                .unwrap();
+
+            let tx = common::test_utils::produce_dummy_empty_transaction();
+            mempool_handle.push(tx).await.unwrap();
+            sequencer
+                .produce_new_block_with_mempool_transactions()
+                .unwrap();
+
+            // Return the current chain height (should be genesis_id + 2)
+            sequencer.chain_height
+        };
+
+        // Step 2: Modify the config to have a DIFFERENT genesis_id
+        let different_genesis_id = original_genesis_id + 100;
+        config.genesis_id = different_genesis_id;
+
+        // Step 3: Restart sequencer with the modified config (different genesis_id)
+        let (sequencer, _mempool_handle) =
+            SequencerCoreWithMockClients::start_from_config(config.clone()).await;
+
+        // Step 4: Verify chain_height comes from database, NOT from the new config.genesis_id
+        assert_eq!(
+            sequencer.chain_height, expected_chain_height,
+            "Chain height should be loaded from database metadata, not config.genesis_id"
+        );
+        assert_ne!(
+            sequencer.chain_height, different_genesis_id,
+            "Chain height should NOT match the modified config.genesis_id"
         );
     }
 }

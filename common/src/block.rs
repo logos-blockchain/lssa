@@ -10,6 +10,7 @@ pub type TimeStamp = u64;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BlockMeta {
+    pub id: BlockId,
     pub hash: BlockHash,
     pub msg_id: MantleMsgId,
 }
