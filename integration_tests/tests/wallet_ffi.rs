@@ -102,8 +102,8 @@ fn new_wallet_ffi_with_test_context_config(ctx: &BlockingTestContext) -> *mut Wa
     let tempdir = tempfile::tempdir().unwrap();
     let config_path = tempdir.path().join("wallet_config.json");
     let storage_path = tempdir.path().join("storage.json");
-    let mut config = ctx.ctx.wallet().config().to_owned();
-    if let Some(config_overrides) = ctx.ctx.wallet().config_overrides().clone() {
+    let mut config = ctx.ctx().wallet().config().to_owned();
+    if let Some(config_overrides) = ctx.ctx().wallet().config_overrides().clone() {
         config.apply_overrides(config_overrides);
     }
     let mut file = std::fs::OpenOptions::new()
@@ -119,7 +119,7 @@ fn new_wallet_ffi_with_test_context_config(ctx: &BlockingTestContext) -> *mut Wa
 
     let config_path = CString::new(config_path.to_str().unwrap()).unwrap();
     let storage_path = CString::new(storage_path.to_str().unwrap()).unwrap();
-    let password = CString::new(ctx.ctx.wallet_password()).unwrap();
+    let password = CString::new(ctx.ctx().wallet_password()).unwrap();
 
     unsafe {
         wallet_ffi_create_new(
@@ -325,7 +325,7 @@ fn test_wallet_ffi_list_accounts() {
 #[test]
 fn test_wallet_ffi_get_balance_public() -> Result<()> {
     let ctx = BlockingTestContext::new()?;
-    let account_id: AccountId = ctx.ctx.existing_public_accounts()[0];
+    let account_id: AccountId = ctx.ctx().existing_public_accounts()[0];
     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
 
     let balance = unsafe {
@@ -353,7 +353,7 @@ fn test_wallet_ffi_get_balance_public() -> Result<()> {
 #[test]
 fn test_wallet_ffi_get_account_public() -> Result<()> {
     let ctx = BlockingTestContext::new()?;
-    let account_id: AccountId = ctx.ctx.existing_public_accounts()[0];
+    let account_id: AccountId = ctx.ctx().existing_public_accounts()[0];
     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
     let mut out_account = FfiAccount::default();
 
@@ -388,7 +388,7 @@ fn test_wallet_ffi_get_account_public() -> Result<()> {
 #[test]
 fn test_wallet_ffi_get_public_account_keys() -> Result<()> {
     let ctx = BlockingTestContext::new()?;
-    let account_id: AccountId = ctx.ctx.existing_public_accounts()[0];
+    let account_id: AccountId = ctx.ctx().existing_public_accounts()[0];
     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
     let mut out_key = FfiPublicAccountKey::default();
 
@@ -404,7 +404,7 @@ fn test_wallet_ffi_get_public_account_keys() -> Result<()> {
 
     let expected_key = {
         let private_key = ctx
-            .ctx
+            .ctx()
             .wallet()
             .get_account_public_signing_key(account_id)
             .unwrap();
@@ -425,7 +425,7 @@ fn test_wallet_ffi_get_public_account_keys() -> Result<()> {
 #[test]
 fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
     let ctx = BlockingTestContext::new()?;
-    let account_id: AccountId = ctx.ctx.existing_public_accounts()[0];
+    let account_id: AccountId = ctx.ctx().existing_public_accounts()[0];
     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
     let mut keys = FfiPrivateAccountKeys::default();
 
@@ -439,7 +439,7 @@ fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
     };
 
     let key_chain = &ctx
-        .ctx
+        .ctx()
         .wallet()
         .storage()
         .user_data
@@ -567,8 +567,8 @@ fn test_wallet_ffi_init_public_account_auth_transfer() -> Result<()> {
 fn test_wallet_ffi_transfer_public() -> Result<()> {
     let ctx = BlockingTestContext::new().unwrap();
     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
-    let from: FfiBytes32 = (&ctx.ctx.existing_public_accounts()[0]).into();
-    let to: FfiBytes32 = (&ctx.ctx.existing_public_accounts()[1]).into();
+    let from: FfiBytes32 = (&ctx.ctx().existing_public_accounts()[0]).into();
+    let to: FfiBytes32 = (&ctx.ctx().existing_public_accounts()[1]).into();
     let amount: [u8; 16] = 100u128.to_le_bytes();
 
     let mut transfer_result = FfiTransferResult::default();
