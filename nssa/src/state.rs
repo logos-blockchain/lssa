@@ -311,6 +311,7 @@ pub mod tests {
 
     use std::collections::HashMap;
 
+    use amm_core::PoolDefinition;
     use nssa_core::{
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
         account::{Account, AccountId, AccountWithMetadata, Nonce, data::Data},
@@ -2329,137 +2330,6 @@ pub mod tests {
         ));
     }
 
-    // TODO repeated code should ultimately be removed;
-    fn compute_pool_pda(
-        amm_program_id: ProgramId,
-        definition_token_a_id: AccountId,
-        definition_token_b_id: AccountId,
-    ) -> AccountId {
-        AccountId::from((
-            &amm_program_id,
-            &compute_pool_pda_seed(definition_token_a_id, definition_token_b_id),
-        ))
-    }
-
-    fn compute_pool_pda_seed(
-        definition_token_a_id: AccountId,
-        definition_token_b_id: AccountId,
-    ) -> PdaSeed {
-        use risc0_zkvm::sha::{Impl, Sha256};
-
-        let mut i: usize = 0;
-        let (token_1, token_2) = loop {
-            if definition_token_a_id.value()[i] > definition_token_b_id.value()[i] {
-                let token_1 = definition_token_a_id;
-                let token_2 = definition_token_b_id;
-                break (token_1, token_2);
-            } else if definition_token_a_id.value()[i] < definition_token_b_id.value()[i] {
-                let token_1 = definition_token_b_id;
-                let token_2 = definition_token_a_id;
-                break (token_1, token_2);
-            }
-
-            if i == 32 {
-                panic!("Definitions match");
-            } else {
-                i += 1;
-            }
-        };
-
-        let mut bytes = [0; 64];
-        bytes[0..32].copy_from_slice(&token_1.to_bytes());
-        bytes[32..].copy_from_slice(&token_2.to_bytes());
-
-        PdaSeed::new(
-            Impl::hash_bytes(&bytes)
-                .as_bytes()
-                .try_into()
-                .expect("Hash output must be exactly 32 bytes long"),
-        )
-    }
-
-    fn compute_vault_pda(
-        amm_program_id: ProgramId,
-        pool_id: AccountId,
-        definition_token_id: AccountId,
-    ) -> AccountId {
-        AccountId::from((
-            &amm_program_id,
-            &compute_vault_pda_seed(pool_id, definition_token_id),
-        ))
-    }
-
-    fn compute_vault_pda_seed(pool_id: AccountId, definition_token_id: AccountId) -> PdaSeed {
-        use risc0_zkvm::sha::{Impl, Sha256};
-
-        let mut bytes = [0; 64];
-        bytes[0..32].copy_from_slice(&pool_id.to_bytes());
-        bytes[32..].copy_from_slice(&definition_token_id.to_bytes());
-
-        PdaSeed::new(
-            Impl::hash_bytes(&bytes)
-                .as_bytes()
-                .try_into()
-                .expect("Hash output must be exactly 32 bytes long"),
-        )
-    }
-
-    fn compute_liquidity_token_pda(amm_program_id: ProgramId, pool_id: AccountId) -> AccountId {
-        AccountId::from((&amm_program_id, &compute_liquidity_token_pda_seed(pool_id)))
-    }
-
-    fn compute_liquidity_token_pda_seed(pool_id: AccountId) -> PdaSeed {
-        use risc0_zkvm::sha::{Impl, Sha256};
-
-        let mut bytes = [0; 64];
-        bytes[0..32].copy_from_slice(&pool_id.to_bytes());
-        bytes[32..].copy_from_slice(&[0; 32]);
-
-        PdaSeed::new(
-            Impl::hash_bytes(&bytes)
-                .as_bytes()
-                .try_into()
-                .expect("Hash output must be exactly 32 bytes long"),
-        )
-    }
-
-    const POOL_DEFINITION_DATA_SIZE: usize = 225;
-
-    #[derive(Default)]
-    struct PoolDefinition {
-        definition_token_a_id: AccountId,
-        definition_token_b_id: AccountId,
-        vault_a_id: AccountId,
-        vault_b_id: AccountId,
-        liquidity_pool_id: AccountId,
-        liquidity_pool_supply: u128,
-        reserve_a: u128,
-        reserve_b: u128,
-        fees: u128,
-        active: bool,
-    }
-
-    impl PoolDefinition {
-        fn into_data(self) -> Data {
-            let mut bytes = [0; POOL_DEFINITION_DATA_SIZE];
-            bytes[0..32].copy_from_slice(&self.definition_token_a_id.to_bytes());
-            bytes[32..64].copy_from_slice(&self.definition_token_b_id.to_bytes());
-            bytes[64..96].copy_from_slice(&self.vault_a_id.to_bytes());
-            bytes[96..128].copy_from_slice(&self.vault_b_id.to_bytes());
-            bytes[128..160].copy_from_slice(&self.liquidity_pool_id.to_bytes());
-            bytes[160..176].copy_from_slice(&self.liquidity_pool_supply.to_le_bytes());
-            bytes[176..192].copy_from_slice(&self.reserve_a.to_le_bytes());
-            bytes[192..208].copy_from_slice(&self.reserve_b.to_le_bytes());
-            bytes[208..224].copy_from_slice(&self.fees.to_le_bytes());
-            bytes[224] = self.active as u8;
-
-            bytes
-                .to_vec()
-                .try_into()
-                .expect("225 bytes should fit into Data")
-        }
-    }
-
     struct PrivateKeysForTests;
 
     impl PrivateKeysForTests {
@@ -2640,7 +2510,7 @@ pub mod tests {
 
     impl IdForTests {
         fn pool_definition_id() -> AccountId {
-            compute_pool_pda(
+            amm_core::compute_pool_pda(
                 Program::amm().id(),
                 IdForTests::token_a_definition_id(),
                 IdForTests::token_b_definition_id(),
@@ -2648,7 +2518,10 @@ pub mod tests {
         }
 
         fn token_lp_definition_id() -> AccountId {
-            compute_liquidity_token_pda(Program::amm().id(), IdForTests::pool_definition_id())
+            amm_core::compute_liquidity_token_pda(
+                Program::amm().id(),
+                IdForTests::pool_definition_id(),
+            )
         }
 
         fn token_a_definition_id() -> AccountId {
@@ -2678,7 +2551,7 @@ pub mod tests {
         }
 
         fn vault_a_id() -> AccountId {
-            compute_vault_pda(
+            amm_core::compute_vault_pda(
                 Program::amm().id(),
                 IdForTests::pool_definition_id(),
                 IdForTests::token_a_definition_id(),
@@ -2686,7 +2559,7 @@ pub mod tests {
         }
 
         fn vault_b_id() -> AccountId {
-            compute_vault_pda(
+            amm_core::compute_vault_pda(
                 Program::amm().id(),
                 IdForTests::pool_definition_id(),
                 IdForTests::token_b_definition_id(),
@@ -2725,7 +2598,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -2844,7 +2717,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -2912,7 +2785,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -2980,7 +2853,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -3073,7 +2946,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -3179,7 +3052,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -3248,7 +3121,7 @@ pub mod tests {
             Account {
                 program_owner: Program::amm().id(),
                 balance: 0u128,
-                data: PoolDefinition::into_data(PoolDefinition {
+                data: Data::from(&PoolDefinition {
                     definition_token_a_id: IdForTests::token_a_definition_id(),
                     definition_token_b_id: IdForTests::token_b_definition_id(),
                     vault_a_id: IdForTests::vault_a_id(),
@@ -3276,11 +3149,6 @@ pub mod tests {
             }
         }
     }
-
-    const AMM_NEW_DEFINITION: u8 = 0;
-    const AMM_SWAP: u8 = 1;
-    const AMM_ADD_LIQUIDITY: u8 = 2;
-    const AMM_REMOVE_LIQUIDITY: u8 = 3;
 
     fn state_for_amm_tests() -> V02State {
         let initial_data = [];
@@ -3347,11 +3215,11 @@ pub mod tests {
     fn test_simple_amm_remove() {
         let mut state = state_for_amm_tests();
 
-        let mut instruction: Vec<u8> = Vec::new();
-        instruction.push(AMM_REMOVE_LIQUIDITY);
-        instruction.extend_from_slice(&BalanceForTests::remove_lp().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::remove_min_amount_a().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::remove_min_amount_b().to_le_bytes());
+        let instruction = amm_core::Instruction::RemoveLiquidity {
+            remove_liquidity_amount: BalanceForTests::remove_lp(),
+            min_amount_to_remove_token_a: BalanceForTests::remove_min_amount_a(),
+            min_amount_to_remove_token_b: BalanceForTests::remove_min_amount_b(),
+        };
 
         let message = public_transaction::Message::try_new(
             Program::amm().id(),
@@ -3424,12 +3292,11 @@ pub mod tests {
             AccountForTests::token_lp_definition_init_inactive(),
         );
 
-        let mut instruction: Vec<u8> = Vec::new();
-        instruction.push(AMM_NEW_DEFINITION);
-        instruction.extend_from_slice(&BalanceForTests::vault_a_balance_init().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::vault_b_balance_init().to_le_bytes());
-        let amm_program_u8: [u8; 32] = bytemuck::cast(Program::amm().id());
-        instruction.extend_from_slice(&amm_program_u8);
+        let instruction = amm_core::Instruction::NewDefinition {
+            token_a_amount: BalanceForTests::vault_a_balance_init(),
+            token_b_amount: BalanceForTests::vault_b_balance_init(),
+            amm_program_id: Program::amm().id(),
+        };
 
         let message = public_transaction::Message::try_new(
             Program::amm().id(),
@@ -3509,12 +3376,11 @@ pub mod tests {
             AccountForTests::user_token_lp_holding_init_zero(),
         );
 
-        let mut instruction: Vec<u8> = Vec::new();
-        instruction.push(AMM_NEW_DEFINITION);
-        instruction.extend_from_slice(&BalanceForTests::vault_a_balance_init().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::vault_b_balance_init().to_le_bytes());
-        let amm_program_u8: [u8; 32] = bytemuck::cast(Program::amm().id());
-        instruction.extend_from_slice(&amm_program_u8);
+        let instruction = amm_core::Instruction::NewDefinition {
+            token_a_amount: BalanceForTests::vault_a_balance_init(),
+            token_b_amount: BalanceForTests::vault_b_balance_init(),
+            amm_program_id: Program::amm().id(),
+        };
 
         let message = public_transaction::Message::try_new(
             Program::amm().id(),
@@ -3582,12 +3448,11 @@ pub mod tests {
             AccountForTests::vault_b_init_inactive(),
         );
 
-        let mut instruction: Vec<u8> = Vec::new();
-        instruction.push(AMM_NEW_DEFINITION);
-        instruction.extend_from_slice(&BalanceForTests::vault_a_balance_init().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::vault_b_balance_init().to_le_bytes());
-        let amm_program_u8: [u8; 32] = bytemuck::cast(Program::amm().id());
-        instruction.extend_from_slice(&amm_program_u8);
+        let instruction = amm_core::Instruction::NewDefinition {
+            token_a_amount: BalanceForTests::vault_a_balance_init(),
+            token_b_amount: BalanceForTests::vault_b_balance_init(),
+            amm_program_id: Program::amm().id(),
+        };
 
         let message = public_transaction::Message::try_new(
             Program::amm().id(),
@@ -3646,11 +3511,11 @@ pub mod tests {
         env_logger::init();
         let mut state = state_for_amm_tests();
 
-        let mut instruction: Vec<u8> = Vec::new();
-        instruction.push(AMM_ADD_LIQUIDITY);
-        instruction.extend_from_slice(&BalanceForTests::add_min_amount_lp().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::add_max_amount_a().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::add_max_amount_b().to_le_bytes());
+        let instruction = amm_core::Instruction::AddLiquidity {
+            min_amount_liquidity: BalanceForTests::add_min_amount_lp(),
+            max_amount_to_add_token_a: BalanceForTests::add_max_amount_a(),
+            max_amount_to_add_token_b: BalanceForTests::add_max_amount_b(),
+        };
 
         let message = public_transaction::Message::try_new(
             Program::amm().id(),
@@ -3708,11 +3573,11 @@ pub mod tests {
     fn test_simple_amm_swap_1() {
         let mut state = state_for_amm_tests();
 
-        let mut instruction: Vec<u8> = Vec::new();
-        instruction.push(AMM_SWAP);
-        instruction.extend_from_slice(&BalanceForTests::swap_amount_in().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::swap_min_amount_out().to_le_bytes());
-        instruction.extend_from_slice(&IdForTests::token_b_definition_id().to_bytes());
+        let instruction = amm_core::Instruction::Swap {
+            swap_amount_in: BalanceForTests::swap_amount_in(),
+            min_amount_out: BalanceForTests::swap_min_amount_out(),
+            token_definition_id_in: IdForTests::token_b_definition_id(),
+        };
 
         let message = public_transaction::Message::try_new(
             Program::amm().id(),
@@ -3759,12 +3624,11 @@ pub mod tests {
     fn test_simple_amm_swap_2() {
         let mut state = state_for_amm_tests();
 
-        let mut instruction: Vec<u8> = Vec::new();
-        instruction.push(AMM_SWAP);
-        instruction.extend_from_slice(&BalanceForTests::swap_amount_in().to_le_bytes());
-        instruction.extend_from_slice(&BalanceForTests::swap_min_amount_out().to_le_bytes());
-        instruction.extend_from_slice(&IdForTests::token_a_definition_id().to_bytes());
-
+        let instruction = amm_core::Instruction::Swap {
+            swap_amount_in: BalanceForTests::swap_amount_in(),
+            min_amount_out: BalanceForTests::swap_min_amount_out(),
+            token_definition_id_in: IdForTests::token_a_definition_id(),
+        };
         let message = public_transaction::Message::try_new(
             Program::amm().id(),
             vec![

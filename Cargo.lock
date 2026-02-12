@@ -303,6 +303,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "amm_core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "nssa_core",
+ "risc0-zkvm",
+ "serde",
+]
+
+[[package]]
+name = "amm_program"
+version = "0.1.0"
+dependencies = [
+ "amm_core",
+ "nssa_core",
+ "token_core",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4808,8 +4827,8 @@ checksum = "38bf9645c8b145698bb0b18a4637dcacbc421ea49bef2317e4fd8065a387cf21"
 name = "nssa"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
  "borsh",
- "bytemuck",
  "env_logger",
  "hex",
  "hex-literal 1.1.0",
@@ -5339,6 +5358,8 @@ dependencies = [
 name = "programs"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
+ "amm_program",
  "nssa_core",
  "risc0-zkvm",
  "serde",
@@ -7754,6 +7775,7 @@ dependencies = [
 name = "wallet"
 version = "0.1.0"
 dependencies = [
+ "amm_core",
  "anyhow",
  "async-stream",
  "base58",
@@ -7773,7 +7795,6 @@ dependencies = [
  "nssa_core",
  "optfield",
  "rand 0.8.5",
- "risc0-zkvm",
  "serde",
  "serde_json",
  "sha2",
