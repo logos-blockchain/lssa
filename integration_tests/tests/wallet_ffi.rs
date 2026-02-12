@@ -425,7 +425,7 @@ fn test_wallet_ffi_get_public_account_keys() -> Result<()> {
 #[test]
 fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
     let ctx = BlockingTestContext::new()?;
-    let account_id: AccountId = ctx.ctx().existing_public_accounts()[0];
+    let account_id: AccountId = ctx.ctx().existing_private_accounts()[0];
     let wallet_ffi_handle = new_wallet_ffi_with_test_context_config(&ctx);
     let mut keys = FfiPrivateAccountKeys::default();
 
