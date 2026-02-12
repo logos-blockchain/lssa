@@ -90,13 +90,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_public(
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
             }
-            match e {
-                ExecutionFailureKind::InsufficientFundsError => WalletFfiError::InsufficientFunds,
-                ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
-                ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
-                ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
-                _ => WalletFfiError::InternalError,
-            }
+            map_execution_error(e)
         }
         Err(e) => e,
     }
@@ -187,13 +181,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_shielded(
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
             }
-            match e {
-                ExecutionFailureKind::InsufficientFundsError => WalletFfiError::InsufficientFunds,
-                ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
-                ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
-                ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
-                _ => WalletFfiError::InternalError,
-            }
+            map_execution_error(e)
         }
         Err(e) => e,
     }
@@ -275,13 +263,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_deshielded(
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
             }
-            match e {
-                ExecutionFailureKind::InsufficientFundsError => WalletFfiError::InsufficientFunds,
-                ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
-                ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
-                ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
-                _ => WalletFfiError::InternalError,
-            }
+            map_execution_error(e)
         }
         Err(e) => e,
     }
@@ -371,13 +353,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_private(
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
             }
-            match e {
-                ExecutionFailureKind::InsufficientFundsError => WalletFfiError::InsufficientFunds,
-                ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
-                ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
-                ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
-                _ => WalletFfiError::InternalError,
-            }
+            map_execution_error(e)
         }
         Err(e) => e,
     }
@@ -450,12 +426,7 @@ pub unsafe extern "C" fn wallet_ffi_register_public_account(
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
             }
-            match e {
-                ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
-                ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
-                ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
-                _ => WalletFfiError::InternalError,
-            }
+            map_execution_error(e)
         }
         Err(e) => e,
     }
@@ -528,12 +499,7 @@ pub unsafe extern "C" fn wallet_ffi_register_private_account(
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
             }
-            match e {
-                ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
-                ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
-                ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
-                _ => WalletFfiError::InternalError,
-            }
+            map_execution_error(e)
         }
         Err(e) => e,
     }
@@ -555,5 +521,15 @@ pub unsafe extern "C" fn wallet_ffi_free_transfer_result(result: *mut FfiTransfe
         if !result.tx_hash.is_null() {
             drop(CString::from_raw(result.tx_hash));
         }
+    }
+}
+
+fn map_execution_error(e: ExecutionFailureKind) -> WalletFfiError {
+    match e {
+        ExecutionFailureKind::InsufficientFundsError => WalletFfiError::InsufficientFunds,
+        ExecutionFailureKind::KeyNotFoundError => WalletFfiError::KeyNotFound,
+        ExecutionFailureKind::SequencerError => WalletFfiError::NetworkError,
+        ExecutionFailureKind::SequencerClientError(_) => WalletFfiError::NetworkError,
+        _ => WalletFfiError::InternalError,
     }
 }
