@@ -293,8 +293,10 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
                 "Clearing pending blocks up to id: {}",
                 last_finalized_block_id
             );
+            // TODO: Delete blocks instead of marking them as finalized.
+            // Current approach is used because we still have `GetBlockDataRequest`.
             (first_pending_block_id..=last_finalized_block_id)
-                .try_for_each(|id| self.store.delete_block_at_id(id))
+                .try_for_each(|id| self.store.mark_block_as_finalized(id))
         } else {
             Ok(())
         }

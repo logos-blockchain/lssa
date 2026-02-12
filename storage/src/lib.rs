@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use common::block::{Block, BlockMeta, MantleMsgId};
+use common::block::{BedrockStatus, Block, BlockMeta, MantleMsgId};
 use error::DbError;
 use nssa::V02State;
 use rocksdb::{
@@ -523,6 +523,37 @@ impl RocksDBIO {
         self.db
             .delete_cf(&cf_block, key)
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        Ok(())
+    }
+
+    pub fn mark_block_as_finalized(&self, block_id: u64) -> DbResult<()> {
+        let mut block = self.get_block(block_id)?;
+        block.bedrock_status = BedrockStatus::Finalized;
+
+        let cf_block = self.block_column();
+        self.db
+            .put_cf(
+                &cf_block,
+                borsh::to_vec(&block_id).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block id".to_string()),
+                    )
+                })?,
+                borsh::to_vec(&block).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block data".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| {
+                DbError::rocksdb_cast_message(
+                    rerr,
+                    Some(format!("Failed to mark block {block_id} as finalized")),
+                )
+            })?;
 
         Ok(())
     }

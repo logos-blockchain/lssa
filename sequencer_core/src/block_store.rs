@@ -58,6 +58,10 @@ impl SequencerStore {
         Ok(self.dbio.delete_block(block_id)?)
     }
 
+    pub fn mark_block_as_finalized(&mut self, block_id: u64) -> Result<()> {
+        Ok(self.dbio.mark_block_as_finalized(block_id)?)
+    }
+
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
     pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<NSSATransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
@@ -225,5 +229,53 @@ mod tests {
         let latest_meta = node_store.latest_block_meta().unwrap();
         assert_eq!(latest_meta.hash, block_hash);
         assert_eq!(latest_meta.msg_id, block_msg_id);
+    }
+
+    #[test]
+    fn test_mark_block_finalized() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let signing_key = sequencer_sign_key_for_testing();
+
+        let genesis_block_hashable_data = HashableBlockData {
+            block_id: 0,
+            prev_block_hash: HashType([0; 32]),
+            timestamp: 0,
+            transactions: vec![],
+        };
+
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
+        let mut node_store = SequencerStore::open_db_with_genesis(
+            path,
+            Some((&genesis_block, [0; 32])),
+            signing_key,
+        )
+        .unwrap();
+
+        // Add a new block with Pending status
+        let tx = common::test_utils::produce_dummy_empty_transaction();
+        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
+        let block_id = block.header.block_id;
+
+        let dummy_state = V02State::new_with_genesis_accounts(&[], &[]);
+        node_store.update(&block, [1; 32], &dummy_state).unwrap();
+
+        // Verify initial status is Pending
+        let retrieved_block = node_store.get_block_at_id(block_id).unwrap();
+        assert!(matches!(
+            retrieved_block.bedrock_status,
+            common::block::BedrockStatus::Pending
+        ));
+
+        // Mark block as finalized
+        node_store.mark_block_as_finalized(block_id).unwrap();
+
+        // Verify status is now Finalized
+        let finalized_block = node_store.get_block_at_id(block_id).unwrap();
+        assert!(matches!(
+            finalized_block.bedrock_status,
+            common::block::BedrockStatus::Finalized
+        ));
     }
 }
