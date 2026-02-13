@@ -174,8 +174,11 @@ async fn retry_pending_blocks_loop(
             (pending_blocks, client)
         };
 
-        info!("Resubmitting {} pending blocks", pending_blocks.len());
-        for block in &pending_blocks {
+        if let Some(block) = pending_blocks.first() {
+            info!(
+                "Resubmitting pending block with id {}",
+                block.header.block_id
+            );
             // TODO: We could cache the inscribe tx for each pending block to avoid re-creating it
             // on every retry.
             let (tx, _msg_id) = block_settlement_client
