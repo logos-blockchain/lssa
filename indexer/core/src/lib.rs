@@ -62,7 +62,7 @@ impl IndexerCore {
         // ToDo: Remove after testnet
         state.add_pinata_program(PINATA_BASE58.parse().unwrap());
 
-        let home = config.home.clone();
+        let home = config.home.join("rocksdb");
 
         Ok(Self {
             bedrock_client: BedrockClient::new(
