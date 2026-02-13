@@ -32,8 +32,8 @@ pub fn BlockPreview(block: Block) -> impl IntoView {
 
     let tx_count = transactions.len();
 
-    let hash_str = hex::encode(hash.0);
-    let prev_hash_str = hex::encode(prev_block_hash.0);
+    let hash_str = hash.to_string();
+    let prev_hash_str = prev_block_hash.to_string();
     let time_str = format_utils::format_timestamp(timestamp);
     let status_str = match &bedrock_status {
         BedrockStatus::Pending => "Pending",

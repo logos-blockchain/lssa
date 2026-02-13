@@ -2484,7 +2484,6 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "env_logger",
- "hex",
  "indexer_service_protocol",
  "indexer_service_rpc",
  "jsonrpsee",
@@ -3427,12 +3426,16 @@ dependencies = [
 name = "indexer_service_protocol"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "base58",
  "base64 0.22.1",
  "common",
+ "hex",
  "nssa",
  "nssa_core",
  "schemars 1.2.0",
  "serde",
+ "serde_with",
 ]
 
 [[package]]
@@ -8257,7 +8260,6 @@ dependencies = [
  "amm_core",
  "anyhow",
  "async-stream",
- "base58",
  "base64 0.22.1",
  "borsh",
  "bytemuck",
