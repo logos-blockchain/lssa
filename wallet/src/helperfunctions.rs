@@ -115,12 +115,6 @@ pub fn produce_data_for_storage(
     }
 }
 
-pub(crate) fn produce_random_nonces(size: usize) -> Vec<Nonce> {
-    let mut result = vec![[0; 16]; size];
-    result.iter_mut().for_each(|bytes| OsRng.fill_bytes(bytes));
-    result.into_iter().map(Nonce::from_le_bytes).collect()
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AccountPrivacyKind {
     Public,
@@ -162,7 +156,7 @@ impl From<Account> for HumanReadableAccount {
             balance: account.balance,
             program_owner_b64,
             data_b64,
-            nonce: account.nonce,
+            nonce: account.nonce.0,
         }
     }
 }

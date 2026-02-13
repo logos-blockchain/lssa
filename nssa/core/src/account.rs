@@ -3,14 +3,43 @@ use std::{fmt::Display, str::FromStr};
 use base58::{FromBase58, ToBase58};
 use borsh::{BorshDeserialize, BorshSerialize};
 pub use data::Data;
+use risc0_zkvm::{guest::sha::guest::Impl, sha::Sha256};
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
-use crate::program::ProgramId;
+use crate::{NullifierPublicKey, NullifierSecretKey, program::ProgramId};
 
 pub mod data;
 
-pub type Nonce = u128;
+#[derive(Copy, Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize, BorshDeserialize, BorshSerialize)]
+pub struct Nonce(pub u128);
+
+impl Nonce {
+    pub fn public_account_nonce_increment(mut self) {
+        self.0 += 1;
+    }
+
+    pub fn private_account_nonce_init(self, npk: &NullifierPublicKey) -> Nonce {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&npk.to_byte_array());
+        let bytes = Impl::hash_bytes(&bytes).as_bytes();
+        let bytes = bytes.first_chunk::<16>().unwrap();
+        
+        Nonce(u128::from_le_bytes(*bytes))
+    }
+
+    pub fn private_account_nonce_increment(self, nsk: &NullifierSecretKey) -> Nonce {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(nsk);
+        let bytes = Impl::hash_bytes(&bytes).as_bytes();
+        let bytes = bytes.first_chunk::<16>().unwrap();
+        
+        Nonce(u128::from_le_bytes(*bytes))
+    }
+
+}
+
+
 
 /// Account to be used both in public and private contexts
 #[derive(
@@ -123,7 +152,7 @@ mod tests {
     fn test_zero_nonce_account_data_creation() {
         let new_acc = Account::default();
 
-        assert_eq!(new_acc.nonce, 0);
+        assert_eq!(new_acc.nonce.0, 0);
     }
 
     #[test]
@@ -150,7 +179,7 @@ mod tests {
                 .to_vec()
                 .try_into()
                 .unwrap(),
-            nonce: 0xdeadbeef,
+            nonce: Nonce(0xdeadbeef),
         };
         let fingerprint = AccountId::new([8; 32]);
         let new_acc_with_metadata = AccountWithMetadata::new(account.clone(), true, fingerprint);

@@ -93,7 +93,7 @@ impl Message {
 pub mod tests {
     use nssa_core::{
         Commitment, EncryptionScheme, Nullifier, NullifierPublicKey, SharedSecretKey,
-        account::Account,
+        account::{Account, Nonce},
         encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
     };
     use sha2::{Digest, Sha256};
@@ -115,7 +115,7 @@ pub mod tests {
 
         let public_account_ids = vec![AccountId::new([1; 32])];
 
-        let nonces = vec![1, 2, 3];
+        let nonces = vec![Nonce(1), Nonce(2), Nonce(3)];
 
         let public_post_states = vec![Account::default()];
 

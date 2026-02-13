@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "convert")]
 mod convert;
 
-pub type Nonce = u128;
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct Nonce(pub u128);
 
 pub type ProgramId = [u32; 8];
 

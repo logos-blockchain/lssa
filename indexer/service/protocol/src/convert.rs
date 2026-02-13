@@ -34,7 +34,7 @@ impl From<nssa_core::account::Account> for Account {
             program_owner,
             balance,
             data: data.into(),
-            nonce,
+            nonce: Nonce(nonce.0),
         }
     }
 }
@@ -54,7 +54,7 @@ impl TryFrom<Account> for nssa_core::account::Account {
             program_owner,
             balance,
             data: data.try_into()?,
-            nonce,
+            nonce: nssa_core::account::Nonce(nonce.0),
         })
     }
 }
@@ -232,7 +232,7 @@ impl From<nssa::public_transaction::Message> for PublicMessage {
         Self {
             program_id,
             account_ids: account_ids.into_iter().map(Into::into).collect(),
-            nonces,
+            nonces: nonces.iter().map(|x|Nonce(x.0)).collect(),
             instruction_data,
         }
     }
@@ -249,7 +249,7 @@ impl From<PublicMessage> for nssa::public_transaction::Message {
         Self::new_preserialized(
             program_id,
             account_ids.into_iter().map(Into::into).collect(),
-            nonces,
+            nonces.iter().map(|x|nssa_core::account::Nonce(x.0)).collect(),
             instruction_data,
         )
     }
@@ -267,7 +267,7 @@ impl From<nssa::privacy_preserving_transaction::message::Message> for PrivacyPre
         } = value;
         Self {
             public_account_ids: public_account_ids.into_iter().map(Into::into).collect(),
-            nonces,
+            nonces: nonces.iter().map(|x|Nonce(x.0)).collect(),
             public_post_states: public_post_states.into_iter().map(Into::into).collect(),
             encrypted_private_post_states: encrypted_private_post_states
                 .into_iter()
@@ -296,7 +296,7 @@ impl TryFrom<PrivacyPreservingMessage> for nssa::privacy_preserving_transaction:
         } = value;
         Ok(Self {
             public_account_ids: public_account_ids.into_iter().map(Into::into).collect(),
-            nonces,
+            nonces: nonces.iter().map(|x|nssa_core::account::Nonce(x.0)).collect(),
             public_post_states: public_post_states
                 .into_iter()
                 .map(TryInto::try_into)

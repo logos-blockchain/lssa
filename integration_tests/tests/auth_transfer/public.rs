@@ -235,7 +235,7 @@ async fn initialize_public_account() -> Result<()> {
         Program::authenticated_transfer_program().id()
     );
     assert_eq!(account.balance, 0);
-    assert_eq!(account.nonce, 1);
+    assert_eq!(account.nonce.0, 1);
     assert!(account.data.is_empty());
 
     info!("Successfully initialized public account");

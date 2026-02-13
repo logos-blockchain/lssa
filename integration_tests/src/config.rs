@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use indexer_service::{BackoffConfig, BedrockClientConfig, ChannelId, IndexerConfig};
 use key_protocol::key_management::KeyChain;
 use nssa::{Account, AccountId, PrivateKey, PublicKey};
-use nssa_core::{account::Data, program::DEFAULT_PROGRAM_ID};
+use nssa_core::{account::{Data, Nonce}, program::DEFAULT_PROGRAM_ID};
 use sequencer_core::config::{
     AccountInitialData, BedrockConfig, CommitmentsInitialData, SequencerConfig,
 };
@@ -156,7 +156,7 @@ impl InitialData {
                         balance: 10_000,
                         data: Data::default(),
                         program_owner: DEFAULT_PROGRAM_ID,
-                        nonce: 0,
+                        nonce: Nonce(0),
                     },
                 ),
                 (
@@ -165,7 +165,7 @@ impl InitialData {
                         balance: 20_000,
                         data: Data::default(),
                         program_owner: DEFAULT_PROGRAM_ID,
-                        nonce: 0,
+                        nonce: Nonce(0),
                     },
                 ),
             ],

@@ -373,7 +373,7 @@ fn test_wallet_ffi_get_account_public() -> Result<()> {
     );
     assert_eq!(account.balance, 10000);
     assert!(account.data.is_empty());
-    assert_eq!(account.nonce, 0);
+    assert_eq!(account.nonce.0, 0);
 
     unsafe {
         wallet_ffi_free_account_data((&mut out_account) as *mut FfiAccount);
