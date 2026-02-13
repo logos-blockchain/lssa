@@ -147,9 +147,7 @@ async fn main_loop(seq_core: Arc<Mutex<SequencerCore>>, block_timeout: Duration)
         let id = {
             let mut state = seq_core.lock().await;
 
-            state
-                .produce_new_block_and_post_to_settlement_layer()
-                .await?
+            state.produce_new_block().await?
         };
 
         info!("Block with id {id} created");
@@ -174,7 +172,10 @@ async fn retry_pending_blocks_loop(
             (pending_blocks, client)
         };
 
-        if let Some(block) = pending_blocks.first() {
+        if let Some(block) = pending_blocks
+            .iter()
+            .min_by_key(|block| block.header.block_id)
+        {
             info!(
                 "Resubmitting pending block with id {}",
                 block.header.block_id
