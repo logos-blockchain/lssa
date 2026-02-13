@@ -12,7 +12,7 @@ use tokio::test;
 use wallet::cli::{Command, programs::native_token_transfer::AuthTransferSubcommand};
 
 /// Timeout in milliseconds to reliably await for block finalization
-const L2_TO_L1_TIMEOUT_MILLIS: u64 = 100000;
+const L2_TO_L1_TIMEOUT_MILLIS: u64 = 220000;
 
 #[test]
 async fn indexer_test_run() -> Result<()> {
@@ -130,13 +130,13 @@ async fn indexer_state_consistency() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment for sender")?;
     assert!(verify_commitment_is_in_state(new_commitment1, ctx.sequencer_client()).await);
 
     let new_commitment2 = ctx
         .wallet()
-        .get_private_account_commitment(&to)
+        .get_private_account_commitment(to)
         .context("Failed to get private account commitment for receiver")?;
     assert!(verify_commitment_is_in_state(new_commitment2, ctx.sequencer_client()).await);
 

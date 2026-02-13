@@ -24,7 +24,7 @@ pub struct IndexerCore {
 }
 
 impl IndexerCore {
-    pub async fn new(config: IndexerConfig) -> Result<Self> {
+    pub fn new(config: IndexerConfig) -> Result<Self> {
         // ToDo: replace with correct startup
         let hashable_data = HashableBlockData {
             block_id: 1,

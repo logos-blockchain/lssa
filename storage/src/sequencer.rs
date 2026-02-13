@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use common::block::Block;
+use common::block::{BedrockStatus, Block, BlockMeta, MantleMsgId};
 use nssa::V02State;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options, WriteBatch,
@@ -28,6 +28,8 @@ pub const DB_META_LAST_BLOCK_IN_DB_KEY: &str = "last_block_in_db";
 pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
 /// Key base for storing metainformation about the last finalized block on Bedrock
 pub const DB_META_LAST_FINALIZED_BLOCK_ID: &str = "last_finalized_block_id";
+/// Key base for storing metainformation about the latest block meta
+pub const DB_META_LATEST_BLOCK_META_KEY: &str = "latest_block_meta";
 
 /// Key base for storing the NSSA state
 pub const DB_NSSA_STATE_KEY: &str = "nssa_state";
@@ -46,7 +48,10 @@ pub struct RocksDBIO {
 }
 
 impl RocksDBIO {
-    pub fn open_or_create(path: &Path, start_block: Option<&Block>) -> DbResult<Self> {
+    pub fn open_or_create(
+        path: &Path,
+        start_block: Option<(&Block, MantleMsgId)>,
+    ) -> DbResult<Self> {
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         // ToDo: Add more column families for different data
@@ -72,12 +77,17 @@ impl RocksDBIO {
 
         if is_start_set {
             Ok(dbio)
-        } else if let Some(block) = start_block {
+        } else if let Some((block, msg_id)) = start_block {
             let block_id = block.header.block_id;
-            dbio.put_meta_first_block_in_db(block)?;
+            dbio.put_meta_first_block_in_db(block, msg_id)?;
             dbio.put_meta_is_first_block_set()?;
             dbio.put_meta_last_block_in_db(block_id)?;
             dbio.put_meta_last_finalized_block_id(None)?;
+            dbio.put_meta_latest_block_meta(&BlockMeta {
+                id: block.header.block_id,
+                hash: block.header.hash,
+                msg_id,
+            })?;
 
             Ok(dbio)
         } else {
@@ -207,7 +217,7 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_meta_first_block_in_db(&self, block: &Block) -> DbResult<()> {
+    pub fn put_meta_first_block_in_db(&self, block: &Block, msg_id: MantleMsgId) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
             .put_cf(
@@ -228,7 +238,7 @@ impl RocksDBIO {
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
         let mut batch = WriteBatch::default();
-        self.put_block(block, true, &mut batch)?;
+        self.put_block(block, msg_id, true, &mut batch)?;
         self.db.write(batch).map_err(|rerr| {
             DbError::rocksdb_cast_message(
                 rerr,
@@ -258,6 +268,30 @@ impl RocksDBIO {
                 })?,
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
+    fn put_meta_last_block_in_db_batch(
+        &self,
+        block_id: u64,
+        batch: &mut WriteBatch,
+    ) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        batch.put_cf(
+            &cf_meta,
+            borsh::to_vec(&DB_META_LAST_BLOCK_IN_DB_KEY).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize DB_META_LAST_BLOCK_IN_DB_KEY".to_string()),
+                )
+            })?,
+            borsh::to_vec(&block_id).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize last block id".to_string()),
+                )
+            })?,
+        );
         Ok(())
     }
 
@@ -300,14 +334,103 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_block(&self, block: &Block, first: bool, batch: &mut WriteBatch) -> DbResult<()> {
+    fn put_meta_latest_block_meta(&self, block_meta: &BlockMeta) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        self.db
+            .put_cf(
+                &cf_meta,
+                borsh::to_vec(&DB_META_LATEST_BLOCK_META_KEY).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize DB_META_LATEST_BLOCK_META_KEY".to_string()),
+                    )
+                })?,
+                borsh::to_vec(&block_meta).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize latest block meta".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
+    fn put_meta_latest_block_meta_batch(
+        &self,
+        block_meta: &BlockMeta,
+        batch: &mut WriteBatch,
+    ) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        batch.put_cf(
+            &cf_meta,
+            borsh::to_vec(&DB_META_LATEST_BLOCK_META_KEY).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize DB_META_LATEST_BLOCK_META_KEY".to_string()),
+                )
+            })?,
+            borsh::to_vec(&block_meta).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to serialize latest block meta".to_string()),
+                )
+            })?,
+        );
+        Ok(())
+    }
+
+    pub fn latest_block_meta(&self) -> DbResult<BlockMeta> {
+        let cf_meta = self.meta_column();
+        let res = self
+            .db
+            .get_cf(
+                &cf_meta,
+                borsh::to_vec(&DB_META_LATEST_BLOCK_META_KEY).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize DB_META_LATEST_BLOCK_META_KEY".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(borsh::from_slice::<BlockMeta>(&data).map_err(|err| {
+                DbError::borsh_cast_message(
+                    err,
+                    Some("Failed to deserialize latest block meta".to_string()),
+                )
+            })?)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Latest block meta not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn put_block(
+        &self,
+        block: &Block,
+        msg_id: MantleMsgId,
+        first: bool,
+        batch: &mut WriteBatch,
+    ) -> DbResult<()> {
         let cf_block = self.block_column();
 
         if !first {
             let last_curr_block = self.get_meta_last_block_in_db()?;
 
             if block.header.block_id > last_curr_block {
-                self.put_meta_last_block_in_db(block.header.block_id)?;
+                self.put_meta_last_block_in_db_batch(block.header.block_id, batch)?;
+                self.put_meta_latest_block_meta_batch(
+                    &BlockMeta {
+                        id: block.header.block_id,
+                        hash: block.header.hash,
+                        msg_id,
+                    },
+                    batch,
+                )?;
             }
         }
 
@@ -405,6 +528,37 @@ impl RocksDBIO {
         Ok(())
     }
 
+    pub fn mark_block_as_finalized(&self, block_id: u64) -> DbResult<()> {
+        let mut block = self.get_block(block_id)?;
+        block.bedrock_status = BedrockStatus::Finalized;
+
+        let cf_block = self.block_column();
+        self.db
+            .put_cf(
+                &cf_block,
+                borsh::to_vec(&block_id).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block id".to_string()),
+                    )
+                })?,
+                borsh::to_vec(&block).map_err(|err| {
+                    DbError::borsh_cast_message(
+                        err,
+                        Some("Failed to serialize block data".to_string()),
+                    )
+                })?,
+            )
+            .map_err(|rerr| {
+                DbError::rocksdb_cast_message(
+                    rerr,
+                    Some(format!("Failed to mark block {block_id} as finalized")),
+                )
+            })?;
+
+        Ok(())
+    }
+
     pub fn get_all_blocks(&self) -> impl Iterator<Item = DbResult<Block>> {
         let cf_block = self.block_column();
         self.db
@@ -426,10 +580,15 @@ impl RocksDBIO {
             })
     }
 
-    pub fn atomic_update(&self, block: &Block, state: &V02State) -> DbResult<()> {
+    pub fn atomic_update(
+        &self,
+        block: &Block,
+        msg_id: MantleMsgId,
+        state: &V02State,
+    ) -> DbResult<()> {
         let block_id = block.header.block_id;
         let mut batch = WriteBatch::default();
-        self.put_block(block, false, &mut batch)?;
+        self.put_block(block, msg_id, false, &mut batch)?;
         self.put_nssa_state_in_db(state, &mut batch)?;
         self.db.write(batch).map_err(|rerr| {
             DbError::rocksdb_cast_message(

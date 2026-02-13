@@ -10,7 +10,7 @@ compile_error!("At least one of `server` or `client` features must be enabled.")
 #[cfg_attr(all(feature = "client", not(feature = "server")), rpc(client))]
 #[cfg_attr(all(feature = "server", feature = "client"), rpc(server, client))]
 pub trait Rpc {
-    #[method(name = "get_schema")]
+    #[method(name = "getSchema")]
     fn get_schema(&self) -> Result<serde_json::Value, ErrorObjectOwned> {
         // TODO: Canonical solution would be to provide `describe` method returning OpenRPC spec,
         // But for now it's painful to implement, although can be done if really needed.

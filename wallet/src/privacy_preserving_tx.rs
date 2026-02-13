@@ -204,7 +204,7 @@ async fn private_acc_preparation(
     let Some((from_keys, from_acc)) = wallet
         .storage
         .user_data
-        .get_private_account(&account_id)
+        .get_private_account(account_id)
         .cloned()
     else {
         return Err(ExecutionFailureKind::KeyNotFoundError);
@@ -217,7 +217,7 @@ async fn private_acc_preparation(
 
     // TODO: Remove this unwrap, error types must be compatible
     let proof = wallet
-        .check_private_account_initialized(&account_id)
+        .check_private_account_initialized(account_id)
         .await
         .unwrap();
 

@@ -225,14 +225,14 @@ impl WalletCore {
             .get_pub_account_signing_key(account_id)
     }
 
-    pub fn get_account_private(&self, account_id: &AccountId) -> Option<Account> {
+    pub fn get_account_private(&self, account_id: AccountId) -> Option<Account> {
         self.storage
             .user_data
             .get_private_account(account_id)
             .map(|value| value.1.clone())
     }
 
-    pub fn get_private_account_commitment(&self, account_id: &AccountId) -> Option<Commitment> {
+    pub fn get_private_account_commitment(&self, account_id: AccountId) -> Option<Commitment> {
         let (keys, account) = self.storage.user_data.get_private_account(account_id)?;
         Some(Commitment::new(&keys.nullifer_public_key, account))
     }
@@ -248,7 +248,7 @@ impl WalletCore {
 
     pub async fn check_private_account_initialized(
         &self,
-        account_id: &AccountId,
+        account_id: AccountId,
     ) -> Result<Option<MembershipProof>> {
         if let Some(acc_comm) = self.get_private_account_commitment(account_id) {
             self.sequencer_client

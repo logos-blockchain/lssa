@@ -139,14 +139,14 @@ impl NSSAUserData {
     /// Returns the signing key for public transaction signatures
     pub fn get_private_account(
         &self,
-        account_id: &nssa::AccountId,
+        account_id: nssa::AccountId,
     ) -> Option<&(KeyChain, nssa_core::account::Account)> {
         // First seek in defaults
-        if let Some(key) = self.default_user_private_accounts.get(account_id) {
+        if let Some(key) = self.default_user_private_accounts.get(&account_id) {
             Some(key)
         // Then seek in tree
         } else {
-            self.private_key_tree.get_node(*account_id).map(Into::into)
+            self.private_key_tree.get_node(account_id).map(Into::into)
         }
     }
 
@@ -208,16 +208,13 @@ mod tests {
         let (account_id_private, _) = user_data
             .generate_new_privacy_preserving_transaction_key_chain(Some(ChainIndex::root()));
 
-        let is_key_chain_generated = user_data.get_private_account(&account_id_private).is_some();
+        let is_key_chain_generated = user_data.get_private_account(account_id_private).is_some();
 
         assert!(is_key_chain_generated);
 
         let account_id_private_str = account_id_private.to_string();
         println!("{account_id_private_str:#?}");
-        let key_chain = &user_data
-            .get_private_account(&account_id_private)
-            .unwrap()
-            .0;
+        let key_chain = &user_data.get_private_account(account_id_private).unwrap().0;
         println!("{key_chain:#?}");
     }
 }

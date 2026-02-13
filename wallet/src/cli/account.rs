@@ -100,7 +100,7 @@ impl WalletSubcommand for NewSubcommand {
                 let (key, _) = wallet_core
                     .storage
                     .user_data
-                    .get_private_account(&account_id)
+                    .get_private_account(account_id)
                     .unwrap();
 
                 println!(
@@ -184,7 +184,7 @@ impl WalletSubcommand for AccountSubcommand {
                         wallet_core.get_account_public(account_id).await?
                     }
                     AccountPrivacyKind::Private => wallet_core
-                        .get_account_private(&account_id)
+                        .get_account_private(account_id)
                         .ok_or(anyhow::anyhow!("Private account not found in storage"))?,
                 };
 
@@ -205,7 +205,7 @@ impl WalletSubcommand for AccountSubcommand {
                             let (key, _) = wallet_core
                                 .storage
                                 .user_data
-                                .get_private_account(&account_id)
+                                .get_private_account(account_id)
                                 .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
 
                             println!("npk {}", hex::encode(key.nullifer_public_key.0));
@@ -275,7 +275,7 @@ impl WalletSubcommand for AccountSubcommand {
                 let user_data = &wallet_core.storage.user_data;
                 let labels = &wallet_core.storage.labels;
 
-                let format_with_label = |prefix: &str, id: &nssa::AccountId| {
+                let format_with_label = |prefix: &str, id: nssa::AccountId| {
                     let id_str = id.to_string();
                     if let Some(label) = labels.get(&id_str) {
                         format!("{prefix} [{label}]")
@@ -285,24 +285,26 @@ impl WalletSubcommand for AccountSubcommand {
                 };
 
                 if !long {
-                    let accounts = user_data
-                        .default_pub_account_signing_keys
-                        .keys()
-                        .map(|id| format_with_label(&format!("Preconfigured Public/{id}"), id))
-                        .chain(user_data.default_user_private_accounts.keys().map(|id| {
-                            format_with_label(&format!("Preconfigured Private/{id}"), id)
-                        }))
-                        .chain(user_data.public_key_tree.account_id_map.iter().map(
-                            |(id, chain_index)| {
-                                format_with_label(&format!("{chain_index} Public/{id}"), id)
-                            },
-                        ))
-                        .chain(user_data.private_key_tree.account_id_map.iter().map(
-                            |(id, chain_index)| {
-                                format_with_label(&format!("{chain_index} Private/{id}"), id)
-                            },
-                        ))
-                        .format("\n");
+                    let accounts =
+                        user_data
+                            .default_pub_account_signing_keys
+                            .keys()
+                            .copied()
+                            .map(|id| format_with_label(&format!("Preconfigured Public/{id}"), id))
+                            .chain(user_data.default_user_private_accounts.keys().copied().map(
+                                |id| format_with_label(&format!("Preconfigured Private/{id}"), id),
+                            ))
+                            .chain(user_data.public_key_tree.account_id_map.iter().map(
+                                |(id, chain_index)| {
+                                    format_with_label(&format!("{chain_index} Public/{id}"), *id)
+                                },
+                            ))
+                            .chain(user_data.private_key_tree.account_id_map.iter().map(
+                                |(id, chain_index)| {
+                                    format_with_label(&format!("{chain_index} Private/{id}"), *id)
+                                },
+                            ))
+                            .format("\n");
 
                     println!("{accounts}");
                     return Ok(SubcommandReturnValue::Empty);
@@ -310,12 +312,12 @@ impl WalletSubcommand for AccountSubcommand {
 
                 // Detailed listing with --long flag
                 // Preconfigured public accounts
-                for id in user_data.default_pub_account_signing_keys.keys() {
+                for id in user_data.default_pub_account_signing_keys.keys().copied() {
                     println!(
                         "{}",
                         format_with_label(&format!("Preconfigured Public/{id}"), id)
                     );
-                    match wallet_core.get_account_public(*id).await {
+                    match wallet_core.get_account_public(id).await {
                         Ok(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
                             println!("  {description}");
@@ -327,7 +329,7 @@ impl WalletSubcommand for AccountSubcommand {
                 }
 
                 // Preconfigured private accounts
-                for id in user_data.default_user_private_accounts.keys() {
+                for id in user_data.default_user_private_accounts.keys().copied() {
                     println!(
                         "{}",
                         format_with_label(&format!("Preconfigured Private/{id}"), id)
@@ -347,7 +349,7 @@ impl WalletSubcommand for AccountSubcommand {
                 for (id, chain_index) in user_data.public_key_tree.account_id_map.iter() {
                     println!(
                         "{}",
-                        format_with_label(&format!("{chain_index} Public/{id}"), id)
+                        format_with_label(&format!("{chain_index} Public/{id}"), *id)
                     );
                     match wallet_core.get_account_public(*id).await {
                         Ok(account) if account != Account::default() => {
@@ -364,9 +366,9 @@ impl WalletSubcommand for AccountSubcommand {
                 for (id, chain_index) in user_data.private_key_tree.account_id_map.iter() {
                     println!(
                         "{}",
-                        format_with_label(&format!("{chain_index} Private/{id}"), id)
+                        format_with_label(&format!("{chain_index} Private/{id}"), *id)
                     );
-                    match wallet_core.get_account_private(id) {
+                    match wallet_core.get_account_private(*id) {
                         Some(account) if account != Account::default() => {
                             let (description, json_view) = format_account_details(&account);
                             println!("  {description}");

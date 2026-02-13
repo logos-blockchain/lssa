@@ -119,7 +119,7 @@ pub unsafe extern "C" fn wallet_ffi_get_private_account_keys(
 
     let account_id = AccountId::new(unsafe { (*account_id).data });
 
-    let (key_chain, _account) = match wallet.storage().user_data.get_private_account(&account_id) {
+    let (key_chain, _account) = match wallet.storage().user_data.get_private_account(account_id) {
         Some(k) => k,
         None => {
             print_error("Private account not found in wallet");

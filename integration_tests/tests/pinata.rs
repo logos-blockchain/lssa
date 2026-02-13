@@ -86,7 +86,7 @@ async fn claim_pinata_to_existing_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&ctx.existing_private_accounts()[0])
+        .get_private_account_commitment(ctx.existing_private_accounts()[0])
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
@@ -135,7 +135,7 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&winner_account_id)
+        .get_private_account_commitment(winner_account_id)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
@@ -157,7 +157,7 @@ async fn claim_pinata_to_new_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&winner_account_id)
+        .get_private_account_commitment(winner_account_id)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 

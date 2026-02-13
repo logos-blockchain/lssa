@@ -26,7 +26,8 @@ use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
 use sequencer_core::{
-    block_settlement_client::BlockSettlementClientTrait, indexer_client::IndexerClientTrait,
+    block_settlement_client::BlockSettlementClientTrait,
+    indexer_client::IndexerClientTrait,
 };
 use serde_json::Value;
 
@@ -94,8 +95,8 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         let tx = borsh::from_slice::<NSSATransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = tx.hash();
 
-        let authenticated_tx =
-            transaction_pre_check(tx).inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
+        let authenticated_tx = transaction_pre_check(tx)
+            .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         // TODO: Do we need a timeout here? It will be usable if we have too many transactions to
         // process
@@ -327,8 +328,7 @@ mod tests {
     use base64::{Engine, engine::general_purpose};
     use bedrock_client::BackoffConfig;
     use common::{
-        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing,
-        transaction::NSSATransaction,
+        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing, transaction::NSSATransaction
     };
     use nssa::AccountId;
     use sequencer_core::{
@@ -348,13 +348,13 @@ mod tests {
         let tempdir = tempdir().unwrap();
         let home = tempdir.path().to_path_buf();
         let acc1_id: Vec<u8> = vec![
-            208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202, 9, 115,
-            84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
+            148, 179, 206, 253, 199, 51, 82, 86, 232, 2, 152, 122, 80, 243, 54, 207, 237, 112, 83,
+            153, 44, 59, 204, 49, 128, 84, 160, 227, 216, 149, 97, 102,
         ];
 
         let acc2_id: Vec<u8> = vec![
-            231, 174, 119, 197, 239, 26, 5, 153, 147, 68, 175, 73, 159, 199, 138, 23, 5, 57, 141,
-            98, 237, 6, 207, 46, 20, 121, 246, 222, 248, 154, 57, 188,
+            30, 145, 107, 3, 207, 73, 192, 230, 160, 63, 238, 207, 18, 69, 54, 216, 103, 244, 92,
+            94, 124, 248, 42, 16, 141, 19, 119, 18, 14, 226, 140, 204,
         ];
 
         let initial_acc1 = AccountInitialData {
@@ -414,8 +414,8 @@ mod tests {
         let tx = common::test_utils::create_transaction_native_token_transfer(
             AccountId::from_str(
                 &[
-                    208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202,
-                    9, 115, 84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
+                    148, 179, 206, 253, 199, 51, 82, 86, 232, 2, 152, 122, 80, 243, 54, 207, 237,
+                    112, 83, 153, 44, 59, 204, 49, 128, 84, 160, 227, 216, 149, 97, 102,
                 ]
                 .to_base58(),
             )

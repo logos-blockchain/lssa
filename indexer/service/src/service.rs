@@ -19,8 +19,8 @@ pub struct IndexerService {
 }
 
 impl IndexerService {
-    pub async fn new(config: IndexerConfig) -> Result<Self> {
-        let indexer = IndexerCore::new(config).await?;
+    pub fn new(config: IndexerConfig) -> Result<Self> {
+        let indexer = IndexerCore::new(config)?;
         let subscription_service = SubscriptionService::spawn_new(indexer.clone());
 
         Ok(Self {

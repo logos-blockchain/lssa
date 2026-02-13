@@ -1,16 +1,18 @@
 #[derive(thiserror::Error, Debug)]
 pub enum DbError {
-    #[error("RocksDb error {additional_info:#?}")]
+    #[error("RocksDb error: {}", additional_info.as_deref().unwrap_or("No additional info"))]
     RocksDbError {
+        #[source]
         error: rocksdb::Error,
         additional_info: Option<String>,
     },
-    #[error("Serialization error {additional_info:#?}")]
+    #[error("Serialization error: {}", additional_info.as_deref().unwrap_or("No additional info"))]
     SerializationError {
+        #[source]
         error: borsh::io::Error,
         additional_info: Option<String>,
     },
-    #[error("Logic Error {additional_info:#?}")]
+    #[error("Logic Error: {additional_info}")]
     DbInteractionError { additional_info: String },
 }
 

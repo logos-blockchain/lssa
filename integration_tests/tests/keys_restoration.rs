@@ -188,11 +188,11 @@ async fn restore_keys_from_seed() -> Result<()> {
     // Verify commitments exist for private accounts
     let comm1 = ctx
         .wallet()
-        .get_private_account_commitment(&to_account_id1)
+        .get_private_account_commitment(to_account_id1)
         .expect("Acc 1 commitment should exist");
     let comm2 = ctx
         .wallet()
-        .get_private_account_commitment(&to_account_id2)
+        .get_private_account_commitment(to_account_id2)
         .expect("Acc 2 commitment should exist");
 
     assert!(verify_commitment_is_in_state(comm1, ctx.sequencer_client()).await);

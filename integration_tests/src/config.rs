@@ -94,7 +94,6 @@ pub fn sequencer_config(
     })
 }
 
-// TODO #312: Remove account id and key hardcoding
 pub fn wallet_config(
     sequencer_addr: SocketAddr,
     initial_data: &InitialData,

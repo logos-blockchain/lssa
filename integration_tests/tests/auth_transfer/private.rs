@@ -37,13 +37,13 @@ async fn private_transfer_to_owned_account() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment for sender")?;
     assert!(verify_commitment_is_in_state(new_commitment1, ctx.sequencer_client()).await);
 
     let new_commitment2 = ctx
         .wallet()
-        .get_private_account_commitment(&to)
+        .get_private_account_commitment(to)
         .context("Failed to get private account commitment for receiver")?;
     assert!(verify_commitment_is_in_state(new_commitment2, ctx.sequencer_client()).await);
 
@@ -79,7 +79,7 @@ async fn private_transfer_to_foreign_account() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment for sender")?;
 
     let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash).await;
@@ -105,7 +105,7 @@ async fn deshielded_transfer_to_public_account() -> Result<()> {
     // Check initial balance of the private sender
     let from_acc = ctx
         .wallet()
-        .get_account_private(&from)
+        .get_account_private(from)
         .context("Failed to get sender's private account")?;
     assert_eq!(from_acc.balance, 10000);
 
@@ -124,11 +124,11 @@ async fn deshielded_transfer_to_public_account() -> Result<()> {
 
     let from_acc = ctx
         .wallet()
-        .get_account_private(&from)
+        .get_account_private(from)
         .context("Failed to get sender's private account")?;
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
@@ -164,7 +164,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
         .wallet()
         .storage()
         .user_data
-        .get_private_account(&to_account_id)
+        .get_private_account(to_account_id)
         .cloned()
         .context("Failed to get private account")?;
 
@@ -190,7 +190,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&from)
+        .get_private_account_commitment(from)
         .context("Failed to get private account commitment for sender")?;
     assert_eq!(tx.message.new_commitments[0], new_commitment1);
 
@@ -201,7 +201,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
 
     let to_res_acc = ctx
         .wallet()
-        .get_account_private(&to_account_id)
+        .get_account_private(to_account_id)
         .context("Failed to get recipient's private account")?;
     assert_eq!(to_res_acc.balance, 100);
 
@@ -232,11 +232,11 @@ async fn shielded_transfer_to_owned_private_account() -> Result<()> {
 
     let acc_to = ctx
         .wallet()
-        .get_account_private(&to)
+        .get_account_private(to)
         .context("Failed to get receiver's private account")?;
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&to)
+        .get_private_account_commitment(to)
         .context("Failed to get receiver's commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
@@ -321,7 +321,7 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
         .wallet()
         .storage()
         .user_data
-        .get_private_account(&to_account_id)
+        .get_private_account(to_account_id)
         .cloned()
         .context("Failed to get private account")?;
 
@@ -354,7 +354,7 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
     // Verify receiver account balance
     let to_res_acc = ctx
         .wallet()
-        .get_account_private(&to_account_id)
+        .get_account_private(to_account_id)
         .context("Failed to get receiver account")?;
 
     assert_eq!(to_res_acc.balance, 100);
@@ -385,13 +385,13 @@ async fn initialize_private_account() -> Result<()> {
 
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&account_id)
+        .get_private_account_commitment(account_id)
         .context("Failed to get private account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
     let account = ctx
         .wallet()
-        .get_account_private(&account_id)
+        .get_account_private(account_id)
         .context("Failed to get private account")?;
 
     assert_eq!(

@@ -36,6 +36,7 @@ pub struct TestContext {
     sequencer_client: SequencerClient,
     indexer_client: IndexerClient,
     wallet: WalletCore,
+    wallet_password: String,
     sequencer_handle: SequencerHandle,
     indexer_handle: IndexerHandle,
     bedrock_compose: DockerCompose,
@@ -78,9 +79,10 @@ impl TestContext {
         .await
         .context("Failed to setup Sequencer")?;
 
-        let (wallet, temp_wallet_dir) = Self::setup_wallet(sequencer_handle.addr(), &initial_data)
-            .await
-            .context("Failed to setup wallet")?;
+        let (wallet, temp_wallet_dir, wallet_password) =
+            Self::setup_wallet(sequencer_handle.addr(), &initial_data)
+                .await
+                .context("Failed to setup wallet")?;
 
         let sequencer_url = config::addr_to_url(config::UrlProtocol::Http, sequencer_handle.addr())
             .context("Failed to convert sequencer addr to URL")?;
@@ -96,6 +98,7 @@ impl TestContext {
             sequencer_client,
             indexer_client,
             wallet,
+            wallet_password,
             bedrock_compose,
             sequencer_handle,
             indexer_handle,
@@ -221,7 +224,7 @@ impl TestContext {
     async fn setup_wallet(
         sequencer_addr: SocketAddr,
         initial_data: &config::InitialData,
-    ) -> Result<(WalletCore, TempDir)> {
+    ) -> Result<(WalletCore, TempDir, String)> {
         let config = config::wallet_config(sequencer_addr, initial_data)
             .context("Failed to create Wallet config")?;
         let config_serialized =
@@ -250,12 +253,16 @@ impl TestContext {
             .await
             .context("Failed to store wallet persistent data")?;
 
-        Ok((wallet, temp_wallet_dir))
+        Ok((wallet, temp_wallet_dir, wallet_password))
     }
 
     /// Get reference to the wallet.
     pub fn wallet(&self) -> &WalletCore {
         &self.wallet
+    }
+
+    pub fn wallet_password(&self) -> &str {
+        &self.wallet_password
     }
 
     /// Get mutable reference to the wallet.
@@ -304,6 +311,7 @@ impl Drop for TestContext {
             sequencer_client: _,
             indexer_client: _,
             wallet: _,
+            wallet_password: _,
         } = self;
 
         if sequencer_handle.is_finished() {
@@ -341,6 +349,27 @@ impl Drop for TestContext {
     }
 }
 
+/// A test context to be used in normal #[test] tests
+pub struct BlockingTestContext {
+    ctx: Option<TestContext>,
+    runtime: tokio::runtime::Runtime,
+}
+
+impl BlockingTestContext {
+    pub fn new() -> Result<Self> {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let ctx = runtime.block_on(TestContext::new())?;
+        Ok(Self {
+            ctx: Some(ctx),
+            runtime,
+        })
+    }
+
+    pub fn ctx(&self) -> &TestContext {
+        self.ctx.as_ref().expect("TestContext is set")
+    }
+}
+
 pub struct TestContextBuilder {
     initial_data: Option<config::InitialData>,
     sequencer_partial_config: Option<config::SequencerPartialConfig>,
@@ -375,6 +404,19 @@ impl TestContextBuilder {
             }),
         )
         .await
+    }
+}
+
+impl Drop for BlockingTestContext {
+    fn drop(&mut self) {
+        let Self { ctx, runtime } = self;
+
+        // Ensure async cleanup of TestContext by blocking on its drop in the runtime.
+        runtime.block_on(async {
+            if let Some(ctx) = ctx.take() {
+                drop(ctx);
+            }
+        })
     }
 }
 

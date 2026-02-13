@@ -23,7 +23,7 @@ pub trait BlockSettlementClientTrait: Clone {
     fn bedrock_signing_key(&self) -> &Ed25519Key;
 
     /// Post a transaction to the node.
-    async fn submit_block_to_bedrock(&self, block: &Block) -> Result<MsgId>;
+    async fn submit_inscribe_tx_to_bedrock(&self, tx: SignedMantleTx) -> Result<()>;
 
     /// Create and sign a transaction for inscribing data.
     fn create_inscribe_tx(&self, block: &Block) -> Result<(SignedMantleTx, MsgId)> {
@@ -89,16 +89,13 @@ impl BlockSettlementClientTrait for BlockSettlementClient {
         })
     }
 
-    async fn submit_block_to_bedrock(&self, block: &Block) -> Result<MsgId> {
-        let (tx, new_msg_id) = self.create_inscribe_tx(block)?;
-
-        // Post the transaction
+    async fn submit_inscribe_tx_to_bedrock(&self, tx: SignedMantleTx) -> Result<()> {
         self.bedrock_client
             .post_transaction(tx)
             .await
             .context("Failed to post transaction to Bedrock")?;
 
-        Ok(new_msg_id)
+        Ok(())
     }
 
     fn bedrock_channel_id(&self) -> ChannelId {

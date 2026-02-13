@@ -77,9 +77,8 @@ pub async fn run_server(config: IndexerConfig, port: u16) -> Result<IndexerHandl
 
     #[cfg(not(feature = "mock-responses"))]
     let handle = {
-        let service = service::IndexerService::new(config)
-            .await
-            .context("Failed to initialize indexer service")?;
+        let service =
+            service::IndexerService::new(config).context("Failed to initialize indexer service")?;
         server.start(service.into_rpc())
     };
     #[cfg(feature = "mock-responses")]

@@ -65,8 +65,8 @@ async fn create_and_transfer_public_token() -> Result<()> {
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_public_account_id(definition_account_id),
         supply_account_id: format_public_account_id(supply_account_id),
-        name: "A NAME".to_string(),
-        total_supply: 37,
+        name: name.clone(),
+        total_supply,
     };
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
 
@@ -161,7 +161,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
         definition: format_public_account_id(definition_account_id),
         holder: format_public_account_id(recipient_account_id),
-        amount: 3,
+        amount: burn_amount,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -304,8 +304,8 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_public_account_id(definition_account_id),
         supply_account_id: format_private_account_id(supply_account_id),
-        name: "A NAME".to_string(),
-        total_supply: 37,
+        name: name.clone(),
+        total_supply,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -333,7 +333,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&supply_account_id)
+        .get_private_account_commitment(supply_account_id)
         .context("Failed to get supply account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment1, ctx.sequencer_client()).await);
 
@@ -354,13 +354,13 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     let new_commitment1 = ctx
         .wallet()
-        .get_private_account_commitment(&supply_account_id)
+        .get_private_account_commitment(supply_account_id)
         .context("Failed to get supply account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment1, ctx.sequencer_client()).await);
 
     let new_commitment2 = ctx
         .wallet()
-        .get_private_account_commitment(&recipient_account_id)
+        .get_private_account_commitment(recipient_account_id)
         .context("Failed to get recipient account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment2, ctx.sequencer_client()).await);
 
@@ -369,7 +369,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
     let subcommand = TokenProgramAgnosticSubcommand::Burn {
         definition: format_public_account_id(definition_account_id),
         holder: format_private_account_id(recipient_account_id),
-        amount: 3,
+        amount: burn_amount,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -396,14 +396,14 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
 
     let new_commitment2 = ctx
         .wallet()
-        .get_private_account_commitment(&recipient_account_id)
+        .get_private_account_commitment(recipient_account_id)
         .context("Failed to get recipient account commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment2, ctx.sequencer_client()).await);
 
     // Check the recipient account balance after burn
     let recipient_acc = ctx
         .wallet()
-        .get_account_private(&recipient_account_id)
+        .get_account_private(recipient_account_id)
         .context("Failed to get recipient account")?;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
 
@@ -460,8 +460,8 @@ async fn create_token_with_private_definition() -> Result<()> {
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_private_account_id(definition_account_id),
         supply_account_id: format_public_account_id(supply_account_id),
-        name: "A NAME".to_string(),
-        total_supply: 37,
+        name: name.clone(),
+        total_supply,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -472,7 +472,7 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Verify private definition commitment
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&definition_account_id)
+        .get_private_account_commitment(definition_account_id)
         .context("Failed to get definition commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
@@ -537,7 +537,7 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Verify definition account has updated supply
     let definition_acc = ctx
         .wallet()
-        .get_account_private(&definition_account_id)
+        .get_account_private(definition_account_id)
         .context("Failed to get definition account")?;
     let token_definition = TokenDefinition::try_from(&definition_acc.data)?;
 
@@ -584,14 +584,14 @@ async fn create_token_with_private_definition() -> Result<()> {
     // Verify private recipient commitment
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&recipient_account_id_private)
+        .get_private_account_commitment(recipient_account_id_private)
         .context("Failed to get recipient commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
     // Verify private recipient balance
     let recipient_acc_private = ctx
         .wallet()
-        .get_account_private(&recipient_account_id_private)
+        .get_account_private(recipient_account_id_private)
         .context("Failed to get private recipient account")?;
     let token_holding = TokenHolding::try_from(&recipient_acc_private.data)?;
 
@@ -639,12 +639,13 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
     };
 
     // Create token with both private definition and supply
+    let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_private_account_id(definition_account_id),
         supply_account_id: format_private_account_id(supply_account_id),
-        name: "A NAME".to_string(),
-        total_supply: 37,
+        name,
+        total_supply,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -655,21 +656,21 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
     // Verify definition commitment
     let definition_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&definition_account_id)
+        .get_private_account_commitment(definition_account_id)
         .context("Failed to get definition commitment")?;
     assert!(verify_commitment_is_in_state(definition_commitment, ctx.sequencer_client()).await);
 
     // Verify supply commitment
     let supply_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&supply_account_id)
+        .get_private_account_commitment(supply_account_id)
         .context("Failed to get supply commitment")?;
     assert!(verify_commitment_is_in_state(supply_commitment, ctx.sequencer_client()).await);
 
     // Verify supply balance
     let supply_acc = ctx
         .wallet()
-        .get_account_private(&supply_account_id)
+        .get_account_private(supply_account_id)
         .context("Failed to get supply account")?;
     let token_holding = TokenHolding::try_from(&supply_acc.data)?;
 
@@ -712,20 +713,20 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
     // Verify both commitments updated
     let supply_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&supply_account_id)
+        .get_private_account_commitment(supply_account_id)
         .context("Failed to get supply commitment")?;
     assert!(verify_commitment_is_in_state(supply_commitment, ctx.sequencer_client()).await);
 
     let recipient_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&recipient_account_id)
+        .get_private_account_commitment(recipient_account_id)
         .context("Failed to get recipient commitment")?;
     assert!(verify_commitment_is_in_state(recipient_commitment, ctx.sequencer_client()).await);
 
     // Verify balances
     let supply_acc = ctx
         .wallet()
-        .get_account_private(&supply_account_id)
+        .get_account_private(supply_account_id)
         .context("Failed to get supply account")?;
     let token_holding = TokenHolding::try_from(&supply_acc.data)?;
     assert_eq!(
@@ -738,7 +739,7 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
 
     let recipient_acc = ctx
         .wallet()
-        .get_account_private(&recipient_account_id)
+        .get_account_private(recipient_account_id)
         .context("Failed to get recipient account")?;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
     assert_eq!(
@@ -798,12 +799,13 @@ async fn shielded_token_transfer() -> Result<()> {
     };
 
     // Create token
+    let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_public_account_id(definition_account_id),
         supply_account_id: format_public_account_id(supply_account_id),
-        name: "A NAME".to_string(),
-        total_supply: 37,
+        name,
+        total_supply,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -844,14 +846,14 @@ async fn shielded_token_transfer() -> Result<()> {
     // Verify recipient commitment exists
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&recipient_account_id)
+        .get_private_account_commitment(recipient_account_id)
         .context("Failed to get recipient commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
     // Verify recipient balance
     let recipient_acc = ctx
         .wallet()
-        .get_account_private(&recipient_account_id)
+        .get_account_private(recipient_account_id)
         .context("Failed to get recipient account")?;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
     assert_eq!(
@@ -911,12 +913,13 @@ async fn deshielded_token_transfer() -> Result<()> {
     };
 
     // Create token with private supply
+    let name = "A NAME".to_string();
     let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_public_account_id(definition_account_id),
         supply_account_id: format_private_account_id(supply_account_id),
-        name: "A NAME".to_string(),
-        total_supply: 37,
+        name,
+        total_supply,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -942,14 +945,14 @@ async fn deshielded_token_transfer() -> Result<()> {
     // Verify supply account commitment exists
     let new_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&supply_account_id)
+        .get_private_account_commitment(supply_account_id)
         .context("Failed to get supply commitment")?;
     assert!(verify_commitment_is_in_state(new_commitment, ctx.sequencer_client()).await);
 
     // Verify supply balance
     let supply_acc = ctx
         .wallet()
-        .get_account_private(&supply_account_id)
+        .get_account_private(supply_account_id)
         .context("Failed to get supply account")?;
     let token_holding = TokenHolding::try_from(&supply_acc.data)?;
     assert_eq!(
@@ -1011,11 +1014,13 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
     };
 
     // Create token
+    let name = "A NAME".to_string();
+    let total_supply = 37;
     let subcommand = TokenProgramAgnosticSubcommand::New {
         definition_account_id: format_private_account_id(definition_account_id),
         supply_account_id: format_private_account_id(supply_account_id),
-        name: "A NAME".to_string(),
-        total_supply: 37,
+        name,
+        total_supply,
     };
 
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
@@ -1041,7 +1046,7 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
         .wallet()
         .storage()
         .user_data
-        .get_private_account(&recipient_account_id)
+        .get_private_account(recipient_account_id)
         .cloned()
         .context("Failed to get private account keys")?;
 
@@ -1067,14 +1072,14 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
     // Verify commitment exists
     let recipient_commitment = ctx
         .wallet()
-        .get_private_account_commitment(&recipient_account_id)
+        .get_private_account_commitment(recipient_account_id)
         .context("Failed to get recipient commitment")?;
     assert!(verify_commitment_is_in_state(recipient_commitment, ctx.sequencer_client()).await);
 
     // Verify balance
     let recipient_acc = ctx
         .wallet()
-        .get_account_private(&recipient_account_id)
+        .get_account_private(recipient_account_id)
         .context("Failed to get recipient account")?;
     let token_holding = TokenHolding::try_from(&recipient_acc.data)?;
     assert_eq!(

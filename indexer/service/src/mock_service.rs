@@ -211,13 +211,6 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
             .ok_or_else(|| ErrorObjectOwned::owned(-32001, "Block with hash not found", None::<()>))
     }
 
-    async fn get_last_block_id(&self) -> Result<BlockId, ErrorObjectOwned> {
-        self.blocks
-            .last()
-            .map(|b| b.header.block_id)
-            .ok_or_else(|| ErrorObjectOwned::owned(-32001, "No blocks available", None::<()>))
-    }
-
     async fn get_account(&self, account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
         self.accounts
             .get(&account_id)

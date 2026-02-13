@@ -16,6 +16,8 @@ indexer_service.workspace = true
 serde_json.workspace = true
 token_core.workspace = true
 indexer_service_rpc.workspace = true
+wallet-ffi.workspace = true
+
 url.workspace = true
 
 anyhow.workspace = true
@@ -27,4 +29,4 @@ hex.workspace = true
 tempfile.workspace = true
 borsh.workspace = true
 futures.workspace = true
-testcontainers = { version = "0.26.3", features = ["docker-compose"] }
+testcontainers = { version = "0.27.0", features = ["docker-compose"] }
