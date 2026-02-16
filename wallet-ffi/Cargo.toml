@@ -19,7 +19,3 @@ cbindgen = "0.29"
 
 [dev-dependencies]
 tempfile = "3"
-
-[features]
-default = []
-prove = ["nssa/prove"]
