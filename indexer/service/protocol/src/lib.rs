@@ -3,21 +3,79 @@
 //! Currently it mostly mimics types from `nssa_core`, but it's important to have a separate crate
 //! to define a stable interface for the indexer service RPCs which evolves in its own way.
 
+use std::{fmt::Display, str::FromStr};
+
+use anyhow::anyhow;
+use base58::{FromBase58 as _, ToBase58 as _};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::{DeserializeFromStr, SerializeDisplay};
 
 #[cfg(feature = "convert")]
 mod convert;
 
 pub type Nonce = u128;
 
-pub type ProgramId = [u32; 8];
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, SerializeDisplay, DeserializeFromStr, JsonSchema,
+)]
+pub struct ProgramId(pub [u32; 8]);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+impl Display for ProgramId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let bytes: Vec<u8> = self.0.iter().flat_map(|n| n.to_be_bytes()).collect();
+        write!(f, "{}", bytes.to_base58())
+    }
+}
+
+impl FromStr for ProgramId {
+    type Err = hex::FromHexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = s
+            .from_base58()
+            .map_err(|_| hex::FromHexError::InvalidStringLength)?;
+        if bytes.len() != 32 {
+            return Err(hex::FromHexError::InvalidStringLength);
+        }
+        let mut arr = [0u32; 8];
+        for (i, chunk) in bytes.chunks_exact(4).enumerate() {
+            arr[i] = u32::from_be_bytes(chunk.try_into().unwrap());
+        }
+        Ok(ProgramId(arr))
+    }
+}
+
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, SerializeDisplay, DeserializeFromStr, JsonSchema,
+)]
 pub struct AccountId {
-    #[serde(with = "base64::arr")]
-    #[schemars(with = "String", description = "base64-encoded account ID")]
     pub value: [u8; 32],
+}
+
+impl Display for AccountId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value.to_base58())
+    }
+}
+
+impl FromStr for AccountId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = s
+            .from_base58()
+            .map_err(|err| anyhow!("invalid base58: {err:?}"))?;
+        if bytes.len() != 32 {
+            return Err(anyhow!(
+                "invalid length: expected 32 bytes, got {}",
+                bytes.len()
+            ));
+        }
+        let mut value = [0u8; 32];
+        value.copy_from_slice(&bytes);
+        Ok(AccountId { value })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -48,12 +106,26 @@ pub struct BlockHeader {
     pub signature: Signature,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeDisplay, DeserializeFromStr, JsonSchema)]
 pub struct Signature(
-    #[serde(with = "base64::arr")]
-    #[schemars(with = "String", description = "base64-encoded signature")]
-    pub [u8; 64],
+    #[schemars(with = "String", description = "hex-encoded signature")] pub [u8; 64],
 );
+
+impl Display for Signature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+impl FromStr for Signature {
+    type Err = hex::FromHexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut bytes = [0u8; 64];
+        hex::decode_to_slice(s, &mut bytes)?;
+        Ok(Signature(bytes))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct BlockBody {
@@ -196,12 +268,26 @@ pub struct Data(
     pub Vec<u8>,
 );
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub struct HashType(
-    #[serde(with = "base64::arr")]
-    #[schemars(with = "String", description = "base64-encoded hash")]
-    pub [u8; 32],
-);
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, SerializeDisplay, DeserializeFromStr, JsonSchema,
+)]
+pub struct HashType(pub [u8; 32]);
+
+impl Display for HashType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+impl FromStr for HashType {
+    type Err = hex::FromHexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut bytes = [0u8; 32];
+        hex::decode_to_slice(s, &mut bytes)?;
+        Ok(HashType(bytes))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct MantleMsgId(

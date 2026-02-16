@@ -321,15 +321,22 @@ impl Drop for TestContext {
 
 /// A test context to be used in normal #[test] tests
 pub struct BlockingTestContext {
-    pub ctx: TestContext,
-    pub runtime: tokio::runtime::Runtime,
+    ctx: Option<TestContext>,
+    runtime: tokio::runtime::Runtime,
 }
 
 impl BlockingTestContext {
     pub fn new() -> Result<Self> {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let ctx = runtime.block_on(TestContext::new())?;
-        Ok(Self { ctx, runtime })
+        Ok(Self {
+            ctx: Some(ctx),
+            runtime,
+        })
+    }
+
+    pub fn ctx(&self) -> &TestContext {
+        self.ctx.as_ref().expect("TestContext is set")
     }
 }
 
@@ -367,6 +374,19 @@ impl TestContextBuilder {
             }),
         )
         .await
+    }
+}
+
+impl Drop for BlockingTestContext {
+    fn drop(&mut self) {
+        let Self { ctx, runtime } = self;
+
+        // Ensure async cleanup of TestContext by blocking on its drop in the runtime.
+        runtime.block_on(async {
+            if let Some(ctx) = ctx.take() {
+                drop(ctx);
+            }
+        })
     }
 }
 

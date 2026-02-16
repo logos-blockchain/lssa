@@ -1,11 +1,12 @@
 use std::{fmt::Display, path::Path, time::Instant};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context as _, Result, anyhow};
+use bedrock_client::SignedMantleTx;
 #[cfg(feature = "testnet")]
 use common::PINATA_BASE58;
 use common::{
     HashType,
-    block::{BedrockStatus, Block, HashableBlockData, MantleMsgId},
+    block::{BedrockStatus, Block, HashableBlockData},
     transaction::NSSATransaction,
 };
 use config::SequencerConfig;
@@ -15,7 +16,7 @@ use mempool::{MemPool, MemPoolHandle};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    block_settlement_client::{BlockSettlementClient, BlockSettlementClientTrait},
+    block_settlement_client::{BlockSettlementClient, BlockSettlementClientTrait, MsgId},
     block_store::SequencerStore,
     indexer_client::{IndexerClient, IndexerClientTrait},
 };
@@ -38,7 +39,6 @@ pub struct SequencerCore<
     chain_height: u64,
     block_settlement_client: BC,
     indexer_client: IC,
-    last_bedrock_msg_id: MantleMsgId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -75,14 +75,32 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
         let genesis_parent_msg_id = [0; 32];
         let genesis_block = hashable_data.into_pending_block(&signing_key, genesis_parent_msg_id);
 
+        let bedrock_signing_key =
+            load_or_create_signing_key(&config.home.join("bedrock_signing_key"))
+                .expect("Failed to load or create bedrock signing key");
+
+        let block_settlement_client = BC::new(&config.bedrock_config, bedrock_signing_key)
+            .expect("Failed to initialize Block Settlement Client");
+
+        let indexer_client = IC::new(&config.indexer_rpc_url)
+            .await
+            .expect("Failed to create Indexer Client");
+
+        let (_tx, genesis_msg_id) = block_settlement_client
+            .create_inscribe_tx(&genesis_block)
+            .expect("Failed to create inscribe tx for genesis block");
+
         // Sequencer should panic if unable to open db,
         // as fixing this issue may require actions non-native to program scope
         let store = SequencerStore::open_db_with_genesis(
             &config.home.join("rocksdb"),
-            Some(&genesis_block),
+            Some((&genesis_block, genesis_msg_id.into())),
             signing_key,
         )
         .unwrap();
+        let latest_block_meta = store
+            .latest_block_meta()
+            .expect("Failed to read latest block meta from store");
 
         #[cfg_attr(not(feature = "testnet"), allow(unused_mut))]
         let mut state = match store.get_nssa_state() {
@@ -123,25 +141,15 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
         state.add_pinata_program(PINATA_BASE58.parse().unwrap());
 
         let (mempool, mempool_handle) = MemPool::new(config.mempool_max_size);
-        let bedrock_signing_key =
-            load_or_create_signing_key(&config.home.join("bedrock_signing_key"))
-                .expect("Failed to load or create signing key");
-        let block_settlement_client = BC::new(&config.bedrock_config, bedrock_signing_key)
-            .expect("Failed to initialize Block Settlement Client");
-
-        let indexer_client = IC::new(&config.indexer_rpc_url)
-            .await
-            .expect("Failed to create Indexer Client");
 
         let sequencer_core = Self {
             state,
             store,
             mempool,
-            chain_height: config.genesis_id,
+            chain_height: latest_block_meta.id,
             sequencer_config: config,
             block_settlement_client,
             indexer_client,
-            last_bedrock_msg_id: genesis_parent_msg_id,
         };
 
         (sequencer_core, mempool_handle)
@@ -165,29 +173,18 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
         Ok(tx)
     }
 
-    pub async fn produce_new_block_and_post_to_settlement_layer(&mut self) -> Result<u64> {
-        {
-            let block = self.produce_new_block_with_mempool_transactions()?;
-            match self
-                .block_settlement_client
-                .submit_block_to_bedrock(&block)
-                .await
-            {
-                Ok(msg_id) => {
-                    self.last_bedrock_msg_id = msg_id.into();
-                    info!("Posted block data to Bedrock, msg_id: {msg_id:?}");
-                }
-                Err(err) => {
-                    error!("Failed to post block data to Bedrock with error: {err:#}");
-                }
-            }
-        }
+    pub async fn produce_new_block(&mut self) -> Result<u64> {
+        let (_tx, _msg_id) = self
+            .produce_new_block_with_mempool_transactions()
+            .context("Failed to produce new block with mempool transactions")?;
 
         Ok(self.chain_height)
     }
 
-    /// Produces new block from transactions in mempool
-    pub fn produce_new_block_with_mempool_transactions(&mut self) -> Result<Block> {
+    /// Produces new block from transactions in mempool and packs it into a SignedMantleTx.
+    pub fn produce_new_block_with_mempool_transactions(
+        &mut self,
+    ) -> Result<(SignedMantleTx, MsgId)> {
         let now = Instant::now();
 
         let new_block_height = self.chain_height + 1;
@@ -214,41 +211,44 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
             }
         }
 
-        let prev_block_hash = self.store.get_block_at_id(self.chain_height)?.header.hash;
+        let latest_block_meta = self
+            .store
+            .latest_block_meta()
+            .context("Failed to get latest block meta from store")?;
 
         let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
             transactions: valid_transactions,
-            prev_block_hash,
+            prev_block_hash: latest_block_meta.hash,
             timestamp: curr_time,
         };
 
         let block = hashable_data
             .clone()
-            .into_pending_block(self.store.signing_key(), self.last_bedrock_msg_id);
+            .into_pending_block(self.store.signing_key(), latest_block_meta.msg_id);
 
-        self.store.update(&block, &self.state)?;
+        let (tx, msg_id) = self
+            .block_settlement_client
+            .create_inscribe_tx(&block)
+            .with_context(|| {
+                format!(
+                    "Failed to create inscribe transaction for block with id {}",
+                    block.header.block_id
+                )
+            })?;
+
+        self.store.update(&block, msg_id.into(), &self.state)?;
 
         self.chain_height = new_block_height;
 
-        // TODO: Consider switching to `tracing` crate to have more structured and consistent logs
-        // e.g.
-        //
-        // ```
-        // info!(
-        //     num_txs = num_txs_in_block,
-        //     time = now.elapsed(),
-        //     "Created block"
-        // );
-        // ```
         log::info!(
             "Created block with {} transactions in {} seconds",
             hashable_data.transactions.len(),
             now.elapsed().as_secs()
         );
-        Ok(block)
+        Ok((tx, msg_id))
     }
 
     pub fn state(&self) -> &nssa::V02State {
@@ -282,8 +282,10 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
                 "Clearing pending blocks up to id: {}",
                 last_finalized_block_id
             );
+            // TODO: Delete blocks instead of marking them as finalized.
+            // Current approach is used because we still have `GetBlockDataRequest`.
             (first_pending_block_id..=last_finalized_block_id)
-                .try_for_each(|id| self.store.delete_block_at_id(id))
+                .try_for_each(|id| self.store.mark_block_as_finalized(id))
         } else {
             Ok(())
         }
@@ -344,6 +346,10 @@ fn load_or_create_signing_key(path: &Path) -> Result<Ed25519Key> {
     } else {
         let mut key_bytes = [0u8; ED25519_SECRET_KEY_SIZE];
         rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut key_bytes);
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         std::fs::write(path, key_bytes)?;
         Ok(Ed25519Key::from_bytes(&key_bytes))
     }
@@ -648,9 +654,9 @@ mod tests {
         let tx = common::test_utils::produce_dummy_empty_transaction();
         mempool_handle.push(tx).await.unwrap();
 
-        let block = sequencer.produce_new_block_with_mempool_transactions();
-        assert!(block.is_ok());
-        assert_eq!(block.unwrap().header.block_id, genesis_height + 1);
+        let result = sequencer.produce_new_block_with_mempool_transactions();
+        assert!(result.is_ok());
+        assert_eq!(sequencer.chain_height, genesis_height + 1);
     }
 
     #[tokio::test]
@@ -673,12 +679,13 @@ mod tests {
         mempool_handle.push(tx_replay).await.unwrap();
 
         // Create block
-        let current_height = sequencer
+        sequencer
             .produce_new_block_with_mempool_transactions()
-            .unwrap()
-            .header
-            .block_id;
-        let block = sequencer.store.get_block_at_id(current_height).unwrap();
+            .unwrap();
+        let block = sequencer
+            .store
+            .get_block_at_id(sequencer.chain_height)
+            .unwrap();
 
         // Only one should be included in the block
         assert_eq!(block.body.transactions, vec![tx.clone()]);
@@ -699,22 +706,24 @@ mod tests {
 
         // The transaction should be included the first time
         mempool_handle.push(tx.clone()).await.unwrap();
-        let current_height = sequencer
+        sequencer
             .produce_new_block_with_mempool_transactions()
-            .unwrap()
-            .header
-            .block_id;
-        let block = sequencer.store.get_block_at_id(current_height).unwrap();
+            .unwrap();
+        let block = sequencer
+            .store
+            .get_block_at_id(sequencer.chain_height)
+            .unwrap();
         assert_eq!(block.body.transactions, vec![tx.clone()]);
 
         // Add same transaction should fail
         mempool_handle.push(tx.clone()).await.unwrap();
-        let current_height = sequencer
+        sequencer
             .produce_new_block_with_mempool_transactions()
-            .unwrap()
-            .header
-            .block_id;
-        let block = sequencer.store.get_block_at_id(current_height).unwrap();
+            .unwrap();
+        let block = sequencer
+            .store
+            .get_block_at_id(sequencer.chain_height)
+            .unwrap();
         assert!(block.body.transactions.is_empty());
     }
 
@@ -742,12 +751,13 @@ mod tests {
             );
 
             mempool_handle.push(tx.clone()).await.unwrap();
-            let current_height = sequencer
+            sequencer
                 .produce_new_block_with_mempool_transactions()
-                .unwrap()
-                .header
-                .block_id;
-            let block = sequencer.store.get_block_at_id(current_height).unwrap();
+                .unwrap();
+            let block = sequencer
+                .store
+                .get_block_at_id(sequencer.chain_height)
+                .unwrap();
             assert_eq!(block.body.transactions, vec![tx.clone()]);
         }
 
@@ -807,5 +817,127 @@ mod tests {
             .unwrap();
 
         assert_eq!(sequencer.get_pending_blocks().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_produce_block_with_correct_prev_meta_after_restart() {
+        let config = setup_sequencer_config();
+        let acc1_account_id = config.initial_accounts[0].account_id;
+        let acc2_account_id = config.initial_accounts[1].account_id;
+
+        // Step 1: Create initial database with some block metadata
+        let expected_prev_meta = {
+            let (mut sequencer, mempool_handle) =
+                SequencerCoreWithMockClients::start_from_config(config.clone()).await;
+
+            let signing_key = PrivateKey::try_new([1; 32]).unwrap();
+
+            // Add a transaction and produce a block to set up block metadata
+            let tx = common::test_utils::create_transaction_native_token_transfer(
+                acc1_account_id,
+                0,
+                acc2_account_id,
+                100,
+                signing_key,
+            );
+
+            mempool_handle.push(tx).await.unwrap();
+            sequencer
+                .produce_new_block_with_mempool_transactions()
+                .unwrap();
+
+            // Get the metadata of the last block produced
+            sequencer.store.latest_block_meta().unwrap()
+        };
+
+        // Step 2: Restart sequencer from the same storage
+        let (mut sequencer, mempool_handle) =
+            SequencerCoreWithMockClients::start_from_config(config.clone()).await;
+
+        // Step 3: Submit a new transaction
+        let signing_key = PrivateKey::try_new([1; 32]).unwrap();
+        let tx = common::test_utils::create_transaction_native_token_transfer(
+            acc1_account_id,
+            1, // Next nonce
+            acc2_account_id,
+            50,
+            signing_key,
+        );
+
+        mempool_handle.push(tx.clone()).await.unwrap();
+
+        // Step 4: Produce new block
+        sequencer
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
+
+        // Step 5: Verify the new block has correct previous block metadata
+        let new_block = sequencer
+            .store
+            .get_block_at_id(sequencer.chain_height)
+            .unwrap();
+
+        assert_eq!(
+            new_block.header.prev_block_hash, expected_prev_meta.hash,
+            "New block's prev_block_hash should match the stored metadata hash"
+        );
+        assert_eq!(
+            new_block.bedrock_parent_id, expected_prev_meta.msg_id,
+            "New block's bedrock_parent_id should match the stored metadata msg_id"
+        );
+        assert_eq!(
+            new_block.body.transactions,
+            vec![tx],
+            "New block should contain the submitted transaction"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_start_from_config_uses_db_height_not_config_genesis() {
+        let mut config = setup_sequencer_config();
+        let original_genesis_id = config.genesis_id;
+
+        // Step 1: Create initial database and produce some blocks
+        let expected_chain_height = {
+            let (mut sequencer, mempool_handle) =
+                SequencerCoreWithMockClients::start_from_config(config.clone()).await;
+
+            // Verify we start with the genesis_id from config
+            assert_eq!(sequencer.chain_height, original_genesis_id);
+
+            // Produce multiple blocks to advance chain height
+            let tx = common::test_utils::produce_dummy_empty_transaction();
+            mempool_handle.push(tx).await.unwrap();
+            sequencer
+                .produce_new_block_with_mempool_transactions()
+                .unwrap();
+
+            let tx = common::test_utils::produce_dummy_empty_transaction();
+            mempool_handle.push(tx).await.unwrap();
+            sequencer
+                .produce_new_block_with_mempool_transactions()
+                .unwrap();
+
+            // Return the current chain height (should be genesis_id + 2)
+            sequencer.chain_height
+        };
+
+        // Step 2: Modify the config to have a DIFFERENT genesis_id
+        let different_genesis_id = original_genesis_id + 100;
+        config.genesis_id = different_genesis_id;
+
+        // Step 3: Restart sequencer with the modified config (different genesis_id)
+        let (sequencer, _mempool_handle) =
+            SequencerCoreWithMockClients::start_from_config(config.clone()).await;
+
+        // Step 4: Verify chain_height comes from database, NOT from the new config.genesis_id
+        assert_eq!(
+            sequencer.chain_height, expected_chain_height,
+            "Chain height should be loaded from database metadata, not config.genesis_id"
+        );
+        assert_ne!(
+            sequencer.chain_height, different_genesis_id,
+            "Chain height should NOT match the modified config.genesis_id"
+        );
     }
 }

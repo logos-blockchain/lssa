@@ -1,7 +1,11 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::Result;
-use common::{HashType, block::Block, transaction::NSSATransaction};
+use common::{
+    HashType,
+    block::{Block, BlockMeta, MantleMsgId},
+    transaction::NSSATransaction,
+};
 use nssa::V02State;
 use storage::RocksDBIO;
 
@@ -20,10 +24,10 @@ impl SequencerStore {
     /// ATTENTION: Will overwrite genesis block.
     pub fn open_db_with_genesis(
         location: &Path,
-        genesis_block: Option<&Block>,
+        genesis_block: Option<(&Block, MantleMsgId)>,
         signing_key: nssa::PrivateKey,
     ) -> Result<Self> {
-        let tx_hash_to_block_map = if let Some(block) = &genesis_block {
+        let tx_hash_to_block_map = if let Some((block, _msg_id)) = &genesis_block {
             block_to_transactions_map(block)
         } else {
             HashMap::new()
@@ -54,6 +58,10 @@ impl SequencerStore {
         Ok(self.dbio.delete_block(block_id)?)
     }
 
+    pub fn mark_block_as_finalized(&mut self, block_id: u64) -> Result<()> {
+        Ok(self.dbio.mark_block_as_finalized(block_id)?)
+    }
+
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
     pub fn get_transaction_by_hash(&self, hash: HashType) -> Option<NSSATransaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
@@ -68,8 +76,8 @@ impl SequencerStore {
         None
     }
 
-    pub fn insert(&mut self, tx: &NSSATransaction, block_id: u64) {
-        self.tx_hash_to_block_map.insert(tx.hash(), block_id);
+    pub fn latest_block_meta(&self) -> Result<BlockMeta> {
+        Ok(self.dbio.latest_block_meta()?)
     }
 
     pub fn genesis_id(&self) -> u64 {
@@ -84,9 +92,14 @@ impl SequencerStore {
         self.dbio.get_all_blocks().map(|res| Ok(res?))
     }
 
-    pub(crate) fn update(&mut self, block: &Block, state: &V02State) -> Result<()> {
+    pub(crate) fn update(
+        &mut self,
+        block: &Block,
+        msg_id: MantleMsgId,
+        state: &V02State,
+    ) -> Result<()> {
         let new_transactions_map = block_to_transactions_map(block);
-        self.dbio.atomic_update(block, state)?;
+        self.dbio.atomic_update(block, msg_id, state)?;
         self.tx_hash_to_block_map.extend(new_transactions_map);
         Ok(())
     }
@@ -128,8 +141,12 @@ mod tests {
 
         let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
         // Start an empty node store
-        let mut node_store =
-            SequencerStore::open_db_with_genesis(path, Some(&genesis_block), signing_key).unwrap();
+        let mut node_store = SequencerStore::open_db_with_genesis(
+            path,
+            Some((&genesis_block, [0; 32])),
+            signing_key,
+        )
+        .unwrap();
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
         let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
@@ -139,9 +156,126 @@ mod tests {
         assert_eq!(None, retrieved_tx);
         // Add the block with the transaction
         let dummy_state = V02State::new_with_genesis_accounts(&[], &[]);
-        node_store.update(&block, &dummy_state).unwrap();
+        node_store.update(&block, [1; 32], &dummy_state).unwrap();
         // Try again
         let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(Some(tx), retrieved_tx);
+    }
+
+    #[test]
+    fn test_latest_block_meta_returns_genesis_meta_initially() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let signing_key = sequencer_sign_key_for_testing();
+
+        let genesis_block_hashable_data = HashableBlockData {
+            block_id: 0,
+            prev_block_hash: HashType([0; 32]),
+            timestamp: 0,
+            transactions: vec![],
+        };
+
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
+        let genesis_hash = genesis_block.header.hash;
+
+        let node_store = SequencerStore::open_db_with_genesis(
+            path,
+            Some((&genesis_block, [0; 32])),
+            signing_key,
+        )
+        .unwrap();
+
+        // Verify that initially the latest block hash equals genesis hash
+        let latest_meta = node_store.latest_block_meta().unwrap();
+        assert_eq!(latest_meta.hash, genesis_hash);
+        assert_eq!(latest_meta.msg_id, [0; 32]);
+    }
+
+    #[test]
+    fn test_latest_block_meta_updates_after_new_block() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let signing_key = sequencer_sign_key_for_testing();
+
+        let genesis_block_hashable_data = HashableBlockData {
+            block_id: 0,
+            prev_block_hash: HashType([0; 32]),
+            timestamp: 0,
+            transactions: vec![],
+        };
+
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
+        let mut node_store = SequencerStore::open_db_with_genesis(
+            path,
+            Some((&genesis_block, [0; 32])),
+            signing_key,
+        )
+        .unwrap();
+
+        // Add a new block
+        let tx = common::test_utils::produce_dummy_empty_transaction();
+        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
+        let block_hash = block.header.hash;
+        let block_msg_id = [1; 32];
+
+        let dummy_state = V02State::new_with_genesis_accounts(&[], &[]);
+        node_store
+            .update(&block, block_msg_id, &dummy_state)
+            .unwrap();
+
+        // Verify that the latest block meta now equals the new block's hash and msg_id
+        let latest_meta = node_store.latest_block_meta().unwrap();
+        assert_eq!(latest_meta.hash, block_hash);
+        assert_eq!(latest_meta.msg_id, block_msg_id);
+    }
+
+    #[test]
+    fn test_mark_block_finalized() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let signing_key = sequencer_sign_key_for_testing();
+
+        let genesis_block_hashable_data = HashableBlockData {
+            block_id: 0,
+            prev_block_hash: HashType([0; 32]),
+            timestamp: 0,
+            transactions: vec![],
+        };
+
+        let genesis_block = genesis_block_hashable_data.into_pending_block(&signing_key, [0; 32]);
+        let mut node_store = SequencerStore::open_db_with_genesis(
+            path,
+            Some((&genesis_block, [0; 32])),
+            signing_key,
+        )
+        .unwrap();
+
+        // Add a new block with Pending status
+        let tx = common::test_utils::produce_dummy_empty_transaction();
+        let block = common::test_utils::produce_dummy_block(1, None, vec![tx.clone()]);
+        let block_id = block.header.block_id;
+
+        let dummy_state = V02State::new_with_genesis_accounts(&[], &[]);
+        node_store.update(&block, [1; 32], &dummy_state).unwrap();
+
+        // Verify initial status is Pending
+        let retrieved_block = node_store.get_block_at_id(block_id).unwrap();
+        assert!(matches!(
+            retrieved_block.bedrock_status,
+            common::block::BedrockStatus::Pending
+        ));
+
+        // Mark block as finalized
+        node_store.mark_block_as_finalized(block_id).unwrap();
+
+        // Verify status is now Finalized
+        let finalized_block = node_store.get_block_at_id(block_id).unwrap();
+        assert!(matches!(
+            finalized_block.bedrock_status,
+            common::block::BedrockStatus::Finalized
+        ));
     }
 }
