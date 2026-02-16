@@ -2,6 +2,7 @@
 name = "indexer_service"
 version = "0.1.0"
 edition = "2024"
+license = { workspace = true }
 
 [dependencies]
 indexer_service_protocol = { workspace = true, features = ["convert"] }

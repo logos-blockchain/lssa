@@ -337,7 +337,11 @@ mod tests {
 
     use base58::ToBase58;
     use bedrock_client::BackoffConfig;
-    use common::{block::AccountInitialData, test_utils::sequencer_sign_key_for_testing, transaction::{NSSATransaction, transaction_pre_check}};
+    use common::{
+        block::AccountInitialData,
+        test_utils::sequencer_sign_key_for_testing,
+        transaction::{NSSATransaction, transaction_pre_check},
+    };
     use logos_blockchain_core::mantle::ops::channel::ChannelId;
     use mempool::MemPoolHandle;
     use nssa::{AccountId, PrivateKey};

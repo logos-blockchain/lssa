@@ -8209,7 +8209,6 @@ dependencies = [
  "nssa_core",
  "optfield",
  "rand 0.8.5",
- "risc0-zkvm",
  "serde",
  "serde_json",
  "sha2",

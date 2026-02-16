@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use indexer_service_protocol::{Account, AccountId, Block, BlockId, HashType, Transaction};
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};

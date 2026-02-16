@@ -26,8 +26,7 @@ use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
 use sequencer_core::{
-    block_settlement_client::BlockSettlementClientTrait,
-    indexer_client::IndexerClientTrait,
+    block_settlement_client::BlockSettlementClientTrait, indexer_client::IndexerClientTrait,
 };
 use serde_json::Value;
 
@@ -95,8 +94,8 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         let tx = borsh::from_slice::<NSSATransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = tx.hash();
 
-        let authenticated_tx = transaction_pre_check(tx)
-            .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
+        let authenticated_tx =
+            transaction_pre_check(tx).inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         // TODO: Do we need a timeout here? It will be usable if we have too many transactions to
         // process
@@ -328,7 +327,8 @@ mod tests {
     use base64::{Engine, engine::general_purpose};
     use bedrock_client::BackoffConfig;
     use common::{
-        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing, transaction::NSSATransaction
+        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing,
+        transaction::NSSATransaction,
     };
     use nssa::AccountId;
     use sequencer_core::{
