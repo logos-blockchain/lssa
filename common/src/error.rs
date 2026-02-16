@@ -13,23 +13,11 @@ pub struct SequencerRpcError {
 #[derive(thiserror::Error, Debug)]
 pub enum SequencerClientError {
     #[error("HTTP error")]
-    HTTPError(reqwest::Error),
+    HTTPError(#[from] reqwest::Error),
     #[error("Serde error")]
-    SerdeError(serde_json::Error),
-    #[error("Internal error")]
+    SerdeError(#[from] serde_json::Error),
+    #[error("Internal error: {0:?}")]
     InternalError(SequencerRpcError),
-}
-
-impl From<reqwest::Error> for SequencerClientError {
-    fn from(value: reqwest::Error) -> Self {
-        SequencerClientError::HTTPError(value)
-    }
-}
-
-impl From<serde_json::Error> for SequencerClientError {
-    fn from(value: serde_json::Error) -> Self {
-        SequencerClientError::SerdeError(value)
-    }
 }
 
 impl From<SequencerRpcError> for SequencerClientError {

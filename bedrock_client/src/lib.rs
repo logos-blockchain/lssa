@@ -62,7 +62,6 @@ impl BedrockClient {
         Retry::spawn(self.backoff_strategy(), || {
             self.http_client
                 .post_transaction(self.node_url.clone(), tx.clone())
-                .inspect_err(|err| warn!("Transaction posting failed with error: {err:#}"))
         })
         .await
     }

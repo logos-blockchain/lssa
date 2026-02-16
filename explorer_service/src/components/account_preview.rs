@@ -2,12 +2,10 @@ use indexer_service_protocol::{Account, AccountId};
 use leptos::prelude::*;
 use leptos_router::components::A;
 
-use crate::format_utils;
-
 /// Account preview component
 #[component]
 pub fn AccountPreview(account_id: AccountId, account: Account) -> impl IntoView {
-    let account_id_str = format_utils::format_account_id(&account_id);
+    let account_id_str = account_id.to_string();
 
     view! {
         <div class="account-preview">
@@ -20,7 +18,7 @@ pub fn AccountPreview(account_id: AccountId, account: Account) -> impl IntoView 
                 </div>
                 {move || {
                     let Account { program_owner, balance, data, nonce } = &account;
-                    let program_id = format_utils::format_program_id(program_owner);
+                    let program_id = program_owner.to_string();
                     view! {
                         <div class="account-preview-body">
                             <div class="account-field">

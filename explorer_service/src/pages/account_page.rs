@@ -1,8 +1,10 @@
+use std::str::FromStr as _;
+
 use indexer_service_protocol::{Account, AccountId};
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
-use crate::{api, components::TransactionPreview, format_utils};
+use crate::{api, components::TransactionPreview};
 
 /// Account page component
 #[component]
@@ -17,16 +19,7 @@ pub fn AccountPage() -> impl IntoView {
     // Parse account ID from URL params
     let account_id = move || {
         let account_id_str = params.read().get("id").unwrap_or_default();
-        format_utils::parse_hex(&account_id_str).and_then(|bytes| {
-            if bytes.len() == 32 {
-                let account_id_array: [u8; 32] = bytes.try_into().ok()?;
-                Some(AccountId {
-                    value: account_id_array,
-                })
-            } else {
-                None
-            }
-        })
+        AccountId::from_str(&account_id_str).ok()
     };
 
     // Load account data
@@ -98,8 +91,8 @@ pub fn AccountPage() -> impl IntoView {
                                 } = acc;
 
                                 let acc_id = account_id().expect("Account ID should be set");
-                                let account_id_str = format_utils::format_account_id(&acc_id);
-                                let program_id = format_utils::format_program_id(&program_owner);
+                                let account_id_str = acc_id.to_string();
+                                let program_id = program_owner.to_string();
                                 let balance_str = balance.to_string();
                                 let nonce_str = nonce.0.to_string();
                                 let data_len = data.0.len();

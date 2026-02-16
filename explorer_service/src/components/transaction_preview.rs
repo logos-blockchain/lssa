@@ -15,7 +15,7 @@ fn transaction_type_info(tx: &Transaction) -> (&'static str, &'static str) {
 #[component]
 pub fn TransactionPreview(transaction: Transaction) -> impl IntoView {
     let hash = transaction.hash();
-    let hash_str = hex::encode(hash.0);
+    let hash_str = hash.to_string();
     let (type_name, type_class) = transaction_type_info(&transaction);
 
     // Get additional metadata based on transaction type

@@ -1,3 +1,5 @@
+use std::str::FromStr as _;
+
 use indexer_service_protocol::{
     HashType, PrivacyPreservingMessage, PrivacyPreservingTransaction, ProgramDeploymentMessage,
     ProgramDeploymentTransaction, PublicMessage, PublicTransaction, Transaction, WitnessSet,
@@ -5,7 +7,7 @@ use indexer_service_protocol::{
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_params_map};
 
-use crate::{api, format_utils};
+use crate::api;
 
 /// Transaction page component
 #[component]
@@ -14,15 +16,10 @@ pub fn TransactionPage() -> impl IntoView {
 
     let transaction_resource = Resource::new(
         move || {
-            let tx_hash_str = params.read().get("hash").unwrap_or_default();
-            format_utils::parse_hex(&tx_hash_str).and_then(|bytes| {
-                if bytes.len() == 32 {
-                    let hash_array: [u8; 32] = bytes.try_into().ok()?;
-                    Some(HashType(hash_array))
-                } else {
-                    None
-                }
-            })
+            params
+                .read()
+                .get("hash")
+                .and_then(|s| HashType::from_str(&s).ok())
         },
         |hash_opt| async move {
             match hash_opt {
@@ -42,7 +39,7 @@ pub fn TransactionPage() -> impl IntoView {
                         .get()
                         .map(|result| match result {
                             Ok(tx) => {
-                                let tx_hash = format_utils::format_hash(&tx.hash().0);
+                                let tx_hash = tx.hash().to_string();
                                 let tx_type = match &tx {
                                     Transaction::Public(_) => "Public Transaction",
                                     Transaction::PrivacyPreserving(_) => "Privacy-Preserving Transaction",
@@ -86,10 +83,7 @@ pub fn TransactionPage() -> impl IntoView {
                                         proof,
                                     } = witness_set;
 
-                                    let program_id_str = program_id
-                                        .iter()
-                                        .map(|n| format!("{:08x}", n))
-                                        .collect::<String>();
+                                    let program_id_str = program_id.to_string();
                                     let proof_len = proof.0.len();
                                     let signatures_count = signatures_and_public_keys.len();
 
@@ -123,7 +117,7 @@ pub fn TransactionPage() -> impl IntoView {
                                                     .into_iter()
                                                     .zip(nonces.into_iter())
                                                     .map(|(account_id, nonce)| {
-                                                        let account_id_str = format_utils::format_account_id(&account_id);
+                                                        let account_id_str = account_id.to_string();
                                                         view! {
                                                             <div class="account-item">
                                                                 <A href=format!("/account/{}", account_id_str)>
@@ -197,7 +191,7 @@ pub fn TransactionPage() -> impl IntoView {
                                                     .into_iter()
                                                     .zip(nonces.into_iter())
                                                     .map(|(account_id, nonce)| {
-                                                        let account_id_str = format_utils::format_account_id(&account_id);
+                                                        let account_id_str = account_id.to_string();
                                                         view! {
                                                             <div class="account-item">
                                                                 <A href=format!("/account/{}", account_id_str)>
