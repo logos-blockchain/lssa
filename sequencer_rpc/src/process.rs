@@ -292,6 +292,7 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         );
         program_ids.insert("token".to_string(), Program::token().id());
         program_ids.insert("pinata".to_string(), Program::pinata().id());
+        program_ids.insert("amm".to_string(), Program::amm().id());
         program_ids.insert(
             "privacy_preserving_circuit".to_string(),
             nssa::PRIVACY_PRESERVING_CIRCUIT_ID,
