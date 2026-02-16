@@ -4,8 +4,8 @@ use indexer_service_protocol::{
     Account, AccountId, BedrockStatus, Block, BlockBody, BlockHeader, BlockId, Commitment,
     CommitmentSetDigest, Data, EncryptedAccountData, HashType, MantleMsgId,
     PrivacyPreservingMessage, PrivacyPreservingTransaction, ProgramDeploymentMessage,
-    ProgramDeploymentTransaction, PublicMessage, PublicTransaction, Signature, Transaction,
-    WitnessSet,
+    ProgramDeploymentTransaction, ProgramId, PublicMessage, PublicTransaction, Signature,
+    Transaction, WitnessSet,
 };
 use jsonrpsee::{core::SubscriptionResult, types::ErrorObjectOwned};
 
@@ -35,7 +35,7 @@ impl MockIndexerService {
             accounts.insert(
                 *account_id,
                 Account {
-                    program_owner: [i as u32; 8],
+                    program_owner: ProgramId([i as u32; 8]),
                     balance: 1000 * (i as u128 + 1),
                     data: Data(vec![0xaa, 0xbb, 0xcc]),
                     nonce: i as u128,
@@ -73,7 +73,7 @@ impl MockIndexerService {
                     0 | 1 => Transaction::Public(PublicTransaction {
                         hash: tx_hash,
                         message: PublicMessage {
-                            program_id: [1u32; 8],
+                            program_id: ProgramId([1u32; 8]),
                             account_ids: vec![
                                 account_ids[tx_idx as usize % account_ids.len()],
                                 account_ids[(tx_idx as usize + 1) % account_ids.len()],
@@ -95,7 +95,7 @@ impl MockIndexerService {
                             ],
                             nonces: vec![block_id as u128],
                             public_post_states: vec![Account {
-                                program_owner: [1u32; 8],
+                                program_owner: ProgramId([1u32; 8]),
                                 balance: 500,
                                 data: Data(vec![0xdd, 0xee]),
                                 nonce: block_id as u128,

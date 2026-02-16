@@ -25,13 +25,6 @@ pub async fn get_account(account_id: AccountId) -> Result<Account, ServerFnError
         .map_err(|e| ServerFnError::ServerError(format!("RPC error: {}", e)))
 }
 
-/// Parse hex string to bytes
-#[cfg(feature = "ssr")]
-fn parse_hex(s: &str) -> Option<Vec<u8>> {
-    let s = s.trim().trim_start_matches("0x");
-    hex::decode(s).ok()
-}
-
 /// Search for a block, transaction, or account by query string
 #[server]
 pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
@@ -42,12 +35,8 @@ pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
     let mut transactions = Vec::new();
     let mut accounts = Vec::new();
 
-    // Try to parse as hash (32 bytes)
-    if let Some(bytes) = parse_hex(&query)
-        && let Ok(hash_array) = <[u8; 32]>::try_from(bytes)
-    {
-        let hash = HashType(hash_array);
-
+    // Try as hash
+    if let Ok(hash) = HashType::from_str(&query) {
         // Try as block hash
         if let Ok(block) = client.get_block_by_hash(hash).await {
             blocks.push(block);
@@ -57,12 +46,13 @@ pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
         if let Ok(tx) = client.get_transaction(hash).await {
             transactions.push(tx);
         }
+    }
 
-        // Try as account ID
-        let account_id = AccountId { value: hash_array };
-        if let Ok(account) = client.get_account(account_id).await {
-            accounts.push((account_id, account));
-        }
+    // Try as account ID
+    if let Ok(account_id) = AccountId::from_str(&query)
+        && let Ok(account) = client.get_account(account_id).await
+    {
+        accounts.push((account_id, account));
     }
 
     // Try as block ID

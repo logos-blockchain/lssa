@@ -26,9 +26,6 @@ console_log = "1.0"
 # Date/Time
 chrono.workspace = true
 
-# Hex encoding/decoding
-hex.workspace = true
-
 # URL encoding
 urlencoding = "2.1"
 

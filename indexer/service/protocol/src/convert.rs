@@ -6,6 +6,18 @@ use crate::*;
 // Account-related conversions
 // ============================================================================
 
+impl From<[u32; 8]> for ProgramId {
+    fn from(value: [u32; 8]) -> Self {
+        Self(value)
+    }
+}
+
+impl From<ProgramId> for [u32; 8] {
+    fn from(value: ProgramId) -> Self {
+        value.0
+    }
+}
+
 impl From<nssa_core::account::AccountId> for AccountId {
     fn from(value: nssa_core::account::AccountId) -> Self {
         Self {
@@ -31,7 +43,7 @@ impl From<nssa_core::account::Account> for Account {
         } = value;
 
         Self {
-            program_owner,
+            program_owner: program_owner.into(),
             balance,
             data: data.into(),
             nonce,
@@ -51,7 +63,7 @@ impl TryFrom<Account> for nssa_core::account::Account {
         } = value;
 
         Ok(nssa_core::account::Account {
-            program_owner,
+            program_owner: program_owner.into(),
             balance,
             data: data.try_into()?,
             nonce,
@@ -230,7 +242,7 @@ impl From<nssa::public_transaction::Message> for PublicMessage {
             instruction_data,
         } = value;
         Self {
-            program_id,
+            program_id: program_id.into(),
             account_ids: account_ids.into_iter().map(Into::into).collect(),
             nonces,
             instruction_data,
@@ -247,7 +259,7 @@ impl From<PublicMessage> for nssa::public_transaction::Message {
             instruction_data,
         } = value;
         Self::new_preserialized(
-            program_id,
+            program_id.into(),
             account_ids.into_iter().map(Into::into).collect(),
             nonces,
             instruction_data,
