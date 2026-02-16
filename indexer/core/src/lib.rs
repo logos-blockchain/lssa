@@ -154,47 +154,98 @@ impl IndexerCore {
             .map(|info| info.header_id)
     }
 
+    /// WARNING: depending on chain behaviour,
+    /// may take indefinite amount of time
     pub async fn search_for_channel_start(
         &self,
     ) -> Result<VecDeque<bedrock_client::Block<SignedMantleTx>>> {
         let mut curr_last_header = self.wait_last_finalized_block_header().await?;
+        // Storing start for future use
+        let mut rollback_start = curr_last_header;
+        // ToDo: How to get root?
+        let mut rollback_limit = HeaderId::from([0; 32]);
         // ToDo: Not scalable, initial buffer should be stored in DB to not run out of memory
         // Don't want to complicate DB even more right now.
-        let mut initial_block_buffer = VecDeque::new();
+        let mut block_buffer = VecDeque::new();
 
-        loop {
-            let Some(curr_last_block) = self
-                .bedrock_client
-                .get_block_by_id(curr_last_header)
-                .await?
-            else {
-                return Err(anyhow::anyhow!("Chain inconsistency"));
-            };
+        'outer: loop {
+            loop {
+                // let res = self
+                //     .bedrock_client
+                //     .get_block_by_id(curr_last_header)
+                //     .await?;
 
-            initial_block_buffer.push_front(curr_last_block.clone());
+                // let curr_last_block;
 
-            if let Some(_) = curr_last_block.transactions().find_map(|tx| {
-                tx.mantle_tx.ops.iter().find_map(|op| match op {
-                    Op::ChannelInscribe(InscriptionOp {
-                        channel_id, parent, ..
-                    }) => {
-                        if (channel_id == &self.config.channel_id) && (parent == &MsgId::root()) {
-                            Some(curr_last_block.header().id())
-                        } else {
-                            None
+                // match res {
+                //     Some(block) => {curr_last_block = block},
+                //     None => {
+                //         break;
+                //     }
+                // }
+
+                let Some(curr_last_block) = self
+                    .bedrock_client
+                    .get_block_by_id(curr_last_header)
+                    .await?
+                else {
+                    log::error!("Failed to get block for header {curr_last_header}");
+                    return Err(anyhow::anyhow!("Chain inconsistency"));
+                };
+
+                info!(
+                    "INITIAL_SEARCH: Observed L1 block at height {}",
+                    curr_last_block.header().slot().into_inner()
+                );
+                info!(
+                    "INITIAL_SEARCH: This block header is {}",
+                    curr_last_block.header().id()
+                );
+                info!(
+                    "INITIAL_SEARCH: This block parent is {}",
+                    curr_last_block.header().parent()
+                );
+
+                block_buffer.push_front(curr_last_block.clone());
+
+                if let Some(_) = curr_last_block.transactions().find_map(|tx| {
+                    tx.mantle_tx.ops.iter().find_map(|op| match op {
+                        Op::ChannelInscribe(InscriptionOp {
+                            channel_id, parent, ..
+                        }) => {
+                            if (channel_id == &self.config.channel_id) && (parent == &MsgId::root())
+                            {
+                                Some(curr_last_block.header().id())
+                            } else {
+                                None
+                            }
                         }
+                        _ => None,
+                    })
+                }) {
+                    info!("INITIAL_SEARCH: Found channel start");
+                    break 'outer;
+                } else {
+                    // Step back to parent
+                    let parent = curr_last_block.header().parent();
+
+                    if parent == rollback_limit {
+                        break;
                     }
-                    _ => None,
-                })
-            }) {
-                break;
-            } else {
-                // Step back to parent
-                curr_last_header = curr_last_block.header().parent();
-            };
+
+                    curr_last_header = parent;
+                };
+            }
+
+            info!("INITIAL_SEARCH: Reached rollback limit, refetching last block");
+
+            block_buffer.clear();
+            rollback_limit = rollback_start;
+            curr_last_header = self.wait_last_finalized_block_header().await?;
+            rollback_start = curr_last_header;
         }
 
-        Ok(initial_block_buffer)
+        Ok(block_buffer)
     }
 
     pub async fn rollback_to_last_known_finalized_l1_id(
