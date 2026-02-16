@@ -118,7 +118,7 @@ pub fn add_liquidity(
     assert!(delta_lp != 0, "Payable LP must be nonzero");
 
     assert!(
-        delta_lp >= min_amount_liquidity.into(),
+        delta_lp >= min_amount_liquidity.get(),
         "Payable LP is less than provided minimum LP amount"
     );
 

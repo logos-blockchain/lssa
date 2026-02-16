@@ -254,7 +254,7 @@ impl indexer_service_rpc::RpcServer for MockIndexerService {
             .collect();
 
         // Sort by block ID descending (most recent first)
-        account_txs.sort_by(|a, b| b.1.cmp(&a.1));
+        account_txs.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         let start = offset as usize;
         if start >= account_txs.len() {
