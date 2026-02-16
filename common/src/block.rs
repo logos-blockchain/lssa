@@ -4,6 +4,16 @@ use sha2::{Digest, Sha256, digest::FixedOutput};
 use crate::{HashType, transaction::NSSATransaction};
 
 pub type MantleMsgId = [u8; 32];
+pub type BlockHash = HashType;
+pub type BlockId = u64;
+pub type TimeStamp = u64;
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct BlockMeta {
+    pub id: BlockId,
+    pub hash: BlockHash,
+    pub msg_id: MantleMsgId,
+}
 
 #[derive(Debug, Clone)]
 /// Our own hasher.
@@ -18,10 +28,6 @@ impl OwnHasher {
         HashType(<[u8; 32]>::from(hasher.finalize_fixed()))
     }
 }
-
-pub type BlockHash = HashType;
-pub type BlockId = u64;
-pub type TimeStamp = u64;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct BlockHeader {

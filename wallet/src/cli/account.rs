@@ -1,5 +1,4 @@
 use anyhow::Result;
-use base58::ToBase58;
 use clap::Subcommand;
 use itertools::Itertools as _;
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
@@ -104,8 +103,7 @@ impl WalletSubcommand for NewSubcommand {
                     .unwrap();
 
                 println!(
-                    "Generated new account with account_id Private/{} at path {chain_index}",
-                    account_id.to_bytes().to_base58()
+                    "Generated new account with account_id Private/{account_id} at path {chain_index}",
                 );
                 println!("With npk {}", hex::encode(key.nullifer_public_key.0));
                 println!(

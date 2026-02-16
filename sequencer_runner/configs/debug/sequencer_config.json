@@ -5,8 +5,8 @@
     "is_genesis_random": true,
     "max_num_tx_in_block": 20,
     "mempool_max_size": 1000,
-    "block_create_timeout_millis": 5000,
-    "retry_pending_blocks_timeout_millis": 7000,
+    "block_create_timeout_millis": 12000,
+    "retry_pending_blocks_timeout_millis": 6000,
     "port": 3040,
     "bedrock_config": {
         "backoff": {
@@ -14,7 +14,7 @@
             "max_retries": 5
         },
         "channel_id": "0101010101010101010101010101010101010101010101010101010101010101",
-        "node_url": "http://localhost:18080"
+        "node_url": "http://localhost:8080"
     },
     "indexer_rpc_url": "ws://localhost:8779",
     "initial_accounts": [

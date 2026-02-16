@@ -1,3 +1,5 @@
+use std::str::FromStr as _;
+
 use indexer_service_protocol::{BedrockStatus, Block, BlockBody, BlockHeader, BlockId, HashType};
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_params_map};
@@ -25,11 +27,8 @@ pub fn BlockPage() -> impl IntoView {
             }
 
             // Try to parse as block hash (hex string)
-            let id_str = id_str.trim().trim_start_matches("0x");
-            if let Some(bytes) = format_utils::parse_hex(id_str)
-                && let Ok(hash_array) = <[u8; 32]>::try_from(bytes)
-            {
-                return Some(BlockIdOrHash::Hash(HashType(hash_array)));
+            if let Ok(hash) = HashType::from_str(&id_str) {
+                return Some(BlockIdOrHash::Hash(hash));
             }
 
             None
@@ -68,10 +67,10 @@ pub fn BlockPage() -> impl IntoView {
                                     bedrock_parent_id: _,
                                 } = blk;
 
-                                let hash_str = format_utils::format_hash(&hash.0);
-                                let prev_hash = format_utils::format_hash(&prev_block_hash.0);
+                                let hash_str = hash.to_string();
+                                let prev_hash = prev_block_hash.to_string();
                                 let timestamp_str = format_utils::format_timestamp(timestamp);
-                                let signature_str = hex::encode(signature.0);
+                                let signature_str = signature.to_string();
                                 let status = match &bedrock_status {
                                     BedrockStatus::Pending => "Pending",
                                     BedrockStatus::Safe => "Safe",
