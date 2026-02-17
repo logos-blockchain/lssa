@@ -1,4 +1,9 @@
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use actix_web::dev::ServerHandle;
 use anyhow::{Context as _, Result};
@@ -7,12 +12,15 @@ use common::rpc_primitives::RpcConfig;
 use futures::{FutureExt as _, never::Never};
 #[cfg(not(feature = "standalone"))]
 use log::warn;
-use log::{error, info};
+use log::{debug, error, info, warn};
 #[cfg(feature = "standalone")]
 use sequencer_core::SequencerCoreWithMockClients as SequencerCore;
-use sequencer_core::config::SequencerConfig;
 #[cfg(not(feature = "standalone"))]
 use sequencer_core::{SequencerCore, block_settlement_client::BlockSettlementClientTrait as _};
+use sequencer_core::{
+    SequencerCore, block_settlement_client::BlockSettlementClientTrait as _,
+    config::SequencerConfig,
+};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -176,20 +184,21 @@ async fn retry_pending_blocks_loop(
             (pending_blocks, client)
         };
 
-        if let Some(block) = pending_blocks
-            .iter()
-            .min_by_key(|block| block.header.block_id)
-        {
+        for block in &pending_blocks {
             info!(
                 "Resubmitting pending block with id {}",
                 block.header.block_id
             );
-            // TODO: We could cache the inscribe tx for each pending block to avoid re-creating
-            // it on every retry.
+            // TODO: We could cache the inscribe tx for each pending block to avoid re-creating it
+            // on every retry.
+            let now = Instant::now();
             let (tx, _msg_id) = block_settlement_client
                 .create_inscribe_tx(block)
                 .context("Failed to create inscribe tx for pending block")?;
 
+            debug!(">>>> Create inscribe: {:?}", now.elapsed());
+
+            let now = Instant::now();
             if let Err(e) = block_settlement_client
                 .submit_inscribe_tx_to_bedrock(tx)
                 .await
@@ -199,6 +208,7 @@ async fn retry_pending_blocks_loop(
                     block.header.block_id
                 );
             }
+            debug!(">>>> Post: {:?}", now.elapsed());
         }
     }
 }

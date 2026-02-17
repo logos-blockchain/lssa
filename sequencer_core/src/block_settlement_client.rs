@@ -28,6 +28,11 @@ pub trait BlockSettlementClientTrait: Clone {
     /// Create and sign a transaction for inscribing data.
     fn create_inscribe_tx(&self, block: &Block) -> Result<(SignedMantleTx, MsgId)> {
         let inscription_data = borsh::to_vec(block)?;
+        log::info!(
+            "The size of the block {} is {} bytes",
+            block.header.block_id,
+            inscription_data.len()
+        );
         let verifying_key_bytes = self.bedrock_signing_key().public_key().to_bytes();
         let verifying_key =
             Ed25519PublicKey::from_bytes(&verifying_key_bytes).expect("valid ed25519 public key");
