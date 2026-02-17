@@ -115,7 +115,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
         from: format_public_account_id(supply_account_id),
         to: Some(format_public_account_id(recipient_account_id)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: transfer_amount,
     };
 
@@ -208,7 +208,7 @@ async fn create_and_transfer_public_token() -> Result<()> {
         definition: format_public_account_id(definition_account_id),
         holder: Some(format_public_account_id(recipient_account_id)),
         holder_npk: None,
-        holder_ipk: None,
+        holder_vpk: None,
         amount: mint_amount,
     };
 
@@ -343,7 +343,7 @@ async fn create_and_transfer_token_with_private_supply() -> Result<()> {
         from: format_private_account_id(supply_account_id),
         to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: transfer_amount,
     };
 
@@ -525,7 +525,7 @@ async fn create_token_with_private_definition() -> Result<()> {
         definition: format_private_account_id(definition_account_id),
         holder: Some(format_public_account_id(recipient_account_id_public)),
         holder_npk: None,
-        holder_ipk: None,
+        holder_vpk: None,
         amount: mint_amount_public,
     };
 
@@ -572,7 +572,7 @@ async fn create_token_with_private_definition() -> Result<()> {
         definition: format_private_account_id(definition_account_id),
         holder: Some(format_private_account_id(recipient_account_id_private)),
         holder_npk: None,
-        holder_ipk: None,
+        holder_vpk: None,
         amount: mint_amount_private,
     };
 
@@ -701,7 +701,7 @@ async fn create_token_with_private_definition_and_supply() -> Result<()> {
         from: format_private_account_id(supply_account_id),
         to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: transfer_amount,
     };
 
@@ -819,7 +819,7 @@ async fn shielded_token_transfer() -> Result<()> {
         from: format_public_account_id(supply_account_id),
         to: Some(format_private_account_id(recipient_account_id)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: transfer_amount,
     };
 
@@ -933,7 +933,7 @@ async fn deshielded_token_transfer() -> Result<()> {
         from: format_private_account_id(supply_account_id),
         to: Some(format_public_account_id(recipient_account_id)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: transfer_amount,
     };
 
@@ -1056,7 +1056,7 @@ async fn token_claiming_path_with_private_accounts() -> Result<()> {
         definition: format_private_account_id(definition_account_id),
         holder: None,
         holder_npk: Some(hex::encode(holder_keys.nullifer_public_key.0)),
-        holder_ipk: Some(hex::encode(holder_keys.incoming_viewing_public_key.0)),
+        holder_vpk: Some(hex::encode(holder_keys.viewing_public_key.0)),
         amount: mint_amount,
     };
 

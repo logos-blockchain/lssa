@@ -600,10 +600,10 @@ fn test_wallet_ffi_get_private_account_keys() -> Result<()> {
         .0;
 
     let expected_npk = &key_chain.nullifer_public_key;
-    let expected_ivk = &key_chain.incoming_viewing_public_key;
+    let expected_vpk = &key_chain.viewing_public_key;
 
     assert_eq!(&keys.npk(), expected_npk);
-    assert_eq!(&keys.ivk().unwrap(), expected_ivk);
+    assert_eq!(&keys.vpk().unwrap(), expected_vpk);
 
     unsafe {
         wallet_ffi_free_private_account_keys((&mut keys) as *mut FfiPrivateAccountKeys);

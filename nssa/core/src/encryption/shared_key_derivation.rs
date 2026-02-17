@@ -28,7 +28,7 @@ impl Secp256k1Point {
 
 pub type EphemeralSecretKey = Scalar;
 pub type EphemeralPublicKey = Secp256k1Point;
-pub type IncomingViewingPublicKey = Secp256k1Point;
+pub type ViewingPublicKey = Secp256k1Point;
 impl From<&EphemeralSecretKey> for EphemeralPublicKey {
     fn from(value: &EphemeralSecretKey) -> Self {
         Secp256k1Point::from_scalar(*value)

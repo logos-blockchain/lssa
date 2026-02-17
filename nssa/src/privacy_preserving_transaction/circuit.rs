@@ -223,7 +223,7 @@ mod tests {
         let expected_sender_pre = sender.clone();
 
         let esk = [3; 32];
-        let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
+        let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.vpk());
 
         let (output, proof) = execute_and_prove(
             vec![sender, recipient],
@@ -316,10 +316,10 @@ mod tests {
         ];
 
         let esk_1 = [3; 32];
-        let shared_secret_1 = SharedSecretKey::new(&esk_1, &sender_keys.ivk());
+        let shared_secret_1 = SharedSecretKey::new(&esk_1, &sender_keys.vpk());
 
         let esk_2 = [5; 32];
-        let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.ivk());
+        let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.vpk());
 
         let (output, proof) = execute_and_prove(
             vec![sender_pre.clone(), recipient],

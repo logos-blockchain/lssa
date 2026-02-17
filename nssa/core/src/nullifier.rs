@@ -10,7 +10,8 @@ pub struct NullifierPublicKey(pub [u8; 32]);
 
 impl From<&NullifierPublicKey> for AccountId {
     fn from(value: &NullifierPublicKey) -> Self {
-        const PRIVATE_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.2/AccountId/Private/\x00\x00\x00";
+        const PRIVATE_ACCOUNT_ID_PREFIX: &[u8; 32] =
+            b"/LEE/v0.3/AccountId/Private/\x00\x00\x00\x00";
 
         let mut bytes = [0; 64];
         bytes[0..32].copy_from_slice(PRIVATE_ACCOUNT_ID_PREFIX);
@@ -28,9 +29,9 @@ impl AsRef<[u8]> for NullifierPublicKey {
 impl From<&NullifierSecretKey> for NullifierPublicKey {
     fn from(value: &NullifierSecretKey) -> Self {
         let mut bytes = Vec::new();
-        const PREFIX: &[u8; 9] = b"NSSA_keys";
+        const PREFIX: &[u8; 8] = b"LEE/keys";
         const SUFFIX_1: &[u8; 1] = &[7];
-        const SUFFIX_2: &[u8; 22] = &[0; 22];
+        const SUFFIX_2: &[u8; 23] = &[0; 23];
         bytes.extend_from_slice(PREFIX);
         bytes.extend_from_slice(value);
         bytes.extend_from_slice(SUFFIX_1);
@@ -102,8 +103,8 @@ mod tests {
             196, 134, 22, 224, 211, 237, 120, 136, 225, 188, 220, 249, 28,
         ];
         let expected_npk = NullifierPublicKey([
-            202, 120, 42, 189, 194, 218, 78, 244, 31, 6, 108, 169, 29, 61, 22, 221, 69, 138, 197,
-            161, 241, 39, 142, 242, 242, 50, 188, 201, 99, 28, 176, 238,
+            78, 20, 20, 5, 177, 198, 233, 100, 175, 134, 174, 200, 24, 205, 68, 215, 130, 74, 35,
+            54, 154, 184, 219, 42, 168, 106, 126, 147, 133, 244, 18, 218,
         ]);
         let npk = NullifierPublicKey::from(&nsk);
         assert_eq!(npk, expected_npk);
@@ -117,8 +118,8 @@ mod tests {
         ];
         let npk = NullifierPublicKey::from(&nsk);
         let expected_account_id = AccountId::new([
-            18, 153, 225, 78, 35, 214, 212, 205, 152, 83, 18, 246, 69, 41, 20, 217, 85, 1, 108, 7,
-            87, 133, 181, 53, 247, 221, 174, 12, 112, 194, 34, 121,
+            139, 72, 194, 222, 215, 187, 147, 56, 55, 35, 222, 205, 156, 12, 204, 227, 166, 44, 30,
+            81, 186, 14, 167, 234, 28, 236, 32, 213, 125, 251, 193, 233,
         ]);
 
         let account_id = AccountId::from(&npk);
