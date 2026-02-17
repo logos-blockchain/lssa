@@ -150,8 +150,8 @@ pub unsafe extern "C" fn wallet_ffi_transfer_shielded(
 
     let from_id = AccountId::new(unsafe { (*from).data });
     let to_npk = (*to_keys).npk();
-    let to_ipk = match (*to_keys).ivk() {
-        Ok(ipk) => ipk,
+    let to_vpk = match (*to_keys).vpk() {
+        Ok(vpk) => vpk,
         Err(e) => {
             print_error("Invalid viewing key");
             return e;
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_shielded(
     let transfer = NativeTokenTransfer(&wallet);
 
     match block_on(
-        transfer.send_shielded_transfer_to_outer_account(from_id, to_npk, to_ipk, amount),
+        transfer.send_shielded_transfer_to_outer_account(from_id, to_npk, to_vpk, amount),
     ) {
         Ok(Ok((response, _shared_key))) => {
             let tx_hash = CString::new(response.tx_hash)
@@ -323,8 +323,8 @@ pub unsafe extern "C" fn wallet_ffi_transfer_private(
 
     let from_id = AccountId::new(unsafe { (*from).data });
     let to_npk = (*to_keys).npk();
-    let to_ipk = match (*to_keys).ivk() {
-        Ok(ipk) => ipk,
+    let to_vpk = match (*to_keys).vpk() {
+        Ok(vpk) => vpk,
         Err(e) => {
             print_error("Invalid viewing key");
             return e;
@@ -334,7 +334,7 @@ pub unsafe extern "C" fn wallet_ffi_transfer_private(
 
     let transfer = NativeTokenTransfer(&wallet);
 
-    match block_on(transfer.send_private_transfer_to_outer_account(from_id, to_npk, to_ipk, amount))
+    match block_on(transfer.send_private_transfer_to_outer_account(from_id, to_npk, to_vpk, amount))
     {
         Ok(Ok((response, _shared_key))) => {
             let tx_hash = CString::new(response.tx_hash)

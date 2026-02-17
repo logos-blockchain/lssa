@@ -15,8 +15,8 @@ use nssa::{
 };
 use nssa_core::{
     MembershipProof, NullifierPublicKey,
-    account::{AccountWithMetadata, Nonce, data::Data},
-    encryption::IncomingViewingPublicKey,
+    account::{AccountWithMetadata, data::Data},
+    encryption::ViewingPublicKey,
 };
 use tokio::test;
 
@@ -192,8 +192,8 @@ impl TpsTestManager {
 fn build_privacy_transaction() -> PrivacyPreservingTransaction {
     let program = Program::authenticated_transfer_program();
     let sender_nsk = [1; 32];
-    let sender_isk = [99; 32];
-    let sender_ipk = IncomingViewingPublicKey::from_scalar(sender_isk);
+    let sender_vsk = [99; 32];
+    let sender_vpk = ViewingPublicKey::from_scalar(sender_vsk);
     let sender_npk = NullifierPublicKey::from(&sender_nsk);
     let sender_pre = AccountWithMetadata::new(
         Account {
@@ -206,18 +206,18 @@ fn build_privacy_transaction() -> PrivacyPreservingTransaction {
         AccountId::from(&sender_npk),
     );
     let recipient_nsk = [2; 32];
-    let recipient_isk = [99; 32];
-    let recipient_ipk = IncomingViewingPublicKey::from_scalar(recipient_isk);
+    let recipient_vsk = [99; 32];
+    let recipient_vpk = ViewingPublicKey::from_scalar(recipient_vsk);
     let recipient_npk = NullifierPublicKey::from(&recipient_nsk);
     let recipient_pre =
         AccountWithMetadata::new(Account::default(), false, AccountId::from(&recipient_npk));
 
     let eph_holder_from = EphemeralKeyHolder::new(&sender_npk);
-    let sender_ss = eph_holder_from.calculate_shared_secret_sender(&sender_ipk);
+    let sender_ss = eph_holder_from.calculate_shared_secret_sender(&sender_vpk);
     let sender_epk = eph_holder_from.generate_ephemeral_public_key();
 
     let eph_holder_to = EphemeralKeyHolder::new(&recipient_npk);
-    let recipient_ss = eph_holder_to.calculate_shared_secret_sender(&recipient_ipk);
+    let recipient_ss = eph_holder_to.calculate_shared_secret_sender(&recipient_vpk);
     let recipient_epk = eph_holder_from.generate_ephemeral_public_key();
 
     let balance_to_move: u128 = 1;
@@ -245,8 +245,8 @@ fn build_privacy_transaction() -> PrivacyPreservingTransaction {
         vec![],
         vec![],
         vec![
-            (sender_npk, sender_ipk, sender_epk),
-            (recipient_npk, recipient_ipk, recipient_epk),
+            (sender_npk, sender_vpk, sender_epk),
+            (recipient_npk, recipient_vpk, recipient_epk),
         ],
         output,
     )

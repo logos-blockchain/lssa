@@ -36,7 +36,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: winner_nsk,
             npk: winner_npk,
-            ipk: winner_ipk,
+            vpk: winner_vpk,
             auth_acc: winner_pre,
             proof: _,
         } = self
@@ -50,7 +50,7 @@ impl WalletCore {
         let pinata_pre = AccountWithMetadata::new(pinata_acc.clone(), false, pinata_account_id);
 
         let eph_holder_winner = EphemeralKeyHolder::new(&winner_npk);
-        let shared_secret_winner = eph_holder_winner.calculate_shared_secret_sender(&winner_ipk);
+        let shared_secret_winner = eph_holder_winner.calculate_shared_secret_sender(&winner_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[pinata_pre, winner_pre],
@@ -70,7 +70,7 @@ impl WalletCore {
                 vec![],
                 vec![(
                     winner_npk.clone(),
-                    winner_ipk.clone(),
+                    winner_vpk.clone(),
                     eph_holder_winner.generate_ephemeral_public_key(),
                 )],
                 output,
@@ -103,7 +103,7 @@ impl WalletCore {
         let AccountPreparedData {
             nsk: _,
             npk: winner_npk,
-            ipk: winner_ipk,
+            vpk: winner_vpk,
             auth_acc: winner_pre,
             proof: _,
         } = self
@@ -117,7 +117,7 @@ impl WalletCore {
         let pinata_pre = AccountWithMetadata::new(pinata_acc.clone(), false, pinata_account_id);
 
         let eph_holder_winner = EphemeralKeyHolder::new(&winner_npk);
-        let shared_secret_winner = eph_holder_winner.calculate_shared_secret_sender(&winner_ipk);
+        let shared_secret_winner = eph_holder_winner.calculate_shared_secret_sender(&winner_vpk);
 
         let (output, proof) = circuit::execute_and_prove(
             &[pinata_pre, winner_pre],
@@ -137,7 +137,7 @@ impl WalletCore {
                 vec![],
                 vec![(
                     winner_npk.clone(),
-                    winner_ipk.clone(),
+                    winner_vpk.clone(),
                     eph_holder_winner.generate_ephemeral_public_key(),
                 )],
                 output,

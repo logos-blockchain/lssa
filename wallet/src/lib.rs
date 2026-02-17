@@ -344,7 +344,7 @@ impl WalletCore {
                 Vec::from_iter(acc_manager.public_account_nonces()),
                 private_account_keys
                     .iter()
-                    .map(|keys| (keys.npk.clone(), keys.ipk.clone(), keys.epk.clone()))
+                    .map(|keys| (keys.npk.clone(), keys.vpk.clone(), keys.epk.clone()))
                     .collect(),
                 output,
             )
@@ -428,7 +428,7 @@ impl WalletCore {
             .flat_map(|(acc_account_id, key_chain)| {
                 let view_tag = EncryptedAccountData::compute_view_tag(
                     key_chain.nullifer_public_key.clone(),
-                    key_chain.incoming_viewing_public_key.clone(),
+                    key_chain.viewing_public_key.clone(),
                 );
 
                 tx.message()

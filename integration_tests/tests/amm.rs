@@ -102,7 +102,7 @@ async fn amm_public() -> Result<()> {
         from: format_public_account_id(supply_account_id_1),
         to: Some(format_public_account_id(recipient_account_id_1)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 
@@ -126,7 +126,7 @@ async fn amm_public() -> Result<()> {
         from: format_public_account_id(supply_account_id_2),
         to: Some(format_public_account_id(recipient_account_id_2)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 7,
     };
 

@@ -197,6 +197,7 @@ mod tests {
         assert_eq!(new_acc_with_metadata.account_id, fingerprint);
     }
 
+    #[cfg(feature = "host")]
     #[test]
     fn parse_valid_account_id() {
         let base58_str = "11111111111111111111111111111111";
@@ -204,6 +205,7 @@ mod tests {
         assert_eq!(account_id.value, [0u8; 32]);
     }
 
+    #[cfg(feature = "host")]
     #[test]
     fn parse_invalid_base58() {
         let base58_str = "00".repeat(32); // invalid base58 chars
@@ -211,6 +213,7 @@ mod tests {
         assert!(matches!(result, AccountIdError::InvalidBase58(_)));
     }
 
+    #[cfg(feature = "host")]
     #[test]
     fn parse_wrong_length_short() {
         let base58_str = "11".repeat(31); // 62 chars = 31 bytes
@@ -218,6 +221,7 @@ mod tests {
         assert!(matches!(result, AccountIdError::InvalidLength(_)));
     }
 
+    #[cfg(feature = "host")]
     #[test]
     fn parse_wrong_length_long() {
         let base58_str = "11".repeat(33); // 66 chars = 33 bytes

@@ -92,7 +92,7 @@ wallet account new private
 # Output:
 Generated new account with account_id Private/HMRHZdPw4pbyPVZHNGrV6K5AA95wACFsHTRST84fr3CF
 With npk 6a2dfe433cf28e525aa0196d719be3c16146f7ee358ca39595323f94fde38f93
-With ipk 03d59abf4bee974cc12ddb44641c19f0b5441fef39191f047c988c29a77252a577
+With vpk 03d59abf4bee974cc12ddb44641c19f0b5441fef39191f047c988c29a77252a577
 ```
 
 2. Create the token (Token B):

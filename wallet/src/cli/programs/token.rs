@@ -29,7 +29,7 @@ pub enum TokenProgramAgnosticSubcommand {
     },
     /// Send tokens from one account to another with variable privacy
     ///
-    /// If receiver is private, then `to` and (`to_npk` , `to_ipk`) is a mutually exclusive
+    /// If receiver is private, then `to` and (`to_npk` , `to_vpk`) is a mutually exclusive
     /// patterns.
     ///
     /// First is used for owned accounts, second otherwise.
@@ -43,9 +43,9 @@ pub enum TokenProgramAgnosticSubcommand {
         /// to_npk - valid 32 byte hex string
         #[arg(long)]
         to_npk: Option<String>,
-        /// to_ipk - valid 33 byte hex string
+        /// to_vpk - valid 33 byte hex string
         #[arg(long)]
-        to_ipk: Option<String>,
+        to_vpk: Option<String>,
         /// amount - amount of balance to move
         #[arg(long)]
         amount: u128,
@@ -71,7 +71,7 @@ pub enum TokenProgramAgnosticSubcommand {
     ///
     /// `definition` is owned
     ///
-    /// If `holder` is private, then `holder` and (`holder_npk` , `holder_ipk`) is a mutually
+    /// If `holder` is private, then `holder` and (`holder_npk` , `holder_vpk`) is a mutually
     /// exclusive patterns.
     ///
     /// First is used for owned accounts, second otherwise.
@@ -85,9 +85,9 @@ pub enum TokenProgramAgnosticSubcommand {
         /// holder_npk - valid 32 byte hex string
         #[arg(long)]
         holder_npk: Option<String>,
-        /// to_ipk - valid 33 byte hex string
+        /// to_vpk - valid 33 byte hex string
         #[arg(long)]
-        holder_ipk: Option<String>,
+        holder_vpk: Option<String>,
         /// amount - amount of balance to mint
         #[arg(long)]
         amount: u128,
@@ -160,10 +160,10 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                 from,
                 to,
                 to_npk,
-                to_ipk,
+                to_vpk,
                 amount,
             } => {
-                let underlying_subcommand = match (to, to_npk, to_ipk) {
+                let underlying_subcommand = match (to, to_npk, to_vpk) {
                     (None, None, None) => {
                         anyhow::bail!(
                             "Provide either account account_id of receiver or their public keys"
@@ -220,7 +220,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                             }
                         }
                     }
-                    (None, Some(to_npk), Some(to_ipk)) => {
+                    (None, Some(to_npk), Some(to_vpk)) => {
                         let (from, from_privacy) = parse_addr_with_privacy_prefix(&from)?;
 
                         match from_privacy {
@@ -228,7 +228,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                                 TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
                                     sender_account_id: from,
                                     recipient_npk: to_npk,
-                                    recipient_ipk: to_ipk,
+                                    recipient_vpk: to_vpk,
                                     balance_to_move: amount,
                                 },
                             ),
@@ -236,7 +236,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                                 TokenProgramSubcommandShielded::TransferTokenShieldedForeign {
                                     sender_account_id: from,
                                     recipient_npk: to_npk,
-                                    recipient_ipk: to_ipk,
+                                    recipient_vpk: to_vpk,
                                     balance_to_move: amount,
                                 },
                             ),
@@ -302,10 +302,10 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                 definition,
                 holder,
                 holder_npk,
-                holder_ipk,
+                holder_vpk,
                 amount,
             } => {
-                let underlying_subcommand = match (holder, holder_npk, holder_ipk) {
+                let underlying_subcommand = match (holder, holder_npk, holder_vpk) {
                     (None, None, None) => {
                         anyhow::bail!(
                             "Provide either account account_id of holder or their public keys"
@@ -363,7 +363,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                             }
                         }
                     }
-                    (None, Some(holder_npk), Some(holder_ipk)) => {
+                    (None, Some(holder_npk), Some(holder_vpk)) => {
                         let (definition, definition_privacy) =
                             parse_addr_with_privacy_prefix(&definition)?;
 
@@ -372,7 +372,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                                 TokenProgramSubcommandPrivate::MintTokenPrivateForeign {
                                     definition_account_id: definition,
                                     holder_npk,
-                                    holder_ipk,
+                                    holder_vpk,
                                     amount,
                                 },
                             ),
@@ -380,7 +380,7 @@ impl WalletSubcommand for TokenProgramAgnosticSubcommand {
                                 TokenProgramSubcommandShielded::MintTokenShieldedForeign {
                                     definition_account_id: definition,
                                     holder_npk,
-                                    holder_ipk,
+                                    holder_vpk,
                                     amount,
                                 },
                             ),
@@ -465,9 +465,9 @@ pub enum TokenProgramSubcommandPrivate {
         /// recipient_npk - valid 32 byte hex string
         #[arg(long)]
         recipient_npk: String,
-        /// recipient_ipk - valid 33 byte hex string
+        /// recipient_vpk - valid 33 byte hex string
         #[arg(long)]
-        recipient_ipk: String,
+        recipient_vpk: String,
         #[arg(short, long)]
         balance_to_move: u128,
     },
@@ -496,7 +496,7 @@ pub enum TokenProgramSubcommandPrivate {
         #[arg(short, long)]
         holder_npk: String,
         #[arg(short, long)]
-        holder_ipk: String,
+        holder_vpk: String,
         #[arg(short, long)]
         amount: u128,
     },
@@ -553,9 +553,9 @@ pub enum TokenProgramSubcommandShielded {
         /// recipient_npk - valid 32 byte hex string
         #[arg(long)]
         recipient_npk: String,
-        /// recipient_ipk - valid 33 byte hex string
+        /// recipient_vpk - valid 33 byte hex string
         #[arg(long)]
-        recipient_ipk: String,
+        recipient_vpk: String,
         #[arg(short, long)]
         balance_to_move: u128,
     },
@@ -584,7 +584,7 @@ pub enum TokenProgramSubcommandShielded {
         #[arg(short, long)]
         holder_npk: String,
         #[arg(short, long)]
-        holder_ipk: String,
+        holder_vpk: String,
         #[arg(short, long)]
         amount: u128,
     },
@@ -745,7 +745,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
             TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
                 sender_account_id,
                 recipient_npk,
-                recipient_ipk,
+                recipient_vpk,
                 balance_to_move,
             } => {
                 let sender_account_id: AccountId = sender_account_id.parse().unwrap();
@@ -754,18 +754,18 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 recipient_npk.copy_from_slice(&recipient_npk_res);
                 let recipient_npk = nssa_core::NullifierPublicKey(recipient_npk);
 
-                let recipient_ipk_res = hex::decode(recipient_ipk)?;
-                let mut recipient_ipk = [0u8; 33];
-                recipient_ipk.copy_from_slice(&recipient_ipk_res);
-                let recipient_ipk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
-                    recipient_ipk.to_vec(),
+                let recipient_vpk_res = hex::decode(recipient_vpk)?;
+                let mut recipient_vpk = [0u8; 33];
+                recipient_vpk.copy_from_slice(&recipient_vpk_res);
+                let recipient_vpk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                    recipient_vpk.to_vec(),
                 );
 
                 let (res, [secret_sender, _]) = Token(wallet_core)
                     .send_transfer_transaction_private_foreign_account(
                         sender_account_id,
                         recipient_npk,
-                        recipient_ipk,
+                        recipient_vpk,
                         balance_to_move,
                     )
                     .await?;
@@ -865,7 +865,7 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
             TokenProgramSubcommandPrivate::MintTokenPrivateForeign {
                 definition_account_id,
                 holder_npk,
-                holder_ipk,
+                holder_vpk,
                 amount,
             } => {
                 let definition_account_id: AccountId = definition_account_id.parse().unwrap();
@@ -875,18 +875,18 @@ impl WalletSubcommand for TokenProgramSubcommandPrivate {
                 holder_npk.copy_from_slice(&holder_npk_res);
                 let holder_npk = nssa_core::NullifierPublicKey(holder_npk);
 
-                let holder_ipk_res = hex::decode(holder_ipk)?;
-                let mut holder_ipk = [0u8; 33];
-                holder_ipk.copy_from_slice(&holder_ipk_res);
-                let holder_ipk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
-                    holder_ipk.to_vec(),
+                let holder_vpk_res = hex::decode(holder_vpk)?;
+                let mut holder_vpk = [0u8; 33];
+                holder_vpk.copy_from_slice(&holder_vpk_res);
+                let holder_vpk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                    holder_vpk.to_vec(),
                 );
 
                 let (res, [secret_definition, _]) = Token(wallet_core)
                     .send_mint_transaction_private_foreign_account(
                         definition_account_id,
                         holder_npk,
-                        holder_ipk,
+                        holder_vpk,
                         amount,
                     )
                     .await?;
@@ -1034,7 +1034,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
             TokenProgramSubcommandShielded::TransferTokenShieldedForeign {
                 sender_account_id,
                 recipient_npk,
-                recipient_ipk,
+                recipient_vpk,
                 balance_to_move,
             } => {
                 let sender_account_id: AccountId = sender_account_id.parse().unwrap();
@@ -1043,18 +1043,18 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 recipient_npk.copy_from_slice(&recipient_npk_res);
                 let recipient_npk = nssa_core::NullifierPublicKey(recipient_npk);
 
-                let recipient_ipk_res = hex::decode(recipient_ipk)?;
-                let mut recipient_ipk = [0u8; 33];
-                recipient_ipk.copy_from_slice(&recipient_ipk_res);
-                let recipient_ipk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
-                    recipient_ipk.to_vec(),
+                let recipient_vpk_res = hex::decode(recipient_vpk)?;
+                let mut recipient_vpk = [0u8; 33];
+                recipient_vpk.copy_from_slice(&recipient_vpk_res);
+                let recipient_vpk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                    recipient_vpk.to_vec(),
                 );
 
                 let (res, _) = Token(wallet_core)
                     .send_transfer_transaction_shielded_foreign_account(
                         sender_account_id,
                         recipient_npk,
-                        recipient_ipk,
+                        recipient_vpk,
                         balance_to_move,
                     )
                     .await?;
@@ -1177,7 +1177,7 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
             TokenProgramSubcommandShielded::MintTokenShieldedForeign {
                 definition_account_id,
                 holder_npk,
-                holder_ipk,
+                holder_vpk,
                 amount,
             } => {
                 let definition_account_id: AccountId = definition_account_id.parse().unwrap();
@@ -1187,18 +1187,18 @@ impl WalletSubcommand for TokenProgramSubcommandShielded {
                 holder_npk.copy_from_slice(&holder_npk_res);
                 let holder_npk = nssa_core::NullifierPublicKey(holder_npk);
 
-                let holder_ipk_res = hex::decode(holder_ipk)?;
-                let mut holder_ipk = [0u8; 33];
-                holder_ipk.copy_from_slice(&holder_ipk_res);
-                let holder_ipk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
-                    holder_ipk.to_vec(),
+                let holder_vpk_res = hex::decode(holder_vpk)?;
+                let mut holder_vpk = [0u8; 33];
+                holder_vpk.copy_from_slice(&holder_vpk_res);
+                let holder_vpk = nssa_core::encryption::shared_key_derivation::Secp256k1Point(
+                    holder_vpk.to_vec(),
                 );
 
                 let (res, _) = Token(wallet_core)
                     .send_mint_transaction_shielded_foreign_account(
                         definition_account_id,
                         holder_npk,
-                        holder_ipk,
+                        holder_vpk,
                         amount,
                     )
                     .await?;

@@ -154,11 +154,11 @@ wallet account new private
 # Output:
 Generated new account with account_id Private/HacPU3hakLYzWtSqUPw6TUr8fqoMieVWovsUR6sJf7cL
 With npk e6366f79d026c8bd64ae6b3d601f0506832ec682ab54897f205fffe64ec0d951
-With ipk 02ddc96d0eb56e00ce14994cfdaec5ae1f76244180a919545983156e3519940a17
+With vpk 02ddc96d0eb56e00ce14994cfdaec5ae1f76244180a919545983156e3519940a17
 ```
 
 > [!Tip]
-> Focus on the account ID for now. The `npk` and `ipk` values are stored locally and used to build privacy-preserving transactions. The private account ID is derived from `npk`.
+> Focus on the account ID for now. The `npk` and `vpk` values are stored locally and used to build privacy-preserving transactions. The private account ID is derived from `npk`.
 
 Just like public accounts, new private accounts start out uninitialized:
 
@@ -228,17 +228,17 @@ wallet account new private
 # Output:
 Generated new account with account_id Private/AukXPRBmrYVqoqEW2HTs7N3hvTn3qdNFDcxDHVr5hMm5
 With npk 0c95ebc4b3830f53da77bb0b80a276a776cdcf6410932acc718dcdb3f788a00e
-With ipk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72
+With vpk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72
 ```
 
 > [!Tip]
-> Ignore the private account ID here and use the `npk` and `ipk` values to send to a foreign private account.
+> Ignore the private account ID here and use the `npk` and `vpk` values to send to a foreign private account.
 
 ```bash
 wallet auth-transfer send \
     --from Public/Ev1JprP9BmhbFVQyBcbznU8bAXcwrzwRoPTetXdQPAWS \
     --to-npk 0c95ebc4b3830f53da77bb0b80a276a776cdcf6410932acc718dcdb3f788a00e \
-    --to-ipk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72 \
+    --to-vpk 039fd12a3674a880d3e917804129141e4170d419d1f9e28a3dcf979c1f2369cb72 \
     --amount 3
 ```
 

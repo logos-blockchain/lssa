@@ -139,6 +139,12 @@ pub async fn execute_subcommand(
             if circuit_id != &nssa::PRIVACY_PRESERVING_CIRCUIT_ID {
                 panic!("Local ID for privacy preserving circuit is different from remote");
             }
+            let Some(amm_id) = remote_program_ids.get("amm") else {
+                panic!("Missing AMM program ID from remote");
+            };
+            if amm_id != &Program::amm().id() {
+                panic!("Local ID for AMM program is different from remote");
+            }
 
             println!("✅All looks good!");
 

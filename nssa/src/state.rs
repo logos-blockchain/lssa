@@ -315,7 +315,7 @@ pub mod tests {
     use nssa_core::{
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
         account::{Account, AccountId, AccountWithMetadata, Nonce, data::Data},
-        encryption::{EphemeralPublicKey, IncomingViewingPublicKey, Scalar},
+        encryption::{EphemeralPublicKey, Scalar, ViewingPublicKey},
         program::{PdaSeed, ProgramId},
     };
     use token_core::{TokenDefinition, TokenHolding};
@@ -864,7 +864,7 @@ pub mod tests {
 
     pub struct TestPrivateKeys {
         pub nsk: NullifierSecretKey,
-        pub isk: Scalar,
+        pub vsk: Scalar,
     }
 
     impl TestPrivateKeys {
@@ -872,22 +872,22 @@ pub mod tests {
             NullifierPublicKey::from(&self.nsk)
         }
 
-        pub fn ivk(&self) -> IncomingViewingPublicKey {
-            IncomingViewingPublicKey::from_scalar(self.isk)
+        pub fn vpk(&self) -> ViewingPublicKey {
+            ViewingPublicKey::from_scalar(self.vsk)
         }
     }
 
     pub fn test_private_account_keys_1() -> TestPrivateKeys {
         TestPrivateKeys {
             nsk: [13; 32],
-            isk: [31; 32],
+            vsk: [31; 32],
         }
     }
 
     pub fn test_private_account_keys_2() -> TestPrivateKeys {
         TestPrivateKeys {
             nsk: [38; 32],
-            isk: [83; 32],
+            vsk: [83; 32],
         }
     }
 
@@ -908,7 +908,7 @@ pub mod tests {
         let recipient = AccountWithMetadata::new(Account::default(), false, &recipient_keys.npk());
 
         let esk = [3; 32];
-        let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.ivk());
+        let shared_secret = SharedSecretKey::new(&esk, &recipient_keys.vpk());
         let epk = EphemeralPublicKey::from_scalar(esk);
 
         let (output, proof) = circuit::execute_and_prove(
@@ -925,7 +925,7 @@ pub mod tests {
         let message = Message::try_from_circuit_output(
             vec![sender_keys.account_id()],
             vec![sender_nonce],
-            vec![(recipient_keys.npk(), recipient_keys.ivk(), epk)],
+            vec![(recipient_keys.npk(), recipient_keys.vpk(), epk)],
             output,
         )
         .unwrap();
@@ -949,11 +949,11 @@ pub mod tests {
             AccountWithMetadata::new(Account::default(), false, &recipient_keys.npk());
 
         let esk_1 = [3; 32];
-        let shared_secret_1 = SharedSecretKey::new(&esk_1, &sender_keys.ivk());
+        let shared_secret_1 = SharedSecretKey::new(&esk_1, &sender_keys.vpk());
         let epk_1 = EphemeralPublicKey::from_scalar(esk_1);
 
         let esk_2 = [3; 32];
-        let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.ivk());
+        let shared_secret_2 = SharedSecretKey::new(&esk_2, &recipient_keys.vpk());
         let epk_2 = EphemeralPublicKey::from_scalar(esk_2);
 
         let (output, proof) = circuit::execute_and_prove(
@@ -974,8 +974,8 @@ pub mod tests {
             vec![],
             vec![],
             vec![
-                (sender_keys.npk(), sender_keys.ivk(), epk_1),
-                (recipient_keys.npk(), recipient_keys.ivk(), epk_2),
+                (sender_keys.npk(), sender_keys.vpk(), epk_1),
+                (recipient_keys.npk(), recipient_keys.vpk(), epk_2),
             ],
             output,
         )
@@ -1004,7 +1004,7 @@ pub mod tests {
         );
 
         let esk = [3; 32];
-        let shared_secret = SharedSecretKey::new(&esk, &sender_keys.ivk());
+        let shared_secret = SharedSecretKey::new(&esk, &sender_keys.vpk());
         let epk = EphemeralPublicKey::from_scalar(esk);
 
         let (output, proof) = circuit::execute_and_prove(
@@ -1021,7 +1021,7 @@ pub mod tests {
         let message = Message::try_from_circuit_output(
             vec![*recipient_account_id],
             vec![],
-            vec![(sender_keys.npk(), sender_keys.ivk(), epk)],
+            vec![(sender_keys.npk(), sender_keys.vpk(), epk)],
             output,
         )
         .unwrap();
@@ -1521,11 +1521,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -1555,7 +1555,7 @@ pub mod tests {
         // Setting only one key for an execution with two private accounts.
         let private_account_keys = [(
             sender_keys.npk(),
-            SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+            SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
         )];
         let result = execute_and_prove(
             vec![private_account_1, private_account_2],
@@ -1596,11 +1596,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -1637,11 +1637,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             private_account_nsks.to_vec(),
@@ -1673,12 +1673,12 @@ pub mod tests {
             // First private account is the sender
             (
                 sender_keys.npk(),
-                SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
             ),
             // Second private account is the recipient
             (
                 recipient_keys.npk(),
-                SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
             ),
         ];
 
@@ -1731,11 +1731,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -1778,11 +1778,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -1824,11 +1824,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -1870,11 +1870,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -1914,11 +1914,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -1984,11 +1984,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             vec![sender_keys.nsk],
@@ -2021,15 +2021,15 @@ pub mod tests {
         let private_account_keys = [
             (
                 sender_keys.npk(),
-                SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
             ),
             (
                 recipient_keys.npk(),
-                SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
             ),
             (
                 sender_keys.npk(),
-                SharedSecretKey::new(&[57; 32], &sender_keys.ivk()),
+                SharedSecretKey::new(&[57; 32], &sender_keys.vpk()),
             ),
         ];
         let result = execute_and_prove(
@@ -2074,11 +2074,11 @@ pub mod tests {
             vec![
                 (
                     sender_keys.npk(),
-                    SharedSecretKey::new(&[55; 32], &sender_keys.ivk()),
+                    SharedSecretKey::new(&[55; 32], &sender_keys.vpk()),
                 ),
                 (
                     recipient_keys.npk(),
-                    SharedSecretKey::new(&[56; 32], &recipient_keys.ivk()),
+                    SharedSecretKey::new(&[56; 32], &recipient_keys.vpk()),
                 ),
             ],
             private_account_nsks.to_vec(),
@@ -2160,7 +2160,7 @@ pub mod tests {
         let visibility_mask = [1, 1];
         let private_account_nsks = [sender_keys.nsk, sender_keys.nsk];
         let private_account_membership_proofs = [Some((1, vec![])), Some((1, vec![]))];
-        let shared_secret = SharedSecretKey::new(&[55; 32], &sender_keys.ivk());
+        let shared_secret = SharedSecretKey::new(&[55; 32], &sender_keys.vpk());
         let result = execute_and_prove(
             vec![private_account_1.clone(), private_account_1],
             Program::serialize_instruction(100u128).unwrap(),
@@ -3780,11 +3780,11 @@ pub mod tests {
         );
 
         let from_esk = [3; 32];
-        let from_ss = SharedSecretKey::new(&from_esk, &from_keys.ivk());
+        let from_ss = SharedSecretKey::new(&from_esk, &from_keys.vpk());
         let from_epk = EphemeralPublicKey::from_scalar(from_esk);
 
         let to_esk = [3; 32];
-        let to_ss = SharedSecretKey::new(&to_esk, &to_keys.ivk());
+        let to_ss = SharedSecretKey::new(&to_esk, &to_keys.vpk());
         let to_epk = EphemeralPublicKey::from_scalar(to_esk);
 
         let mut dependencies = HashMap::new();
@@ -3828,8 +3828,8 @@ pub mod tests {
             vec![],
             vec![],
             vec![
-                (to_keys.npk(), to_keys.ivk(), to_epk),
-                (from_keys.npk(), from_keys.ivk(), from_epk),
+                (to_keys.npk(), to_keys.vpk(), to_epk),
+                (from_keys.npk(), from_keys.vpk(), from_epk),
             ],
             output,
         )
@@ -4039,7 +4039,7 @@ pub mod tests {
 
         // Set up parameters for the new account
         let esk = [3; 32];
-        let shared_secret = SharedSecretKey::new(&esk, &private_keys.ivk());
+        let shared_secret = SharedSecretKey::new(&esk, &private_keys.vpk());
         let epk = EphemeralPublicKey::from_scalar(esk);
 
         // Balance to initialize the account with (0 for a new account)
@@ -4061,7 +4061,7 @@ pub mod tests {
         let message = Message::try_from_circuit_output(
             vec![],
             vec![],
-            vec![(private_keys.npk(), private_keys.ivk(), epk)],
+            vec![(private_keys.npk(), private_keys.vpk(), epk)],
             output,
         )
         .unwrap();
@@ -4091,7 +4091,7 @@ pub mod tests {
 
         // Set up parameters for claiming the new account
         let esk = [3; 32];
-        let shared_secret = SharedSecretKey::new(&esk, &private_keys.ivk());
+        let shared_secret = SharedSecretKey::new(&esk, &private_keys.vpk());
         let epk = EphemeralPublicKey::from_scalar(esk);
 
         let balance: u128 = 0;
@@ -4111,7 +4111,7 @@ pub mod tests {
         let message = Message::try_from_circuit_output(
             vec![],
             vec![],
-            vec![(private_keys.npk(), private_keys.ivk(), epk)],
+            vec![(private_keys.npk(), private_keys.vpk(), epk)],
             output,
         )
         .unwrap();
@@ -4139,7 +4139,7 @@ pub mod tests {
 
         let noop_program = Program::noop();
         let esk2 = [4; 32];
-        let shared_secret2 = SharedSecretKey::new(&esk2, &private_keys.ivk());
+        let shared_secret2 = SharedSecretKey::new(&esk2, &private_keys.vpk());
 
         // Step 3: Try to execute noop program with authentication but without initialization
         let res = execute_and_prove(
@@ -4217,7 +4217,7 @@ pub mod tests {
             vec![1],
             vec![(
                 sender_keys.npk(),
-                SharedSecretKey::new(&[3; 32], &sender_keys.ivk()),
+                SharedSecretKey::new(&[3; 32], &sender_keys.vpk()),
             )],
             vec![sender_keys.nsk],
             vec![Some((0, vec![]))],
@@ -4244,7 +4244,7 @@ pub mod tests {
             vec![1],
             vec![(
                 sender_keys.npk(),
-                SharedSecretKey::new(&[3; 32], &sender_keys.ivk()),
+                SharedSecretKey::new(&[3; 32], &sender_keys.vpk()),
             )],
             vec![sender_keys.nsk],
             vec![Some((0, vec![]))],
@@ -4287,7 +4287,7 @@ pub mod tests {
         let instruction = (balance_to_transfer, auth_transfers.id());
 
         let recipient_esk = [3; 32];
-        let recipient = SharedSecretKey::new(&recipient_esk, &recipient_keys.ivk());
+        let recipient = SharedSecretKey::new(&recipient_esk, &recipient_keys.vpk());
 
         let mut dependencies = HashMap::new();
         dependencies.insert(auth_transfers.id(), auth_transfers);
