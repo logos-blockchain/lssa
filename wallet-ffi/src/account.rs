@@ -354,6 +354,61 @@ pub unsafe extern "C" fn wallet_ffi_get_account_public(
     WalletFfiError::Success
 }
 
+/// Get full private account data from the local storage.
+///
+/// # Parameters
+/// - `handle`: Valid wallet handle
+/// - `account_id`: The account ID (32 bytes)
+/// - `out_account`: Output pointer for account data
+///
+/// # Returns
+/// - `Success` on successful query
+/// - Error code on failure
+///
+/// # Memory
+/// The account data must be freed with `wallet_ffi_free_account_data()`.
+///
+/// # Safety
+/// - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+/// - `account_id` must be a valid pointer to a `FfiBytes32` struct
+/// - `out_account` must be a valid pointer to a `FfiAccount` struct
+#[no_mangle]
+pub unsafe extern "C" fn wallet_ffi_get_account_private(
+    handle: *mut WalletHandle,
+    account_id: *const FfiBytes32,
+    out_account: *mut FfiAccount,
+) -> WalletFfiError {
+    let wrapper = match get_wallet(handle) {
+        Ok(w) => w,
+        Err(e) => return e,
+    };
+
+    if account_id.is_null() || out_account.is_null() {
+        print_error("Null pointer argument");
+        return WalletFfiError::NullPointer;
+    }
+
+    let wallet = match wrapper.core.lock() {
+        Ok(w) => w,
+        Err(e) => {
+            print_error(format!("Failed to lock wallet: {}", e));
+            return WalletFfiError::InternalError;
+        }
+    };
+
+    let account_id = AccountId::new(unsafe { (*account_id).data });
+
+    let Some(account) = wallet.get_account_private(account_id) else {
+        return WalletFfiError::AccountNotFound;
+    };
+
+    unsafe {
+        *out_account = account.into();
+    }
+
+    WalletFfiError::Success
+}
+
 /// Free account data returned by `wallet_ffi_get_account_public`.
 ///
 /// # Safety

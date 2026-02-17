@@ -1,6 +1,6 @@
 use nssa_core::{
     NullifierPublicKey, SharedSecretKey,
-    encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
+    encryption::{EphemeralPublicKey, ViewingPublicKey},
 };
 use secret_holders::{PrivateKeyHolder, SecretSpendingKey, SeedHolder};
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ pub struct KeyChain {
     pub secret_spending_key: SecretSpendingKey,
     pub private_key_holder: PrivateKeyHolder,
     pub nullifer_public_key: NullifierPublicKey,
-    pub incoming_viewing_public_key: IncomingViewingPublicKey,
+    pub viewing_public_key: ViewingPublicKey,
 }
 
 impl KeyChain {
@@ -27,16 +27,16 @@ impl KeyChain {
         let seed_holder = SeedHolder::new_os_random();
         let secret_spending_key = seed_holder.produce_top_secret_key_holder();
 
-        let private_key_holder = secret_spending_key.produce_private_key_holder();
+        let private_key_holder = secret_spending_key.produce_private_key_holder(None);
 
         let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
-        let incoming_viewing_public_key = private_key_holder.generate_incoming_viewing_public_key();
+        let viewing_public_key = private_key_holder.generate_viewing_public_key();
 
         Self {
             secret_spending_key,
             private_key_holder,
             nullifer_public_key,
-            incoming_viewing_public_key,
+            viewing_public_key,
         }
     }
 
@@ -46,16 +46,16 @@ impl KeyChain {
         let seed_holder = SeedHolder::new_mnemonic(passphrase);
         let secret_spending_key = seed_holder.produce_top_secret_key_holder();
 
-        let private_key_holder = secret_spending_key.produce_private_key_holder();
+        let private_key_holder = secret_spending_key.produce_private_key_holder(None);
 
         let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
-        let incoming_viewing_public_key = private_key_holder.generate_incoming_viewing_public_key();
+        let viewing_public_key = private_key_holder.generate_viewing_public_key();
 
         Self {
             secret_spending_key,
             private_key_holder,
             nullifer_public_key,
-            incoming_viewing_public_key,
+            viewing_public_key,
         }
     }
 
@@ -64,9 +64,7 @@ impl KeyChain {
         ephemeral_public_key_sender: EphemeralPublicKey,
     ) -> SharedSecretKey {
         SharedSecretKey::new(
-            &self
-                .secret_spending_key
-                .generate_incoming_viewing_secret_key(),
+            &self.secret_spending_key.generate_viewing_secret_key(None),
             &ephemeral_public_key_sender,
         )
     }
@@ -112,10 +110,10 @@ mod tests {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let utxo_secret_key_holder = top_secret_key_holder.produce_private_key_holder();
+        let utxo_secret_key_holder = top_secret_key_holder.produce_private_key_holder(None);
 
         let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
-        let viewing_public_key = utxo_secret_key_holder.generate_incoming_viewing_public_key();
+        let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
 
         let pub_account_signing_key = nssa::PrivateKey::new_os_random();
 

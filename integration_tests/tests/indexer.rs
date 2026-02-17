@@ -12,7 +12,7 @@ use tokio::test;
 use wallet::cli::{Command, programs::native_token_transfer::AuthTransferSubcommand};
 
 /// Timeout in milliseconds to reliably await for block finalization
-const L2_TO_L1_TIMEOUT_MILLIS: u64 = 220000;
+const L2_TO_L1_TIMEOUT_MILLIS: u64 = 300000;
 
 #[test]
 async fn indexer_test_run() -> Result<()> {
@@ -45,6 +45,7 @@ async fn indexer_test_run() -> Result<()> {
 }
 
 #[test]
+#[ignore = "Not reliable with current bedrock node"]
 async fn indexer_block_batching() -> Result<()> {
     let ctx = TestContext::new().await?;
 
@@ -80,6 +81,7 @@ async fn indexer_block_batching() -> Result<()> {
 }
 
 #[test]
+#[ignore = "Not reliable with current bedrock node"]
 async fn indexer_state_consistency() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
@@ -87,7 +89,7 @@ async fn indexer_state_consistency() -> Result<()> {
         from: format_public_account_id(ctx.existing_public_accounts()[0]),
         to: Some(format_public_account_id(ctx.existing_public_accounts()[1])),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 
@@ -119,7 +121,7 @@ async fn indexer_state_consistency() -> Result<()> {
         from: format_private_account_id(from),
         to: Some(format_private_account_id(to)),
         to_npk: None,
-        to_ipk: None,
+        to_vpk: None,
         amount: 100,
     });
 

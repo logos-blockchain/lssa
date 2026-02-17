@@ -20,7 +20,7 @@ pub enum AccountSubcommand {
         /// Flag to get raw account data
         #[arg(short, long)]
         raw: bool,
-        /// Display keys (pk for public accounts, npk/ipk for private accounts)
+        /// Display keys (pk for public accounts, npk/vpk for private accounts)
         #[arg(short, long)]
         keys: bool,
         /// Valid 32 byte base58 string with privacy prefix
@@ -107,8 +107,8 @@ impl WalletSubcommand for NewSubcommand {
                 );
                 println!("With npk {}", hex::encode(key.nullifer_public_key.0));
                 println!(
-                    "With ipk {}",
-                    hex::encode(key.incoming_viewing_public_key.to_bytes())
+                    "With vpk {}",
+                    hex::encode(key.viewing_public_key.to_bytes())
                 );
 
                 wallet_core.store_persistent_data().await?;
@@ -207,10 +207,7 @@ impl WalletSubcommand for AccountSubcommand {
                                 .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
 
                             println!("npk {}", hex::encode(key.nullifer_public_key.0));
-                            println!(
-                                "ipk {}",
-                                hex::encode(key.incoming_viewing_public_key.to_bytes())
-                            );
+                            println!("vpk {}", hex::encode(key.viewing_public_key.to_bytes()));
                         }
                     }
                     Ok(())
