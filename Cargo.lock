@@ -1212,6 +1212,7 @@ dependencies = [
  "futures",
  "log",
  "logos-blockchain-chain-broadcast-service",
+ "logos-blockchain-chain-service",
  "logos-blockchain-common-http-client",
  "logos-blockchain-core",
  "reqwest",

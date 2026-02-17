@@ -5,6 +5,7 @@ use common::config::BasicAuth;
 use futures::{Stream, TryFutureExt};
 use log::{info, warn};
 pub use logos_blockchain_chain_broadcast_service::BlockInfo;
+use logos_blockchain_chain_service::CryptarchiaInfo;
 pub use logos_blockchain_common_http_client::{CommonHttpClient, Error};
 pub use logos_blockchain_core::{block::Block, header::HeaderId, mantle::SignedMantleTx};
 use reqwest::{Client, Url};
@@ -77,6 +78,15 @@ impl BedrockClient {
         Retry::spawn(self.backoff_strategy(), || {
             self.http_client
                 .get_block_by_id(self.node_url.clone(), header_id)
+                .inspect_err(|err| warn!("Block fetching failed with error: {err:#}"))
+        })
+        .await
+    }
+
+    pub async fn get_consensus_info(&self) -> Result<CryptarchiaInfo, Error> {
+        Retry::spawn(self.backoff_strategy(), || {
+            self.http_client
+                .consensus_info(self.node_url.clone())
                 .inspect_err(|err| warn!("Block fetching failed with error: {err:#}"))
         })
         .await

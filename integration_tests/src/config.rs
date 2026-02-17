@@ -74,7 +74,7 @@ pub fn sequencer_config(
         max_num_tx_in_block,
         mempool_max_size,
         block_create_timeout_millis,
-        retry_pending_blocks_timeout_millis: 240_000,
+        retry_pending_blocks_timeout_millis: 120_000,
         port: 0,
         initial_accounts: initial_data.sequencer_initial_accounts(),
         initial_commitments: initial_data.sequencer_initial_commitments(),
