@@ -296,10 +296,12 @@ fn compute_circuit_output(
                         nsk,
                     );
 
-                    let new_nonce = pre_state.account.nonce.private_account_nonce_increment(&nsk);
+                    let new_nonce = pre_state
+                        .account
+                        .nonce
+                        .private_account_nonce_increment(&nsk);
 
                     (new_nullifier, new_nonce)
-
                 } else {
                     // Private account without authentication
 
@@ -354,9 +356,6 @@ fn compute_circuit_output(
             _ => panic!("Invalid visibility mask value"),
         }
     }
-
-    //TODO delete
-    //assert!(private_nonces_iter.next().is_none(), "Too many nonces");
 
     assert!(
         private_keys_iter.next().is_none(),

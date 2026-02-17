@@ -244,7 +244,7 @@ impl From<nssa::public_transaction::Message> for PublicMessage {
         Self {
             program_id: program_id.into(),
             account_ids: account_ids.into_iter().map(Into::into).collect(),
-            nonces: nonces.iter().map(|x|Nonce(x.0)).collect(),
+            nonces: nonces.iter().map(|x| Nonce(x.0)).collect(),
             instruction_data,
         }
     }
@@ -261,7 +261,10 @@ impl From<PublicMessage> for nssa::public_transaction::Message {
         Self::new_preserialized(
             program_id.into(),
             account_ids.into_iter().map(Into::into).collect(),
-            nonces.iter().map(|x|nssa_core::account::Nonce(x.0)).collect(),
+            nonces
+                .iter()
+                .map(|x| nssa_core::account::Nonce(x.0))
+                .collect(),
             instruction_data,
         )
     }
@@ -279,7 +282,7 @@ impl From<nssa::privacy_preserving_transaction::message::Message> for PrivacyPre
         } = value;
         Self {
             public_account_ids: public_account_ids.into_iter().map(Into::into).collect(),
-            nonces: nonces.iter().map(|x|Nonce(x.0)).collect(),
+            nonces: nonces.iter().map(|x| Nonce(x.0)).collect(),
             public_post_states: public_post_states.into_iter().map(Into::into).collect(),
             encrypted_private_post_states: encrypted_private_post_states
                 .into_iter()
@@ -308,7 +311,10 @@ impl TryFrom<PrivacyPreservingMessage> for nssa::privacy_preserving_transaction:
         } = value;
         Ok(Self {
             public_account_ids: public_account_ids.into_iter().map(Into::into).collect(),
-            nonces: nonces.iter().map(|x|nssa_core::account::Nonce(x.0)).collect(),
+            nonces: nonces
+                .iter()
+                .map(|x| nssa_core::account::Nonce(x.0))
+                .collect(),
             public_post_states: public_post_states
                 .into_iter()
                 .map(TryInto::try_into)
