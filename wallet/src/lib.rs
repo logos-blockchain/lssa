@@ -2,6 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use bip39::Mnemonic;
 use chain_storage::WalletChainStore;
 use common::{
     HashType, error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse,
@@ -87,14 +88,23 @@ impl WalletCore {
         storage_path: PathBuf,
         config_overrides: Option<WalletConfigOverrides>,
         password: String,
-    ) -> Result<Self> {
-        Self::new(
+    ) -> Result<(Self, Mnemonic)> {
+        let mut mnemonic_out = None;
+        let wallet = Self::new(
             config_path,
             storage_path,
             config_overrides,
-            |config| WalletChainStore::new_storage(config, password),
+            |config| {
+                let (storage, mnemonic) = WalletChainStore::new_storage(config, password)?;
+                mnemonic_out = Some(mnemonic);
+                Ok(storage)
+            },
             0,
-        )
+        )?;
+        Ok((
+            wallet,
+            mnemonic_out.expect("mnemonic should be set after new_storage"),
+        ))
     }
 
     fn new(
@@ -139,9 +149,13 @@ impl WalletCore {
         &self.storage
     }
 
-    /// Reset storage
-    pub fn reset_storage(&mut self, password: String) -> Result<()> {
-        self.storage = WalletChainStore::new_storage(self.storage.wallet_config.clone(), password)?;
+    /// Restore storage from an existing mnemonic phrase.
+    pub fn restore_storage(&mut self, mnemonic: &Mnemonic, password: &str) -> Result<()> {
+        self.storage = WalletChainStore::restore_storage(
+            self.storage.wallet_config.clone(),
+            mnemonic,
+            password,
+        )?;
         Ok(())
     }
 

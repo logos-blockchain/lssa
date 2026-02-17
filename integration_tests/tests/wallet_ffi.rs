@@ -205,13 +205,14 @@ fn new_wallet_rust_with_default_config(password: &str) -> WalletCore {
     let config_path = tempdir.path().join("wallet_config.json");
     let storage_path = tempdir.path().join("storage.json");
 
-    WalletCore::new_init_storage(
+    let (core, _mnemonic) = WalletCore::new_init_storage(
         config_path.to_path_buf(),
         storage_path.to_path_buf(),
         None,
         password.to_string(),
     )
-    .unwrap()
+    .unwrap();
+    core
 }
 
 fn load_existing_ffi_wallet(home: &Path) -> *mut WalletHandle {
