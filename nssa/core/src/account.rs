@@ -3,7 +3,7 @@ use std::{fmt::Display, str::FromStr};
 use base58::{FromBase58, ToBase58};
 use borsh::{BorshDeserialize, BorshSerialize};
 pub use data::Data;
-use risc0_zkvm::{guest::sha::guest::Impl, sha::Sha256};
+use risc0_zkvm::sha::{Impl, Sha256};
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
@@ -11,7 +11,18 @@ use crate::{NullifierPublicKey, NullifierSecretKey, program::ProgramId};
 
 pub mod data;
 
-#[derive(Copy, Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Copy,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    BorshDeserialize,
+    BorshSerialize,
+)]
 pub struct Nonce(pub u128);
 
 impl Nonce {
@@ -20,26 +31,24 @@ impl Nonce {
     }
 
     pub fn private_account_nonce_init(self, npk: &NullifierPublicKey) -> Nonce {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&npk.to_byte_array());
-        let bytes = Impl::hash_bytes(&bytes).as_bytes();
-        let bytes = bytes.first_chunk::<16>().unwrap();
-        
-        Nonce(u128::from_le_bytes(*bytes))
+        let mut bytes: [u8; 64] = [0u8; 64];
+        bytes[..32].copy_from_slice(&npk.0);
+        let result: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        let result = result.first_chunk::<16>().unwrap();
+
+        Nonce(u128::from_le_bytes(*result))
     }
 
     pub fn private_account_nonce_increment(self, nsk: &NullifierSecretKey) -> Nonce {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(nsk);
-        let bytes = Impl::hash_bytes(&bytes).as_bytes();
-        let bytes = bytes.first_chunk::<16>().unwrap();
-        
-        Nonce(u128::from_le_bytes(*bytes))
+        let mut bytes: [u8; 64] = [0u8; 64];
+        bytes[..32].copy_from_slice(nsk);
+        bytes[32..48].copy_from_slice(&self.0.to_le_bytes());
+        let result: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        let result = result.first_chunk::<16>().unwrap();
+
+        Nonce(u128::from_le_bytes(*result))
     }
-
 }
-
-
 
 /// Account to be used both in public and private contexts
 #[derive(

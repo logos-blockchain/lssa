@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Commitment, CommitmentSetDigest, MembershipProof, Nullifier, NullifierPublicKey,
     NullifierSecretKey, SharedSecretKey,
-    account::{Account, AccountWithMetadata, Nonce},
+    account::{Account, AccountWithMetadata},
     encryption::Ciphertext,
     program::{ProgramId, ProgramOutput},
 };
@@ -53,7 +53,7 @@ mod tests {
     use super::*;
     use crate::{
         Commitment, Nullifier, NullifierPublicKey,
-        account::{Account, AccountId, AccountWithMetadata},
+        account::{Account, AccountId, AccountWithMetadata, Nonce},
     };
 
     #[test]

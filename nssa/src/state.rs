@@ -939,7 +939,6 @@ pub mod tests {
         sender_private_account: &Account,
         recipient_keys: &TestPrivateKeys,
         balance_to_move: u128,
-        new_nonces: [Nonce; 2],
         state: &V02State,
     ) -> PrivacyPreservingTransaction {
         let program = Program::authenticated_transfer_program();
@@ -992,7 +991,6 @@ pub mod tests {
         sender_private_account: &Account,
         recipient_account_id: &AccountId,
         balance_to_move: u128,
-        new_nonce: Nonce,
         state: &V02State,
     ) -> PrivacyPreservingTransaction {
         let program = Program::authenticated_transfer_program();
@@ -1077,10 +1075,11 @@ pub mod tests {
     #[test]
     fn test_transition_from_privacy_preserving_transaction_private() {
         let sender_keys = test_private_account_keys_1();
+        let sender_nonce = Nonce(0xdeadbeef);
         let sender_private_account = Account {
             program_owner: Program::authenticated_transfer_program().id(),
             balance: 100,
-            nonce: Nonce(0xdeadbeef),
+            nonce: sender_nonce,
             data: Data::default(),
         };
         let recipient_keys = test_private_account_keys_2();
@@ -1095,7 +1094,6 @@ pub mod tests {
             &sender_private_account,
             &recipient_keys,
             balance_to_move,
-            [Nonce(0xcafecafe), Nonce(0xfecafeca)],
             &state,
         );
 
@@ -1103,7 +1101,7 @@ pub mod tests {
             &sender_keys.npk(),
             &Account {
                 program_owner: Program::authenticated_transfer_program().id(),
-                nonce: Nonce(0), //TODO update
+                nonce: sender_nonce.private_account_nonce_increment(&sender_keys.nsk),
                 balance: sender_private_account.balance - balance_to_move,
                 data: Data::default(),
             },
@@ -1117,7 +1115,7 @@ pub mod tests {
             &recipient_keys.npk(),
             &Account {
                 program_owner: Program::authenticated_transfer_program().id(),
-                nonce: Nonce(0),
+                nonce: Nonce::default().private_account_nonce_init(&recipient_keys.npk()),
                 balance: balance_to_move,
                 ..Account::default()
             },
@@ -1143,6 +1141,7 @@ pub mod tests {
     #[test]
     fn test_transition_from_privacy_preserving_transaction_deshielded() {
         let sender_keys = test_private_account_keys_1();
+        let sender_nonce = Nonce(0xdeadbeef);
         let sender_private_account = Account {
             program_owner: Program::authenticated_transfer_program().id(),
             balance: 100,
@@ -1170,7 +1169,6 @@ pub mod tests {
             &sender_private_account,
             &recipient_keys.account_id(),
             balance_to_move,
-            Nonce(0xcafecafe),
             &state,
         );
 
@@ -1178,7 +1176,7 @@ pub mod tests {
             &sender_keys.npk(),
             &Account {
                 program_owner: Program::authenticated_transfer_program().id(),
-                nonce: Nonce(0xcafecafe),
+                nonce: sender_nonce.private_account_nonce_increment(&sender_keys.nsk),
                 balance: sender_private_account.balance - balance_to_move,
                 data: Data::default(),
             },
@@ -1516,7 +1514,6 @@ pub mod tests {
             AccountWithMetadata::new(Account::default(), false, &recipient_keys.npk());
 
         // Setting only one nonce for an execution with two private accounts.
-        let private_account_nonces = [Nonce(0xdeadbeef1)];
         let result = execute_and_prove(
             vec![private_account_1, private_account_2],
             Program::serialize_instruction(10u128).unwrap(),
@@ -1980,7 +1977,6 @@ pub mod tests {
 
         // Setting three new private account nonces for a circuit execution with only two private
         // accounts.
-        let private_account_nonces = [Nonce(0xdeadbeef1), Nonce(0xdeadbeef2), Nonce(0xdeadbeef3)];
         let result = execute_and_prove(
             vec![private_account_1, private_account_2],
             Program::serialize_instruction(10u128).unwrap(),
@@ -2096,10 +2092,11 @@ pub mod tests {
     #[test]
     fn test_private_accounts_can_only_be_initialized_once() {
         let sender_keys = test_private_account_keys_1();
+        let sender_nonce = Nonce(0xdeadbeef);
         let sender_private_account = Account {
             program_owner: Program::authenticated_transfer_program().id(),
             balance: 100,
-            nonce: Nonce(0xdeadbeef),
+            nonce: sender_nonce,
             data: Data::default(),
         };
         let recipient_keys = test_private_account_keys_2();
@@ -2114,7 +2111,6 @@ pub mod tests {
             &sender_private_account,
             &recipient_keys,
             balance_to_move,
-            [Nonce(0xcafecafe), Nonce(0xfecafeca)],
             &state,
         );
 
@@ -2125,7 +2121,7 @@ pub mod tests {
         let sender_private_account = Account {
             program_owner: Program::authenticated_transfer_program().id(),
             balance: 100 - balance_to_move,
-            nonce: Nonce(0xcafecafe),
+            nonce: sender_nonce.private_account_nonce_increment(&sender_keys.nsk),
             data: Data::default(),
         };
 
@@ -2134,7 +2130,6 @@ pub mod tests {
             &sender_private_account,
             &recipient_keys,
             balance_to_move,
-            [Nonce(0x1234), Nonce(0x5678)],
             &state,
         );
 
@@ -2205,9 +2200,13 @@ pub mod tests {
             ..Account::default()
         };
 
-        let message =
-            public_transaction::Message::try_new(program.id(), vec![from, to], vec![Nonce(0)], amount)
-                .unwrap();
+        let message = public_transaction::Message::try_new(
+            program.id(),
+            vec![from, to],
+            vec![Nonce(0)],
+            amount,
+        )
+        .unwrap();
         let witness_set = public_transaction::WitnessSet::for_message(&message, &[&from_key]);
         let tx = PublicTransaction::new(message, witness_set);
 
@@ -3793,8 +3792,8 @@ pub mod tests {
         dependencies.insert(auth_transfers.id(), auth_transfers);
         let program_with_deps = ProgramWithDependencies::new(chain_caller, dependencies);
 
-        let from_new_nonce = Nonce(0xdeadbeef1);
-        let to_new_nonce = Nonce(0xdeadbeef2);
+        let from_new_nonce = Nonce::default().private_account_nonce_increment(&from_keys.nsk);
+        let to_new_nonce = Nonce::default().private_account_nonce_increment(&to_keys.nsk);
 
         let from_expected_post = Account {
             balance: initial_balance - number_of_calls as u128 * amount,
@@ -4046,8 +4045,6 @@ pub mod tests {
         // Balance to initialize the account with (0 for a new account)
         let balance: u128 = 0;
 
-        let nonce = Nonce(0xdeadbeef1);
-
         // Execute and prove the circuit with the authorized account but no commitment proof
         let (output, proof) = execute_and_prove(
             vec![authorized_account],
@@ -4098,7 +4095,6 @@ pub mod tests {
         let epk = EphemeralPublicKey::from_scalar(esk);
 
         let balance: u128 = 0;
-        let nonce = Nonce(0xdeadbeef1);
 
         // Step 2: Execute claimer program to claim the account with authentication
         let (output, proof) = execute_and_prove(
@@ -4144,8 +4140,6 @@ pub mod tests {
         let noop_program = Program::noop();
         let esk2 = [4; 32];
         let shared_secret2 = SharedSecretKey::new(&esk2, &private_keys.ivk());
-
-        let nonce2 = Nonce(0xdeadbeef2);
 
         // Step 3: Try to execute noop program with authentication but without initialization
         let res = execute_and_prove(
@@ -4298,8 +4292,6 @@ pub mod tests {
         let mut dependencies = HashMap::new();
         dependencies.insert(auth_transfers.id(), auth_transfers);
         let program_with_deps = ProgramWithDependencies::new(malicious_program, dependencies);
-
-        let recipient_new_nonce = Nonce(0xdeadbeef1);
 
         // Act - execute the malicious program - this should fail during proving
         let result = execute_and_prove(

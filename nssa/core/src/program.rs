@@ -327,9 +327,8 @@ impl WrappedBalanceSum {
 
 #[cfg(test)]
 mod tests {
-    use crate::account::Nonce;
-
     use super::*;
+    use crate::account::Nonce;
 
     #[test]
     fn test_post_state_new_with_claim_constructor() {

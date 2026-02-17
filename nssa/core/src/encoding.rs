@@ -160,9 +160,8 @@ impl AccountId {
 
 #[cfg(test)]
 mod tests {
-    use crate::account::Nonce;
-
     use super::*;
+    use crate::account::Nonce;
 
     #[test]
     fn test_enconding() {

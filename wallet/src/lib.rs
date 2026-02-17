@@ -22,7 +22,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::{
     config::{PersistentStorage, WalletConfigOverrides},
-    helperfunctions::{produce_data_for_storage},
+    helperfunctions::produce_data_for_storage,
     poller::TxPoller,
 };
 
