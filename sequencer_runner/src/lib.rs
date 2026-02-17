@@ -5,12 +5,14 @@ use anyhow::{Context as _, Result};
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
 use futures::{FutureExt as _, never::Never};
-use log::{error, info};
 #[cfg(not(feature = "standalone"))]
-use sequencer_core::SequencerCore;
+use log::warn;
+use log::{error, info};
 #[cfg(feature = "standalone")]
 use sequencer_core::SequencerCoreWithMockClients as SequencerCore;
 use sequencer_core::config::SequencerConfig;
+#[cfg(not(feature = "standalone"))]
+use sequencer_core::{SequencerCore, block_settlement_client::BlockSettlementClientTrait as _};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
 
