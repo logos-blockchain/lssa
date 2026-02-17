@@ -15,11 +15,11 @@ use wallet::cli::{Command, programs::native_token_transfer::AuthTransferSubcomma
 const L2_TO_L1_TIMEOUT_MILLIS: u64 = 300000;
 
 #[test]
+#[ignore = "Not reliable with current bedrock node"]
 async fn indexer_test_run() -> Result<()> {
     let ctx = TestContext::new().await?;
 
     // RUN OBSERVATION
-    info!("LETS TAKE A LOOK");
     tokio::time::sleep(std::time::Duration::from_millis(L2_TO_L1_TIMEOUT_MILLIS)).await;
 
     let last_block_seq = ctx
