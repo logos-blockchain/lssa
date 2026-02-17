@@ -298,6 +298,8 @@ impl WalletCore {
         instruction_data: InstructionData,
         program: &ProgramWithDependencies,
     ) -> Result<(SendTxResponse, Vec<SharedSecretKey>), ExecutionFailureKind> {
+        // TODO: handle large Err-variant properly
+        #[allow(clippy::result_large_err)]
         self.send_privacy_preserving_tx_with_pre_check(accounts, instruction_data, program, |_| {
             Ok(())
         })
