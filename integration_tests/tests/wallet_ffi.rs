@@ -10,7 +10,7 @@ use anyhow::Result;
 use integration_tests::{BlockingTestContext, TIME_TO_WAIT_FOR_BLOCK_SECONDS};
 use log::info;
 use nssa::{Account, AccountId, PrivateKey, PublicKey, program::Program};
-use nssa_core::program::DEFAULT_PROGRAM_ID;
+use nssa_core::{account::Nonce, program::DEFAULT_PROGRAM_ID};
 use tempfile::tempdir;
 use wallet::WalletCore;
 use wallet_ffi::{
@@ -523,7 +523,7 @@ fn test_wallet_ffi_get_account_private() -> Result<()> {
     );
     assert_eq!(account.balance, 10000);
     assert!(account.data.is_empty());
-    assert_eq!(account.nonce, 0);
+    assert_eq!(account.nonce, Nonce(0));
 
     unsafe {
         wallet_ffi_free_account_data((&mut out_account) as *mut FfiAccount);

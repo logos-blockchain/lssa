@@ -89,7 +89,7 @@ impl Message {
 pub mod tests {
     use nssa_core::{
         Commitment, EncryptionScheme, Nullifier, NullifierPublicKey, SharedSecretKey,
-        account::Account,
+        account::{Account, Nonce},
         encryption::{EphemeralPublicKey, ViewingPublicKey},
     };
     use sha2::{Digest, Sha256};

@@ -15,7 +15,7 @@ use nssa::{
 };
 use nssa_core::{
     MembershipProof, NullifierPublicKey,
-    account::{AccountWithMetadata, data::Data},
+    account::{AccountWithMetadata, Nonce, data::Data},
     encryption::ViewingPublicKey,
 };
 use tokio::test;

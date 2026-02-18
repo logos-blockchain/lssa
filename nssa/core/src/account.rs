@@ -235,4 +235,21 @@ mod tests {
         let expected_account_id = AccountId::new([0; 32]);
         assert!(default_account_id == expected_account_id);
     }
+
+    #[test]
+    fn initialize_private_nonce() {
+        let npk = NullifierPublicKey([42; 32]);
+        let nonce = Nonce::default().private_account_nonce_init(&npk);
+        let expected_nonce = Nonce(37937661125547691021612781941709513486);
+        assert_eq!(nonce, expected_nonce);
+    }
+
+    #[test]
+    fn increment_private_nonce() {
+        let nsk: NullifierSecretKey = [42u8; 32];
+        let nonce =
+            Nonce(37937661125547691021612781941709513486).private_account_nonce_increment(&nsk);
+        let expected_nonce = Nonce(327300903218789900388409116014290259894);
+        assert_eq!(nonce, expected_nonce);
+    }
 }
