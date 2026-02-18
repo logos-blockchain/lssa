@@ -49,3 +49,9 @@ pub fn rpc_error_responce_inverter(err: RpcError) -> RpcError {
         data: content,
     }
 }
+
+#[cfg(feature = "standalone")]
+use sequencer_core::mock::{MockBlockSettlementClient, MockIndexerClient};
+
+#[cfg(feature = "standalone")]
+pub type JsonHandlerWithMockClients = JsonHandler<MockBlockSettlementClient, MockIndexerClient>;

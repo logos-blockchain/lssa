@@ -129,9 +129,8 @@ RUST_LOG=info RISC0_DEV_MODE=1 cargo run $(pwd)/configs/debug all
 
 
 ## Running Manually
-
-The sequencer and node can be run locally:
-
+### Normal mode
+The sequencer and logos blockchain node can be run locally:
  1. On one terminal go to the `logos-blockchain/logos-blockchain` repo and run a local logos blockchain node:
       - `git checkout master; git pull`
       - `cargo clean`
@@ -141,10 +140,16 @@ The sequencer and node can be run locally:
       - `./target/debug/logos-blockchain-node --deployment nodes/node/standalone-deployment-config.yaml nodes/node/standalone-node-config.yaml`
 
  2. On another terminal go to the `logos-blockchain/lssa` repo and run indexer service:
-      - `RUST_LOG=info cargo run --release -p indexer_service indexer/service/configs/indexer_config.json`
+      - `RUST_LOG=info cargo run -p indexer_service indexer/service/configs/indexer_config.json`
 
  3. On another terminal go to the `logos-blockchain/lssa` repo and run the sequencer:
-      - `RUST_LOG=info RISC0_DEV_MODE=1 cargo run --release -p sequencer_runner sequencer_runner/configs/debug`
+      - `RUST_LOG=info cargo run -p sequencer_runner sequencer_runner/configs/debug`
+
+### Standalone mode
+The sequencer can be run in standalone mode with:
+```bash
+RUST_LOG=info cargo run --features standalone -p sequencer_runner sequencer_runner/configs/debug
+```
 
 ## Running with Docker
 

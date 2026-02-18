@@ -18,3 +18,8 @@ actix.workspace = true
 actix-web.workspace = true
 tokio.workspace = true
 futures.workspace = true
+
+[features]
+default = []
+# Runs the sequencer in standalone mode without depending on Bedrock and Indexer services.
+standalone = ["sequencer_core/mock", "sequencer_rpc/standalone"]
