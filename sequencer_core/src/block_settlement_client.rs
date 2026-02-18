@@ -95,6 +95,15 @@ impl BlockSettlementClientTrait for BlockSettlementClient {
     }
 
     async fn submit_inscribe_tx_to_bedrock(&self, tx: SignedMantleTx) -> Result<()> {
+        let (parent_id, msg_id) = match tx.mantle_tx.ops.first() {
+            Some(Op::ChannelInscribe(inscribe)) => (inscribe.parent, inscribe.id()),
+            _ => panic!("Expected ChannelInscribe op"),
+        };
+        log::info!(">>>>>>>>>>>>>>>>>>>>>>");
+        log::info!("Posted block to Bedrock");
+        log::info!(">>>>>> parent id: {parent_id:?}");
+        log::info!(">>>>>> msg id: {msg_id:?}");
+        log::info!(">>>>>>>>>>>>>>>>>>>>>>");
         self.bedrock_client
             .post_transaction(tx)
             .await
