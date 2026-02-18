@@ -9,10 +9,19 @@ use common::{
 use futures::{Future, FutureExt};
 use log::info;
 use mempool::MemPoolHandle;
+#[cfg(not(feature = "standalone"))]
 use sequencer_core::SequencerCore;
+#[cfg(feature = "standalone")]
+use sequencer_core::SequencerCoreWithMockClients as SequencerCore;
+
+#[cfg(not(feature = "standalone"))]
+use super::JsonHandler;
+
+#[cfg(feature = "standalone")]
+type JsonHandler = super::JsonHandlerWithMockClients;
+
 use tokio::sync::Mutex;
 
-use super::JsonHandler;
 use crate::process::Process;
 
 pub const SHUTDOWN_TIMEOUT_SECS: u64 = 10;

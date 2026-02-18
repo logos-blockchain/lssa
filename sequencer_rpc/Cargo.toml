@@ -28,3 +28,8 @@ borsh.workspace = true
 
 [dev-dependencies]
 sequencer_core = { workspace = true, features = ["mock"] }
+
+[features]
+default = []
+# Includes types to run the sequencer in standalone mode
+standalone = ["sequencer_core/mock"]

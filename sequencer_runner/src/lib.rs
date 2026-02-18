@@ -5,11 +5,14 @@ use anyhow::{Context as _, Result};
 use clap::Parser;
 use common::rpc_primitives::RpcConfig;
 use futures::{FutureExt as _, never::Never};
-use log::{error, info, warn};
-use sequencer_core::{
-    SequencerCore, block_settlement_client::BlockSettlementClientTrait as _,
-    config::SequencerConfig,
-};
+#[cfg(not(feature = "standalone"))]
+use log::warn;
+use log::{error, info};
+#[cfg(feature = "standalone")]
+use sequencer_core::SequencerCoreWithMockClients as SequencerCore;
+use sequencer_core::config::SequencerConfig;
+#[cfg(not(feature = "standalone"))]
+use sequencer_core::{SequencerCore, block_settlement_client::BlockSettlementClientTrait as _};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -156,6 +159,7 @@ async fn main_loop(seq_core: Arc<Mutex<SequencerCore>>, block_timeout: Duration)
     }
 }
 
+#[cfg(not(feature = "standalone"))]
 async fn retry_pending_blocks_loop(
     seq_core: Arc<Mutex<SequencerCore>>,
     retry_pending_blocks_timeout: Duration,
@@ -180,8 +184,8 @@ async fn retry_pending_blocks_loop(
                 "Resubmitting pending block with id {}",
                 block.header.block_id
             );
-            // TODO: We could cache the inscribe tx for each pending block to avoid re-creating it
-            // on every retry.
+            // TODO: We could cache the inscribe tx for each pending block to avoid re-creating
+            // it on every retry.
             let (tx, _msg_id) = block_settlement_client
                 .create_inscribe_tx(block)
                 .context("Failed to create inscribe tx for pending block")?;
@@ -199,6 +203,7 @@ async fn retry_pending_blocks_loop(
     }
 }
 
+#[cfg(not(feature = "standalone"))]
 async fn listen_for_bedrock_blocks_loop(seq_core: Arc<Mutex<SequencerCore>>) -> Result<Never> {
     use indexer_service_rpc::RpcClient as _;
 
@@ -233,6 +238,19 @@ async fn listen_for_bedrock_blocks_loop(seq_core: Arc<Mutex<SequencerCore>>) -> 
         );
         tokio::time::sleep(retry_delay).await;
     }
+}
+
+#[cfg(feature = "standalone")]
+async fn listen_for_bedrock_blocks_loop(_seq_core: Arc<Mutex<SequencerCore>>) -> Result<Never> {
+    std::future::pending::<Result<Never>>().await
+}
+
+#[cfg(feature = "standalone")]
+async fn retry_pending_blocks_loop(
+    _seq_core: Arc<Mutex<SequencerCore>>,
+    _retry_pending_blocks_timeout: Duration,
+) -> Result<Never> {
+    std::future::pending::<Result<Never>>().await
 }
 
 pub async fn main_runner() -> Result<()> {

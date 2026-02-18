@@ -673,6 +673,80 @@ enum WalletFfiError wallet_ffi_transfer_private(struct WalletHandle *handle,
                                                 struct FfiTransferResult *out_result);
 
 /**
+ * Send a shielded token transfer to an owned private account.
+ *
+ * Transfers tokens from a public account to a private account that is owned
+ * by this wallet. Unlike `wallet_ffi_transfer_shielded` which sends to a
+ * foreign account using NPK/VPK keys, this variant takes a destination
+ * account ID that must belong to this wallet.
+ *
+ * # Parameters
+ * - `handle`: Valid wallet handle
+ * - `from`: Source public account ID (must be owned by this wallet)
+ * - `to`: Destination private account ID (must be owned by this wallet)
+ * - `amount`: Amount to transfer as little-endian [u8; 16]
+ * - `out_result`: Output pointer for transfer result
+ *
+ * # Returns
+ * - `Success` if the transfer was submitted successfully
+ * - `InsufficientFunds` if the source account doesn't have enough balance
+ * - `KeyNotFound` if either account's keys are not in this wallet
+ * - Error code on other failures
+ *
+ * # Memory
+ * The result must be freed with `wallet_ffi_free_transfer_result()`.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `from` must be a valid pointer to a `FfiBytes32` struct
+ * - `to` must be a valid pointer to a `FfiBytes32` struct
+ * - `amount` must be a valid pointer to a `[u8; 16]` array
+ * - `out_result` must be a valid pointer to a `FfiTransferResult` struct
+ */
+enum WalletFfiError wallet_ffi_transfer_shielded_owned(struct WalletHandle *handle,
+                                                       const struct FfiBytes32 *from,
+                                                       const struct FfiBytes32 *to,
+                                                       const uint8_t (*amount)[16],
+                                                       struct FfiTransferResult *out_result);
+
+/**
+ * Send a private token transfer to an owned private account.
+ *
+ * Transfers tokens from a private account to another private account that is
+ * owned by this wallet. Unlike `wallet_ffi_transfer_private` which sends to a
+ * foreign account using NPK/VPK keys, this variant takes a destination
+ * account ID that must belong to this wallet.
+ *
+ * # Parameters
+ * - `handle`: Valid wallet handle
+ * - `from`: Source private account ID (must be owned by this wallet)
+ * - `to`: Destination private account ID (must be owned by this wallet)
+ * - `amount`: Amount to transfer as little-endian [u8; 16]
+ * - `out_result`: Output pointer for transfer result
+ *
+ * # Returns
+ * - `Success` if the transfer was submitted successfully
+ * - `InsufficientFunds` if the source account doesn't have enough balance
+ * - `KeyNotFound` if either account's keys are not in this wallet
+ * - Error code on other failures
+ *
+ * # Memory
+ * The result must be freed with `wallet_ffi_free_transfer_result()`.
+ *
+ * # Safety
+ * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
+ * - `from` must be a valid pointer to a `FfiBytes32` struct
+ * - `to` must be a valid pointer to a `FfiBytes32` struct
+ * - `amount` must be a valid pointer to a `[u8; 16]` array
+ * - `out_result` must be a valid pointer to a `FfiTransferResult` struct
+ */
+enum WalletFfiError wallet_ffi_transfer_private_owned(struct WalletHandle *handle,
+                                                      const struct FfiBytes32 *from,
+                                                      const struct FfiBytes32 *to,
+                                                      const uint8_t (*amount)[16],
+                                                      struct FfiTransferResult *out_result);
+
+/**
  * Register a public account on the network.
  *
  * This initializes a public account on the blockchain. The account must be

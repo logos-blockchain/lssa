@@ -28,6 +28,9 @@ pub mod indexer_client;
 #[cfg(feature = "mock")]
 pub mod mock;
 
+#[cfg(feature = "mock")]
+pub use mock::SequencerCoreWithMockClients;
+
 pub struct SequencerCore<
     BC: BlockSettlementClientTrait = BlockSettlementClient,
     IC: IndexerClientTrait = IndexerClient,
