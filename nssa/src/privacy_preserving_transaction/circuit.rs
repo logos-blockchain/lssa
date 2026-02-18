@@ -260,10 +260,11 @@ mod tests {
         let sender_keys = test_private_account_keys_1();
         let recipient_keys = test_private_account_keys_2();
 
+        let sender_nonce = Nonce(0xdeadbeef);
         let sender_pre = AccountWithMetadata::new(
             Account {
                 balance: 100,
-                nonce: Nonce(0xdeadbeef),
+                nonce: sender_nonce,
                 program_owner: program.id(),
                 data: Data::default(),
             },
@@ -298,13 +299,13 @@ mod tests {
         let expected_private_account_1 = Account {
             program_owner: program.id(),
             balance: 100 - balance_to_move,
-            nonce: Nonce(0xdeadbeef1),
+            nonce: sender_nonce.private_account_nonce_increment(&sender_keys.nsk),
             ..Default::default()
         };
         let expected_private_account_2 = Account {
             program_owner: program.id(),
             balance: balance_to_move,
-            nonce: Nonce(0xdeadbeef2),
+            nonce: Nonce::default().private_account_nonce_init(&recipient_keys.npk()),
             ..Default::default()
         };
         let expected_new_commitments = vec![
