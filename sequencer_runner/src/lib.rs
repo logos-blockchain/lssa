@@ -175,7 +175,7 @@ async fn retry_pending_blocks_loop(
     loop {
         tokio::time::sleep(retry_pending_blocks_timeout).await;
 
-        let (pending_blocks, block_settlement_client) = {
+        let (mut pending_blocks, block_settlement_client) = {
             let sequencer_core = seq_core.lock().await;
             let client = sequencer_core.block_settlement_client();
             let pending_blocks = sequencer_core
@@ -184,7 +184,11 @@ async fn retry_pending_blocks_loop(
             (pending_blocks, client)
         };
 
-        for block in &pending_blocks {
+        let k = 50;
+        if pending_blocks.len() > k {
+            pending_blocks.select_nth_unstable_by_key(k, |b| b.header.block_id);
+        }
+        for block in pending_blocks.iter().take(k) {
             info!(
                 "Resubmitting pending block with id {}",
                 block.header.block_id
