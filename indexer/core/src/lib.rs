@@ -201,7 +201,7 @@ impl IndexerCore {
                     };
 
                 info!(
-                    "INITIAL_SEARCH: Observed L1 block at height {}",
+                    "INITIAL_SEARCH: Observed L1 block at slot {}",
                     curr_last_block.header().slot().into_inner()
                 );
                 info!(
