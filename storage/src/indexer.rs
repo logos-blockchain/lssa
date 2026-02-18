@@ -27,8 +27,9 @@ pub const CACHE_SIZE: usize = 1000;
 pub const DB_META_FIRST_BLOCK_IN_DB_KEY: &str = "first_block_in_db";
 /// Key base for storing metainformation about id of last current block in db
 pub const DB_META_LAST_BLOCK_IN_DB_KEY: &str = "last_block_in_db";
-/// Key base for storing metainformation about id of last observed L1 block in db
-pub const DB_META_LAST_OBSERVED_L1_BLOCK_IN_DB_KEY: &str = "last_observed_l1_block_in_db";
+/// Key base for storing metainformation about id of last observed L1 lib header in db
+pub const DB_META_LAST_OBSERVED_L1_LIB_HEADER_ID_IN_DB_KEY: &str =
+    "last_observed_l1_lib_header_in_db";
 /// Key base for storing metainformation which describe if first block has been set
 pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
 /// Key base for storing metainformation about the last breakpoint
@@ -219,21 +220,23 @@ impl RocksDBIO {
         }
     }
 
-    pub fn get_meta_last_observed_l1_block_in_db(&self) -> DbResult<Option<[u8; 32]>> {
+    pub fn get_meta_last_observed_l1_lib_header_in_db(&self) -> DbResult<Option<[u8; 32]>> {
         let cf_meta = self.meta_column();
         let res = self
             .db
             .get_cf(
                 &cf_meta,
-                borsh::to_vec(&DB_META_LAST_OBSERVED_L1_BLOCK_IN_DB_KEY).map_err(|err| {
-                    DbError::borsh_cast_message(
+                borsh::to_vec(&DB_META_LAST_OBSERVED_L1_LIB_HEADER_ID_IN_DB_KEY).map_err(
+                    |err| {
+                        DbError::borsh_cast_message(
                         err,
                         Some(
-                            "Failed to serialize DB_META_LAST_OBSERVED_L1_BLOCK_IN_DB_KEY"
+                            "Failed to serialize DB_META_LAST_OBSERVED_L1_LIB_HEADER_ID_IN_DB_KEY"
                                 .to_string(),
                         ),
                     )
-                })?,
+                    },
+                )?,
             )
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
 
@@ -241,7 +244,7 @@ impl RocksDBIO {
             borsh::from_slice::<[u8; 32]>(&data).map_err(|err| {
                 DbError::borsh_cast_message(
                     err,
-                    Some("Failed to deserialize last l1 header".to_string()),
+                    Some("Failed to deserialize last l1 lib header".to_string()),
                 )
             })
         })
@@ -341,21 +344,26 @@ impl RocksDBIO {
         Ok(())
     }
 
-    pub fn put_meta_last_observed_l1_block_in_db(&self, l1_block_header: [u8; 32]) -> DbResult<()> {
+    pub fn put_meta_last_observed_l1_lib_header_in_db(
+        &self,
+        l1_lib_header: [u8; 32],
+    ) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
             .put_cf(
                 &cf_meta,
-                borsh::to_vec(&DB_META_LAST_OBSERVED_L1_BLOCK_IN_DB_KEY).map_err(|err| {
-                    DbError::borsh_cast_message(
+                borsh::to_vec(&DB_META_LAST_OBSERVED_L1_LIB_HEADER_ID_IN_DB_KEY).map_err(
+                    |err| {
+                        DbError::borsh_cast_message(
                         err,
                         Some(
-                            "Failed to serialize DB_META_LAST_OBSERVED_L1_BLOCK_IN_DB_KEY"
+                            "Failed to serialize DB_META_LAST_OBSERVED_L1_LIB_HEADER_ID_IN_DB_KEY"
                                 .to_string(),
                         ),
                     )
-                })?,
-                borsh::to_vec(&l1_block_header).map_err(|err| {
+                    },
+                )?,
+                borsh::to_vec(&l1_lib_header).map_err(|err| {
                     DbError::borsh_cast_message(
                         err,
                         Some("Failed to serialize last l1 block header".to_string()),
@@ -407,7 +415,7 @@ impl RocksDBIO {
 
     // Block
 
-    pub fn put_block(&self, block: Block, l1_block_header: [u8; 32]) -> DbResult<()> {
+    pub fn put_block(&self, block: Block, l1_lib_header: [u8; 32]) -> DbResult<()> {
         let cf_block = self.block_column();
         let cf_hti = self.hash_to_id_column();
         let cf_tti: Arc<BoundColumnFamily<'_>> = self.tx_hash_to_id_column();
@@ -436,7 +444,7 @@ impl RocksDBIO {
 
         if block.header.block_id > last_curr_block {
             self.put_meta_last_block_in_db(block.header.block_id)?;
-            self.put_meta_last_observed_l1_block_in_db(l1_block_header)?;
+            self.put_meta_last_observed_l1_lib_header_in_db(l1_lib_header)?;
         }
 
         self.db

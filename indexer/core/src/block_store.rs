@@ -35,11 +35,11 @@ impl IndexerStore {
         Self::open_db_with_genesis(location, None)
     }
 
-    pub fn last_observed_l1_header(&self) -> Result<Option<HeaderId>> {
+    pub fn last_observed_l1_lib_header(&self) -> Result<Option<HeaderId>> {
         Ok(self
             .dbio
-            .get_meta_last_observed_l1_block_in_db()?
-            .map(|raw_id| HeaderId::from(raw_id)))
+            .get_meta_last_observed_l1_lib_header_in_db()?
+            .map(HeaderId::from))
     }
 
     pub fn get_last_block_id(&self) -> Result<u64> {
