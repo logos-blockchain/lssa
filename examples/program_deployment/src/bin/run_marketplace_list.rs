@@ -46,7 +46,7 @@ async fn main() {
     let program = Program::new(bytecode).unwrap();
 
     // Load signing keys to provide authorization
-    let signing_key = wallet_core
+    let signing_key: &nssa::PrivateKey = wallet_core
         .storage()
         .user_data
         .get_pub_account_signing_key(&account_id)
@@ -79,9 +79,12 @@ async fn main() {
     let tx = PublicTransaction::new(message, witness_set);
 
     // Submit the transaction
-    let _response = wallet_core
+    let response = wallet_core
         .sequencer_client
         .send_tx_public(tx)
         .await
         .unwrap();
+
+    // Pretty-print the response for debugging
+    println!("Transaction response: {:#?}", response);
 }
