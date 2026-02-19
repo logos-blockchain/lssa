@@ -139,13 +139,12 @@ fn withdraw_from_escrow(
     ]
 }
 
-enum MarketplaceInstruction {
-    List {
-        price: u128,
-        unique_string: [u8; 16],
-    },
-    Buy,
-}
+type MarketplaceInstruction = (u8, Vec<u8>);
+
+// Selector constants
+const LIST_ITEM: u8 = 0;
+const BUY_ITEM: u8 = 1;
+const WITHDRAW_ESCROW: u8 = 2;
 
 fn main() {
     let (
@@ -156,14 +155,18 @@ fn main() {
         instruction_words,
     ) = read_nssa_inputs::<MarketplaceInstruction>();
 
-    let post_states = match (pre_states.as_slice(), instruction) {
-        (
-            [seller, item],
-            MarketplaceInstruction::List {
-                price,
-                unique_string,
-            },
-        ) => {
+    let (selector, data) = instruction;
+
+    let post_states = match (pre_states.as_slice(), selector) {
+        // List item: expects [seller, item] accounts
+        ([seller, item], LIST_ITEM) => {
+            // data should contain: price (16 bytes) + unique_string (16 bytes)
+            if data.len() != 32 {
+                panic!("Invalid instruction data length for LIST_ITEM");
+            }
+            let price = u128::from_le_bytes(data[0..16].try_into().unwrap());
+            let mut unique_string = [0u8; 16];
+            unique_string.copy_from_slice(&data[16..32]);
             vec![list_item(
                 item.clone(),
                 seller.clone(),
@@ -172,9 +175,11 @@ fn main() {
             )]
         }
 
-        ([buyer, item, seller], MarketplaceInstruction::Buy) => {
-            buy_item(buyer.clone(), item.clone(), seller.clone())
-        }
+        // Buy item: expects [buyer, item, escrow]
+        ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
+
+        // Withdraw escrow: expects [seller, escrow]
+        ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
 
         _ => panic!("Invalid accounts or instruction"),
     };
