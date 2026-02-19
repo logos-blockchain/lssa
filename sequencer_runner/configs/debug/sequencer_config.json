@@ -5,7 +5,7 @@
     "is_genesis_random": true,
     "max_num_tx_in_block": 20,
     "mempool_max_size": 1000,
-    "block_create_timeout_millis": 12000,
+    "block_create_timeout_millis": 18000,
     "retry_pending_blocks_timeout_millis": 6000,
     "port": 3040,
     "bedrock_config": {
