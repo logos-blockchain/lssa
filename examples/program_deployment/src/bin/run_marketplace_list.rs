@@ -15,13 +15,13 @@ use wallet::WalletCore;
 //
 //
 // Usage:
-//   ./run_hello_world_with_authorization /path/to/guest/binary <account_id>
+//   ./run_marketplace_list /path/to/guest/binary <account_id>
 //
 // Note: the provided account_id needs to be of a public self owned account
 //
 // Example:
-//   cargo run --bin run_hello_world_with_authorization \
-//      methods/guest/target/riscv32im-risc0-zkvm-elf/docker/hello_world_with_authorization.bin \
+//   cargo run --bin run_marketplace_list \
+//      methods/guest/target/riscv32im-risc0-zkvm-elf/docker/marketplace.bin \
 //      Ds8q5PjLcKwwV97Zi7duhRVF9uwA2PuYMoLL7FwCzsXE
 
 #[tokio::main]
@@ -32,7 +32,7 @@ async fn main() {
     // Parse arguments
     // First argument is the path to the program binary
     let program_path = std::env::args_os().nth(1).unwrap().into_string().unwrap();
-    // Second argument is the account_id
+    // Second argument is the SIGNER account_id
     let account_id: AccountId = std::env::args_os()
         .nth(2)
         .unwrap()
@@ -52,8 +52,18 @@ async fn main() {
         .get_pub_account_signing_key(&account_id)
         .expect("Input account should be a self owned public account");
 
-    // Define the desired greeting in ASCII
-    let greeting: Vec<u8> = vec![72, 111, 108, 97, 32, 109, 117, 110, 100, 111, 33];
+    // hardcoding item value and price for ease of use
+    // LIST needs to define instruction as {selector: 0, [price(16), unique_string(16)] }
+    let unique_string: [u8; 16] = *b"UNIQUE_ITEM_1234";
+    let price: u128 = 500;
+
+    let mut instruction_data: Vec<u8> = Vec::new();
+    instruction_data.extend_from_slice(&price.to_le_bytes()); // 16 bytes
+    instruction_data.extend_from_slice(&unique_string); // 16 bytes
+
+    // --- Step 3: Create instruction with selector 0 for LIST ---
+    const LIST_SELECTOR: u8 = 0;
+    let instruction: (u8, Vec<u8>) = (LIST_SELECTOR, instruction_data);
 
     // Construct the public transaction
     // Query the current nonce from the node
@@ -62,7 +72,7 @@ async fn main() {
         .await
         .expect("Node should be reachable to query account data");
     let signing_keys = [signing_key];
-    let message = Message::try_new(program.id(), vec![account_id], nonces, greeting).unwrap();
+    let message = Message::try_new(program.id(), vec![account_id], nonces, instruction).unwrap();
     // Pass the signing key to sign the message. This will be used by the node
     // to flag the pre_state as `is_authorized` when executing the program
     let witness_set = WitnessSet::for_message(&message, &signing_keys);
