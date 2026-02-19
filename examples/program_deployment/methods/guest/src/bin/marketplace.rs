@@ -181,7 +181,7 @@ fn main() {
         // Withdraw escrow: expects [seller, escrow]
         ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
 
-        _ => panic!("Invalid accounts or instruction"),
+        _ => panic!("Transaction response: {:#?}", instruction_words),
     };
 
     write_nssa_outputs(instruction_words, pre_states, post_states);

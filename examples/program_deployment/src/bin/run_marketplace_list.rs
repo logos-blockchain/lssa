@@ -73,13 +73,18 @@ async fn main() {
     instruction_data.extend_from_slice(&price.to_le_bytes()); // 16 bytes
     instruction_data.extend_from_slice(&unique_string); // 16 bytes
 
-    let instruction: Instruction = (LIST_FUNC_ID, instruction_data);
-    let account_id = account_id.parse().unwrap();
-    let nonces = vec![];
-    let message =
-        public_transaction::Message::try_new(program.id(), vec![account_id], nonces, instruction)
-            .unwrap();
-    let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
+    let unique_string: [u8; 16] = *b"UNIQUE_ITEM_1234";
+    let price: u128 = 500;
+    let instruction: Instruction = serialize_list_instruction(price, unique_string);
+
+    let nonces = wallet_core
+        .get_accounts_nonces(vec![account_id])
+        .await
+        .expect("Node should be reachable to query account data");
+    
+    let message: Message =
+        Message::try_new(program.id(), vec![account_id], nonces, instruction).unwrap();
+    let witness_set = WitnessSet::for_message(&message, &[signing_key]);
     let tx = PublicTransaction::new(message, witness_set);
 
     // Submit the transaction
@@ -88,7 +93,6 @@ async fn main() {
         .send_tx_public(tx)
         .await
         .unwrap();
-
     // Pretty-print the response for debugging
-    println!("Transaction response: {:#?}", response);
+    println!("Transaction response: {:#?}", _response);
 }
