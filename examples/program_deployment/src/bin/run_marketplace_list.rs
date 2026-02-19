@@ -24,6 +24,18 @@ use wallet::WalletCore;
 //      methods/guest/target/riscv32im-risc0-zkvm-elf/docker/marketplace.bin \
 //      Ds8q5PjLcKwwV97Zi7duhRVF9uwA2PuYMoLL7FwCzsXE
 
+type Instruction = (u8, Vec<u8>);
+const LIST_FUNC_ID: u8 = 0;
+const BUY_FUNC_ID: u8 = 1;
+const WITHDRAW_FUNC_ID: u8 = 2;
+
+fn serialize_list_instruction(price: u128, unique_string: [u8; 16]) -> Instruction {
+    let mut instr_bytes = Vec::with_capacity(32); // 16 + 16
+    instr_bytes.extend_from_slice(&price.to_le_bytes()); // 16 bytes
+    instr_bytes.extend_from_slice(&unique_string); // 16 bytes
+    (0u8, instr_bytes) // 0 = WRITE_FUNCTION_ID / list
+}
+
 #[tokio::main]
 async fn main() {
     // Initialize wallet
@@ -61,25 +73,17 @@ async fn main() {
     instruction_data.extend_from_slice(&price.to_le_bytes()); // 16 bytes
     instruction_data.extend_from_slice(&unique_string); // 16 bytes
 
-    // --- Step 3: Create instruction with selector 0 for LIST ---
-    const LIST_SELECTOR: u8 = 0;
-    let instruction: (u8, Vec<u8>) = (LIST_SELECTOR, instruction_data);
-
-    // Construct the public transaction
-    // Query the current nonce from the node
-    let nonces = wallet_core
-        .get_accounts_nonces(vec![account_id])
-        .await
-        .expect("Node should be reachable to query account data");
-    let signing_keys = [signing_key];
-    let message = Message::try_new(program.id(), vec![account_id], nonces, instruction).unwrap();
-    // Pass the signing key to sign the message. This will be used by the node
-    // to flag the pre_state as `is_authorized` when executing the program
-    let witness_set = WitnessSet::for_message(&message, &signing_keys);
+    let instruction: Instruction = (LIST_FUNC_ID, instruction_data);
+    let account_id = account_id.parse().unwrap();
+    let nonces = vec![];
+    let message =
+        public_transaction::Message::try_new(program.id(), vec![account_id], nonces, instruction)
+            .unwrap();
+    let witness_set = public_transaction::WitnessSet::for_message(&message, &[]);
     let tx = PublicTransaction::new(message, witness_set);
 
     // Submit the transaction
-    let response = wallet_core
+    let _response = wallet_core
         .sequencer_client
         .send_tx_public(tx)
         .await
