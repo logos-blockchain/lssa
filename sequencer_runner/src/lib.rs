@@ -183,11 +183,7 @@ async fn retry_pending_blocks(seq_core: &Arc<Mutex<SequencerCore>>) -> Result<()
         (pending_blocks, client)
     };
 
-    let k = 25;
-    if pending_blocks.len() > k {
-        pending_blocks.select_nth_unstable_by_key(k, |b| b.header.block_id);
-    }
-    for block in pending_blocks.iter().take(k) {
+    for block in pending_blocks.iter() {
         info!(
             "Resubmitting pending block with id {}",
             block.header.block_id
