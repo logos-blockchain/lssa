@@ -1,9 +1,4 @@
-use std::{
-    net::SocketAddr,
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use actix_web::dev::ServerHandle;
 use anyhow::{Context as _, Result};
@@ -12,15 +7,12 @@ use common::rpc_primitives::RpcConfig;
 use futures::{FutureExt as _, never::Never};
 #[cfg(not(feature = "standalone"))]
 use log::warn;
-use log::{debug, error, info, warn};
+use log::{error, info};
 #[cfg(feature = "standalone")]
 use sequencer_core::SequencerCoreWithMockClients as SequencerCore;
+use sequencer_core::config::SequencerConfig;
 #[cfg(not(feature = "standalone"))]
 use sequencer_core::{SequencerCore, block_settlement_client::BlockSettlementClientTrait as _};
-use sequencer_core::{
-    SequencerCore, block_settlement_client::BlockSettlementClientTrait as _,
-    config::SequencerConfig,
-};
 use sequencer_rpc::new_http_server;
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -127,10 +119,13 @@ pub async fn startup_sequencer(app_config: SequencerConfig) -> Result<SequencerH
     let http_server_handle = http_server.handle();
     tokio::spawn(http_server);
 
-    info!("Submitting stored pending blocks");
-    retry_pending_blocks(&seq_core_wrapped)
-        .await
-        .expect("Failed to submit pending blocks on startup");
+    #[cfg(not(feature = "standalone"))]
+    {
+        info!("Submitting stored pending blocks");
+        retry_pending_blocks(&seq_core_wrapped)
+            .await
+            .expect("Failed to submit pending blocks on startup");
+    }
 
     info!("Starting main sequencer loop");
     let main_loop_handle = tokio::spawn(main_loop(Arc::clone(&seq_core_wrapped), block_timeout));
@@ -174,7 +169,11 @@ async fn main_loop(seq_core: Arc<Mutex<SequencerCore>>, block_timeout: Duration)
 
 #[cfg(not(feature = "standalone"))]
 async fn retry_pending_blocks(seq_core: &Arc<Mutex<SequencerCore>>) -> Result<()> {
-    let (mut pending_blocks, block_settlement_client) = {
+    use std::time::Instant;
+
+    use log::debug;
+
+    let (pending_blocks, block_settlement_client) = {
         let sequencer_core = seq_core.lock().await;
         let client = sequencer_core.block_settlement_client();
         let pending_blocks = sequencer_core
