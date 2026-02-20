@@ -65,14 +65,6 @@ async fn main() {
         .expect("Input account should be a self owned public account");
 
     // hardcoding item value and price for ease of use
-    // LIST needs to define instruction as {selector: 0, [price(16), unique_string(16)] }
-    let unique_string: [u8; 16] = *b"UNIQUE_ITEM_1234";
-    let price: u128 = 500;
-
-    let mut instruction_data: Vec<u8> = Vec::new();
-    instruction_data.extend_from_slice(&price.to_le_bytes()); // 16 bytes
-    instruction_data.extend_from_slice(&unique_string); // 16 bytes
-
     let unique_string: [u8; 16] = *b"UNIQUE_ITEM_1234";
     let price: u128 = 500;
     let instruction: Instruction = serialize_list_instruction(price, unique_string);

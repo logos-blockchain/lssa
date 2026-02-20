@@ -9,7 +9,7 @@ use nssa_core::{
 // [16..48]  seller: [u8;32]
 // [48..64]  unique_string > making the item "unique"
 // When a sale happens, the program:
-// - transfers funds to the program's escrow
+// - transfers funds to the per-sale escrow
 // - sets the item's new owner
 // - allows a withdrawal for the original seller from the escrow
 
@@ -139,7 +139,7 @@ fn withdraw_from_escrow(
     ]
 }
 
-type MarketplaceInstruction = (u8, Vec<u8>);
+type Instruction = (u8, Vec<u8>);
 
 // Selector constants
 const LIST_ITEM: u8 = 0;
@@ -153,17 +153,18 @@ fn main() {
             instruction,
         },
         instruction_words,
-    ) = read_nssa_inputs::<MarketplaceInstruction>();
+    ) = read_nssa_inputs::<Instruction>();
 
     let (selector, data) = instruction;
 
     let post_states = match (pre_states.as_slice(), selector) {
         // List item: expects [seller, item] accounts
-        ([seller, item], LIST_ITEM) => {
+        ([item, seller], LIST_ITEM) => {
             // data should contain: price (16 bytes) + unique_string (16 bytes)
             if data.len() != 32 {
                 panic!("Invalid instruction data length for LIST_ITEM");
             }
+
             let price = u128::from_le_bytes(data[0..16].try_into().unwrap());
             let mut unique_string = [0u8; 16];
             unique_string.copy_from_slice(&data[16..32]);
@@ -174,13 +175,12 @@ fn main() {
                 unique_string,
             )]
         }
+x
+        // // Buy item: expects [buyer, item, escrow]
+        // ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
 
-        // Buy item: expects [buyer, item, escrow]
-        ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
-
-        // Withdraw escrow: expects [seller, escrow]
-        ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
-
+        // // Withdraw escrow: expects [seller, escrow]
+        // ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
         _ => panic!("Transaction response: {:#?}", instruction_words),
     };
 
