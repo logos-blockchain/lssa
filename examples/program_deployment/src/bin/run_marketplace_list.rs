@@ -84,7 +84,7 @@ async fn main() {
 
     let message: Message = Message::try_new(
         program.id(),
-        vec![account_id_item, account_id_seller],
+        vec![account_id_item, account_id_seller], 
         nonces,
         instruction,
     )
