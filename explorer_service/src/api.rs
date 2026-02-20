@@ -1,5 +1,3 @@
-use std::str::FromStr as _;
-
 use indexer_service_protocol::{Account, AccountId, Block, BlockId, HashType, Transaction};
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -30,7 +28,10 @@ pub async fn get_account(account_id: AccountId) -> Result<Account, ServerFnError
 /// Search for a block, transaction, or account by query string
 #[server]
 pub async fn search(query: String) -> Result<SearchResults, ServerFnError> {
+    use std::str::FromStr as _;
+
     use indexer_service_rpc::RpcClient as _;
+
     let client = expect_context::<IndexerRpcClient>();
 
     let mut blocks = Vec::new();

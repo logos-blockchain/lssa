@@ -5,26 +5,14 @@ use std::{
 };
 
 use anyhow::Result;
-pub use bedrock_client::BackoffConfig;
-use common::config::BasicAuth;
+use bedrock_client::BackoffConfig;
+use common::{
+    block::{AccountInitialData, CommitmentsInitialData},
+    config::BasicAuth,
+};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
-use nssa::AccountId;
 use serde::{Deserialize, Serialize};
 use url::Url;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct for account serialization
-pub struct AccountInitialData {
-    pub account_id: AccountId,
-    pub balance: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct to initialize commitments
-pub struct CommitmentsInitialData {
-    pub npk: nssa_core::NullifierPublicKey,
-    pub account: nssa_core::account::Account,
-}
 
 // TODO: Provide default values
 #[derive(Clone, Serialize, Deserialize)]

@@ -113,6 +113,7 @@ logos-blockchain-common-http-client = { git = "https://github.com/logos-blockcha
 logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 logos-blockchain-chain-broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
+logos-blockchain-chain-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git" }
 
 rocksdb = { version = "0.24.0", default-features = false, features = [
   "snappy",
