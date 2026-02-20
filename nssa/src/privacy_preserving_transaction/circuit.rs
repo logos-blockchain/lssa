@@ -59,7 +59,6 @@ pub fn execute_and_prove(
     pre_states: Vec<AccountWithMetadata>,
     instruction_data: InstructionData,
     visibility_mask: Vec<u8>,
-    private_account_nonces: Vec<u128>,
     private_account_keys: Vec<(NullifierPublicKey, SharedSecretKey)>,
     private_account_nsks: Vec<NullifierSecretKey>,
     private_account_membership_proofs: Vec<Option<MembershipProof>>,
@@ -116,7 +115,6 @@ pub fn execute_and_prove(
     let circuit_input = PrivacyPreservingCircuitInput {
         program_outputs,
         visibility_mask,
-        private_account_nonces,
         private_account_keys,
         private_account_nsks,
         private_account_membership_proofs,
@@ -171,7 +169,7 @@ impl Proof {
 mod tests {
     use nssa_core::{
         Commitment, DUMMY_COMMITMENT_HASH, EncryptionScheme, Nullifier,
-        account::{Account, AccountId, AccountWithMetadata, data::Data},
+        account::{Account, AccountId, AccountWithMetadata, Nonce, data::Data},
     };
 
     use super::*;
@@ -209,14 +207,14 @@ mod tests {
         let expected_sender_post = Account {
             program_owner: program.id(),
             balance: 100 - balance_to_move,
-            nonce: 0,
+            nonce: Nonce(0),
             data: Data::default(),
         };
 
         let expected_recipient_post = Account {
             program_owner: program.id(),
             balance: balance_to_move,
-            nonce: 0xdeadbeef,
+            nonce: Nonce::default().private_account_nonce_init(&recipient_keys.npk()),
             data: Data::default(),
         };
 
@@ -229,7 +227,6 @@ mod tests {
             vec![sender, recipient],
             Program::serialize_instruction(balance_to_move).unwrap(),
             vec![0, 2],
-            vec![0xdeadbeef],
             vec![(recipient_keys.npk(), shared_secret)],
             vec![],
             vec![None],
@@ -263,10 +260,11 @@ mod tests {
         let sender_keys = test_private_account_keys_1();
         let recipient_keys = test_private_account_keys_2();
 
+        let sender_nonce = Nonce(0xdeadbeef);
         let sender_pre = AccountWithMetadata::new(
             Account {
                 balance: 100,
-                nonce: 0xdeadbeef,
+                nonce: sender_nonce,
                 program_owner: program.id(),
                 data: Data::default(),
             },
@@ -301,13 +299,13 @@ mod tests {
         let expected_private_account_1 = Account {
             program_owner: program.id(),
             balance: 100 - balance_to_move,
-            nonce: 0xdeadbeef1,
+            nonce: sender_nonce.private_account_nonce_increment(&sender_keys.nsk),
             ..Default::default()
         };
         let expected_private_account_2 = Account {
             program_owner: program.id(),
             balance: balance_to_move,
-            nonce: 0xdeadbeef2,
+            nonce: Nonce::default().private_account_nonce_init(&recipient_keys.npk()),
             ..Default::default()
         };
         let expected_new_commitments = vec![
@@ -325,7 +323,6 @@ mod tests {
             vec![sender_pre.clone(), recipient],
             Program::serialize_instruction(balance_to_move).unwrap(),
             vec![1, 2],
-            vec![0xdeadbeef1, 0xdeadbeef2],
             vec![
                 (sender_keys.npk(), shared_secret_1),
                 (recipient_keys.npk(), shared_secret_2),

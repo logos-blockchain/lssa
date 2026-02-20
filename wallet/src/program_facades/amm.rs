@@ -80,7 +80,10 @@ impl Amm<'_> {
         let message = nssa::public_transaction::Message::try_new(
             program.id(),
             account_ids,
-            nonces,
+            nonces
+                .iter()
+                .map(|x| nssa_core::account::Nonce(*x))
+                .collect(),
             instruction,
         )
         .unwrap();
@@ -187,7 +190,10 @@ impl Amm<'_> {
         let message = nssa::public_transaction::Message::try_new(
             program.id(),
             account_ids,
-            nonces,
+            nonces
+                .iter()
+                .map(|x| nssa_core::account::Nonce(*x))
+                .collect(),
             instruction,
         )
         .unwrap();
@@ -274,7 +280,10 @@ impl Amm<'_> {
         let message = nssa::public_transaction::Message::try_new(
             program.id(),
             account_ids,
-            nonces,
+            nonces
+                .iter()
+                .map(|x| nssa_core::account::Nonce(*x))
+                .collect(),
             instruction,
         )
         .unwrap();
@@ -356,7 +365,10 @@ impl Amm<'_> {
         let message = nssa::public_transaction::Message::try_new(
             program.id(),
             account_ids,
-            nonces,
+            nonces
+                .iter()
+                .map(|x| nssa_core::account::Nonce(*x))
+                .collect(),
             instruction,
         )
         .unwrap();

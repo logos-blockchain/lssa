@@ -20,7 +20,6 @@ fn main() {
     let PrivacyPreservingCircuitInput {
         program_outputs,
         visibility_mask,
-        private_account_nonces,
         private_account_keys,
         private_account_nsks,
         private_account_membership_proofs,
@@ -32,7 +31,6 @@ fn main() {
     let output = compute_circuit_output(
         execution_state,
         &visibility_mask,
-        &private_account_nonces,
         &private_account_keys,
         &private_account_nsks,
         &private_account_membership_proofs,
@@ -223,7 +221,6 @@ impl ExecutionState {
 fn compute_circuit_output(
     execution_state: ExecutionState,
     visibility_mask: &[u8],
-    private_account_nonces: &[Nonce],
     private_account_keys: &[(NullifierPublicKey, SharedSecretKey)],
     private_account_nsks: &[NullifierSecretKey],
     private_account_membership_proofs: &[Option<MembershipProof>],
@@ -243,7 +240,6 @@ fn compute_circuit_output(
         "Invalid visibility mask length"
     );
 
-    let mut private_nonces_iter = private_account_nonces.iter();
     let mut private_keys_iter = private_account_keys.iter();
     let mut private_nsks_iter = private_account_nsks.iter();
     let mut private_membership_proofs_iter = private_account_membership_proofs.iter();
@@ -269,7 +265,7 @@ fn compute_circuit_output(
                     "AccountId mismatch"
                 );
 
-                let new_nullifier = if visibility_mask == 1 {
+                let (new_nullifier, new_nonce) = if visibility_mask == 1 {
                     // Private account with authentication
 
                     let Some(nsk) = private_nsks_iter.next() else {
@@ -293,12 +289,19 @@ fn compute_circuit_output(
                         panic!("Missing membership proof");
                     };
 
-                    compute_nullifier_and_set_digest(
+                    let new_nullifier = compute_nullifier_and_set_digest(
                         membership_proof_opt.as_ref(),
                         &pre_state.account,
                         npk,
                         nsk,
-                    )
+                    );
+
+                    let new_nonce = pre_state
+                        .account
+                        .nonce
+                        .private_account_nonce_increment(&nsk);
+
+                    (new_nullifier, new_nonce)
                 } else {
                     // Private account without authentication
 
@@ -323,16 +326,17 @@ fn compute_circuit_output(
                     );
 
                     let nullifier = Nullifier::for_account_initialization(npk);
-                    (nullifier, DUMMY_COMMITMENT_HASH)
+
+                    let new_nonce = Nonce::default().private_account_nonce_init(npk);
+
+                    ((nullifier, DUMMY_COMMITMENT_HASH), new_nonce)
                 };
                 output.new_nullifiers.push(new_nullifier);
 
                 // Update post-state with new nonce
                 let mut post_with_updated_nonce = post_state;
-                let Some(new_nonce) = private_nonces_iter.next() else {
-                    panic!("Missing private account nonce");
-                };
-                post_with_updated_nonce.nonce = *new_nonce;
+
+                post_with_updated_nonce.nonce = new_nonce; //*new_nonce;
 
                 // Compute commitment
                 let commitment_post = Commitment::new(npk, &post_with_updated_nonce);
@@ -352,8 +356,6 @@ fn compute_circuit_output(
             _ => panic!("Invalid visibility mask value"),
         }
     }
-
-    assert!(private_nonces_iter.next().is_none(), "Too many nonces");
 
     assert!(
         private_keys_iter.next().is_none(),

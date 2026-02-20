@@ -22,7 +22,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::{
     config::{PersistentStorage, WalletConfigOverrides},
-    helperfunctions::{produce_data_for_storage, produce_random_nonces},
+    helperfunctions::produce_data_for_storage,
     poller::TxPoller,
 };
 
@@ -328,7 +328,6 @@ impl WalletCore {
             pre_states,
             instruction_data,
             acc_manager.visibility_mask().to_vec(),
-            produce_random_nonces(private_account_keys.len()),
             private_account_keys
                 .iter()
                 .map(|keys| (keys.npk.clone(), keys.ssk))

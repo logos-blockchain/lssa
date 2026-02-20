@@ -14,7 +14,8 @@ use serde_with::{DeserializeFromStr, SerializeDisplay};
 #[cfg(feature = "convert")]
 mod convert;
 
-pub type Nonce = u128;
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct Nonce(pub u128);
 
 #[derive(
     Debug, Copy, Clone, PartialEq, Eq, Hash, SerializeDisplay, DeserializeFromStr, JsonSchema,

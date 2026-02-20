@@ -47,7 +47,7 @@ impl Commitment {
                 this.extend_from_slice(&word.to_le_bytes());
             }
             this.extend_from_slice(&account.balance.to_le_bytes());
-            this.extend_from_slice(&account.nonce.to_le_bytes());
+            this.extend_from_slice(&account.nonce.0.to_le_bytes());
             let hashed_data: [u8; 32] = Impl::hash_bytes(&account.data)
                 .as_bytes()
                 .try_into()

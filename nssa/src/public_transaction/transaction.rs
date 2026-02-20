@@ -222,6 +222,7 @@ impl PublicTransaction {
 
 #[cfg(test)]
 pub mod tests {
+    use nssa_core::account::Nonce;
     use sha2::{Digest, digest::FixedOutput};
 
     use crate::{
@@ -247,7 +248,7 @@ pub mod tests {
 
     fn transaction_for_tests() -> PublicTransaction {
         let (key1, key2, addr1, addr2) = keys_for_tests();
-        let nonces = vec![0, 0];
+        let nonces = vec![Nonce(0), Nonce(0)];
         let instruction = 1337;
         let message = Message::try_new(
             Program::authenticated_transfer_program().id(),
@@ -325,7 +326,7 @@ pub mod tests {
     fn test_account_id_list_cant_have_duplicates() {
         let (key1, _, addr1, _) = keys_for_tests();
         let state = state_for_tests();
-        let nonces = vec![0, 0];
+        let nonces = vec![Nonce(0), Nonce(0)];
         let instruction = 1337;
         let message = Message::try_new(
             Program::authenticated_transfer_program().id(),
@@ -345,7 +346,7 @@ pub mod tests {
     fn test_number_of_nonces_must_match_number_of_signatures() {
         let (key1, key2, addr1, addr2) = keys_for_tests();
         let state = state_for_tests();
-        let nonces = vec![0];
+        let nonces = vec![Nonce(0)];
         let instruction = 1337;
         let message = Message::try_new(
             Program::authenticated_transfer_program().id(),
@@ -365,7 +366,7 @@ pub mod tests {
     fn test_all_signatures_must_be_valid() {
         let (key1, key2, addr1, addr2) = keys_for_tests();
         let state = state_for_tests();
-        let nonces = vec![0, 0];
+        let nonces = vec![Nonce(0), Nonce(0)];
         let instruction = 1337;
         let message = Message::try_new(
             Program::authenticated_transfer_program().id(),
@@ -386,7 +387,7 @@ pub mod tests {
     fn test_nonces_must_match_the_state_current_nonces() {
         let (key1, key2, addr1, addr2) = keys_for_tests();
         let state = state_for_tests();
-        let nonces = vec![0, 1];
+        let nonces = vec![Nonce(0), Nonce(1)];
         let instruction = 1337;
         let message = Message::try_new(
             Program::authenticated_transfer_program().id(),
@@ -406,7 +407,7 @@ pub mod tests {
     fn test_program_id_must_belong_to_bulitin_program_ids() {
         let (key1, key2, addr1, addr2) = keys_for_tests();
         let state = state_for_tests();
-        let nonces = vec![0, 0];
+        let nonces = vec![Nonce(0), Nonce(0)];
         let instruction = 1337;
         let unknown_program_id = [0xdeadbeef; 8];
         let message =

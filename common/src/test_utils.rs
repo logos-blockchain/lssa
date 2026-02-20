@@ -1,4 +1,5 @@
 use nssa::AccountId;
+use nssa_core::account::Nonce;
 
 use crate::{
     HashType,
@@ -64,7 +65,7 @@ pub fn create_transaction_native_token_transfer(
     signing_key: nssa::PrivateKey,
 ) -> NSSATransaction {
     let account_ids = vec![from, to];
-    let nonces = vec![nonce];
+    let nonces = vec![Nonce(nonce)];
     let program_id = nssa::program::Program::authenticated_transfer_program().id();
     let message = nssa::public_transaction::Message::try_new(
         program_id,
