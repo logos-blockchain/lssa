@@ -23,6 +23,7 @@
 pub mod account;
 pub mod error;
 pub mod keys;
+pub mod pinata;
 pub mod sync;
 pub mod transfer;
 pub mod types;
