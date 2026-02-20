@@ -2105,6 +2105,7 @@ pub mod tests {
             .with_private_account(&sender_keys, &sender_private_account);
 
         let balance_to_move = 37;
+        let balance_to_move_2 = 30;
 
         let tx = private_balance_transfer_for_tests(
             &sender_keys,
@@ -2120,8 +2121,8 @@ pub mod tests {
 
         let sender_private_account = Account {
             program_owner: Program::authenticated_transfer_program().id(),
-            balance: 100 - balance_to_move,
-            nonce: sender_nonce.private_account_nonce_increment(&sender_keys.nsk),
+            balance: 100,
+            nonce: Nonce(0xdeadbeef),
             data: Data::default(),
         };
 
@@ -2129,7 +2130,7 @@ pub mod tests {
             &sender_keys,
             &sender_private_account,
             &recipient_keys,
-            balance_to_move,
+            balance_to_move_2,
             &state,
         );
 
