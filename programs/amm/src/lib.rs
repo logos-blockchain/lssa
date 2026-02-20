@@ -8,3 +8,4 @@ pub mod remove;
 pub mod swap;
 
 mod tests;
+mod full_tests;

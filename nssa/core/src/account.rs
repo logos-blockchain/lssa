@@ -11,6 +11,7 @@ use crate::program::ProgramId;
 pub mod data;
 
 pub type Nonce = u128;
+pub type Balance = u128;
 
 /// Account to be used both in public and private contexts
 #[derive(
@@ -18,7 +19,7 @@ pub type Nonce = u128;
 )]
 pub struct Account {
     pub program_owner: ProgramId,
-    pub balance: u128,
+    pub balance: Balance,
     pub data: Data,
     pub nonce: Nonce,
 }
