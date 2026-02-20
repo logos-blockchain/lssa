@@ -8,3 +8,4 @@ license = { workspace = true }
 nssa_core.workspace = true
 token_core.workspace = true
 amm_core.workspace = true
+nssa.workspace = true
