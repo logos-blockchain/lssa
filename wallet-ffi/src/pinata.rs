@@ -179,12 +179,10 @@ pub unsafe extern "C" fn wallet_ffi_claim_pinata_private_owned_already_initializ
 
     let pinata = Pinata(&wallet);
 
-    match block_on(pinata.claim_private_owned_account_already_initialized(
-        pinata_id,
-        winner_id,
-        solution,
-        proof,
-    )) {
+    match block_on(
+        pinata
+            .claim_private_owned_account_already_initialized(pinata_id, winner_id, solution, proof),
+    ) {
         Ok(Ok((response, _shared_key))) => {
             let tx_hash = CString::new(response.tx_hash.to_string())
                 .map(|s| s.into_raw())
@@ -197,7 +195,10 @@ pub unsafe extern "C" fn wallet_ffi_claim_pinata_private_owned_already_initializ
             WalletFfiError::Success
         }
         Ok(Err(e)) => {
-            print_error(format!("Pinata private claim (already initialized) failed: {:?}", e));
+            print_error(format!(
+                "Pinata private claim (already initialized) failed: {:?}",
+                e
+            ));
             unsafe {
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
@@ -282,7 +283,10 @@ pub unsafe extern "C" fn wallet_ffi_claim_pinata_private_owned_not_initialized(
             WalletFfiError::Success
         }
         Ok(Err(e)) => {
-            print_error(format!("Pinata private claim (not initialized) failed: {:?}", e));
+            print_error(format!(
+                "Pinata private claim (not initialized) failed: {:?}",
+                e
+            ));
             unsafe {
                 (*out_result).tx_hash = ptr::null_mut();
                 (*out_result).success = false;
