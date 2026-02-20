@@ -214,7 +214,7 @@ mod tests {
         let expected_recipient_post = Account {
             program_owner: program.id(),
             balance: balance_to_move,
-            nonce: Nonce(0xdeadbeef),
+            nonce: Nonce::default().private_account_nonce_init(&recipient_keys.npk()),
             data: Data::default(),
         };
 
