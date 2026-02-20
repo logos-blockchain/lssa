@@ -177,9 +177,19 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
     }
 
     pub async fn produce_new_block(&mut self) -> Result<u64> {
-        let (_tx, _msg_id) = self
+        let (tx, _msg_id) = self
             .produce_new_block_with_mempool_transactions()
             .context("Failed to produce new block with mempool transactions")?;
+        match self
+            .block_settlement_client
+            .submit_inscribe_tx_to_bedrock(tx)
+            .await
+        {
+            Ok(()) => {}
+            Err(err) => {
+                error!("Failed to post block data to Bedrock with error: {err:#}");
+            }
+        }
 
         Ok(self.chain_height)
     }

@@ -100,7 +100,9 @@ impl IndexerCore {
                         &self.config.channel_id,
                     ).collect::<Vec<_>>();
 
-                    info!("Parsed {} L2 blocks", l2_blocks_parsed.len());
+                    let mut l2_blocks_parsed_ids: Vec<_> = l2_blocks_parsed.iter().map(|block| block.header.block_id).collect();
+                    l2_blocks_parsed_ids.sort();
+                    info!("Parsed {} L2 blocks with ids {:?}", l2_blocks_parsed.len(), l2_blocks_parsed_ids);
 
                     for l2_block in l2_blocks_parsed {
                         self.store.put_block(l2_block.clone())?;
