@@ -26,6 +26,9 @@ pub trait Rpc {
     #[subscription(name = "subscribeToFinalizedBlocks", item = BlockId)]
     async fn subscribe_to_finalized_blocks(&self) -> SubscriptionResult;
 
+    #[method(name = "getLastFinalizedBlockId")]
+    async fn get_last_finalized_block_id(&self) -> Result<BlockId, ErrorObjectOwned>;
+
     #[method(name = "getBlockById")]
     async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned>;
 
@@ -48,4 +51,8 @@ pub trait Rpc {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<Transaction>, ErrorObjectOwned>;
+
+    // ToDo: expand healthcheck response into some kind of report
+    #[method(name = "checkHealth")]
+    async fn healthcheck(&self) -> Result<(), ErrorObjectOwned>;
 }
