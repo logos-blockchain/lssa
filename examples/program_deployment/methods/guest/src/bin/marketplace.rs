@@ -13,7 +13,9 @@ use nssa_core::{
 // - sets the item's new owner
 // - allows a withdrawal for the original seller from the escrow
 
-// The lister/owner accountID is hashed to preseve privacy (as PDAs + ZK currently doesn't work as per the docs)
+// The lister/owner accountID is hashed to preserve privacy (as PDAs + ZK currently doesn't work as per the docs)
+// This app can be ran publicly, where the accountID of the users are public,
+// OR via ZKPs, where the inputs (ie accountIDs) are hidden from the chain
 
 // When listing an item, your provide:
 // new item account (uninitialized)
@@ -178,12 +180,13 @@ fn main() {
             )]
         }
 
+        // not fully implemented yet
         // // Buy item: expects [buyer, item, escrow]
         // ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
 
         // // Withdraw escrow: expects [seller, escrow]
         // ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
-        _ => panic!("Transaction response: {:#?}", instruction_words),
+        _ => panic!("Transaction response: {:#?}", pre_states), // for debugging
     };
 
     write_nssa_outputs(instruction_words, pre_states, post_states);

@@ -5,13 +5,13 @@ use nssa::{
 };
 use wallet::WalletCore;
 
-// Before running this example, compile the `hello_world_with_authorization.rs` guest program with:
+// Before running this example, compile the `marketplace.rs` guest program with:
 //
 //   cargo risczero build --manifest-path examples/program_deployment/methods/guest/Cargo.toml
 //
 // Note: you must run the above command from the root of the `lssa` repository.
 // Note: The compiled binary file is stored in
-// methods/guest/target/riscv32im-risc0-zkvm-elf/docker/hello_world_with_authorization.bin
+// methods/guest/target/riscv32im-risc0-zkvm-elf/docker/marketplace.bin
 //
 //
 // Usage:
@@ -33,7 +33,7 @@ fn serialize_list_instruction(price: u128, unique_string: [u8; 16]) -> Instructi
     let mut instr_bytes = Vec::with_capacity(32); // 16 + 16
     instr_bytes.extend_from_slice(&price.to_le_bytes()); // 16 bytes
     instr_bytes.extend_from_slice(&unique_string); // 16 bytes
-    (0u8, instr_bytes) // 0 = WRITE_FUNCTION_ID / list
+    (LIST_FUNC_ID, instr_bytes) // 0 = WRITE_FUNCTION_ID / list
 }
 
 #[tokio::main]
@@ -45,8 +45,16 @@ async fn main() {
     // First argument is the path to the program binary
     let program_path = std::env::args_os().nth(1).unwrap().into_string().unwrap();
     // Second argument is the SIGNER account_id
-    let account_id: AccountId = std::env::args_os()
+    let account_id_item: AccountId = std::env::args_os()
         .nth(2)
+        .unwrap()
+        .into_string()
+        .unwrap()
+        .parse()
+        .unwrap();
+
+    let account_id_seller: AccountId = std::env::args_os()
+        .nth(3)
         .unwrap()
         .into_string()
         .unwrap()
@@ -61,7 +69,7 @@ async fn main() {
     let signing_key: &nssa::PrivateKey = wallet_core
         .storage()
         .user_data
-        .get_pub_account_signing_key(&account_id)
+        .get_pub_account_signing_key(&account_id_seller)
         .expect("Input account should be a self owned public account");
 
     // hardcoding item value and price for ease of use
@@ -70,12 +78,17 @@ async fn main() {
     let instruction: Instruction = serialize_list_instruction(price, unique_string);
 
     let nonces = wallet_core
-        .get_accounts_nonces(vec![account_id])
+        .get_accounts_nonces(vec![account_id_item, account_id_seller])
         .await
         .expect("Node should be reachable to query account data");
-    
-    let message: Message =
-        Message::try_new(program.id(), vec![account_id], nonces, instruction).unwrap();
+
+    let message: Message = Message::try_new(
+        program.id(),
+        vec![account_id_item, account_id_seller],
+        nonces,
+        instruction,
+    )
+    .unwrap();
     let witness_set = WitnessSet::for_message(&message, &[signing_key]);
     let tx = PublicTransaction::new(message, witness_set);
 
