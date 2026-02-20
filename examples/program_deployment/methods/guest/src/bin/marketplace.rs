@@ -175,7 +175,7 @@ fn main() {
                 unique_string,
             )]
         }
-x
+
         // // Buy item: expects [buyer, item, escrow]
         // ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
 
