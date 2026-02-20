@@ -13,6 +13,8 @@ use nssa_core::{
 // - sets the item's new owner
 // - allows a withdrawal for the original seller from the escrow
 
+// The lister/owner accountID is hashed to preseve privacy (as PDAs + ZK currently doesn't work as per the docs)
+
 // When listing an item, your provide:
 // new item account (uninitialized)
 // your own account_id via account
