@@ -39,7 +39,7 @@ fn list_item(
         panic!("Item already initialized");
     }
 
-    let mut acc = item_account.account.clone();
+    let mut item = item_account.account.clone();
     let mut data: Vec<u8> = vec![0u8; 64]; // 16 price + 32 seller_id_hash + 16 unique_string
 
     // Create hash of seller account_id for privacy-preserving
@@ -51,9 +51,9 @@ fn list_item(
     data[16..48].copy_from_slice(&seller_id_hashed.as_bytes()); // set seller hash
     data[48..64].copy_from_slice(&unique_string); // set unique string
 
-    acc.data = data.try_into().unwrap();
+    item.data = data.try_into().unwrap();
     vec![
-        AccountPostState::new(acc),
+        AccountPostState::new(item),
         AccountPostState::new(seller.account.clone()),
     ]
 }
