@@ -5,7 +5,7 @@ First, we need to ask ourselves what kind of persona is reading the docs:
 - Are they a developer?
   - If yes, what kind?
     - Web3, non-Web3 (understanding of basic blockchain concepts)
-    - Which langauge(s) do they know? Rust -> a lot easier
+    - Which language(s) do they know? Rust -> a lot easier
     - Do they come from Ethereum, Solana, Cosmos...
     - Are they familiar with the Solana tech stack, account model, etc?
 - Are they looking to run a node/blockchain infra?
@@ -19,7 +19,7 @@ I could not find information about how exactly the account model is applied to t
 
 - For this, a comparison list between differences would be a good resource and time-saver for newcomers. This can also be done via code-first examples, showcasing differences and similarities between a LEE and Solana program with the same or similar business logic
 
-I found it hard to explore my actions. Running the explorer_serivce via docker builds and runs properly, but displays a 404 error upon opening up localhost:8080. `cargo leptos watch` came back with an error
+I found it hard to explore my actions. Running the `explorer_serivce` via docker builds and runs properly, but displays a 404 error upon opening up `localhost:8080`. `cargo leptos watch` came back with an error:
 
 ```
 ❯ cargo leptos watch
@@ -33,15 +33,9 @@ I found it hard to explore my actions. Running the explorer_serivce via docker b
    Compiling semver v1.0.27
    Compiling cfg-if v1.0.4
 error[E0463]: can't find crate for `core`
-  |
-  = note: the `wasm32-unknown-unknown` target may not be installed
-  = help: consider downloading the target with `rustup target add wasm32-unknown-unknown`
-
-For more information about this error, try `rustc --explain E0463`.
-error: could not compile `unicode-ident` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `cfg-if` (lib) due to 1 previous error
 ```
+
+The reason for the explorer service
 
 The sequencer was constantly giving a large amount of WARN lines, ie
 
@@ -56,3 +50,15 @@ The sequencer was constantly giving a large amount of WARN lines, ie
 even with a clean state. Not sure what is causing this.
 
 I got no feedback from the wallet when deploying a program - had to chase sequencer logs to see if the program was deployed properly. Ideally a program ID or address or similar would be displayed, possibly also to be used for searching for the program via the explorer
+
+## Wallet Issues
+
+- Name could be less generic - ie `leew`, `lssew` `logoswallet`
+- Naming accounts by default during account creation
+- Plain-text password input should be hidden
+- Some simple docs/readme would be nice:
+    - How does account generation work
+    - Config data
+    - Which accounts are preconfigured/premined?
+- If we have pre-installed programs to interact with in the wallet, some info in the CLI or docs/links would be nice as to what they are
+
