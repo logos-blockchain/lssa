@@ -27,7 +27,7 @@ fn list_item(
     seller: AccountWithMetadata,
     price: u128,
     unique_string: [u8; 16],
-) -> AccountPostState {
+) -> Vec<AccountPostState> {
     use risc0_zkvm::sha::{Impl, Sha256};
 
     if !seller.is_authorized {
@@ -52,7 +52,10 @@ fn list_item(
     data[48..64].copy_from_slice(&unique_string); // set unique string
 
     acc.data = data.try_into().unwrap();
-    AccountPostState::new_claimed(acc)
+    vec![
+        AccountPostState::new(acc),
+        AccountPostState::new(seller.account.clone()),
+    ]
 }
 
 fn buy_item(
@@ -150,7 +153,6 @@ const LIST_ITEM: u8 = 0;
 const BUY_ITEM: u8 = 1;
 const WITHDRAW_ESCROW: u8 = 2;
 
-
 fn main() {
     let (
         ProgramInput {
@@ -173,12 +175,7 @@ fn main() {
             let price = u128::from_le_bytes(data[0..16].try_into().unwrap());
             let mut unique_string = [0u8; 16];
             unique_string.copy_from_slice(&data[16..32]);
-            vec![list_item(
-                item.clone(),
-                seller.clone(),
-                price,
-                unique_string,
-            )]
+            list_item(item.clone(), seller.clone(), price, unique_string)
         }
 
         // not fully implemented yet

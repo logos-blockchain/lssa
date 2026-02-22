@@ -78,13 +78,13 @@ async fn main() {
     let instruction: Instruction = serialize_list_instruction(price, unique_string);
 
     let nonces = wallet_core
-        .get_accounts_nonces(vec![account_id_item, account_id_seller])
+        .get_accounts_nonces(vec![account_id_seller])
         .await
         .expect("Node should be reachable to query account data");
 
     let message: Message = Message::try_new(
         program.id(),
-        vec![account_id_item, account_id_seller], 
+        vec![account_id_item, account_id_seller],
         nonces,
         instruction,
     )
