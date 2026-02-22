@@ -18,3 +18,41 @@ Missing clickable links to resources, repos. Many opportunities to delegate docu
 I could not find information about how exactly the account model is applied to the stack - ie, is it fully compatible with Solana, are there some things that work there but not here, etc?
 
 - For this, a comparison list between differences would be a good resource and time-saver for newcomers. This can also be done via code-first examples, showcasing differences and similarities between a LEE and Solana program with the same or similar business logic
+
+I found it hard to explore my actions. Running the explorer_serivce via docker builds and runs properly, but displays a 404 error upon opening up localhost:8080. `cargo leptos watch` came back with an error
+
+```
+❯ cargo leptos watch
+   Compiling proc-macro2 v1.0.103
+   Compiling quote v1.0.42
+   Compiling unicode-ident v1.0.22
+   Compiling version_check v0.9.5
+   Compiling wasm-bindgen-shared v0.2.106
+   Compiling libc v0.2.178
+   Compiling serde_core v1.0.228
+   Compiling semver v1.0.27
+   Compiling cfg-if v1.0.4
+error[E0463]: can't find crate for `core`
+  |
+  = note: the `wasm32-unknown-unknown` target may not be installed
+  = help: consider downloading the target with `rustup target add wasm32-unknown-unknown`
+
+For more information about this error, try `rustc --explain E0463`.
+error: could not compile `unicode-ident` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `cfg-if` (lib) due to 1 previous error
+```
+
+The sequencer was constantly giving a large amount of WARN lines, ie
+
+```
+[2026-02-22T20:17:32Z WARN  sequencer_runner] Failed to resubmit block with id 1 with error Internal server error: Item already in mempool
+[2026-02-22T20:17:32Z WARN  sequencer_runner] Failed to resubmit block with id 2 with error Internal server error: Item already in mempool
+[2026-02-22T20:17:32Z WARN  sequencer_runner] Failed to resubmit block with id 3 with error Internal server error: Item already in mempool
+[2026-02-22T20:17:32Z WARN  sequencer_runner] Failed to resubmit block with id 4 with error Internal server error: Item already in mempool
+[2026-02-22T20:17:32Z WARN  sequencer_runner] Failed to resubmit block with id 5 with error Internal server error: Item already in mempoo
+```
+
+even with a clean state. Not sure what is causing this.
+
+I got no feedback from the wallet when deploying a program - had to chase sequencer logs to see if the program was deployed properly. Ideally a program ID or address or similar would be displayed, possibly also to be used for searching for the program via the explorer
