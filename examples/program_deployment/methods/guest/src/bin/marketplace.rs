@@ -58,6 +58,11 @@ fn list_item(
     ]
 }
 
+// buy_item buys an item from the marketplace at the price it's listed.
+// The buyer needs to know the item account (for example, can be saved off-chain during the listing process,
+// or indexed and displayed on the marketplace website)
+// The buyer also needs to provide an uninitialized account that the program will use for the escrow.
+// This can be avoided if PDAs work with ZK proofs down the line.
 fn buy_item(
     buyer: AccountWithMetadata,
     item_account: AccountWithMetadata,
@@ -66,6 +71,15 @@ fn buy_item(
     use risc0_zkvm::sha::{Impl, Sha256};
     if !buyer.is_authorized {
         panic!("Buyer must be authorized");
+    }
+
+    // Must be an existing item
+    if item_account.account == Account::default() {
+        panic!("Item does not exist");
+    }
+
+    if escrow.account != Account::default() {
+        panic!("Must be an uninitialized escrow account");
     }
 
     // Get the data from the item account
@@ -114,18 +128,23 @@ fn buy_item(
 // Withdrawing allows the correct seller (by hash of acc_id) to withdraw everything to their balance.
 fn withdraw_from_escrow(
     seller: AccountWithMetadata,
-    escrow_account: AccountWithMetadata,
+    escrow: AccountWithMetadata,
 ) -> Vec<AccountPostState> {
     use risc0_zkvm::sha::{Impl, Sha256};
     if !seller.is_authorized {
-        panic!("Seller must authorize withdrawal");
+        panic!("Seller must be authorized");
+    }
+
+    // Must be a new account provided
+    if escrow.account == Account::default() {
+        panic!("Escrow account {:#?} not found", escrow.account_id);
     }
 
     // Hash the seller's account ID
     let seller_hash = Impl::hash_bytes(seller.account_id.as_ref());
 
     // Get the seller hash stored in escrow
-    let escrow_acc = escrow_account.account.clone();
+    let escrow_acc = escrow.account.clone();
     let escrow_data: Vec<u8> = escrow_acc.data.into_inner();
 
     // escrow_data[0..32] is assumed to hold the hashed seller ID
@@ -133,7 +152,7 @@ fn withdraw_from_escrow(
         panic!("Unauthorized: seller hash does not match escrow");
     }
 
-    let mut escrow_post = escrow_account.account.clone();
+    let mut escrow_post = escrow.account.clone();
     let mut seller_post = seller.account.clone();
 
     // Withdraw all in escrow - this is a simplification as escrows are created per-sale
@@ -165,7 +184,7 @@ fn main() {
     let (selector, data) = instruction;
 
     let post_states: Vec<AccountPostState> = match (pre_states.as_slice(), selector) {
-        // List item: expects [seller, item] accounts
+        // List item: expects [item, seller] accounts
         ([item, seller], LIST_ITEM) => {
             // data should contain: price (16 bytes) + unique_string (16 bytes)
             if data.len() != 32 {
