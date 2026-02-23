@@ -61,7 +61,7 @@ pub enum TxKind {
     ProgramDeployment,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TransactionMalformationError {
     InvalidSignature,
     FailedToDecode { tx: HashType },
