@@ -164,7 +164,7 @@ fn main() {
 
     let (selector, data) = instruction;
 
-    let post_states = match (pre_states.as_slice(), selector) {
+    let post_states: Vec<AccountPostState> = match (pre_states.as_slice(), selector) {
         // List item: expects [seller, item] accounts
         ([item, seller], LIST_ITEM) => {
             // data should contain: price (16 bytes) + unique_string (16 bytes)
@@ -179,11 +179,11 @@ fn main() {
         }
 
         // not fully implemented yet
-        // // Buy item: expects [buyer, item, escrow]
-        // ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
+        // Buy item: expects [buyer, item, escrow]
+        ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
 
         // // Withdraw escrow: expects [seller, escrow]
-        // ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
+        ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
         _ => panic!("Transaction response: {:#?}", pre_states), // for debugging
     };
 
