@@ -99,11 +99,12 @@ impl BlockSettlementClientTrait for BlockSettlementClient {
             Some(Op::ChannelInscribe(inscribe)) => (inscribe.parent, inscribe.id()),
             _ => panic!("Expected ChannelInscribe op"),
         };
-        log::info!("Posted block to Bedrock with parent id {parent_id:?} and msg id: {msg_id:?}");
         self.bedrock_client
             .post_transaction(tx)
             .await
             .context("Failed to post transaction to Bedrock")?;
+
+        log::info!("Posted block to Bedrock with parent id {parent_id:?} and msg id: {msg_id:?}");
 
         Ok(())
     }

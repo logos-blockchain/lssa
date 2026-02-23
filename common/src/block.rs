@@ -52,7 +52,7 @@ pub enum BedrockStatus {
     Finalized,
 }
 
-#[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,
