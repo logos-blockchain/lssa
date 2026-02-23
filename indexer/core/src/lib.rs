@@ -24,6 +24,20 @@ pub struct IndexerCore {
     pub store: IndexerStore,
 }
 
+#[derive(Clone)]
+/// This struct represents one L1 block data fetched from backfilling
+pub struct BackfillBlockData {
+    l2_blocks: Vec<Block>,
+    l1_header: HeaderId,
+}
+
+#[derive(Clone)]
+/// This struct represents data fetched fom backfilling in one iteration
+pub struct BackfillData {
+    block_data: VecDeque<BackfillBlockData>,
+    curr_fin_l1_lib_header: HeaderId,
+}
+
 impl IndexerCore {
     pub fn new(config: IndexerConfig) -> Result<Self> {
         let hashable_data = HashableBlockData {
@@ -100,9 +114,15 @@ impl IndexerCore {
                     info!("Last l1 lib header not found in DB");
                     info!("Searching for the start of a channel");
 
-                    let (start_buff, last_l1_lib_header) = self.search_for_channel_start().await?;
+                    let BackfillData {
+                        block_data: start_buff,
+                        curr_fin_l1_lib_header: last_l1_lib_header,
+                    } = self.search_for_channel_start().await?;
 
-                    for (l2_block_vec, l1_header) in start_buff {
+                    for BackfillBlockData {
+                        l2_blocks: l2_block_vec,
+                        l1_header,
+                    } in start_buff {
                         for l2_block in l2_block_vec {
                             self.store.put_block(l2_block.clone(), l1_header)?;
 
@@ -119,14 +139,20 @@ impl IndexerCore {
             info!("Starting backfilling from {prev_last_l1_lib_header}");
 
             loop {
-                let (buff, curr_last_l1_lib_header) = self
-                        .backfill_to_last_l1_lib_header_id(prev_last_l1_lib_header, &self.config.channel_id)
-                        .await
-                        .inspect_err(|err| error!("Failed to backfill to last l1 lib header id with err {err:#?}"))?;
+                let BackfillData {
+                    block_data: buff,
+                    curr_fin_l1_lib_header,
+                } = self
+                    .backfill_to_last_l1_lib_header_id(prev_last_l1_lib_header, &self.config.channel_id)
+                    .await
+                    .inspect_err(|err| error!("Failed to backfill to last l1 lib header id with err {err:#?}"))?;
 
-                prev_last_l1_lib_header = curr_last_l1_lib_header;
+                prev_last_l1_lib_header = curr_fin_l1_lib_header;
 
-                for (l2_block_vec, header) in buff {
+                for BackfillBlockData {
+                    l2_blocks: l2_block_vec,
+                    l1_header: header,
+                } in buff {
                     for l2_block in l2_block_vec {
                         self.store.put_block(l2_block.clone(), header)?;
 
@@ -161,9 +187,7 @@ impl IndexerCore {
 
     /// WARNING: depending on channel state,
     /// may take indefinite amount of time
-    pub async fn search_for_channel_start(
-        &self,
-    ) -> Result<(VecDeque<(Vec<Block>, HeaderId)>, HeaderId)> {
+    pub async fn search_for_channel_start(&self) -> Result<BackfillData> {
         let mut curr_last_l1_lib_header = self.get_lib().await?;
         let mut backfill_start = curr_last_l1_lib_header;
         // ToDo: How to get root?
@@ -206,7 +230,10 @@ impl IndexerCore {
                 info!("Parsed {} L2 blocks", l2_block_vec.len());
 
                 if !l2_block_vec.is_empty() {
-                    block_buffer.push_front((l2_block_vec.clone(), l1_header));
+                    block_buffer.push_front(BackfillBlockData {
+                        l2_blocks: l2_block_vec.clone(),
+                        l1_header,
+                    });
                 }
 
                 if let Some(first_l2_block) = l2_block_vec.first() {
@@ -234,14 +261,17 @@ impl IndexerCore {
             backfill_start = curr_last_l1_lib_header;
         }
 
-        Ok((block_buffer, backfill_limit))
+        Ok(BackfillData {
+            block_data: block_buffer,
+            curr_fin_l1_lib_header: backfill_limit,
+        })
     }
 
     pub async fn backfill_to_last_l1_lib_header_id(
         &self,
         last_fin_l1_lib_header: HeaderId,
         channel_id: &ChannelId,
-    ) -> Result<(VecDeque<(Vec<Block>, HeaderId)>, HeaderId)> {
+    ) -> Result<BackfillData> {
         let curr_fin_l1_lib_header = self.get_next_lib(last_fin_l1_lib_header).await?;
         // ToDo: Not scalable, buffer should be stored in DB to not run out of memory
         // Don't want to complicate DB even more right now.
@@ -271,11 +301,17 @@ impl IndexerCore {
             info!("Parsed {} L2 blocks", l2_block_vec.len());
 
             if !l2_block_vec.is_empty() {
-                block_buffer.push_front((l2_block_vec, l1_header));
+                block_buffer.push_front(BackfillBlockData {
+                    l2_blocks: l2_block_vec,
+                    l1_header,
+                });
             }
         }
 
-        Ok((block_buffer, curr_fin_l1_lib_header))
+        Ok(BackfillData {
+            block_data: block_buffer,
+            curr_fin_l1_lib_header,
+        })
     }
 }
 
