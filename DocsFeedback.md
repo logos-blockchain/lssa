@@ -23,7 +23,7 @@ I approached this as a Web3 developer with very little Rust & Solana experience.
 
 While reading, I was often missing clickable links to resources, repos, folders, etc. There were many opportunities to delegate documentation work to other resources - ie, if the system is based on the account model, linking back to the Solana documentation, an actively maintained resource, is a great way to offload work and help developers onboard.
 
-Furthermore, whenever new concepts/terminology is introduced, linking to a resource is a great way to help the user not feel confused or question themselves if they should know about the term already. For example, the `witness` was introduced without any explanation or further link.
+Furthermore, whenever new concepts/terminology is introduced, linking to a resource is a great way to help the user not feel confused or question themselves if they should know about the term already. It helps helps prevent confusion and self-doubt (`should I already know this?`). For instance, the concept of a `witness` was introduced without explanation or reference.
 
 We could:
 
@@ -92,6 +92,7 @@ Ideally, I would move docs into a separate folder, and partition them as follows
 ### Deploying & interacting with NSSA programs
 
 This is the culmination of the items above. The user now has a properly set-up environment, knows the basics, has the right tools installed and running, and is now ready to start deploying and using the programs on a live chain. Now:
+
 - Jump into practical code examples, going from the simplest, to slowly introducing concepts talked about in the previous section (Core Concepts & Programs)
 
 During the initial examples, almost every code line should be commented, while assuming the reader does not have any pre-existing knowledge on the tech - primarily about the stack, but maybe even some light Rust syntax help could benefit the reader.
@@ -125,8 +126,8 @@ This process was tedious and impractical, due to multiple steps that almost alwa
 
 ## 6. Final Thoughts
 
-Currently, the documentation seems like it's more oriented towards existing contributors that understand core concepts than to newcomers. This is understandable as the project is in an early phase, but creating easy to follow documentation will enable easier onboarding, potentially attracting more and more open-source contributors which could accelerate project development. 
+Currently, the documentation seems like it's more oriented towards existing contributors that understand core concepts than to newcomers. This is understandable as the project is in an early phase, but creating easy to follow documentation will enable easier onboarding, potentially attracting more and more open-source contributors which could accelerate project development.
 
-If we're looking to expand the contributor base, some sort of online community should be created so people can reach out with beginner questions, apart from GitHub itself. I had the privilege of being in a Signal group with the engineers behind the project, but most newcomers probably do not, which is a drawback. 
+If we're looking to expand the contributor base, some sort of online community should be created so people can reach out with beginner questions, apart from GitHub itself. I had the privilege of being in a Signal group with the engineers behind the project, but most newcomers probably do not, which is a drawback.
 
 Creating video content on the core concepts & development & setting up short, weekly office hours could greatly benefit the project.
