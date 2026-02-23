@@ -1,11 +1,11 @@
-
 use nssa_core::{
     account::{Account, AccountWithMetadata},
     program::{AccountPostState, ProgramInput, read_nssa_inputs, write_nssa_outputs},
 };
 
-// This is a small marketplace-like program where a user can list items and someone can buy them
-// Currently the "item" listed has the following structure:
+// This is a small marketplace-like program where a user can list items and another user can buy them
+// Currently the "item" listed has the following data structure:
+// 64 bytes:
 // [0..16]   price: u128
 // [16..48]  seller: [u8;32]
 // [48..64]  unique_string > making the item "unique"
@@ -198,10 +198,11 @@ fn main() {
             list_item(item.clone(), seller.clone(), price, unique_string)
         }
 
-        // not fully implemented yet
+        // not fully functioning yet
         // Buy item: expects [buyer, item, escrow]
         ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
 
+        // not fully functioning yet
         // Withdraw escrow: expects [seller, escrow]
         ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
         _ => panic!("Transaction response: {:#?}", pre_states), // for debugging

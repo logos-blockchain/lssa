@@ -22,7 +22,7 @@ use wallet::WalletCore;
 // Example:
 //   cargo run --bin run_marketplace_list \
 //      methods/guest/target/riscv32im-risc0-zkvm-elf/docker/marketplace.bin \
-//      Ds8q5PjLcKwwV97Zi7duhRVF9uwA2PuYMoLL7FwCzsXE
+//      itemaccID selleraccID
 
 type Instruction = (u8, Vec<u8>);
 const LIST_FUNC_ID: u8 = 0;
