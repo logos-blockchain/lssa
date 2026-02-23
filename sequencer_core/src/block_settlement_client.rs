@@ -99,11 +99,7 @@ impl BlockSettlementClientTrait for BlockSettlementClient {
             Some(Op::ChannelInscribe(inscribe)) => (inscribe.parent, inscribe.id()),
             _ => panic!("Expected ChannelInscribe op"),
         };
-        log::info!(">>>>>>>>>>>>>>>>>>>>>>");
-        log::info!("Posted block to Bedrock");
-        log::info!(">>>>>> parent id: {parent_id:?}");
-        log::info!(">>>>>> msg id: {msg_id:?}");
-        log::info!(">>>>>>>>>>>>>>>>>>>>>>");
+        log::info!("Posted block to Bedrock with parent id {parent_id:?} and msg id: {msg_id:?}");
         self.bedrock_client
             .post_transaction(tx)
             .await

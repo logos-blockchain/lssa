@@ -20,7 +20,7 @@ use common::{
             SendTxResponse,
         },
     },
-    transaction::{NSSATransaction, transaction_pre_check},
+    transaction::NSSATransaction,
 };
 use itertools::Itertools as _;
 use log::warn;
@@ -94,8 +94,9 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         let tx = borsh::from_slice::<NSSATransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = tx.hash();
 
-        let authenticated_tx =
-            transaction_pre_check(tx).inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
+        let authenticated_tx = tx
+            .transaction_stateless_check()
+            .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         // TODO: Do we need a timeout here? It will be usable if we have too many transactions to
         // process

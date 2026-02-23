@@ -351,9 +351,8 @@ mod tests {
     use base58::ToBase58;
     use bedrock_client::BackoffConfig;
     use common::{
-        block::AccountInitialData,
-        test_utils::sequencer_sign_key_for_testing,
-        transaction::{NSSATransaction, transaction_pre_check},
+        block::AccountInitialData, test_utils::sequencer_sign_key_for_testing,
+        transaction::NSSATransaction,
     };
     use logos_blockchain_core::mantle::ops::channel::ChannelId;
     use mempool::MemPoolHandle;
@@ -515,7 +514,7 @@ mod tests {
     #[test]
     fn test_transaction_pre_check_pass() {
         let tx = common::test_utils::produce_dummy_empty_transaction();
-        let result = transaction_pre_check(tx);
+        let result = tx.transaction_stateless_check();
 
         assert!(result.is_ok());
     }
@@ -532,7 +531,7 @@ mod tests {
         let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key1,
         );
-        let result = transaction_pre_check(tx);
+        let result = tx.transaction_stateless_check();
 
         assert!(result.is_ok());
     }
@@ -551,7 +550,7 @@ mod tests {
         );
 
         // Signature is valid, stateless check pass
-        let tx = transaction_pre_check(tx).unwrap();
+        let tx = tx.transaction_stateless_check().unwrap();
 
         // Signature is not from sender. Execution fails
         let result = sequencer.execute_check_transaction_on_state(tx);
@@ -575,7 +574,7 @@ mod tests {
             acc1, 0, acc2, 10000000, sign_key1,
         );
 
-        let result = transaction_pre_check(tx);
+        let result = tx.transaction_stateless_check();
 
         // Passed pre-check
         assert!(result.is_ok());

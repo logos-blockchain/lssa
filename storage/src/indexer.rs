@@ -1,9 +1,6 @@
 use std::{collections::HashMap, ops::Div, path::Path, sync::Arc};
 
-use common::{
-    block::Block,
-    transaction::{NSSATransaction, execute_check_transaction_on_state, transaction_pre_check},
-};
+use common::{block::Block, transaction::NSSATransaction};
 use nssa::V02State;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options, WriteBatch,
@@ -652,19 +649,19 @@ impl RocksDBIO {
                 let block = self.get_block(id)?;
 
                 for transaction in block.body.transactions {
-                    execute_check_transaction_on_state(
-                        &mut breakpoint,
-                        transaction_pre_check(transaction).map_err(|err| {
+                    transaction
+                        .transaction_stateless_check()
+                        .map_err(|err| {
                             DbError::db_interaction_error(format!(
                                 "transaction pre check failed with err {err:?}"
                             ))
-                        })?,
-                    )
-                    .map_err(|err| {
-                        DbError::db_interaction_error(format!(
-                            "transaction execution failed with err {err:?}"
-                        ))
-                    })?;
+                        })?
+                        .execute_check_on_state(&mut breakpoint)
+                        .map_err(|err| {
+                            DbError::db_interaction_error(format!(
+                                "transaction execution failed with err {err:?}"
+                            ))
+                        })?;
                 }
             }
 
