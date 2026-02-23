@@ -105,7 +105,9 @@ impl TestContext {
 
         let mut compose = DockerCompose::with_auto_client(&[bedrock_compose_path])
             .await
-            .context("Failed to setup docker compose for Bedrock")?;
+            .context("Failed to setup docker compose for Bedrock")?
+            // Setting port to 0 to avoid conflicts between parallel tests, actual port will be retrieved after container is up
+            .with_env("PORT", "0");
 
         async fn up_and_retrieve_port(compose: &mut DockerCompose) -> Result<u16> {
             compose
