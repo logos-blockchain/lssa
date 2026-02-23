@@ -201,7 +201,7 @@ fn main() {
         // Buy item: expects [buyer, item, escrow]
         ([buyer, item, escrow], BUY_ITEM) => buy_item(buyer.clone(), item.clone(), escrow.clone()),
 
-        // // Withdraw escrow: expects [seller, escrow]
+        // Withdraw escrow: expects [seller, escrow]
         ([seller, escrow], WITHDRAW_ESCROW) => withdraw_from_escrow(seller.clone(), escrow.clone()),
         _ => panic!("Transaction response: {:#?}", pre_states), // for debugging
     };
