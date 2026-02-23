@@ -35,6 +35,11 @@ RUN strip /indexer_service/target/release/indexer_service
 # Runtime stage - minimal image
 FROM debian:trixie-slim
 
+# Install runtime dependencies
+RUN apt-get update \
+ && apt-get install -y gosu jq \
+ && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user for security
 RUN useradd -m -u 1000 -s /bin/bash indexer_service_user && \
     mkdir -p /indexer_service /etc/indexer_service && \
