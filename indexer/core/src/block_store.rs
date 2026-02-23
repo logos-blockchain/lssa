@@ -1,10 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
-use common::{
-    block::Block,
-    transaction::{NSSATransaction, execute_check_transaction_on_state, transaction_pre_check},
-};
+use common::{block::Block, transaction::NSSATransaction};
 use nssa::{Account, AccountId, V02State};
 use storage::indexer::RocksDBIO;
 
@@ -99,10 +96,10 @@ impl IndexerStore {
         let mut final_state = self.dbio.final_state()?;
 
         for transaction in &block.body.transactions {
-            execute_check_transaction_on_state(
-                &mut final_state,
-                transaction_pre_check(transaction.clone())?,
-            )?;
+            transaction
+                .clone()
+                .transaction_stateless_check()?
+                .execute_check_on_state(&mut final_state)?;
         }
 
         Ok(self.dbio.put_block(block)?)
