@@ -99,7 +99,7 @@ pub enum TxKind {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, thiserror::Error)]
 pub enum TransactionMalformationError {
-    #[error("Invalid signature(s)")]
+    #[error("Invalid signature(-s)")]
     InvalidSignature,
     #[error("Failed to decode transaction with hash: {tx:?}")]
     FailedToDecode { tx: HashType },

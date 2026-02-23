@@ -1,11 +1,11 @@
 #!/bin/sh
 
-# This is an entrypoint script for the sequencer_runner Docker container,
+# This is an entrypoint script for the indexer_service Docker container,
 # it's not meant to be executed outside of the container.
 
 set -e
 
-CONFIG="/etc/sequencer_runner/sequencer_config.json"
+CONFIG="/etc/indexer_service/indexer_service.json"
 
 # Check config file exists
 if [ ! -f "$CONFIG" ]; then
@@ -24,6 +24,6 @@ fi
 # Give permissions to the data directory and switch to non-root user
 if [ "$(id -u)" = "0" ]; then
   mkdir -p "$HOME_DIR"
-  chown -R sequencer_user:sequencer_user "$HOME_DIR"
-  exec gosu sequencer_user "$@"
+  chown -R indexer_service_user:indexer_service_user "$HOME_DIR"
+  exec gosu indexer_service_user "$@"
 fi

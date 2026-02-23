@@ -278,5 +278,5 @@ pub fn not_yet_implemented_error() -> ErrorObjectOwned {
 }
 
 fn db_error(err: anyhow::Error) -> ErrorObjectOwned {
-    ErrorObjectOwned::owned(-32001, "DBError".to_string(), Some(format!("{err:#?}")))
+    ErrorObjectOwned::owned(ErrorCode::InternalError.code(), "DBError".to_string(), Some(format!("{err:#?}")))
 }
