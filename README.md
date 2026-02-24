@@ -157,7 +157,7 @@ The sequencer and logos blockchain node can be run locally:
 ### Notes on cleanup
 
 After stopping services above you need to remove 3 folders to start cleanly:
- 1. In the `logos-blockchain/logos-blockchain` folder `db` (not needed in case of docker setup)
+ 1. In the `logos-blockchain/logos-blockchain` folder `state` (not needed in case of docker setup)
  2. In the `lssa` folder `sequencer_runner/rocksdb`
  3. In the `lssa` file `sequencer_runner/bedrock_signing_key`
  4. In the `lssa` folder `indexer/service/rocksdb`
