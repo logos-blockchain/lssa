@@ -16,7 +16,7 @@ use crate::{
 
 pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
@@ -64,6 +64,7 @@ impl CommitmentSet {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+#[derive(Clone)]
 struct NullifierSet(BTreeSet<Nullifier>);
 
 impl NullifierSet {
@@ -104,7 +105,7 @@ impl BorshDeserialize for NullifierSet {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct V02State {
     public_state: HashMap<AccountId, Account>,

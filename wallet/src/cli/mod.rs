@@ -173,7 +173,7 @@ pub async fn execute_subcommand(
                 .sequencer_client
                 .send_tx_program(transaction)
                 .await
-                .context("Transaction submission error");
+                .context("Transaction submission error")?;
 
             SubcommandReturnValue::Empty
         }

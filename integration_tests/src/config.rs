@@ -1,6 +1,7 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use anyhow::{Context, Result};
+use bytesize::ByteSize;
 use common::block::{AccountInitialData, CommitmentsInitialData};
 use indexer_service::{BackoffConfig, ChannelId, ClientConfig, IndexerConfig};
 use key_protocol::key_management::KeyChain;
@@ -39,6 +40,7 @@ pub fn indexer_config(
 /// Sequencer config options available for custom changes in integration tests.
 pub struct SequencerPartialConfig {
     pub max_num_tx_in_block: usize,
+    pub max_block_size: ByteSize,
     pub mempool_max_size: usize,
     pub block_create_timeout_millis: u64,
 }
@@ -47,6 +49,7 @@ impl Default for SequencerPartialConfig {
     fn default() -> Self {
         Self {
             max_num_tx_in_block: 20,
+            max_block_size: ByteSize::mib(1),
             mempool_max_size: 10_000,
             block_create_timeout_millis: 10_000,
         }
@@ -62,6 +65,7 @@ pub fn sequencer_config(
 ) -> Result<SequencerConfig> {
     let SequencerPartialConfig {
         max_num_tx_in_block,
+        max_block_size,
         mempool_max_size,
         block_create_timeout_millis,
     } = partial;
@@ -72,6 +76,7 @@ pub fn sequencer_config(
         genesis_id: 1,
         is_genesis_random: true,
         max_num_tx_in_block,
+        max_block_size,
         mempool_max_size,
         block_create_timeout_millis,
         retry_pending_blocks_timeout_millis: 120_000,

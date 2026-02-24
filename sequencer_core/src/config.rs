@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Result;
 use bedrock_client::BackoffConfig;
+use bytesize::ByteSize;
 use common::{
     block::{AccountInitialData, CommitmentsInitialData},
     config::BasicAuth,
@@ -27,6 +28,9 @@ pub struct SequencerConfig {
     pub is_genesis_random: bool,
     /// Maximum number of transactions in block
     pub max_num_tx_in_block: usize,
+    /// Maximum block size (includes header and transactions)
+    #[serde(default = "default_max_block_size")]
+    pub max_block_size: ByteSize,
     /// Mempool maximum size
     pub mempool_max_size: usize,
     /// Interval in which blocks produced
@@ -67,4 +71,8 @@ impl SequencerConfig {
 
         Ok(serde_json::from_reader(reader)?)
     }
+}
+
+fn default_max_block_size() -> ByteSize {
+    ByteSize::mib(1)
 }

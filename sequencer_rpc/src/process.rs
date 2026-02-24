@@ -94,6 +94,27 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         let tx = borsh::from_slice::<NSSATransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = tx.hash();
 
+        // Check transaction size against block size limit
+        // Reserve ~200 bytes for block header overhead
+        const BLOCK_HEADER_OVERHEAD: usize = 200;
+        let tx_size = borsh::to_vec(&tx)
+            .map_err(
+                |_| sequencer_core::TransactionMalformationError::FailedToDecode { tx: tx_hash },
+            )?
+            .len();
+
+        let max_tx_size = self.max_block_size.saturating_sub(BLOCK_HEADER_OVERHEAD);
+
+        if tx_size > max_tx_size {
+            return Err(
+                sequencer_core::TransactionMalformationError::TransactionTooLarge {
+                    size: tx_size,
+                    max: max_tx_size,
+                }
+                .into(),
+            );
+        }
+
         let authenticated_tx = tx
             .transaction_stateless_check()
             .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
@@ -377,6 +398,7 @@ mod tests {
             genesis_id: 1,
             is_genesis_random: false,
             max_num_tx_in_block: 10,
+            max_block_size: bytesize::ByteSize::mib(1),
             mempool_max_size: 1000,
             block_create_timeout_millis: 1000,
             port: 8080,
@@ -437,12 +459,14 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap();
 
+        let max_block_size = sequencer_core.sequencer_config().max_block_size.as_u64() as usize;
         let sequencer_core = Arc::new(Mutex::new(sequencer_core));
 
         (
             JsonHandlerWithMockClients {
                 sequencer_state: sequencer_core,
                 mempool_handle,
+                max_block_size,
             },
             initial_accounts,
             tx,

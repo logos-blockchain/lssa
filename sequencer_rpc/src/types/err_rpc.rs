@@ -44,10 +44,7 @@ impl RpcErrKind for RpcErrInternal {
 
 impl RpcErrKind for TransactionMalformationError {
     fn into_rpc_err(self) -> RpcError {
-        RpcError::new_internal_error(
-            Some(serde_json::to_value(self).unwrap()),
-            "transaction not accepted",
-        )
+        RpcError::invalid_params(Some(serde_json::to_value(self).unwrap()))
     }
 }
 

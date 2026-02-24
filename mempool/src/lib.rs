@@ -2,19 +2,30 @@ use tokio::sync::mpsc::{Receiver, Sender};
 
 pub struct MemPool<T> {
     receiver: Receiver<T>,
+    front_buffer: Vec<T>,
 }
 
 impl<T> MemPool<T> {
     pub fn new(max_size: usize) -> (Self, MemPoolHandle<T>) {
         let (sender, receiver) = tokio::sync::mpsc::channel(max_size);
 
-        let mem_pool = Self { receiver };
+        let mem_pool = Self {
+            receiver,
+            front_buffer: Vec::new(),
+        };
         let sender = MemPoolHandle::new(sender);
         (mem_pool, sender)
     }
 
     pub fn pop(&mut self) -> Option<T> {
         use tokio::sync::mpsc::error::TryRecvError;
+
+        // First check if there are any items in the front buffer (LIFO)
+        if let Some(item) = self.front_buffer.pop() {
+            return Some(item);
+        }
+
+        // Otherwise, try to receive from the channel (FIFO)
 
         match self.receiver.try_recv() {
             Ok(item) => Some(item),
@@ -23,6 +34,11 @@ impl<T> MemPool<T> {
                 panic!("Mempool senders disconnected, cannot receive items, this is a bug")
             }
         }
+    }
+
+    /// Push an item to the front of the mempool (will be popped first)
+    pub fn push_front(&mut self, item: T) {
+        self.front_buffer.push(item);
     }
 }
 
@@ -95,5 +111,25 @@ mod tests {
         // For now, just verify we can pop items
         assert_eq!(pool.pop(), Some(1));
         assert_eq!(pool.pop(), Some(2));
+    }
+
+    #[test]
+    async fn test_push_front() {
+        let (mut pool, handle) = MemPool::new(10);
+
+        handle.push(1).await.unwrap();
+        handle.push(2).await.unwrap();
+
+        // Push items to the front - these should be popped first
+        pool.push_front(10);
+        pool.push_front(20);
+
+        // Items pushed to front are popped in LIFO order
+        assert_eq!(pool.pop(), Some(20));
+        assert_eq!(pool.pop(), Some(10));
+        // Original items are then popped in FIFO order
+        assert_eq!(pool.pop(), Some(1));
+        assert_eq!(pool.pop(), Some(2));
+        assert_eq!(pool.pop(), None);
     }
 }

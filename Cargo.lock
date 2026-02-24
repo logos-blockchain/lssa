@@ -1489,6 +1489,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bd91ee7b2422bcb158d90ef4d14f75ef67f340943fc4149891dcce8f8b972a3"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "bytestring"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1743,6 +1752,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "borsh",
+ "bytesize",
  "hex",
  "log",
  "logos-blockchain-common-http-client",
@@ -3835,6 +3845,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "borsh",
+ "bytesize",
  "common",
  "env_logger",
  "futures",
@@ -7430,6 +7441,7 @@ dependencies = [
  "base58",
  "bedrock_client",
  "borsh",
+ "bytesize",
  "chrono",
  "common",
  "futures",
@@ -7460,6 +7472,7 @@ dependencies = [
  "base64 0.22.1",
  "bedrock_client",
  "borsh",
+ "bytesize",
  "common",
  "futures",
  "hex",

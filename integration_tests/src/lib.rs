@@ -21,6 +21,7 @@ pub mod config;
 // TODO: Remove this and control time from tests
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &str = "data_changer.bin";
+pub const NSSA_PROGRAM_FOR_TEST_NOOP: &str = "noop.bin";
 
 const BEDROCK_SERVICE_WITH_OPEN_PORT: &str = "logos-blockchain-node-0";
 const BEDROCK_SERVICE_PORT: u16 = 18080;

@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use bytesize::ByteSize;
 use integration_tests::{
     TestContext,
     config::{InitialData, SequencerPartialConfig},
@@ -178,6 +179,7 @@ impl TpsTestManager {
     fn generate_sequencer_partial_config() -> SequencerPartialConfig {
         SequencerPartialConfig {
             max_num_tx_in_block: 300,
+            max_block_size: ByteSize::mb(500),
             mempool_max_size: 10_000,
             block_create_timeout_millis: 12_000,
         }

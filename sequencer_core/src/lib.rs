@@ -48,6 +48,7 @@ pub struct SequencerCore<
 pub enum TransactionMalformationError {
     InvalidSignature,
     FailedToDecode { tx: HashType },
+    TransactionTooLarge { size: usize, max: usize },
 }
 
 impl Display for TransactionMalformationError {
@@ -204,12 +205,48 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
 
         let mut valid_transactions = vec![];
 
+        let max_block_size = self.sequencer_config.max_block_size.as_u64() as usize;
+
+        let latest_block_meta = self
+            .store
+            .latest_block_meta()
+            .context("Failed to get latest block meta from store")?;
+
+        let curr_time = chrono::Utc::now().timestamp_millis() as u64;
+
         while let Some(tx) = self.mempool.pop() {
             let tx_hash = tx.hash();
+
+            // Check if block size exceeds limit
+            let temp_valid_transactions =
+                [valid_transactions.as_slice(), std::slice::from_ref(&tx)].concat();
+            let temp_hashable_data = HashableBlockData {
+                block_id: new_block_height,
+                transactions: temp_valid_transactions,
+                prev_block_hash: latest_block_meta.hash,
+                timestamp: curr_time,
+            };
+
+            let block_size = borsh::to_vec(&temp_hashable_data)
+                .context("Failed to serialize block for size check")?
+                .len();
+
+            if block_size > max_block_size {
+                // Block would exceed size limit, remove last transaction and push back
+                warn!(
+                    "Transaction with hash {tx_hash} deferred to next block: \
+                     block size {block_size} bytes would exceed limit of {max_block_size} bytes",
+                );
+
+                self.mempool.push_front(tx);
+                break;
+            }
+
             match self.execute_check_transaction_on_state(tx) {
                 Ok(valid_tx) => {
-                    info!("Validated transaction with hash {tx_hash}, including it in block",);
                     valid_transactions.push(valid_tx);
+
+                    info!("Validated transaction with hash {tx_hash}, including it in block");
 
                     if valid_transactions.len() >= self.sequencer_config.max_num_tx_in_block {
                         break;
@@ -223,13 +260,6 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
                 }
             }
         }
-
-        let latest_block_meta = self
-            .store
-            .latest_block_meta()
-            .context("Failed to get latest block meta from store")?;
-
-        let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
@@ -375,6 +405,7 @@ mod tests {
             genesis_id: 1,
             is_genesis_random: false,
             max_num_tx_in_block: 10,
+            max_block_size: bytesize::ByteSize::mib(1),
             mempool_max_size: 10000,
             block_create_timeout_millis: 1000,
             port: 8080,

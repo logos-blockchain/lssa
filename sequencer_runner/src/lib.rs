@@ -114,7 +114,8 @@ pub async fn startup_sequencer(app_config: SequencerConfig) -> Result<SequencerH
         RpcConfig::with_port(port),
         Arc::clone(&seq_core_wrapped),
         mempool_handle,
-    )?;
+    )
+    .await?;
     info!("HTTP server started");
     let http_server_handle = http_server.handle();
     tokio::spawn(http_server);
