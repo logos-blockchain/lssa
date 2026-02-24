@@ -1,4 +1,4 @@
-#![cfg(all(test, feature = "test-utils"))]
+#![cfg(all(test, feature = "with-nssa"))]
 
 use amm_core::PoolDefinition;
 use nssa::{Account, AccountId, Data, PrivateKey, PublicKey, PublicTransaction, V02State, program::Program, public_transaction};

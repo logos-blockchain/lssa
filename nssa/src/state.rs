@@ -306,7 +306,7 @@ impl V02State {
     }
 }
 
-    #[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 impl V02State {
             pub fn force_insert_account(&mut self, account_id: AccountId, account: Account) {
             self.public_state.insert(account_id, account);
@@ -317,9 +317,6 @@ impl V02State {
 pub mod tests {
 
     use std::collections::HashMap;
-
-    use token_core::{TokenDefinition, TokenHolding};
-
     use nssa_core::{
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
         account::{Account, AccountId, AccountWithMetadata, Nonce, data::Data},
