@@ -221,7 +221,7 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
 
             account_ids
                 .into_iter()
-                .map(|account_id| state.state().get_account_by_id(account_id).nonce)
+                .map(|account_id| state.state().get_account_by_id(account_id).nonce.0)
                 .collect()
         };
 

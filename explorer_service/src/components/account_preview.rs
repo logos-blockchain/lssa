@@ -31,7 +31,7 @@ pub fn AccountPreview(account_id: AccountId, account: Account) -> impl IntoView 
                             </div>
                             <div class="account-field">
                                 <span class="field-label">"Nonce: "</span>
-                                <span class="field-value">{nonce.to_string()}</span>
+                                <span class="field-value">{nonce.0.to_string()}</span>
                             </div>
                             <div class="account-field">
                                 <span class="field-label">"Data: "</span>

@@ -23,7 +23,7 @@ impl Account {
             bytes.extend_from_slice(&word.to_le_bytes());
         }
         bytes.extend_from_slice(&self.balance.to_le_bytes());
-        bytes.extend_from_slice(&self.nonce.to_le_bytes());
+        bytes.extend_from_slice(&self.nonce.0.to_le_bytes());
         let data_length: u32 = self.data.len() as u32;
         bytes.extend_from_slice(&data_length.to_le_bytes());
         bytes.extend_from_slice(self.data.as_ref());
@@ -32,7 +32,7 @@ impl Account {
 
     #[cfg(feature = "host")]
     pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
-        use crate::account::data::Data;
+        use crate::account::{Nonce, data::Data};
 
         let mut u32_bytes = [0u8; 4];
         let mut u128_bytes = [0u8; 16];
@@ -50,7 +50,7 @@ impl Account {
 
         // nonce
         cursor.read_exact(&mut u128_bytes)?;
-        let nonce = u128::from_le_bytes(u128_bytes);
+        let nonce = Nonce(u128::from_le_bytes(u128_bytes));
 
         // data
         let data = Data::from_cursor(cursor)?;
@@ -161,13 +161,14 @@ impl AccountId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::account::Nonce;
 
     #[test]
     fn test_enconding() {
         let account = Account {
             program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
             balance: 123456789012345678901234567890123456,
-            nonce: 42,
+            nonce: Nonce(42),
             data: b"hola mundo".to_vec().try_into().unwrap(),
         };
 
@@ -225,10 +226,12 @@ mod tests {
     #[cfg(feature = "host")]
     #[test]
     fn test_account_to_bytes_roundtrip() {
+        use crate::account::Nonce;
+
         let account = Account {
             program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
             balance: 123456789012345678901234567890123456,
-            nonce: 42,
+            nonce: Nonce(42),
             data: b"hola mundo".to_vec().try_into().unwrap(),
         };
         let bytes = account.to_bytes();

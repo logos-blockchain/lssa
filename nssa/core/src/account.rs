@@ -3,14 +3,52 @@ use std::{fmt::Display, str::FromStr};
 use base58::{FromBase58, ToBase58};
 use borsh::{BorshDeserialize, BorshSerialize};
 pub use data::Data;
+use risc0_zkvm::sha::{Impl, Sha256};
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
-use crate::program::ProgramId;
+use crate::{NullifierPublicKey, NullifierSecretKey, program::ProgramId};
 
 pub mod data;
 
-pub type Nonce = u128;
+#[derive(
+    Copy,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    BorshDeserialize,
+    BorshSerialize,
+)]
+pub struct Nonce(pub u128);
+
+impl Nonce {
+    pub fn public_account_nonce_increment(mut self) {
+        self.0 += 1;
+    }
+
+    pub fn private_account_nonce_init(self, npk: &NullifierPublicKey) -> Nonce {
+        let mut bytes: [u8; 64] = [0u8; 64];
+        bytes[..32].copy_from_slice(&npk.0);
+        let result: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        let result = result.first_chunk::<16>().unwrap();
+
+        Nonce(u128::from_le_bytes(*result))
+    }
+
+    pub fn private_account_nonce_increment(self, nsk: &NullifierSecretKey) -> Nonce {
+        let mut bytes: [u8; 64] = [0u8; 64];
+        bytes[..32].copy_from_slice(nsk);
+        bytes[32..48].copy_from_slice(&self.0.to_le_bytes());
+        let result: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        let result = result.first_chunk::<16>().unwrap();
+
+        Nonce(u128::from_le_bytes(*result))
+    }
+}
 
 /// Account to be used both in public and private contexts
 #[derive(
@@ -123,7 +161,7 @@ mod tests {
     fn test_zero_nonce_account_data_creation() {
         let new_acc = Account::default();
 
-        assert_eq!(new_acc.nonce, 0);
+        assert_eq!(new_acc.nonce.0, 0);
     }
 
     #[test]
@@ -150,7 +188,7 @@ mod tests {
                 .to_vec()
                 .try_into()
                 .unwrap(),
-            nonce: 0xdeadbeef,
+            nonce: Nonce(0xdeadbeef),
         };
         let fingerprint = AccountId::new([8; 32]);
         let new_acc_with_metadata = AccountWithMetadata::new(account.clone(), true, fingerprint);
@@ -196,5 +234,22 @@ mod tests {
         let default_account_id = AccountId::default();
         let expected_account_id = AccountId::new([0; 32]);
         assert!(default_account_id == expected_account_id);
+    }
+
+    #[test]
+    fn initialize_private_nonce() {
+        let npk = NullifierPublicKey([42; 32]);
+        let nonce = Nonce::default().private_account_nonce_init(&npk);
+        let expected_nonce = Nonce(37937661125547691021612781941709513486);
+        assert_eq!(nonce, expected_nonce);
+    }
+
+    #[test]
+    fn increment_private_nonce() {
+        let nsk: NullifierSecretKey = [42u8; 32];
+        let nonce =
+            Nonce(37937661125547691021612781941709513486).private_account_nonce_increment(&nsk);
+        let expected_nonce = Nonce(327300903218789900388409116014290259894);
+        assert_eq!(nonce, expected_nonce);
     }
 }
