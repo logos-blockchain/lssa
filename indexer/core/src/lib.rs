@@ -236,21 +236,21 @@ impl IndexerCore {
                     });
                 }
 
-                if let Some(first_l2_block) = l2_block_vec.first() {
-                    if first_l2_block.header.block_id == 1 {
-                        info!("INITIAL_SEARCH: Found channel start");
-                        break 'outer;
-                    }
-                } else {
-                    // Step back to parent
-                    let parent = cycle_block.header().parent();
+                if let Some(first_l2_block) = l2_block_vec.first()
+                    && first_l2_block.header.block_id == 1
+                {
+                    info!("INITIAL_SEARCH: Found channel start");
+                    break 'outer;
+                }
 
-                    if parent == backfill_limit {
-                        break;
-                    }
+                // Step back to parent
+                let parent = cycle_block.header().parent();
 
-                    cycle_header = parent;
-                };
+                if parent == backfill_limit {
+                    break;
+                }
+
+                cycle_header = parent;
             }
 
             info!("INITIAL_SEARCH: Reached backfill limit, refetching last l1 lib header");
