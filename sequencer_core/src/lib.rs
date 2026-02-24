@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::Path, time::Instant};
+use std::{path::Path, time::Instant};
 
 use anyhow::{Context as _, Result, anyhow};
 use bedrock_client::SignedMantleTx;
@@ -13,7 +13,6 @@ use config::SequencerConfig;
 use log::{error, info, warn};
 use logos_blockchain_key_management_system_service::keys::{ED25519_SECRET_KEY_SIZE, Ed25519Key};
 use mempool::{MemPool, MemPoolHandle};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     block_settlement_client::{BlockSettlementClient, BlockSettlementClientTrait, MsgId},
@@ -43,21 +42,6 @@ pub struct SequencerCore<
     block_settlement_client: BC,
     indexer_client: IC,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum TransactionMalformationError {
-    InvalidSignature,
-    FailedToDecode { tx: HashType },
-    TransactionTooLarge { size: usize, max: usize },
-}
-
-impl Display for TransactionMalformationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:#?}")
-    }
-}
-
-impl std::error::Error for TransactionMalformationError {}
 
 impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, IC> {
     /// Starts the sequencer using the provided configuration.
@@ -376,7 +360,7 @@ fn load_or_create_signing_key(path: &Path) -> Result<Ed25519Key> {
 
 #[cfg(all(test, feature = "mock"))]
 mod tests {
-    use std::{pin::pin, str::FromStr as _};
+    use std::{pin::pin, str::FromStr as _, time::Duration};
 
     use base58::ToBase58;
     use bedrock_client::BackoffConfig;
@@ -407,21 +391,21 @@ mod tests {
             max_num_tx_in_block: 10,
             max_block_size: bytesize::ByteSize::mib(1),
             mempool_max_size: 10000,
-            block_create_timeout_millis: 1000,
+            block_create_timeout: Duration::from_secs(1),
             port: 8080,
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
             bedrock_config: BedrockConfig {
                 backoff: BackoffConfig {
-                    start_delay_millis: 100,
+                    start_delay: Duration::from_millis(100),
                     max_retries: 5,
                 },
                 channel_id: ChannelId::from([0; 32]),
                 node_url: "http://not-used-in-unit-tests".parse().unwrap(),
                 auth: None,
             },
-            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            retry_pending_blocks_timeout: Duration::from_secs(60 * 4),
             indexer_rpc_url: "ws://localhost:8779".parse().unwrap(),
         }
     }

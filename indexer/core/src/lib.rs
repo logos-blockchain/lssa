@@ -174,13 +174,10 @@ impl IndexerCore {
                 break Ok(next_lib);
             } else {
                 info!(
-                    "Wait {}ms to not spam the node",
-                    self.config.consensus_info_polling_interval_millis
+                    "Wait {:?} to not spam the node",
+                    self.config.consensus_info_polling_interval
                 );
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    self.config.consensus_info_polling_interval_millis,
-                ))
-                .await;
+                tokio::time::sleep(self.config.consensus_info_polling_interval).await;
             }
         }
     }

@@ -1,9 +1,9 @@
 {
-    "resubscribe_interval_millis": 1000,
+    "resubscribe_interval": "1s",
     "bedrock_client_config": {
         "addr": "http://logos-blockchain-node-0:18080",
         "backoff": {
-            "start_delay_millis": 100,
+            "start_delay": "100ms",
             "max_retries": 5
         }
     },

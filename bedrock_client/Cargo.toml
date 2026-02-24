@@ -13,6 +13,7 @@ tokio-retry.workspace = true
 futures.workspace = true
 log.workspace = true
 serde.workspace = true
+humantime-serde.workspace = true
 logos-blockchain-common-http-client.workspace = true
 logos-blockchain-core.workspace = true
 logos-blockchain-chain-broadcast-service.workspace = true

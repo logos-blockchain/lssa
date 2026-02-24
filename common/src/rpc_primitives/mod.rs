@@ -1,3 +1,4 @@
+use bytesize::ByteSize;
 use serde::{Deserialize, Serialize};
 
 pub mod errors;
@@ -8,13 +9,13 @@ pub mod requests;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RpcLimitsConfig {
     /// Maximum byte size of the json payload.
-    pub json_payload_max_size: usize,
+    pub json_payload_max_size: ByteSize,
 }
 
 impl Default for RpcLimitsConfig {
     fn default() -> Self {
         Self {
-            json_payload_max_size: 10 * 1024 * 1024,
+            json_payload_max_size: ByteSize::mib(10),
         }
     }
 }

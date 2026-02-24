@@ -99,9 +99,8 @@ impl Drop for SequencerHandle {
 }
 
 pub async fn startup_sequencer(app_config: SequencerConfig) -> Result<SequencerHandle> {
-    let block_timeout = Duration::from_millis(app_config.block_create_timeout_millis);
-    let retry_pending_blocks_timeout =
-        Duration::from_millis(app_config.retry_pending_blocks_timeout_millis);
+    let block_timeout = app_config.block_create_timeout;
+    let retry_pending_blocks_timeout = app_config.retry_pending_blocks_timeout;
     let port = app_config.port;
 
     let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config).await;

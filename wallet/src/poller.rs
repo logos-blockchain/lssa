@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use common::{HashType, block::HashableBlockData, sequencer_client::SequencerClient};
@@ -11,8 +11,7 @@ use crate::config::WalletConfig;
 pub struct TxPoller {
     polling_max_blocks_to_query: usize,
     polling_max_error_attempts: u64,
-    // TODO: This should be Duration
-    polling_delay_millis: u64,
+    polling_delay: Duration,
     block_poll_max_amount: u64,
     client: Arc<SequencerClient>,
 }
@@ -20,7 +19,7 @@ pub struct TxPoller {
 impl TxPoller {
     pub fn new(config: WalletConfig, client: Arc<SequencerClient>) -> Self {
         Self {
-            polling_delay_millis: config.seq_poll_timeout_millis,
+            polling_delay: config.seq_poll_timeout,
             polling_max_blocks_to_query: config.seq_tx_poll_max_blocks,
             polling_max_error_attempts: config.seq_poll_max_retries,
             block_poll_max_amount: config.seq_block_poll_max_amount,
@@ -62,7 +61,7 @@ impl TxPoller {
                 return Ok(tx);
             }
 
-            tokio::time::sleep(std::time::Duration::from_millis(self.polling_delay_millis)).await;
+            tokio::time::sleep(self.polling_delay).await;
         }
 
         anyhow::bail!("Transaction not found in preconfigured amount of blocks");

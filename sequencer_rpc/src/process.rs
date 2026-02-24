@@ -20,7 +20,7 @@ use common::{
             SendTxResponse,
         },
     },
-    transaction::NSSATransaction,
+    transaction::{NSSATransaction, TransactionMalformationError},
 };
 use itertools::Itertools as _;
 use log::warn;
@@ -98,21 +98,17 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         // Reserve ~200 bytes for block header overhead
         const BLOCK_HEADER_OVERHEAD: usize = 200;
         let tx_size = borsh::to_vec(&tx)
-            .map_err(
-                |_| sequencer_core::TransactionMalformationError::FailedToDecode { tx: tx_hash },
-            )?
+            .map_err(|_| TransactionMalformationError::FailedToDecode { tx: tx_hash })?
             .len();
 
         let max_tx_size = self.max_block_size.saturating_sub(BLOCK_HEADER_OVERHEAD);
 
         if tx_size > max_tx_size {
-            return Err(
-                sequencer_core::TransactionMalformationError::TransactionTooLarge {
-                    size: tx_size,
-                    max: max_tx_size,
-                }
-                .into(),
-            );
+            return Err(TransactionMalformationError::TransactionTooLarge {
+                size: tx_size,
+                max: max_tx_size,
+            }
+            .into());
         }
 
         let authenticated_tx = tx
@@ -344,7 +340,7 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr as _, sync::Arc};
+    use std::{str::FromStr as _, sync::Arc, time::Duration};
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
@@ -400,15 +396,15 @@ mod tests {
             max_num_tx_in_block: 10,
             max_block_size: bytesize::ByteSize::mib(1),
             mempool_max_size: 1000,
-            block_create_timeout_millis: 1000,
+            block_create_timeout: Duration::from_secs(1),
             port: 8080,
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
-            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            retry_pending_blocks_timeout: Duration::from_secs(60 * 4),
             bedrock_config: BedrockConfig {
                 backoff: BackoffConfig {
-                    start_delay_millis: 100,
+                    start_delay: Duration::from_millis(100),
                     max_retries: 5,
                 },
                 channel_id: [42; 32].into(),

@@ -80,7 +80,10 @@ pub async fn new_http_server(
         App::new()
             .wrap(get_cors(&cors_allowed_origins))
             .app_data(handler.clone())
-            .app_data(web::JsonConfig::default().limit(limits_config.json_payload_max_size))
+            .app_data(
+                web::JsonConfig::default()
+                    .limit(limits_config.json_payload_max_size.as_u64() as usize),
+            )
             .wrap(middleware::Logger::default())
             .service(web::resource("/").route(web::post().to(rpc_handler::<JsonHandler>)))
     })

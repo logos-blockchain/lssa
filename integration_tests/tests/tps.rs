@@ -181,7 +181,7 @@ impl TpsTestManager {
             max_num_tx_in_block: 300,
             max_block_size: ByteSize::mb(500),
             mempool_max_size: 10_000,
-            block_create_timeout_millis: 12_000,
+            block_create_timeout: Duration::from_secs(12),
         }
     }
 }

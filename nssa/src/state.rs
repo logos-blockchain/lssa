@@ -1332,7 +1332,8 @@ pub mod tests {
             AccountId::new([0; 32]),
         );
 
-        let large_data: Vec<u8> = vec![0; nssa_core::account::data::DATA_MAX_LENGTH_IN_BYTES + 1];
+        let large_data: Vec<u8> =
+            vec![0; nssa_core::account::data::DATA_MAX_LENGTH.as_u64() as usize + 1];
 
         let result = execute_and_prove(
             vec![public_account],

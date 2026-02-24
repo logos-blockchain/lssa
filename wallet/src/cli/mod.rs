@@ -191,10 +191,7 @@ pub async fn execute_continuous_run(wallet_core: &mut WalletCore) -> Result<()> 
             .last_block;
         wallet_core.sync_to_block(latest_block_num).await?;
 
-        tokio::time::sleep(std::time::Duration::from_millis(
-            wallet_core.config().seq_poll_timeout_millis,
-        ))
-        .await;
+        tokio::time::sleep(wallet_core.config().seq_poll_timeout).await;
     }
 }
 

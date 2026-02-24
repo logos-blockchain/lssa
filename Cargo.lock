@@ -1210,6 +1210,7 @@ dependencies = [
  "anyhow",
  "common",
  "futures",
+ "humantime-serde",
  "log",
  "logos-blockchain-chain-broadcast-service",
  "logos-blockchain-chain-service",
@@ -3441,6 +3442,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
+name = "humantime-serde"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
+dependencies = [
+ "humantime",
+ "serde",
+]
+
+[[package]]
 name = "hydration_context"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3735,6 +3746,7 @@ dependencies = [
  "borsh",
  "common",
  "futures",
+ "humantime-serde",
  "log",
  "logos-blockchain-core",
  "nssa",
@@ -5573,6 +5585,7 @@ dependencies = [
  "base58",
  "borsh",
  "bytemuck",
+ "bytesize",
  "chacha20",
  "k256",
  "risc0-zkvm",
@@ -7445,6 +7458,7 @@ dependencies = [
  "chrono",
  "common",
  "futures",
+ "humantime-serde",
  "jsonrpsee",
  "log",
  "logos-blockchain-core",
@@ -8981,6 +8995,8 @@ dependencies = [
  "env_logger",
  "futures",
  "hex",
+ "humantime",
+ "humantime-serde",
  "indicatif",
  "itertools 0.14.0",
  "key_protocol",

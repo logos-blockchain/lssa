@@ -2,6 +2,7 @@ use std::{
     fs::File,
     io::BufReader,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -11,6 +12,7 @@ use common::{
     block::{AccountInitialData, CommitmentsInitialData},
     config::BasicAuth,
 };
+use humantime_serde;
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -34,9 +36,11 @@ pub struct SequencerConfig {
     /// Mempool maximum size
     pub mempool_max_size: usize,
     /// Interval in which blocks produced
-    pub block_create_timeout_millis: u64,
+    #[serde(with = "humantime_serde")]
+    pub block_create_timeout: Duration,
     /// Interval in which pending blocks are retried
-    pub retry_pending_blocks_timeout_millis: u64,
+    #[serde(with = "humantime_serde")]
+    pub retry_pending_blocks_timeout: Duration,
     /// Port to listen
     pub port: u16,
     /// List of initial accounts data
