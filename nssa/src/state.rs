@@ -308,15 +308,16 @@ impl V02State {
 
 #[cfg(any(test, feature = "test-utils"))]
 impl V02State {
-            pub fn force_insert_account(&mut self, account_id: AccountId, account: Account) {
-            self.public_state.insert(account_id, account);
-        }
+    pub fn force_insert_account(&mut self, account_id: AccountId, account: Account) {
+        self.public_state.insert(account_id, account);
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
 
     use std::collections::HashMap;
+
     use nssa_core::{
         Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey, SharedSecretKey,
         account::{Account, AccountId, AccountWithMetadata, Nonce, data::Data},
@@ -537,8 +538,6 @@ pub mod tests {
     }
 
     impl V02State {
-
-
         /// Include test programs in the builtin programs map
         pub fn with_test_programs(mut self) -> Self {
             self.insert_program(Program::nonce_changer_program());
