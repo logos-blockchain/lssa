@@ -2721,6 +2721,7 @@ dependencies = [
  "env_logger",
  "indexer_service_protocol",
  "indexer_service_rpc",
+ "itertools 0.14.0",
  "jsonrpsee",
  "leptos",
  "leptos_axum",
@@ -3769,6 +3770,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_with",
+ "sha2",
 ]
 
 [[package]]

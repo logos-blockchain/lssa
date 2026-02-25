@@ -50,6 +50,9 @@ clap = { workspace = true, features = ["derive"], optional = true }
 url = { workspace = true, optional = true }
 env_logger = { workspace = true, optional = true }
 
+# Mandatory server side dependencies
+itertools.workspace = true
+
 [features]
 hydrate = ["leptos/hydrate"]
 ssr = [

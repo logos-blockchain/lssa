@@ -11,7 +11,7 @@ services:
     image: ghcr.io/logos-blockchain/logos-blockchain@sha256:000982e751dfd346ca5346b8025c685fc3abc585079c59cde3bde7fd63100657
     ports:
       # Map 0 port so that multiple instances can run on the same host
-      - "0:18080/tcp"
+      - "8080:18080/tcp"
     volumes:
       - ./scripts:/etc/logos-blockchain/scripts
       - ./kzgrs_test_params:/kzgrs_test_params:z

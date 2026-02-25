@@ -4,6 +4,7 @@ use indexer_service_protocol::{
     HashType, PrivacyPreservingMessage, PrivacyPreservingTransaction, ProgramDeploymentMessage,
     ProgramDeploymentTransaction, PublicMessage, PublicTransaction, Transaction, WitnessSet,
 };
+use itertools::{EitherOrBoth, Itertools};
 use leptos::prelude::*;
 use leptos_router::{components::A, hooks::use_params_map};
 
@@ -65,7 +66,9 @@ pub fn TransactionPage() -> impl IntoView {
                                             </div>
                                         </div>
 
-                                        {match tx {
+                                        {
+                                            let affected_pub_acc_ids = tx.affected_public_account_ids();
+                                            match tx {
                                 Transaction::Public(ptx) => {
                                     let PublicTransaction {
                                         hash: _,
@@ -74,7 +77,7 @@ pub fn TransactionPage() -> impl IntoView {
                                     } = ptx;
                                     let PublicMessage {
                                         program_id,
-                                        account_ids,
+                                        account_ids: _,
                                         nonces,
                                         instruction_data,
                                     } = message;
@@ -113,11 +116,13 @@ pub fn TransactionPage() -> impl IntoView {
 
                                             <h3>"Accounts"</h3>
                                             <div class="accounts-list">
-                                                {account_ids
+                                                {affected_pub_acc_ids
                                                     .into_iter()
-                                                    .zip(nonces.into_iter())
-                                                    .map(|(account_id, nonce)| {
-                                                        let account_id_str = account_id.to_string();
+                                                    .zip_longest(nonces.into_iter())
+                                                    .map(|maybe_pair| {
+                                                        match maybe_pair {
+                                                            EitherOrBoth::Both(account_id, nonce) => {
+                                                                let account_id_str = account_id.to_string();
                                                         view! {
                                                             <div class="account-item">
                                                                 <A href=format!("/account/{}", account_id_str)>
@@ -127,6 +132,33 @@ pub fn TransactionPage() -> impl IntoView {
                                                                     " (nonce: " {nonce.to_string()} ")"
                                                                 </span>
                                                             </div>
+                                                        }
+                                                            }
+                                                            EitherOrBoth::Left(account_id) => {
+                                                                let account_id_str = account_id.to_string();
+                                                        view! {
+                                                            <div class="account-item">
+                                                                <A href=format!("/account/{}", account_id_str)>
+                                                                    <span class="hash">{account_id_str}</span>
+                                                                </A>
+                                                                <span class="nonce">
+                                                                    " (nonce: "{"Not affected by this transaction".to_string()}" )"
+                                                                </span>
+                                                            </div>
+                                                        }
+                                                            }
+                                                            EitherOrBoth::Right(_) => {
+                                                                view! {
+                                                            <div class="account-item">
+                                                                <A href=format!("/account/{}", "Account not found")>
+                                                                    <span class="hash">{"Account not found"}</span>
+                                                                </A>
+                                                                <span class="nonce">
+                                                                    " (nonce: "{"Account not found".to_string()}" )"
+                                                                </span>
+                                                            </div>
+                                                        }
+                                                            }
                                                         }
                                                     })
                                                     .collect::<Vec<_>>()}

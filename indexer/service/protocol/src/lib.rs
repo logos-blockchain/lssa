@@ -3,13 +3,14 @@
 //! Currently it mostly mimics types from `nssa_core`, but it's important to have a separate crate
 //! to define a stable interface for the indexer service RPCs which evolves in its own way.
 
-use std::{fmt::Display, str::FromStr};
+use std::{collections::HashSet, fmt::Display, str::FromStr};
 
 use anyhow::anyhow;
 use base58::{FromBase58 as _, ToBase58 as _};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
+use sha2::{Digest, Sha256};
 
 #[cfg(feature = "convert")]
 mod convert;
@@ -52,6 +53,18 @@ impl FromStr for ProgramId {
 pub struct AccountId {
     pub value: [u8; 32],
 }
+
+impl From<&PublicKey> for AccountId {
+    fn from(key: &PublicKey) -> Self {
+        const PUBLIC_ACCOUNT_ID_PREFIX: &[u8; 32] =
+            b"/LEE/v0.3/AccountId/Public/\x00\x00\x00\x00\x00";
+
+        let mut hasher = Sha256::new();
+        hasher.update(PUBLIC_ACCOUNT_ID_PREFIX);
+        hasher.update(key.0);
+        Self{ value: hasher.finalize().into()}
+    }
+} 
 
 impl Display for AccountId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -148,6 +161,15 @@ impl Transaction {
             Transaction::ProgramDeployment(tx) => &tx.hash,
         }
     }
+
+    /// Get affected public account ids
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        match self {
+            Transaction::Public(tx) => tx.affected_public_account_ids(),
+            Transaction::PrivacyPreserving(tx) => tx.affected_public_account_ids(),
+            Transaction::ProgramDeployment(tx) => tx.affected_public_account_ids(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -157,11 +179,53 @@ pub struct PublicTransaction {
     pub witness_set: WitnessSet,
 }
 
+impl PublicTransaction {
+
+
+    pub(crate) fn signer_account_ids(&self) -> Vec<AccountId> {
+        self.witness_set
+            .signatures_and_public_keys()
+            .iter()
+            .map(|(_, public_key)| AccountId::from(public_key))
+            .collect()
+    }
+
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        let mut acc_set = self
+            .signer_account_ids()
+            .into_iter()
+            .collect::<HashSet<_>>();
+        acc_set.extend(&self.message.account_ids);
+
+        acc_set.into_iter().collect()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct PrivacyPreservingTransaction {
     pub hash: HashType,
     pub message: PrivacyPreservingMessage,
     pub witness_set: WitnessSet,
+}
+
+impl PrivacyPreservingTransaction {
+    pub(crate) fn signer_account_ids(&self) -> Vec<AccountId> {
+        self.witness_set
+            .signatures_and_public_keys()
+            .iter()
+            .map(|(_, public_key)| AccountId::from(public_key))
+            .collect()
+    }
+
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        let mut acc_set = self
+            .signer_account_ids()
+            .into_iter()
+            .collect::<HashSet<_>>();
+        acc_set.extend(&self.message.public_account_ids);
+
+        acc_set.into_iter().collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -190,6 +254,12 @@ pub struct WitnessSet {
     pub proof: Proof,
 }
 
+impl WitnessSet {
+    pub fn signatures_and_public_keys(&self) -> &[(Signature, PublicKey)] {
+        &self.signatures_and_public_keys
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Proof(
     #[serde(with = "base64")]
@@ -208,6 +278,12 @@ pub struct EncryptedAccountData {
 pub struct ProgramDeploymentTransaction {
     pub hash: HashType,
     pub message: ProgramDeploymentMessage,
+}
+
+impl ProgramDeploymentTransaction {
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        vec![]
+    }
 }
 
 pub type ViewTag = u8;
