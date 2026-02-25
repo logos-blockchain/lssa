@@ -126,7 +126,7 @@ impl WalletCore {
             &produce_random_nonces(1),
             &[(winner_npk.clone(), shared_secret_winner.clone())],
             &[],
-            &[]
+            &[],
             &program.into(),
         )
         .unwrap();

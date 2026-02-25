@@ -1,6 +1,6 @@
 use common::{error::ExecutionFailureKind, rpc_primitives::requests::SendTxResponse};
 use nssa::AccountId;
-use nssa_core::SharedSecretKey;
+use nssa_core::{MembershipProof, SharedSecretKey};
 
 use crate::{PrivacyPreservingAccount, WalletCore};
 
@@ -23,6 +23,22 @@ impl Pinata<'_> {
         let tx = nssa::PublicTransaction::new(message, witness_set);
 
         Ok(self.0.sequencer_client.send_tx_public(tx).await?)
+    }
+
+    /// Claim a pinata reward using a privacy-preserving transaction for an already-initialized
+    /// owned private account.
+    ///
+    /// The `winner_proof` parameter is accepted for API completeness; the wallet currently fetches
+    /// the membership proof automatically from the chain.
+    pub async fn claim_private_owned_account_already_initialized(
+        &self,
+        pinata_account_id: AccountId,
+        winner_account_id: AccountId,
+        solution: u128,
+        _winner_proof: MembershipProof,
+    ) -> Result<(SendTxResponse, SharedSecretKey), ExecutionFailureKind> {
+        self.claim_private_owned_account(pinata_account_id, winner_account_id, solution)
+            .await
     }
 
     pub async fn claim_private_owned_account(

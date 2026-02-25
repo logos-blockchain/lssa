@@ -45,6 +45,44 @@
           rustToolchain = pkgs.rust-bin.stable.latest.default;
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
           src = ./.;
+          cargoLock = builtins.fromTOML (builtins.readFile ./Cargo.lock);
+
+          # Parse Cargo.lock at eval time to find the locked risc0-circuit-recursion
+          # version and its crates.io checksum — no hardcoding required.
+          risc0CircuitRecursion = builtins.head (
+            builtins.filter (p: p.name == "risc0-circuit-recursion") cargoLock.package
+          );
+
+          # Download the crate tarball from crates.io; the checksum from Cargo.lock
+          # is the sha256 of the .crate file, so this is a verified fixed-output fetch.
+          risc0CircuitRecursionCrate = pkgs.fetchurl {
+            url = "https://crates.io/api/v1/crates/risc0-circuit-recursion/${risc0CircuitRecursion.version}/download";
+            sha256 = risc0CircuitRecursion.checksum;
+            name = "risc0-circuit-recursion-${risc0CircuitRecursion.version}.crate";
+          };
+
+          # Extract the zkr artifact hash from build.rs inside the crate (IFD).
+          # This hash is both the S3 filename and the sha256 of the zip content.
+          recursionZkrHash =
+            let
+              hashFile = pkgs.runCommand "extract-risc0-recursion-zkr-hash"
+                { nativeBuildInputs = [ pkgs.gnutar ]; }
+                ''
+                  tmp=$(mktemp -d)
+                  tar xf ${risc0CircuitRecursionCrate} -C "$tmp"
+                  hash=$(grep -o '"[0-9a-f]\{64\}"' \
+                    "$tmp/risc0-circuit-recursion-${risc0CircuitRecursion.version}/build.rs" \
+                    | head -1 | tr -d '"')
+                  printf '%s' "$hash" > $out
+                '';
+            in
+            builtins.replaceStrings [ "\n" " " ] [ "" "" ] (builtins.readFile hashFile);
+
+          # Pre-fetch the zkr zip so the sandboxed Rust build can't be blocked.
+          recursionZkr = pkgs.fetchurl {
+            url = "https://risc0-artifacts.s3.us-west-2.amazonaws.com/zkr/${recursionZkrHash}.zip";
+            sha256 = recursionZkrHash;
+          };
 
           commonArgs = {
             inherit src;
@@ -55,6 +93,9 @@
               pkgs.llvmPackages.libclang.lib
             ];
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+            # Point the risc0-circuit-recursion build script to the pre-fetched zip
+            # so it doesn't try to download it inside the sandbox.
+            RECURSION_SRC_PATH = "${recursionZkr}";
           };
 
           walletFfiPackage = craneLib.buildPackage (
