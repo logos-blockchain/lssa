@@ -7,6 +7,8 @@ use crate::{
     components::{AccountPreview, BlockPreview, TransactionPreview},
 };
 
+const RECENT_BLOCKS_LIMIT: u64 = 10;
+
 /// Main page component
 #[component]
 pub fn MainPage() -> impl IntoView {
@@ -38,7 +40,21 @@ pub fn MainPage() -> impl IntoView {
     });
 
     // Load recent blocks on mount
-    let recent_blocks_resource = Resource::new(|| (), |_| async { api::get_blocks(0, 10).await });
+    let recent_blocks_resource = Resource::new(
+        || (),
+        |_| async {
+            match api::get_latest_block_id().await {
+                Ok(last_id) => {
+                    api::get_blocks(
+                        std::cmp::max(last_id.saturating_sub(RECENT_BLOCKS_LIMIT) as u32, 1),
+                        RECENT_BLOCKS_LIMIT as u32,
+                    )
+                    .await
+                }
+                Err(err) => Err(err),
+            }
+        },
+    );
 
     // Handle search - update URL parameter
     let on_search = move |ev: SubmitEvent| {
