@@ -50,7 +50,7 @@ indexer_service = { path = "indexer/service" }
 indexer_service_protocol = { path = "indexer/service/protocol" }
 indexer_service_rpc = { path = "indexer/service/rpc" }
 wallet = { path = "wallet" }
-wallet-ffi = { path = "wallet-ffi" }
+wallet-ffi = { path = "wallet-ffi", default-features = false }
 token_core = { path = "programs/token/core" }
 token_program = { path = "programs/token" }
 amm_core = { path = "programs/amm/core" }
