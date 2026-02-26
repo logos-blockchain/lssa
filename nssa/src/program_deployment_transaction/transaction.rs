@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use nssa_core::account::AccountId;
 use sha2::{Digest as _, digest::FixedOutput as _};
 
 use crate::{
@@ -37,5 +38,9 @@ impl ProgramDeploymentTransaction {
         let mut hasher = sha2::Sha256::new();
         hasher.update(&bytes);
         hasher.finalize_fixed().into()
+    }
+
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        vec![]
     }
 }

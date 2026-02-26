@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use actix_web::Error as HttpError;
 use base64::{Engine, engine::general_purpose};
 use common::{
-    block::HashableBlockData,
+    block::{AccountInitialData, HashableBlockData},
     rpc_primitives::{
         errors::RpcError,
         message::{Message, Request},
@@ -26,8 +26,7 @@ use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
 use sequencer_core::{
-    block_settlement_client::BlockSettlementClientTrait, config::AccountInitialData,
-    indexer_client::IndexerClientTrait,
+    block_settlement_client::BlockSettlementClientTrait, indexer_client::IndexerClientTrait,
 };
 use serde_json::Value;
 
@@ -95,7 +94,8 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         let tx = borsh::from_slice::<NSSATransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = tx.hash();
 
-        let authenticated_tx = sequencer_core::transaction_pre_check(tx)
+        let authenticated_tx = tx
+            .transaction_stateless_check()
             .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         // TODO: Do we need a timeout here? It will be usable if we have too many transactions to
@@ -327,12 +327,14 @@ mod tests {
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
+    use bedrock_client::BackoffConfig;
     use common::{
-        config::BasicAuth, test_utils::sequencer_sign_key_for_testing, transaction::NSSATransaction,
+        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing,
+        transaction::NSSATransaction,
     };
     use nssa::AccountId;
     use sequencer_core::{
-        config::{AccountInitialData, BackoffConfig, BedrockConfig, SequencerConfig},
+        config::{BedrockConfig, SequencerConfig},
         mock::{MockBlockSettlementClient, MockIndexerClient, SequencerCoreWithMockClients},
     };
     use serde_json::Value;

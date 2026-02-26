@@ -1,6 +1,8 @@
-use common::rpc_primitives::errors::{RpcError, RpcParseError};
+use common::{
+    rpc_primitives::errors::{RpcError, RpcParseError},
+    transaction::TransactionMalformationError,
+};
 use log::debug;
-use sequencer_core::TransactionMalformationError;
 
 pub struct RpcErr(pub RpcError);
 

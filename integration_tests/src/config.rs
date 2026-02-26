@@ -1,22 +1,26 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use anyhow::{Context, Result};
-use indexer_service::{BackoffConfig, BedrockClientConfig, ChannelId, IndexerConfig};
+use common::block::{AccountInitialData, CommitmentsInitialData};
+use indexer_service::{BackoffConfig, ChannelId, ClientConfig, IndexerConfig};
 use key_protocol::key_management::KeyChain;
 use nssa::{Account, AccountId, PrivateKey, PublicKey};
 use nssa_core::{account::Data, program::DEFAULT_PROGRAM_ID};
-use sequencer_core::config::{
-    AccountInitialData, BedrockConfig, CommitmentsInitialData, SequencerConfig,
-};
+use sequencer_core::config::{BedrockConfig, SequencerConfig};
 use url::Url;
 use wallet::config::{
     InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic, WalletConfig,
 };
 
-pub fn indexer_config(bedrock_addr: SocketAddr) -> Result<IndexerConfig> {
+pub fn indexer_config(
+    bedrock_addr: SocketAddr,
+    home: PathBuf,
+    initial_data: &InitialData,
+) -> Result<IndexerConfig> {
     Ok(IndexerConfig {
+        home,
         resubscribe_interval_millis: 1000,
-        bedrock_client_config: BedrockClientConfig {
+        bedrock_client_config: ClientConfig {
             addr: addr_to_url(UrlProtocol::Http, bedrock_addr)
                 .context("Failed to convert bedrock addr to URL")?,
             auth: None,
@@ -25,6 +29,9 @@ pub fn indexer_config(bedrock_addr: SocketAddr) -> Result<IndexerConfig> {
                 max_retries: 10,
             },
         },
+        initial_accounts: initial_data.sequencer_initial_accounts(),
+        initial_commitments: initial_data.sequencer_initial_commitments(),
+        signing_key: [37; 32],
         channel_id: bedrock_channel_id(),
     })
 }

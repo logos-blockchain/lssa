@@ -35,8 +35,12 @@ To our knowledge, this design is unique to LEZ. Other privacy-focused programmab
 3. Transferring private to public (local / privacy-preserving execution)
    - Bob executes the token program `Transfer` function locally, sending to Charlie’s public account.
    - A ZKP of correct execution is generated.
-   - Bob’s private balance stays hidden.
-   - Charlie’s public account is updated on-chain.
+   - Bob’s private account and balance still remain hidden.
+   - Charlie's public account is modified with the new tokens added.
+4. Transferring public to public (public execution):
+   - Alice submits a transaction to execute the token program `Transfer` function on-chain, specifying Charlie's public account as recipient.
+   - The execution is handled on-chain without ZKPs involved.
+   - Alice's and Charlie's accounts are modified according to the transaction.
 
 4. Transfer from public to public (public execution)
    - Alice submits an on-chain transaction to run `Transfer`, sending to Charlie’s public account.
@@ -138,12 +142,25 @@ The sequencer and logos blockchain node can be run locally:
       - `./scripts/setup-logos-blockchain-circuits.sh`
       - `cargo build --all-features`
       - `./target/debug/logos-blockchain-node --deployment nodes/node/standalone-deployment-config.yaml nodes/node/standalone-node-config.yaml`
+      
+ 2. Alternatively (WARNING: This node is outdated) go to ``logos-blockchain/lssa/` repo and run the node from docker:
+      - `cd bedrock`
+      - Change line 14 of `docker-compose.yml` from `"0:18080/tcp"` into `"8080:18080/tcp"`
+      - `docker compose up`
 
- 2. On another terminal go to the `logos-blockchain/lssa` repo and run indexer service:
+ 3. On another terminal go to the `logos-blockchain/lssa` repo and run indexer service:
       - `RUST_LOG=info cargo run -p indexer_service indexer/service/configs/indexer_config.json`
 
- 3. On another terminal go to the `logos-blockchain/lssa` repo and run the sequencer:
+ 4. On another terminal go to the `logos-blockchain/lssa` repo and run the sequencer:
       - `RUST_LOG=info cargo run -p sequencer_runner sequencer_runner/configs/debug`
+
+### Notes on cleanup
+
+After stopping services above you need to remove 3 folders to start cleanly:
+ 1. In the `logos-blockchain/logos-blockchain` folder `db` (not needed in case of docker setup)
+ 2. In the `lssa` folder `sequencer_runner/rocksdb`
+ 3. In the `lssa` file `sequencer_runner/bedrock_signing_key`
+ 4. In the `lssa` folder `indexer/service/rocksdb`
 
 ### Standalone mode
 The sequencer can be run in standalone mode with:

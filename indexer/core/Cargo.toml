@@ -7,6 +7,9 @@ license = { workspace = true }
 [dependencies]
 common.workspace = true
 bedrock_client.workspace = true
+nssa.workspace = true
+nssa_core.workspace = true
+storage.workspace = true
 
 anyhow.workspace = true
 log.workspace = true

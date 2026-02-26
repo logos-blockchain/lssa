@@ -1,14 +1,21 @@
-use std::{fs::File, io::BufReader, path::Path};
+use std::{
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context as _, Result};
 pub use bedrock_client::BackoffConfig;
-use common::config::BasicAuth;
+use common::{
+    block::{AccountInitialData, CommitmentsInitialData},
+    config::BasicAuth,
+};
 pub use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BedrockClientConfig {
+pub struct ClientConfig {
     /// For individual RPC requests we use Fibonacci backoff retry strategy.
     pub backoff: BackoffConfig,
     pub addr: Url,
@@ -18,8 +25,20 @@ pub struct BedrockClientConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexerConfig {
+    /// Home dir of sequencer storage
+    pub home: PathBuf,
+    /// List of initial accounts data
+    pub initial_accounts: Vec<AccountInitialData>,
+    /// List of initial commitments
+    pub initial_commitments: Vec<CommitmentsInitialData>,
+    /// Sequencers signing key
+    ///
+    /// ToDo: Remove it after introducing bedrock block parsing.
+    /// Currently can not be removed, because indexer must start
+    /// chain BEFORE sequencer.
+    pub signing_key: [u8; 32],
     pub resubscribe_interval_millis: u64,
-    pub bedrock_client_config: BedrockClientConfig,
+    pub bedrock_client_config: ClientConfig,
     pub channel_id: ChannelId,
 }
 
