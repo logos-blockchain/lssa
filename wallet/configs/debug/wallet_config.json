@@ -1,7 +1,7 @@
 {
   "override_rust_log": null,
   "sequencer_addr": "http://127.0.0.1:3040",
-  "seq_poll_timeout": "30s",
+  "seq_poll_timeout_millis": 30000",
   "seq_tx_poll_max_blocks": 15,
   "seq_poll_max_retries": 10,
   "seq_block_poll_max_amount": 100,
