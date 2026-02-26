@@ -182,11 +182,21 @@ async fn retry_pending_blocks(seq_core: &Arc<Mutex<SequencerCore>>) -> Result<()
         (pending_blocks, client)
     };
 
+    let min = pending_blocks
+        .iter()
+        .map(|b| b.header.block_id)
+        .min()
+        .expect("empty");
+
+    let max = pending_blocks
+        .iter()
+        .map(|b| b.header.block_id)
+        .max()
+        .expect("empty");
+
+    info!("Resubmitting pending blocks from block id {} to {}", min, max);
+
     for block in pending_blocks.iter() {
-        info!(
-            "Resubmitting pending block with id {}",
-            block.header.block_id
-        );
         // TODO: We could cache the inscribe tx for each pending block to avoid re-creating it
         // on every retry.
         let now = Instant::now();
@@ -208,6 +218,7 @@ async fn retry_pending_blocks(seq_core: &Arc<Mutex<SequencerCore>>) -> Result<()
         }
         debug!(">>>> Post: {:?}", now.elapsed());
     }
+
     Ok(())
 }
 
