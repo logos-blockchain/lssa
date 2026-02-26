@@ -190,12 +190,6 @@ pub struct WitnessSet {
     pub proof: Proof,
 }
 
-impl WitnessSet {
-    pub fn signatures_and_public_keys(&self) -> &[(Signature, PublicKey)] {
-        &self.signatures_and_public_keys
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Proof(
     #[serde(with = "base64")]

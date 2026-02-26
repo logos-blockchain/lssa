@@ -183,7 +183,7 @@ async fn retry_pending_blocks(seq_core: &Arc<Mutex<SequencerCore>>) -> Result<()
     };
 
     for block in pending_blocks.iter() {
-        info!(
+        debug!(
             "Resubmitting pending block with id {}",
             block.header.block_id
         );
