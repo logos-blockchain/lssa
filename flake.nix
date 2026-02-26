@@ -91,11 +91,22 @@
               pkgs.pkg-config
               pkgs.clang
               pkgs.llvmPackages.libclang.lib
+              pkgs.gnutar  # Required for crane's archive operations (macOS tar lacks --sort)
             ];
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
             # Point the risc0-circuit-recursion build script to the pre-fetched zip
             # so it doesn't try to download it inside the sandbox.
             RECURSION_SRC_PATH = "${recursionZkr}";
+            # Provide a writable HOME so risc0-build-kernel can use its cache directory
+            # (needed on macOS for Metal kernel compilation cache).
+            # On macOS, append /usr/bin to PATH so xcrun (Metal compiler) can be found,
+            # while keeping Nix tools (like gnutar) first in PATH.
+            # This requires running with --option sandbox false for Metal GPU support.
+            preBuild = ''
+              export HOME=$(mktemp -d)
+            '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+              export PATH="$PATH:/usr/bin"
+            '';
           };
 
           walletFfiPackage = craneLib.buildPackage (

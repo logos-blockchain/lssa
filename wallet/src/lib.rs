@@ -156,6 +156,8 @@ impl WalletCore {
 
         let mut storage_file = tokio::fs::File::create(&self.storage_path).await?;
         storage_file.write_all(&storage).await?;
+        // Ensure data is flushed to disk before returning to prevent race conditions
+        storage_file.sync_all().await?;
 
         println!("Stored persistent accounts at {:#?}", self.storage_path);
 
@@ -168,6 +170,8 @@ impl WalletCore {
 
         let mut config_file = tokio::fs::File::create(&self.config_path).await?;
         config_file.write_all(&config).await?;
+        // Ensure data is flushed to disk before returning to prevent race conditions
+        config_file.sync_all().await?;
 
         info!("Stored data at {:#?}", self.config_path);
 

@@ -12,10 +12,9 @@ use tokio::test;
 use wallet::cli::{Command, programs::native_token_transfer::AuthTransferSubcommand};
 
 /// Timeout in milliseconds to reliably await for block finalization
-const L2_TO_L1_TIMEOUT_MILLIS: u64 = 300000;
+const L2_TO_L1_TIMEOUT_MILLIS: u64 = 600000;
 
 #[test]
-#[ignore = "Not reliable with current bedrock node"]
 async fn indexer_test_run() -> Result<()> {
     let ctx = TestContext::new().await?;
 
@@ -45,7 +44,6 @@ async fn indexer_test_run() -> Result<()> {
 }
 
 #[test]
-#[ignore = "Not reliable with current bedrock node"]
 async fn indexer_block_batching() -> Result<()> {
     let ctx = TestContext::new().await?;
 
@@ -81,7 +79,6 @@ async fn indexer_block_batching() -> Result<()> {
 }
 
 #[test]
-#[ignore = "Not reliable with current bedrock node"]
 async fn indexer_state_consistency() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 

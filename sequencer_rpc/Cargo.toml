@@ -25,6 +25,7 @@ itertools.workspace = true
 actix-web.workspace = true
 tokio.workspace = true
 borsh.workspace = true
+bytesize.workspace = true
 
 [dev-dependencies]
 sequencer_core = { workspace = true, features = ["mock"] }

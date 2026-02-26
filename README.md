@@ -142,7 +142,7 @@ The sequencer and logos blockchain node can be run locally:
       - `./scripts/setup-logos-blockchain-circuits.sh`
       - `cargo build --all-features`
       - `./target/debug/logos-blockchain-node --deployment nodes/node/standalone-deployment-config.yaml nodes/node/standalone-node-config.yaml`
-      
+
  2. Alternatively (WARNING: This node is outdated) go to ``logos-blockchain/lssa/` repo and run the node from docker:
       - `cd bedrock`
       - Change line 14 of `docker-compose.yml` from `"0:18080/tcp"` into `"8080:18080/tcp"`
@@ -157,10 +157,52 @@ The sequencer and logos blockchain node can be run locally:
 ### Notes on cleanup
 
 After stopping services above you need to remove 3 folders to start cleanly:
- 1. In the `logos-blockchain/logos-blockchain` folder `db` (not needed in case of docker setup)
+ 1. In the `logos-blockchain/logos-blockchain` folder `state` (not needed in case of docker setup)
  2. In the `lssa` folder `sequencer_runner/rocksdb`
  3. In the `lssa` file `sequencer_runner/bedrock_signing_key`
  4. In the `lssa` folder `indexer/service/rocksdb`
+
+### Normal mode (`just` commands)
+We provide a `Justfile` for developer and user needs, you can run the whole setup with it. The only difference will be that logos-blockchain (bedrock) will be started from docker.
+
+#### 1'st Terminal
+
+```bash
+just run-bedrock
+```
+
+#### 2'nd Terminal
+
+```bash
+just run-indexer
+```
+
+#### 3'rd Terminal
+
+```bash
+just run-sequencer
+```
+
+#### 4'th Terminal
+
+```bash
+just run-explorer
+```
+
+#### 5'th Terminal
+
+You can run any command our wallet support by passing it as an argument for `just run-wallet`, for example:
+
+```bash
+just run-wallet check-health
+```
+
+This will use a wallet binary built from this repo and not the one installed in your system if you have some. Also another wallet home directory will be used. This is done to not to mess up with your local wallet and to easily clean generated files (see next section).
+
+#### Shutdown
+
+1. Press `ctrl-c` in every terminal
+2. Run `just clean` to clean runtime data
 
 ### Standalone mode
 The sequencer can be run in standalone mode with:
