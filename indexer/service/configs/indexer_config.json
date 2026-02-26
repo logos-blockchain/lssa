@@ -1,6 +1,6 @@
 {
     "home": "./indexer/service",
-    "resubscribe_interval_millis": 1000,
+    "consensus_info_polling_interval_millis": 10000,
     "bedrock_client_config": {
         "addr": "http://localhost:8080",
         "backoff": {

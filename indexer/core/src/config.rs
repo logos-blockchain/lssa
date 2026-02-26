@@ -32,12 +32,8 @@ pub struct IndexerConfig {
     /// List of initial commitments
     pub initial_commitments: Vec<CommitmentsInitialData>,
     /// Sequencers signing key
-    ///
-    /// ToDo: Remove it after introducing bedrock block parsing.
-    /// Currently can not be removed, because indexer must start
-    /// chain BEFORE sequencer.
     pub signing_key: [u8; 32],
-    pub resubscribe_interval_millis: u64,
+    pub consensus_info_polling_interval_millis: u64,
     pub bedrock_client_config: ClientConfig,
     pub channel_id: ChannelId,
 }

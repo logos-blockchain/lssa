@@ -19,7 +19,7 @@ pub fn indexer_config(
 ) -> Result<IndexerConfig> {
     Ok(IndexerConfig {
         home,
-        resubscribe_interval_millis: 1000,
+        consensus_info_polling_interval_millis: 10000,
         bedrock_client_config: ClientConfig {
             addr: addr_to_url(UrlProtocol::Http, bedrock_addr)
                 .context("Failed to convert bedrock addr to URL")?,
@@ -74,7 +74,7 @@ pub fn sequencer_config(
         max_num_tx_in_block,
         mempool_max_size,
         block_create_timeout_millis,
-        retry_pending_blocks_timeout_millis: 240_000,
+        retry_pending_blocks_timeout_millis: 120_000,
         port: 0,
         initial_accounts: initial_data.sequencer_initial_accounts(),
         initial_commitments: initial_data.sequencer_initial_commitments(),
