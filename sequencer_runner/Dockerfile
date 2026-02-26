@@ -14,13 +14,24 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install r0vm (manual build as it's portable across different host platforms)
-RUN git clone --depth 1 --branch release-3.0 https://github.com/risc0/risc0.git
-RUN git clone --depth 1 --branch r0.1.91.1 https://github.com/risc0/rust.git
-WORKDIR /risc0
-RUN cargo install --path rzup
-RUN rzup build --path /rust rust --verbose
-RUN cargo install --path risc0/cargo-risczero
+# Install r0vm
+# Use quick install for x86-64 (risczero provides binaries only for this linux platform)
+# Manual build for other platforms (including arm64 Linux)
+RUN ARCH=$(uname -m); \
+    if [ "$ARCH" = "x86_64" ]; then \
+        echo "Using quick install for $ARCH"; \
+        curl -L https://risczero.com/install | bash; \
+        export PATH="/root/.cargo/bin:/root/.risc0/bin:${PATH}"; \
+        rzup install; \
+    else \
+        echo "Using manual build for $ARCH"; \
+        git clone --depth 1 --branch release-3.0 https://github.com/risc0/risc0.git; \
+        git clone --depth 1 --branch r0.1.91.1 https://github.com/risc0/rust.git; \
+        cd /risc0; \
+        cargo install --path rzup; \
+        rzup build --path /rust rust --verbose; \
+        cargo install --path risc0/cargo-risczero; \
+    fi
 ENV PATH="/root/.cargo/bin:/root/.risc0/bin:${PATH}"
 RUN cp "$(which r0vm)" /usr/local/bin/r0vm
 RUN test -x /usr/local/bin/r0vm
