@@ -139,9 +139,6 @@ impl IndexerCore {
 
             info!("Searching for initial header finished");
 
-            info!("Moving one block into future in case if channel start was on first L1 block");
-            prev_last_l1_lib_header = self.get_next_lib(prev_last_l1_lib_header).await?;
-
             info!("Starting backfilling from {prev_last_l1_lib_header}");
 
             loop {
@@ -270,7 +267,7 @@ impl IndexerCore {
 
         Ok(BackfillData {
             block_data: block_buffer,
-            curr_fin_l1_lib_header: backfill_limit,
+            curr_fin_l1_lib_header: curr_last_l1_lib_header,
         })
     }
 
