@@ -28,7 +28,7 @@ pub trait BlockSettlementClientTrait: Clone {
     /// Create and sign a transaction for inscribing data.
     fn create_inscribe_tx(&self, block: &Block) -> Result<(SignedMantleTx, MsgId)> {
         let inscription_data = borsh::to_vec(block)?;
-        log::info!(
+        log::debug!(
             "The size of the block {} is {} bytes",
             block.header.block_id,
             inscription_data.len()
@@ -104,7 +104,7 @@ impl BlockSettlementClientTrait for BlockSettlementClient {
             .await
             .context("Failed to post transaction to Bedrock")?;
 
-        log::info!("Posted block to Bedrock with parent id {parent_id:?} and msg id: {msg_id:?}");
+        log::debug!("Posted block to Bedrock with parent id {parent_id:?} and msg id: {msg_id:?}");
 
         Ok(())
     }

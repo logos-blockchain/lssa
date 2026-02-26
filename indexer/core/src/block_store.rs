@@ -2,7 +2,10 @@ use std::{path::Path, sync::Arc};
 
 use anyhow::Result;
 use bedrock_client::HeaderId;
-use common::{block::Block, transaction::NSSATransaction};
+use common::{
+    block::{BedrockStatus, Block},
+    transaction::NSSATransaction,
+};
 use nssa::{Account, AccountId, V02State};
 use storage::indexer::RocksDBIO;
 
@@ -100,7 +103,7 @@ impl IndexerStore {
         Ok(self.final_state()?.get_account_by_id(*account_id))
     }
 
-    pub fn put_block(&self, block: Block, l1_header: HeaderId) -> Result<()> {
+    pub fn put_block(&self, mut block: Block, l1_header: HeaderId) -> Result<()> {
         let mut final_state = self.dbio.final_state()?;
 
         for transaction in &block.body.transactions {
@@ -109,6 +112,11 @@ impl IndexerStore {
                 .transaction_stateless_check()?
                 .execute_check_on_state(&mut final_state)?;
         }
+
+        // ToDo: Currently we are fetching only finalized blocks
+        // if it changes, the following lines need to be updated
+        // to represent correct block finality
+        block.bedrock_status = BedrockStatus::Finalized;
 
         Ok(self.dbio.put_block(block, l1_header.into())?)
     }
