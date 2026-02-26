@@ -10,7 +10,7 @@ async fn main() {
 
     env_logger::init();
 
-    /// LEE Blockchain Explorer Server CLI arguments.
+    /// LEZ Block Explorer Server CLI arguments.
     #[derive(Parser, Debug)]
     #[command(version, about, long_about = None)]
     struct Args {

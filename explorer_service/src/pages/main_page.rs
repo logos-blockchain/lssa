@@ -74,7 +74,7 @@ pub fn MainPage() -> impl IntoView {
     view! {
         <div class="main-page">
             <div class="page-header">
-                <h1>"LEE Blockchain Explorer"</h1>
+                <h1>"LEZ Block Explorer"</h1>
             </div>
 
             <div class="search-section">
