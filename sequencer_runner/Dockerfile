@@ -14,13 +14,24 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install r0vm (manual build as it's portable across different host platforms)
-RUN git clone --depth 1 --branch release-3.0 https://github.com/risc0/risc0.git
-RUN git clone --depth 1 --branch r0.1.91.1 https://github.com/risc0/rust.git
-WORKDIR /risc0
-RUN cargo install --path rzup
-RUN rzup build --path /rust rust --verbose
-RUN cargo install --path risc0/cargo-risczero
+# Install r0vm
+# Use quick install for x86-64 (risczero provides binaries only for this linux platform)
+# Manual build for other platforms (including arm64 Linux)
+RUN ARCH=$(uname -m); \
+    if [ "$ARCH" = "x86_64" ]; then \
+        echo "Using quick install for $ARCH"; \
+        curl -L https://risczero.com/install | bash; \
+        export PATH="/root/.cargo/bin:/root/.risc0/bin:${PATH}"; \
+        rzup install; \
+    else \
+        echo "Using manual build for $ARCH"; \
+        git clone --depth 1 --branch release-3.0 https://github.com/risc0/risc0.git; \
+        git clone --depth 1 --branch r0.1.91.1 https://github.com/risc0/rust.git; \
+        cd /risc0; \
+        cargo install --path rzup; \
+        rzup build --path /rust rust --verbose; \
+        cargo install --path risc0/cargo-risczero; \
+    fi
 ENV PATH="/root/.cargo/bin:/root/.risc0/bin:${PATH}"
 RUN cp "$(which r0vm)" /usr/local/bin/r0vm
 RUN test -x /usr/local/bin/r0vm
@@ -31,6 +42,9 @@ RUN curl -sSL https://raw.githubusercontent.com/logos-blockchain/logos-blockchai
 
 WORKDIR /sequencer_runner
 
+# Build argument to enable standalone feature (defaults to false)
+ARG STANDALONE=false
+
 # Planner stage - generates dependency recipe
 FROM chef AS planner
 COPY . .
@@ -38,15 +52,24 @@ RUN cargo chef prepare --bin sequencer_runner --recipe-path recipe.json
 
 # Builder stage - builds dependencies and application
 FROM chef AS builder
+ARG STANDALONE
 COPY --from=planner /sequencer_runner/recipe.json recipe.json
 # Build dependencies only (this layer will be cached)
-RUN cargo chef cook --bin sequencer_runner --release --recipe-path recipe.json
+RUN if [ "$STANDALONE" = "true" ]; then \
+      cargo chef cook --bin sequencer_runner --features standalone --release --recipe-path recipe.json; \
+    else \
+      cargo chef cook --bin sequencer_runner --release --recipe-path recipe.json; \
+    fi
 
 # Copy source code
 COPY . .
 
 # Build the actual application
-RUN cargo build --release --bin sequencer_runner
+RUN if [ "$STANDALONE" = "true" ]; then \
+      cargo build --release --features standalone --bin sequencer_runner; \
+    else \
+      cargo build --release --bin sequencer_runner; \
+    fi
 
 # Strip debug symbols to reduce binary size
 RUN strip /sequencer_runner/target/release/sequencer_runner

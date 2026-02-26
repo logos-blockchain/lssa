@@ -1,16 +1,17 @@
 {
-    "home": ".",
+    "home": "./sequencer_runner",
     "override_rust_log": null,
     "genesis_id": 1,
     "is_genesis_random": true,
     "max_num_tx_in_block": 20,
+    "max_block_size": "1 MiB",
     "mempool_max_size": 1000,
-    "block_create_timeout_millis": 12000,
-    "retry_pending_blocks_timeout_millis": 6000,
+    "block_create_timeout": "15s",
+    "retry_pending_blocks_timeout": "5s",
     "port": 3040,
     "bedrock_config": {
         "backoff": {
-            "start_delay_millis": 100,
+            "start_delay": "100ms",
             "max_retries": 5
         },
         "channel_id": "0101010101010101010101010101010101010101010101010101010101010101",

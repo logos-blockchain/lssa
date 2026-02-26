@@ -49,11 +49,8 @@ impl WalletSubcommand for ConfigSubcommand {
                         "sequencer_addr" => {
                             println!("{}", wallet_core.storage.wallet_config.sequencer_addr);
                         }
-                        "seq_poll_timeout_millis" => {
-                            println!(
-                                "{}",
-                                wallet_core.storage.wallet_config.seq_poll_timeout_millis
-                            );
+                        "seq_poll_timeout" => {
+                            println!("{:?}", wallet_core.storage.wallet_config.seq_poll_timeout);
                         }
                         "seq_tx_poll_max_blocks" => {
                             println!(
@@ -97,9 +94,10 @@ impl WalletSubcommand for ConfigSubcommand {
                     "sequencer_addr" => {
                         wallet_core.storage.wallet_config.sequencer_addr = value.parse()?;
                     }
-                    "seq_poll_timeout_millis" => {
-                        wallet_core.storage.wallet_config.seq_poll_timeout_millis =
-                            value.parse()?;
+                    "seq_poll_timeout" => {
+                        wallet_core.storage.wallet_config.seq_poll_timeout =
+                            humantime::parse_duration(&value)
+                                .map_err(|e| anyhow::anyhow!("Invalid duration: {}", e))?;
                     }
                     "seq_tx_poll_max_blocks" => {
                         wallet_core.storage.wallet_config.seq_tx_poll_max_blocks = value.parse()?;
@@ -131,9 +129,9 @@ impl WalletSubcommand for ConfigSubcommand {
                 "sequencer_addr" => {
                     println!("HTTP V4 account_id of sequencer");
                 }
-                "seq_poll_timeout_millis" => {
+                "seq_poll_timeout" => {
                     println!(
-                        "Sequencer client retry variable: how much time to wait between retries in milliseconds(can be zero)"
+                        "Sequencer client retry variable: how much time to wait between retries (human readable duration)"
                     );
                 }
                 "seq_tx_poll_max_blocks" => {

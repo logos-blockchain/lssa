@@ -262,7 +262,7 @@ mod tests {
         WalletConfig {
             override_rust_log: None,
             sequencer_addr: "http://127.0.0.1".parse().unwrap(),
-            seq_poll_timeout_millis: 12000,
+            seq_poll_timeout: std::time::Duration::from_secs(12),
             seq_tx_poll_max_blocks: 5,
             seq_poll_max_retries: 10,
             seq_block_poll_max_amount: 100,

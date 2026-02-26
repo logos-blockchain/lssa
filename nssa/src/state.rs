@@ -16,7 +16,7 @@ use crate::{
 
 pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
@@ -64,6 +64,7 @@ impl CommitmentSet {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+#[derive(Clone)]
 struct NullifierSet(BTreeSet<Nullifier>);
 
 impl NullifierSet {
@@ -104,7 +105,7 @@ impl BorshDeserialize for NullifierSet {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct V02State {
     public_state: HashMap<AccountId, Account>,
@@ -1331,7 +1332,8 @@ pub mod tests {
             AccountId::new([0; 32]),
         );
 
-        let large_data: Vec<u8> = vec![0; nssa_core::account::data::DATA_MAX_LENGTH_IN_BYTES + 1];
+        let large_data: Vec<u8> =
+            vec![0; nssa_core::account::data::DATA_MAX_LENGTH.as_u64() as usize + 1];
 
         let result = execute_and_prove(
             vec![public_account],

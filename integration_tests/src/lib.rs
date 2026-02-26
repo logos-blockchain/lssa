@@ -10,6 +10,7 @@ use indexer_service::IndexerHandle;
 use log::{debug, error, warn};
 use nssa::{AccountId, PrivacyPreservingTransaction};
 use nssa_core::Commitment;
+use sequencer_core::indexer_client::{IndexerClient, IndexerClientTrait};
 use sequencer_runner::SequencerHandle;
 use tempfile::TempDir;
 use testcontainers::compose::DockerCompose;
@@ -20,6 +21,7 @@ pub mod config;
 // TODO: Remove this and control time from tests
 pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &str = "data_changer.bin";
+pub const NSSA_PROGRAM_FOR_TEST_NOOP: &str = "noop.bin";
 
 const BEDROCK_SERVICE_WITH_OPEN_PORT: &str = "logos-blockchain-node-0";
 const BEDROCK_SERVICE_PORT: u16 = 18080;
@@ -33,11 +35,13 @@ static LOGGER: LazyLock<()> = LazyLock::new(env_logger::init);
 // NOTE: Order of fields is important for proper drop order.
 pub struct TestContext {
     sequencer_client: SequencerClient,
+    indexer_client: IndexerClient,
     wallet: WalletCore,
     wallet_password: String,
     sequencer_handle: SequencerHandle,
     indexer_handle: IndexerHandle,
     bedrock_compose: DockerCompose,
+    _temp_indexer_dir: TempDir,
     _temp_sequencer_dir: TempDir,
     _temp_wallet_dir: TempDir,
 }
@@ -63,7 +67,7 @@ impl TestContext {
 
         let (bedrock_compose, bedrock_addr) = Self::setup_bedrock_node().await?;
 
-        let indexer_handle = Self::setup_indexer(bedrock_addr)
+        let (indexer_handle, temp_indexer_dir) = Self::setup_indexer(bedrock_addr, &initial_data)
             .await
             .context("Failed to setup Indexer")?;
 
@@ -83,16 +87,23 @@ impl TestContext {
 
         let sequencer_url = config::addr_to_url(config::UrlProtocol::Http, sequencer_handle.addr())
             .context("Failed to convert sequencer addr to URL")?;
+        let indexer_url = config::addr_to_url(config::UrlProtocol::Ws, indexer_handle.addr())
+            .context("Failed to convert indexer addr to URL")?;
         let sequencer_client =
             SequencerClient::new(sequencer_url).context("Failed to create sequencer client")?;
+        let indexer_client = IndexerClient::new(&indexer_url)
+            .await
+            .context("Failed to create indexer client")?;
 
         Ok(Self {
             sequencer_client,
+            indexer_client,
             wallet,
             wallet_password,
             bedrock_compose,
             sequencer_handle,
             indexer_handle,
+            _temp_indexer_dir: temp_indexer_dir,
             _temp_sequencer_dir: temp_sequencer_dir,
             _temp_wallet_dir: temp_wallet_dir,
         })
@@ -163,13 +174,26 @@ impl TestContext {
         Ok((compose, addr))
     }
 
-    async fn setup_indexer(bedrock_addr: SocketAddr) -> Result<IndexerHandle> {
-        let indexer_config =
-            config::indexer_config(bedrock_addr).context("Failed to create Indexer config")?;
+    async fn setup_indexer(
+        bedrock_addr: SocketAddr,
+        initial_data: &config::InitialData,
+    ) -> Result<(IndexerHandle, TempDir)> {
+        let temp_indexer_dir =
+            tempfile::tempdir().context("Failed to create temp dir for indexer home")?;
+
+        debug!("Using temp indexer home at {:?}", temp_indexer_dir.path());
+
+        let indexer_config = config::indexer_config(
+            bedrock_addr,
+            temp_indexer_dir.path().to_owned(),
+            initial_data,
+        )
+        .context("Failed to create Indexer config")?;
 
         indexer_service::run_server(indexer_config, 0)
             .await
             .context("Failed to run Indexer Service")
+            .map(|handle| (handle, temp_indexer_dir))
     }
 
     async fn setup_sequencer(
@@ -254,6 +278,11 @@ impl TestContext {
         &self.sequencer_client
     }
 
+    /// Get reference to the indexer client.
+    pub fn indexer_client(&self) -> &IndexerClient {
+        &self.indexer_client
+    }
+
     /// Get existing public account IDs in the wallet.
     pub fn existing_public_accounts(&self) -> Vec<AccountId> {
         self.wallet
@@ -279,9 +308,11 @@ impl Drop for TestContext {
             sequencer_handle,
             indexer_handle,
             bedrock_compose,
+            _temp_indexer_dir: _,
             _temp_sequencer_dir: _,
             _temp_wallet_dir: _,
             sequencer_client: _,
+            indexer_client: _,
             wallet: _,
             wallet_password: _,
         } = self;

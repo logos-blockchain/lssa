@@ -35,6 +35,11 @@ RUN strip /indexer_service/target/release/indexer_service
 # Runtime stage - minimal image
 FROM debian:trixie-slim
 
+# Install runtime dependencies
+RUN apt-get update \
+ && apt-get install -y gosu jq \
+ && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user for security
 RUN useradd -m -u 1000 -s /bin/bash indexer_service_user && \
     mkdir -p /indexer_service /etc/indexer_service && \
@@ -42,6 +47,10 @@ RUN useradd -m -u 1000 -s /bin/bash indexer_service_user && \
 
 # Copy binary from builder
 COPY --from=builder --chown=indexer_service_user:indexer_service_user /indexer_service/target/release/indexer_service /usr/local/bin/indexer_service
+
+# Copy entrypoint script
+COPY indexer/service/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Expose default port
 EXPOSE 8779
@@ -60,7 +69,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Run the application
 ENV RUST_LOG=info
 
-USER indexer_service_user
+USER root
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
 WORKDIR /indexer_service
 CMD ["indexer_service", "/etc/indexer_service/indexer_config.json"]

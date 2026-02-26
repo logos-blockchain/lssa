@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use actix_web::Error as HttpError;
 use base64::{Engine, engine::general_purpose};
 use common::{
-    block::HashableBlockData,
+    block::{AccountInitialData, HashableBlockData},
     rpc_primitives::{
         errors::RpcError,
         message::{Message, Request},
@@ -20,14 +20,13 @@ use common::{
             SendTxResponse,
         },
     },
-    transaction::NSSATransaction,
+    transaction::{NSSATransaction, TransactionMalformationError},
 };
 use itertools::Itertools as _;
 use log::warn;
 use nssa::{self, program::Program};
 use sequencer_core::{
-    block_settlement_client::BlockSettlementClientTrait, config::AccountInitialData,
-    indexer_client::IndexerClientTrait,
+    block_settlement_client::BlockSettlementClientTrait, indexer_client::IndexerClientTrait,
 };
 use serde_json::Value;
 
@@ -95,7 +94,25 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
         let tx = borsh::from_slice::<NSSATransaction>(&send_tx_req.transaction).unwrap();
         let tx_hash = tx.hash();
 
-        let authenticated_tx = sequencer_core::transaction_pre_check(tx)
+        // Check transaction size against block size limit
+        // Reserve ~200 bytes for block header overhead
+        const BLOCK_HEADER_OVERHEAD: usize = 200;
+        let tx_size = borsh::to_vec(&tx)
+            .map_err(|_| TransactionMalformationError::FailedToDecode { tx: tx_hash })?
+            .len();
+
+        let max_tx_size = self.max_block_size.saturating_sub(BLOCK_HEADER_OVERHEAD);
+
+        if tx_size > max_tx_size {
+            return Err(TransactionMalformationError::TransactionTooLarge {
+                size: tx_size,
+                max: max_tx_size,
+            }
+            .into());
+        }
+
+        let authenticated_tx = tx
+            .transaction_stateless_check()
             .inspect_err(|err| warn!("Error at pre_check {err:#?}"))?;
 
         // TODO: Do we need a timeout here? It will be usable if we have too many transactions to
@@ -323,16 +340,18 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> JsonHandler<BC, IC>
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr as _, sync::Arc};
+    use std::{str::FromStr as _, sync::Arc, time::Duration};
 
     use base58::ToBase58;
     use base64::{Engine, engine::general_purpose};
+    use bedrock_client::BackoffConfig;
     use common::{
-        config::BasicAuth, test_utils::sequencer_sign_key_for_testing, transaction::NSSATransaction,
+        block::AccountInitialData, config::BasicAuth, test_utils::sequencer_sign_key_for_testing,
+        transaction::NSSATransaction,
     };
     use nssa::AccountId;
     use sequencer_core::{
-        config::{AccountInitialData, BackoffConfig, BedrockConfig, SequencerConfig},
+        config::{BedrockConfig, SequencerConfig},
         mock::{MockBlockSettlementClient, MockIndexerClient, SequencerCoreWithMockClients},
     };
     use serde_json::Value;
@@ -375,16 +394,17 @@ mod tests {
             genesis_id: 1,
             is_genesis_random: false,
             max_num_tx_in_block: 10,
+            max_block_size: bytesize::ByteSize::mib(1),
             mempool_max_size: 1000,
-            block_create_timeout_millis: 1000,
+            block_create_timeout: Duration::from_secs(1),
             port: 8080,
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
-            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            retry_pending_blocks_timeout: Duration::from_secs(60 * 4),
             bedrock_config: BedrockConfig {
                 backoff: BackoffConfig {
-                    start_delay_millis: 100,
+                    start_delay: Duration::from_millis(100),
                     max_retries: 5,
                 },
                 channel_id: [42; 32].into(),
@@ -435,12 +455,14 @@ mod tests {
             .produce_new_block_with_mempool_transactions()
             .unwrap();
 
+        let max_block_size = sequencer_core.sequencer_config().max_block_size.as_u64() as usize;
         let sequencer_core = Arc::new(Mutex::new(sequencer_core));
 
         (
             JsonHandlerWithMockClients {
                 sequencer_state: sequencer_core,
                 mempool_handle,
+                max_block_size,
             },
             initial_accounts,
             tx,
