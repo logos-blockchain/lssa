@@ -11,10 +11,18 @@ jobs:
         include:
           - name: sequencer_runner
             dockerfile: ./sequencer_runner/Dockerfile
+            build_args: |
+              STANDALONE=false
+          - name: sequencer_runner-standalone
+            dockerfile: ./sequencer_runner/Dockerfile
+            build_args: |
+              STANDALONE=true
           - name: indexer_service
             dockerfile: ./indexer/service/Dockerfile
+            build_args: ""
           - name: explorer_service
             dockerfile: ./explorer_service/Dockerfile
+            build_args: ""
     steps:
       - uses: actions/checkout@v5
 
@@ -49,5 +57,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build_args }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

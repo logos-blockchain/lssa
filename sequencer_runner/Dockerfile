@@ -31,6 +31,9 @@ RUN curl -sSL https://raw.githubusercontent.com/logos-blockchain/logos-blockchai
 
 WORKDIR /sequencer_runner
 
+# Build argument to enable standalone feature (defaults to false)
+ARG STANDALONE=false
+
 # Planner stage - generates dependency recipe
 FROM chef AS planner
 COPY . .
@@ -38,15 +41,24 @@ RUN cargo chef prepare --bin sequencer_runner --recipe-path recipe.json
 
 # Builder stage - builds dependencies and application
 FROM chef AS builder
+ARG STANDALONE
 COPY --from=planner /sequencer_runner/recipe.json recipe.json
 # Build dependencies only (this layer will be cached)
-RUN cargo chef cook --bin sequencer_runner --release --recipe-path recipe.json
+RUN if [ "$STANDALONE" = "true" ]; then \
+      cargo chef cook --bin sequencer_runner --features standalone --release --recipe-path recipe.json; \
+    else \
+      cargo chef cook --bin sequencer_runner --release --recipe-path recipe.json; \
+    fi
 
 # Copy source code
 COPY . .
 
 # Build the actual application
-RUN cargo build --release --bin sequencer_runner
+RUN if [ "$STANDALONE" = "true" ]; then \
+      cargo build --release --features standalone --bin sequencer_runner; \
+    else \
+      cargo build --release --bin sequencer_runner; \
+    fi
 
 # Strip debug symbols to reduce binary size
 RUN strip /sequencer_runner/target/release/sequencer_runner
