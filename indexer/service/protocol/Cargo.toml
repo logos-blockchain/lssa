@@ -16,7 +16,6 @@ base64.workspace = true
 base58.workspace = true
 hex.workspace = true
 anyhow.workspace = true
-sha2.workspace = true
 
 [features]
 # Enable conversion to/from NSSA core types

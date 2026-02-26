@@ -14,7 +14,6 @@ use crate::{block_store::IndexerStore, config::IndexerConfig};
 
 pub mod block_store;
 pub mod config;
-pub mod state;
 
 #[derive(Clone)]
 pub struct IndexerCore {

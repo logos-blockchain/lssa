@@ -19,12 +19,14 @@ pub fn TransactionPreview(transaction: Transaction) -> impl IntoView {
     let (type_name, type_class) = transaction_type_info(&transaction);
 
     // Get additional metadata based on transaction type
-    let affected_pub_account_ids = transaction
-        .affected_public_account_ids();
-
     let metadata = match &transaction {
-        Transaction::Public(_) => {
-            format!("{} accounts involved", affected_pub_account_ids.len())
+        Transaction::Public(tx) => {
+            let indexer_service_protocol::PublicTransaction {
+                hash: _,
+                message,
+                witness_set: _,
+            } = tx;
+            format!("{} accounts involved", message.account_ids.len())
         }
         Transaction::PrivacyPreserving(tx) => {
             let indexer_service_protocol::PrivacyPreservingTransaction {
@@ -34,7 +36,7 @@ pub fn TransactionPreview(transaction: Transaction) -> impl IntoView {
             } = tx;
             format!(
                 "{} public accounts, {} commitments",
-                affected_pub_account_ids.len(),
+                message.public_account_ids.len(),
                 message.new_commitments.len()
             )
         }

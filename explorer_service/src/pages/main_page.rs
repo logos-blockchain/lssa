@@ -47,7 +47,7 @@ pub fn MainPage() -> impl IntoView {
                 Ok(last_id) => {
                     api::get_blocks(
                         std::cmp::max(last_id.saturating_sub(RECENT_BLOCKS_LIMIT) as u32, 1),
-                        RECENT_BLOCKS_LIMIT as u32,
+                        (RECENT_BLOCKS_LIMIT + 1) as u32,
                     )
                     .await
                 }
