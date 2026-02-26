@@ -2,6 +2,7 @@ use std::{
     fs::File,
     io::BufReader,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::{Context as _, Result};
@@ -10,6 +11,7 @@ use common::{
     block::{AccountInitialData, CommitmentsInitialData},
     config::BasicAuth,
 };
+use humantime_serde;
 pub use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -33,7 +35,8 @@ pub struct IndexerConfig {
     pub initial_commitments: Vec<CommitmentsInitialData>,
     /// Sequencers signing key
     pub signing_key: [u8; 32],
-    pub consensus_info_polling_interval_millis: u64,
+    #[serde(with = "humantime_serde")]
+    pub consensus_info_polling_interval: Duration,
     pub bedrock_client_config: ClientConfig,
     pub channel_id: ChannelId,
 }

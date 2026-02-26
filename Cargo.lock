@@ -1210,6 +1210,7 @@ dependencies = [
  "anyhow",
  "common",
  "futures",
+ "humantime-serde",
  "log",
  "logos-blockchain-chain-broadcast-service",
  "logos-blockchain-chain-service",
@@ -1489,6 +1490,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bd91ee7b2422bcb158d90ef4d14f75ef67f340943fc4149891dcce8f8b972a3"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "bytestring"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1743,6 +1753,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "borsh",
+ "bytesize",
  "hex",
  "log",
  "logos-blockchain-common-http-client",
@@ -3431,6 +3442,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
+name = "humantime-serde"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
+dependencies = [
+ "humantime",
+ "serde",
+]
+
+[[package]]
 name = "hydration_context"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3725,6 +3746,7 @@ dependencies = [
  "borsh",
  "common",
  "futures",
+ "humantime-serde",
  "log",
  "logos-blockchain-core",
  "nssa",
@@ -3835,6 +3857,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "borsh",
+ "bytesize",
  "common",
  "env_logger",
  "futures",
@@ -5562,6 +5585,7 @@ dependencies = [
  "base58",
  "borsh",
  "bytemuck",
+ "bytesize",
  "chacha20",
  "k256",
  "risc0-zkvm",
@@ -7430,9 +7454,11 @@ dependencies = [
  "base58",
  "bedrock_client",
  "borsh",
+ "bytesize",
  "chrono",
  "common",
  "futures",
+ "humantime-serde",
  "jsonrpsee",
  "log",
  "logos-blockchain-core",
@@ -7460,6 +7486,7 @@ dependencies = [
  "base64 0.22.1",
  "bedrock_client",
  "borsh",
+ "bytesize",
  "common",
  "futures",
  "hex",
@@ -8968,6 +8995,8 @@ dependencies = [
  "env_logger",
  "futures",
  "hex",
+ "humantime",
+ "humantime-serde",
  "indicatif",
  "itertools 0.14.0",
  "key_protocol",

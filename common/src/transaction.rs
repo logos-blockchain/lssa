@@ -103,4 +103,6 @@ pub enum TransactionMalformationError {
     InvalidSignature,
     #[error("Failed to decode transaction with hash: {tx:?}")]
     FailedToDecode { tx: HashType },
+    #[error("Transaction size {size} exceeds maximum allowed size of {max} bytes")]
+    TransactionTooLarge { size: usize, max: usize },
 }

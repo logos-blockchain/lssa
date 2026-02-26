@@ -28,6 +28,7 @@ pub struct JsonHandler<
 > {
     sequencer_state: Arc<Mutex<SequencerCore<BC, IC>>>,
     mempool_handle: MemPoolHandle<NSSATransaction>,
+    max_block_size: usize,
 }
 
 fn respond<T: Serialize>(val: T) -> Result<Value, RpcErr> {

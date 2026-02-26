@@ -346,7 +346,7 @@ _wallet_config() {
         'all'
         'override_rust_log'
         'sequencer_addr'
-        'seq_poll_timeout_millis'
+        'seq_poll_timeout'
         'seq_tx_poll_max_blocks'
         'seq_poll_max_retries'
         'seq_block_poll_max_amount'
