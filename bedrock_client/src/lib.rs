@@ -3,8 +3,11 @@ use std::time::Duration;
 use anyhow::{Context as _, Result};
 use common::config::BasicAuth;
 use futures::{Stream, TryFutureExt};
+#[expect(clippy::single_component_path_imports, reason = "Satisfy machete")]
+use humantime_serde;
 use log::{info, warn};
 pub use logos_blockchain_chain_broadcast_service::BlockInfo;
+use logos_blockchain_chain_service::CryptarchiaInfo;
 pub use logos_blockchain_common_http_client::{CommonHttpClient, Error};
 pub use logos_blockchain_core::{block::Block, header::HeaderId, mantle::SignedMantleTx};
 use reqwest::{Client, Url};
@@ -14,14 +17,15 @@ use tokio_retry::Retry;
 /// Fibonacci backoff retry strategy configuration
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BackoffConfig {
-    pub start_delay_millis: u64,
+    #[serde(with = "humantime_serde")]
+    pub start_delay: Duration,
     pub max_retries: usize,
 }
 
 impl Default for BackoffConfig {
     fn default() -> Self {
         Self {
-            start_delay_millis: 100,
+            start_delay: Duration::from_millis(100),
             max_retries: 5,
         }
     }
@@ -82,8 +86,19 @@ impl BedrockClient {
         .await
     }
 
+    pub async fn get_consensus_info(&self) -> Result<CryptarchiaInfo, Error> {
+        Retry::spawn(self.backoff_strategy(), || {
+            self.http_client
+                .consensus_info(self.node_url.clone())
+                .inspect_err(|err| warn!("Block fetching failed with error: {err:#}"))
+        })
+        .await
+    }
+
     fn backoff_strategy(&self) -> impl Iterator<Item = Duration> {
-        tokio_retry::strategy::FibonacciBackoff::from_millis(self.backoff.start_delay_millis)
-            .take(self.backoff.max_retries)
+        tokio_retry::strategy::FibonacciBackoff::from_millis(
+            self.backoff.start_delay.as_millis() as u64
+        )
+        .take(self.backoff.max_retries)
     }
 }

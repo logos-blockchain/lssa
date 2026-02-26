@@ -1,14 +1,23 @@
-use std::{fs::File, io::BufReader, path::Path};
+use std::{
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::{Context as _, Result};
 pub use bedrock_client::BackoffConfig;
-use common::config::BasicAuth;
+use common::{
+    block::{AccountInitialData, CommitmentsInitialData},
+    config::BasicAuth,
+};
+use humantime_serde;
 pub use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BedrockClientConfig {
+pub struct ClientConfig {
     /// For individual RPC requests we use Fibonacci backoff retry strategy.
     pub backoff: BackoffConfig,
     pub addr: Url,
@@ -18,8 +27,17 @@ pub struct BedrockClientConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexerConfig {
-    pub resubscribe_interval_millis: u64,
-    pub bedrock_client_config: BedrockClientConfig,
+    /// Home dir of sequencer storage
+    pub home: PathBuf,
+    /// List of initial accounts data
+    pub initial_accounts: Vec<AccountInitialData>,
+    /// List of initial commitments
+    pub initial_commitments: Vec<CommitmentsInitialData>,
+    /// Sequencers signing key
+    pub signing_key: [u8; 32],
+    #[serde(with = "humantime_serde")]
+    pub consensus_info_polling_interval: Duration,
+    pub bedrock_client_config: ClientConfig,
     pub channel_id: ChannelId,
 }
 

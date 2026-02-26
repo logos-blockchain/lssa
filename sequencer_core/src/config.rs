@@ -2,29 +2,20 @@ use std::{
     fs::File,
     io::BufReader,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::Result;
-pub use bedrock_client::BackoffConfig;
-use common::config::BasicAuth;
+use bedrock_client::BackoffConfig;
+use bytesize::ByteSize;
+use common::{
+    block::{AccountInitialData, CommitmentsInitialData},
+    config::BasicAuth,
+};
+use humantime_serde;
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
-use nssa::AccountId;
 use serde::{Deserialize, Serialize};
 use url::Url;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct for account serialization
-pub struct AccountInitialData {
-    pub account_id: AccountId,
-    pub balance: u128,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// Helperstruct to initialize commitments
-pub struct CommitmentsInitialData {
-    pub npk: nssa_core::NullifierPublicKey,
-    pub account: nssa_core::account::Account,
-}
 
 // TODO: Provide default values
 #[derive(Clone, Serialize, Deserialize)]
@@ -39,12 +30,17 @@ pub struct SequencerConfig {
     pub is_genesis_random: bool,
     /// Maximum number of transactions in block
     pub max_num_tx_in_block: usize,
+    /// Maximum block size (includes header and transactions)
+    #[serde(default = "default_max_block_size")]
+    pub max_block_size: ByteSize,
     /// Mempool maximum size
     pub mempool_max_size: usize,
     /// Interval in which blocks produced
-    pub block_create_timeout_millis: u64,
+    #[serde(with = "humantime_serde")]
+    pub block_create_timeout: Duration,
     /// Interval in which pending blocks are retried
-    pub retry_pending_blocks_timeout_millis: u64,
+    #[serde(with = "humantime_serde")]
+    pub retry_pending_blocks_timeout: Duration,
     /// Port to listen
     pub port: u16,
     /// List of initial accounts data
@@ -79,4 +75,8 @@ impl SequencerConfig {
 
         Ok(serde_json::from_reader(reader)?)
     }
+}
+
+fn default_max_block_size() -> ByteSize {
+    ByteSize::mib(1)
 }

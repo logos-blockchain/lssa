@@ -2,10 +2,12 @@ use std::{
     collections::HashMap,
     io::{BufReader, Write as _},
     path::Path,
+    time::Duration,
 };
 
 use anyhow::{Context as _, Result};
 use common::config::BasicAuth;
+use humantime_serde;
 use key_protocol::key_management::{
     KeyChain,
     key_tree::{
@@ -184,8 +186,9 @@ pub struct WalletConfig {
     pub override_rust_log: Option<String>,
     /// Sequencer URL
     pub sequencer_addr: Url,
-    /// Sequencer polling duration for new blocks in milliseconds
-    pub seq_poll_timeout_millis: u64,
+    /// Sequencer polling duration for new blocks
+    #[serde(with = "humantime_serde")]
+    pub seq_poll_timeout: Duration,
     /// Sequencer polling max number of blocks to find transaction
     pub seq_tx_poll_max_blocks: usize,
     /// Sequencer polling max number error retries
@@ -204,7 +207,7 @@ impl Default for WalletConfig {
         Self {
             override_rust_log: None,
             sequencer_addr: "http://127.0.0.1:3040".parse().unwrap(),
-            seq_poll_timeout_millis: 12000,
+            seq_poll_timeout: Duration::from_secs(12),
             seq_tx_poll_max_blocks: 5,
             seq_poll_max_retries: 5,
             seq_block_poll_max_amount: 100,
@@ -539,7 +542,7 @@ impl WalletConfig {
         let WalletConfig {
             override_rust_log,
             sequencer_addr,
-            seq_poll_timeout_millis,
+            seq_poll_timeout,
             seq_tx_poll_max_blocks,
             seq_poll_max_retries,
             seq_block_poll_max_amount,
@@ -550,7 +553,7 @@ impl WalletConfig {
         let WalletConfigOverrides {
             override_rust_log: o_override_rust_log,
             sequencer_addr: o_sequencer_addr,
-            seq_poll_timeout_millis: o_seq_poll_timeout_millis,
+            seq_poll_timeout: o_seq_poll_timeout,
             seq_tx_poll_max_blocks: o_seq_tx_poll_max_blocks,
             seq_poll_max_retries: o_seq_poll_max_retries,
             seq_block_poll_max_amount: o_seq_block_poll_max_amount,
@@ -566,9 +569,9 @@ impl WalletConfig {
             warn!("Overriding wallet config 'sequencer_addr' to {v}");
             *sequencer_addr = v;
         }
-        if let Some(v) = o_seq_poll_timeout_millis {
-            warn!("Overriding wallet config 'seq_poll_timeout_millis' to {v}");
-            *seq_poll_timeout_millis = v;
+        if let Some(v) = o_seq_poll_timeout {
+            warn!("Overriding wallet config 'seq_poll_timeout' to {v:?}");
+            *seq_poll_timeout = v;
         }
         if let Some(v) = o_seq_tx_poll_max_blocks {
             warn!("Overriding wallet config 'seq_tx_poll_max_blocks' to {v}");

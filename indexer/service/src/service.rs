@@ -15,11 +15,6 @@ use tokio::sync::mpsc::UnboundedSender;
 
 pub struct IndexerService {
     subscription_service: SubscriptionService,
-
-    #[expect(
-        dead_code,
-        reason = "Will be used in future implementations of RPC methods"
-    )]
     indexer: IndexerCore,
 }
 
@@ -53,33 +48,88 @@ impl indexer_service_rpc::RpcServer for IndexerService {
         Ok(())
     }
 
-    async fn get_block_by_id(&self, _block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
-        Err(not_yet_implemented_error())
+    async fn get_last_finalized_block_id(&self) -> Result<BlockId, ErrorObjectOwned> {
+        self.indexer.store.get_last_block_id().map_err(db_error)
     }
 
-    async fn get_block_by_hash(&self, _block_hash: HashType) -> Result<Block, ErrorObjectOwned> {
-        Err(not_yet_implemented_error())
+    async fn get_block_by_id(&self, block_id: BlockId) -> Result<Block, ErrorObjectOwned> {
+        Ok(self
+            .indexer
+            .store
+            .get_block_at_id(block_id)
+            .map_err(db_error)?
+            .into())
     }
 
-    async fn get_account(&self, _account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
-        Err(not_yet_implemented_error())
+    async fn get_block_by_hash(&self, block_hash: HashType) -> Result<Block, ErrorObjectOwned> {
+        Ok(self
+            .indexer
+            .store
+            .get_block_by_hash(block_hash.0)
+            .map_err(db_error)?
+            .into())
     }
 
-    async fn get_transaction(&self, _tx_hash: HashType) -> Result<Transaction, ErrorObjectOwned> {
-        Err(not_yet_implemented_error())
+    async fn get_account(&self, account_id: AccountId) -> Result<Account, ErrorObjectOwned> {
+        Ok(self
+            .indexer
+            .store
+            .get_account_final(&account_id.into())
+            .map_err(db_error)?
+            .into())
     }
 
-    async fn get_blocks(&self, _offset: u32, _limit: u32) -> Result<Vec<Block>, ErrorObjectOwned> {
-        Err(not_yet_implemented_error())
+    async fn get_transaction(&self, tx_hash: HashType) -> Result<Transaction, ErrorObjectOwned> {
+        Ok(self
+            .indexer
+            .store
+            .get_transaction_by_hash(tx_hash.0)
+            .map_err(db_error)?
+            .into())
+    }
+
+    async fn get_blocks(&self, offset: u32, limit: u32) -> Result<Vec<Block>, ErrorObjectOwned> {
+        let blocks = self
+            .indexer
+            .store
+            .get_block_batch(offset as u64, limit as u64)
+            .map_err(db_error)?;
+
+        let mut block_res = vec![];
+
+        for block in blocks {
+            block_res.push(block.into())
+        }
+
+        Ok(block_res)
     }
 
     async fn get_transactions_by_account(
         &self,
-        _account_id: AccountId,
-        _limit: u32,
-        _offset: u32,
+        account_id: AccountId,
+        limit: u32,
+        offset: u32,
     ) -> Result<Vec<Transaction>, ErrorObjectOwned> {
-        Err(not_yet_implemented_error())
+        let transactions = self
+            .indexer
+            .store
+            .get_transactions_by_account(account_id.value, offset as u64, limit as u64)
+            .map_err(db_error)?;
+
+        let mut tx_res = vec![];
+
+        for tx in transactions {
+            tx_res.push(tx.into())
+        }
+
+        Ok(tx_res)
+    }
+
+    async fn healthcheck(&self) -> Result<(), ErrorObjectOwned> {
+        // Checking, that indexer can calculate last state
+        let _ = self.indexer.store.final_state().map_err(db_error)?;
+
+        Ok(())
     }
 }
 
@@ -219,10 +269,18 @@ impl<T> Drop for Subscription<T> {
     }
 }
 
-fn not_yet_implemented_error() -> ErrorObjectOwned {
+pub fn not_yet_implemented_error() -> ErrorObjectOwned {
     ErrorObject::owned(
         ErrorCode::InternalError.code(),
         "Not yet implemented",
         Option::<String>::None,
+    )
+}
+
+fn db_error(err: anyhow::Error) -> ErrorObjectOwned {
+    ErrorObjectOwned::owned(
+        ErrorCode::InternalError.code(),
+        "DBError".to_string(),
+        Some(format!("{err:#?}")),
     )
 }
