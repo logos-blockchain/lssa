@@ -170,7 +170,7 @@ mod tests {
         let initial_acc1 = serde_json::from_str(
             r#"{
             "Public": {
-                "account_id": "KfDnqyHg5VVyhxnZyA9q3nCaJnuCscFogSDDC473Aqh",
+                "account_id": "GLuGnLWZahxEEMPWKhu2r2LYhdBzTB2EFPsNPUpg7KKc",
                 "pub_sign_key": [
                     188,
                     163,
@@ -213,7 +213,7 @@ mod tests {
         let initial_acc2 = serde_json::from_str(
             r#"{
             "Public": {
-                "account_id": "HcHYYUFwwyGyRQKincqNbpPHf3XYoMthq4LkfNymoZF3",
+                "account_id": "8wbZV1W1b6P2ShtsgJTh9p2uwjZ6KR6P6qc5u3uRvKPH",
                 "pub_sign_key": [
                     210,
                     59,

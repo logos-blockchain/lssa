@@ -8,7 +8,7 @@
   "initial_accounts": [
     {
       "Public": {
-        "account_id": "KfDnqyHg5VVyhxnZyA9q3nCaJnuCscFogSDDC473Aqh",
+        "account_id": "GLuGnLWZahxEEMPWKhu2r2LYhdBzTB2EFPsNPUpg7KKc",
         "pub_sign_key": [
           188, 163, 203, 45, 151, 154, 230, 254, 123, 114, 158, 130, 19, 182, 164, 143, 150, 131, 176, 7, 27, 58, 204, 116, 5, 247, 0, 255, 111, 160, 52, 201
         ]
@@ -16,7 +16,7 @@
     },
     {
       "Public": {
-        "account_id": "HcHYYUFwwyGyRQKincqNbpPHf3XYoMthq4LkfNymoZF3",
+        "account_id": "8wbZV1W1b6P2ShtsgJTh9p2uwjZ6KR6P6qc5u3uRvKPH",
         "pub_sign_key": [
           210, 59, 119, 137, 21, 153, 82, 22, 195, 82, 12, 16, 80, 156, 125, 199, 19, 173, 46, 224, 213, 144, 165, 126, 70, 129, 171, 141, 77, 212, 108, 233
         ]

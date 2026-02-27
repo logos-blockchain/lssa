@@ -47,13 +47,11 @@ impl PrivateKey {
         bytes.extend_from_slice(&secp256k1::PublicKey::serialize(&pk));
         let hashed: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
 
-        let tweaked_sk = PrivateKey::try_new(
+        PrivateKey::try_new(
             sk.add_tweak(&secp256k1::Scalar::from_be_bytes(hashed).unwrap())
                 .expect("Expect a valid Scalar")
                 .secret_bytes(),
-        );
-
-        tweaked_sk
+        )
     }
 }
 
