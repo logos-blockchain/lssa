@@ -2,6 +2,15 @@ use std::io;
 
 use thiserror::Error;
 
+#[macro_export]
+macro_rules! ensure {
+    ($cond:expr, $err:expr) => {
+        if !$cond {
+            return Err($err);
+        }
+    };
+}
+
 #[derive(Error, Debug)]
 pub enum NssaError {
     #[error("Invalid input: {0}")]
