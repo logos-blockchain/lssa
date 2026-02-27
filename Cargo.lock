@@ -8990,7 +8990,6 @@ dependencies = [
  "async-stream",
  "base64 0.22.1",
  "borsh",
- "bytemuck",
  "clap",
  "common",
  "env_logger",

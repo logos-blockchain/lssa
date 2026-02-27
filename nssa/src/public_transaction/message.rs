@@ -18,7 +18,10 @@ pub struct Message {
 impl std::fmt::Debug for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let program_id_hex = hex::encode(
-            self.program_id.iter().flat_map(|n| n.to_le_bytes()).collect::<Vec<u8>>(),
+            self.program_id
+                .iter()
+                .flat_map(|n| n.to_le_bytes())
+                .collect::<Vec<u8>>(),
         );
         f.debug_struct("Message")
             .field("program_id", &program_id_hex)

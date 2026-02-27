@@ -70,7 +70,10 @@ impl std::fmt::Debug for Message {
             .field("public_account_ids", &self.public_account_ids)
             .field("nonces", &self.nonces)
             .field("public_post_states", &self.public_post_states)
-            .field("encrypted_private_post_states", &self.encrypted_private_post_states)
+            .field(
+                "encrypted_private_post_states",
+                &self.encrypted_private_post_states,
+            )
             .field("new_commitments", &self.new_commitments)
             .field("new_nullifiers", &nullifiers)
             .finish()
