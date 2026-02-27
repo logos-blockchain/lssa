@@ -10,6 +10,10 @@
     };
 
     crane.url = "github:ipetkov/crane";
+
+    logos-blockchain-circuits = {
+      url = "github:logos-blockchain/logos-blockchain-circuits";
+    };
   };
 
   outputs =
@@ -18,6 +22,7 @@
       nixpkgs,
       rust-overlay,
       crane,
+      logos-blockchain-circuits,
       ...
     }:
     let
@@ -107,6 +112,7 @@
             '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
               export PATH="$PATH:/usr/bin"
             '';
+            LOGOS_BLOCKCHAIN_CIRCUITS = logos-blockchain-circuits.packages.${system}.default;
           };
 
           walletFfiPackage = craneLib.buildPackage (
