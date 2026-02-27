@@ -45,6 +45,16 @@ impl PublicTransaction {
             .collect()
     }
 
+    pub fn affected_public_account_ids(&self) -> Vec<AccountId> {
+        let mut acc_set = self
+            .signer_account_ids()
+            .into_iter()
+            .collect::<HashSet<_>>();
+        acc_set.extend(&self.message.account_ids);
+
+        acc_set.into_iter().collect()
+    }
+
     pub fn hash(&self) -> [u8; 32] {
         let bytes = self.to_bytes();
         let mut hasher = sha2::Sha256::new();

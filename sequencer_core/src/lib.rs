@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::Path, time::Instant};
+use std::{path::Path, time::Instant};
 
 use anyhow::{Context as _, Result, anyhow};
 use bedrock_client::SignedMantleTx;
@@ -13,7 +13,6 @@ use config::SequencerConfig;
 use log::{error, info, warn};
 use logos_blockchain_key_management_system_service::keys::{ED25519_SECRET_KEY_SIZE, Ed25519Key};
 use mempool::{MemPool, MemPoolHandle};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     block_settlement_client::{BlockSettlementClient, BlockSettlementClientTrait, MsgId},
@@ -43,20 +42,6 @@ pub struct SequencerCore<
     block_settlement_client: BC,
     indexer_client: IC,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum TransactionMalformationError {
-    InvalidSignature,
-    FailedToDecode { tx: HashType },
-}
-
-impl Display for TransactionMalformationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:#?}")
-    }
-}
-
-impl std::error::Error for TransactionMalformationError {}
 
 impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, IC> {
     /// Starts the sequencer using the provided configuration.
@@ -177,9 +162,19 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
     }
 
     pub async fn produce_new_block(&mut self) -> Result<u64> {
-        let (_tx, _msg_id) = self
+        let (tx, _msg_id) = self
             .produce_new_block_with_mempool_transactions()
             .context("Failed to produce new block with mempool transactions")?;
+        match self
+            .block_settlement_client
+            .submit_inscribe_tx_to_bedrock(tx)
+            .await
+        {
+            Ok(()) => {}
+            Err(err) => {
+                error!("Failed to post block data to Bedrock with error: {err:#}");
+            }
+        }
 
         Ok(self.chain_height)
     }
@@ -194,12 +189,48 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
 
         let mut valid_transactions = vec![];
 
+        let max_block_size = self.sequencer_config.max_block_size.as_u64() as usize;
+
+        let latest_block_meta = self
+            .store
+            .latest_block_meta()
+            .context("Failed to get latest block meta from store")?;
+
+        let curr_time = chrono::Utc::now().timestamp_millis() as u64;
+
         while let Some(tx) = self.mempool.pop() {
             let tx_hash = tx.hash();
+
+            // Check if block size exceeds limit
+            let temp_valid_transactions =
+                [valid_transactions.as_slice(), std::slice::from_ref(&tx)].concat();
+            let temp_hashable_data = HashableBlockData {
+                block_id: new_block_height,
+                transactions: temp_valid_transactions,
+                prev_block_hash: latest_block_meta.hash,
+                timestamp: curr_time,
+            };
+
+            let block_size = borsh::to_vec(&temp_hashable_data)
+                .context("Failed to serialize block for size check")?
+                .len();
+
+            if block_size > max_block_size {
+                // Block would exceed size limit, remove last transaction and push back
+                warn!(
+                    "Transaction with hash {tx_hash} deferred to next block: \
+                     block size {block_size} bytes would exceed limit of {max_block_size} bytes",
+                );
+
+                self.mempool.push_front(tx);
+                break;
+            }
+
             match self.execute_check_transaction_on_state(tx) {
                 Ok(valid_tx) => {
-                    info!("Validated transaction with hash {tx_hash}, including it in block",);
                     valid_transactions.push(valid_tx);
+
+                    info!("Validated transaction with hash {tx_hash}, including it in block");
 
                     if valid_transactions.len() >= self.sequencer_config.max_num_tx_in_block {
                         break;
@@ -213,13 +244,6 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
                 }
             }
         }
-
-        let latest_block_meta = self
-            .store
-            .latest_block_meta()
-            .context("Failed to get latest block meta from store")?;
-
-        let curr_time = chrono::Utc::now().timestamp_millis() as u64;
 
         let hashable_data = HashableBlockData {
             block_id: new_block_height,
@@ -314,30 +338,6 @@ impl<BC: BlockSettlementClientTrait, IC: IndexerClientTrait> SequencerCore<BC, I
     }
 }
 
-// TODO: Introduce type-safe wrapper around checked transaction, e.g. AuthenticatedTransaction
-pub fn transaction_pre_check(
-    tx: NSSATransaction,
-) -> Result<NSSATransaction, TransactionMalformationError> {
-    // Stateless checks here
-    match tx {
-        NSSATransaction::Public(tx) => {
-            if tx.witness_set().is_valid_for(tx.message()) {
-                Ok(NSSATransaction::Public(tx))
-            } else {
-                Err(TransactionMalformationError::InvalidSignature)
-            }
-        }
-        NSSATransaction::PrivacyPreserving(tx) => {
-            if tx.witness_set().signatures_are_valid_for(tx.message()) {
-                Ok(NSSATransaction::PrivacyPreserving(tx))
-            } else {
-                Err(TransactionMalformationError::InvalidSignature)
-            }
-        }
-        NSSATransaction::ProgramDeployment(tx) => Ok(NSSATransaction::ProgramDeployment(tx)),
-    }
-}
-
 /// Load signing key from file or generate a new one if it doesn't exist
 fn load_or_create_signing_key(path: &Path) -> Result<Ed25519Key> {
     if path.exists() {
@@ -360,19 +360,21 @@ fn load_or_create_signing_key(path: &Path) -> Result<Ed25519Key> {
 
 #[cfg(all(test, feature = "mock"))]
 mod tests {
-    use std::{pin::pin, str::FromStr as _};
+    use std::{pin::pin, str::FromStr as _, time::Duration};
 
     use base58::ToBase58;
     use bedrock_client::BackoffConfig;
-    use common::{test_utils::sequencer_sign_key_for_testing, transaction::NSSATransaction};
+    use common::{
+        block::AccountInitialData, test_utils::sequencer_sign_key_for_testing,
+        transaction::NSSATransaction,
+    };
     use logos_blockchain_core::mantle::ops::channel::ChannelId;
     use mempool::MemPoolHandle;
     use nssa::{AccountId, PrivateKey};
 
     use crate::{
-        config::{AccountInitialData, BedrockConfig, SequencerConfig},
+        config::{BedrockConfig, SequencerConfig},
         mock::SequencerCoreWithMockClients,
-        transaction_pre_check,
     };
 
     fn setup_sequencer_config_variable_initial_accounts(
@@ -387,22 +389,23 @@ mod tests {
             genesis_id: 1,
             is_genesis_random: false,
             max_num_tx_in_block: 10,
+            max_block_size: bytesize::ByteSize::mib(1),
             mempool_max_size: 10000,
-            block_create_timeout_millis: 1000,
+            block_create_timeout: Duration::from_secs(1),
             port: 8080,
             initial_accounts,
             initial_commitments: vec![],
             signing_key: *sequencer_sign_key_for_testing().value(),
             bedrock_config: BedrockConfig {
                 backoff: BackoffConfig {
-                    start_delay_millis: 100,
+                    start_delay: Duration::from_millis(100),
                     max_retries: 5,
                 },
                 channel_id: ChannelId::from([0; 32]),
                 node_url: "http://not-used-in-unit-tests".parse().unwrap(),
                 auth: None,
             },
-            retry_pending_blocks_timeout_millis: 1000 * 60 * 4,
+            retry_pending_blocks_timeout: Duration::from_secs(60 * 4),
             indexer_rpc_url: "ws://localhost:8779".parse().unwrap(),
         }
     }
@@ -526,7 +529,7 @@ mod tests {
     #[test]
     fn test_transaction_pre_check_pass() {
         let tx = common::test_utils::produce_dummy_empty_transaction();
-        let result = transaction_pre_check(tx);
+        let result = tx.transaction_stateless_check();
 
         assert!(result.is_ok());
     }
@@ -543,7 +546,7 @@ mod tests {
         let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10, sign_key1,
         );
-        let result = transaction_pre_check(tx);
+        let result = tx.transaction_stateless_check();
 
         assert!(result.is_ok());
     }
@@ -562,7 +565,7 @@ mod tests {
         );
 
         // Signature is valid, stateless check pass
-        let tx = transaction_pre_check(tx).unwrap();
+        let tx = tx.transaction_stateless_check().unwrap();
 
         // Signature is not from sender. Execution fails
         let result = sequencer.execute_check_transaction_on_state(tx);
@@ -586,7 +589,7 @@ mod tests {
             acc1, 0, acc2, 10000000, sign_key1,
         );
 
-        let result = transaction_pre_check(tx);
+        let result = tx.transaction_stateless_check();
 
         // Passed pre-check
         assert!(result.is_ok());

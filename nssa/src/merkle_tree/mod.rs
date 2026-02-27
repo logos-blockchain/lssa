@@ -21,7 +21,7 @@ fn hash_value(value: &Value) -> Node {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub struct MerkleTree {
     nodes: Vec<Node>,
     capacity: usize,

@@ -17,6 +17,8 @@ serde_json.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
+humantime-serde.workspace = true
+humantime.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 clap.workspace = true
 base64.workspace = true

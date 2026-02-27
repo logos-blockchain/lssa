@@ -52,7 +52,7 @@ fn get_cors(cors_allowed_origins: &[String]) -> Cors {
         .max_age(3600)
 }
 
-pub fn new_http_server(
+pub async fn new_http_server(
     config: RpcConfig,
     seuquencer_core: Arc<Mutex<SequencerCore>>,
     mempool_handle: MemPoolHandle<NSSATransaction>,
@@ -63,9 +63,16 @@ pub fn new_http_server(
         limits_config,
     } = config;
     info!(target:NETWORK, "Starting HTTP server at {addr}");
+    let max_block_size = seuquencer_core
+        .lock()
+        .await
+        .sequencer_config()
+        .max_block_size
+        .as_u64() as usize;
     let handler = web::Data::new(JsonHandler {
         sequencer_state: seuquencer_core.clone(),
         mempool_handle,
+        max_block_size,
     });
 
     // HTTP server
@@ -73,7 +80,10 @@ pub fn new_http_server(
         App::new()
             .wrap(get_cors(&cors_allowed_origins))
             .app_data(handler.clone())
-            .app_data(web::JsonConfig::default().limit(limits_config.json_payload_max_size))
+            .app_data(
+                web::JsonConfig::default()
+                    .limit(limits_config.json_payload_max_size.as_u64() as usize),
+            )
             .wrap(middleware::Logger::default())
             .service(web::resource("/").route(web::post().to(rpc_handler::<JsonHandler>)))
     })

@@ -8,22 +8,22 @@ use wallet::cli::{Command, config::ConfigSubcommand};
 async fn modify_config_field() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
-    let old_seq_poll_timeout_millis = ctx.wallet().config().seq_poll_timeout_millis;
+    let old_seq_poll_timeout = ctx.wallet().config().seq_poll_timeout;
 
     // Change config field
     let command = Command::Config(ConfigSubcommand::Set {
-        key: "seq_poll_timeout_millis".to_string(),
-        value: "1000".to_string(),
+        key: "seq_poll_timeout".to_string(),
+        value: "1s".to_string(),
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 
-    let new_seq_poll_timeout_millis = ctx.wallet().config().seq_poll_timeout_millis;
-    assert_eq!(new_seq_poll_timeout_millis, 1000);
+    let new_seq_poll_timeout = ctx.wallet().config().seq_poll_timeout;
+    assert_eq!(new_seq_poll_timeout, std::time::Duration::from_secs(1));
 
     // Return how it was at the beginning
     let command = Command::Config(ConfigSubcommand::Set {
-        key: "seq_poll_timeout_millis".to_string(),
-        value: old_seq_poll_timeout_millis.to_string(),
+        key: "seq_poll_timeout".to_string(),
+        value: format!("{:?}", old_seq_poll_timeout),
     });
     wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
 

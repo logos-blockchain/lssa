@@ -99,9 +99,8 @@ impl Drop for SequencerHandle {
 }
 
 pub async fn startup_sequencer(app_config: SequencerConfig) -> Result<SequencerHandle> {
-    let block_timeout = Duration::from_millis(app_config.block_create_timeout_millis);
-    let retry_pending_blocks_timeout =
-        Duration::from_millis(app_config.retry_pending_blocks_timeout_millis);
+    let block_timeout = app_config.block_create_timeout;
+    let retry_pending_blocks_timeout = app_config.retry_pending_blocks_timeout;
     let port = app_config.port;
 
     let (sequencer_core, mempool_handle) = SequencerCore::start_from_config(app_config).await;
@@ -114,10 +113,19 @@ pub async fn startup_sequencer(app_config: SequencerConfig) -> Result<SequencerH
         RpcConfig::with_port(port),
         Arc::clone(&seq_core_wrapped),
         mempool_handle,
-    )?;
+    )
+    .await?;
     info!("HTTP server started");
     let http_server_handle = http_server.handle();
     tokio::spawn(http_server);
+
+    #[cfg(not(feature = "standalone"))]
+    {
+        info!("Submitting stored pending blocks");
+        retry_pending_blocks(&seq_core_wrapped)
+            .await
+            .expect("Failed to submit pending blocks on startup");
+    }
 
     info!("Starting main sequencer loop");
     let main_loop_handle = tokio::spawn(main_loop(Arc::clone(&seq_core_wrapped), block_timeout));
@@ -160,46 +168,65 @@ async fn main_loop(seq_core: Arc<Mutex<SequencerCore>>, block_timeout: Duration)
 }
 
 #[cfg(not(feature = "standalone"))]
+async fn retry_pending_blocks(seq_core: &Arc<Mutex<SequencerCore>>) -> Result<()> {
+    use std::time::Instant;
+
+    use log::debug;
+
+    let (pending_blocks, block_settlement_client) = {
+        let sequencer_core = seq_core.lock().await;
+        let client = sequencer_core.block_settlement_client();
+        let pending_blocks = sequencer_core
+            .get_pending_blocks()
+            .expect("Sequencer should be able to retrieve pending blocks");
+        (pending_blocks, client)
+    };
+
+    if !pending_blocks.is_empty() {
+        info!(
+            "Resubmitting blocks from {} to {}",
+            pending_blocks.first().unwrap().header.block_id,
+            pending_blocks.last().unwrap().header.block_id
+        );
+    }
+
+    for block in pending_blocks.iter() {
+        debug!(
+            "Resubmitting pending block with id {}",
+            block.header.block_id
+        );
+        // TODO: We could cache the inscribe tx for each pending block to avoid re-creating it
+        // on every retry.
+        let now = Instant::now();
+        let (tx, _msg_id) = block_settlement_client
+            .create_inscribe_tx(block)
+            .context("Failed to create inscribe tx for pending block")?;
+
+        debug!(">>>> Create inscribe: {:?}", now.elapsed());
+
+        let now = Instant::now();
+        if let Err(e) = block_settlement_client
+            .submit_inscribe_tx_to_bedrock(tx)
+            .await
+        {
+            warn!(
+                "Failed to resubmit block with id {} with error {e:#}",
+                block.header.block_id
+            );
+        }
+        debug!(">>>> Post: {:?}", now.elapsed());
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "standalone"))]
 async fn retry_pending_blocks_loop(
     seq_core: Arc<Mutex<SequencerCore>>,
     retry_pending_blocks_timeout: Duration,
 ) -> Result<Never> {
     loop {
         tokio::time::sleep(retry_pending_blocks_timeout).await;
-
-        let (pending_blocks, block_settlement_client) = {
-            let sequencer_core = seq_core.lock().await;
-            let client = sequencer_core.block_settlement_client();
-            let pending_blocks = sequencer_core
-                .get_pending_blocks()
-                .expect("Sequencer should be able to retrieve pending blocks");
-            (pending_blocks, client)
-        };
-
-        if let Some(block) = pending_blocks
-            .iter()
-            .min_by_key(|block| block.header.block_id)
-        {
-            info!(
-                "Resubmitting pending block with id {}",
-                block.header.block_id
-            );
-            // TODO: We could cache the inscribe tx for each pending block to avoid re-creating
-            // it on every retry.
-            let (tx, _msg_id) = block_settlement_client
-                .create_inscribe_tx(block)
-                .context("Failed to create inscribe tx for pending block")?;
-
-            if let Err(e) = block_settlement_client
-                .submit_inscribe_tx_to_bedrock(tx)
-                .await
-            {
-                warn!(
-                    "Failed to resubmit block with id {} with error {e:#}",
-                    block.header.block_id
-                );
-            }
-        }
+        retry_pending_blocks(&seq_core).await?;
     }
 }
 

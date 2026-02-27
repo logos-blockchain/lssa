@@ -77,7 +77,7 @@ pub fn new_definition(
     );
 
     // LP Token minting calculation
-    // We assume LP is based on the initial deposit amount for Token_A.
+    let initial_lp = (token_a_amount.get() * token_b_amount.get()).isqrt();
 
     // Update pool account
     let mut pool_post = pool.account.clone();
@@ -87,7 +87,7 @@ pub fn new_definition(
         vault_a_id: vault_a.account_id,
         vault_b_id: vault_b.account_id,
         liquidity_pool_id: pool_definition_lp.account_id,
-        liquidity_pool_supply: token_a_amount.into(),
+        liquidity_pool_supply: initial_lp,
         reserve_a: token_a_amount.into(),
         reserve_b: token_b_amount.into(),
         fees: 0u128, // TODO: we assume all fees are 0 for now.
@@ -124,11 +124,11 @@ pub fn new_definition(
     let instruction = if pool.account == Account::default() {
         token_core::Instruction::NewFungibleDefinition {
             name: String::from("LP Token"),
-            total_supply: token_a_amount.into(),
+            total_supply: initial_lp,
         }
     } else {
         token_core::Instruction::Mint {
-            amount_to_mint: token_a_amount.into(),
+            amount_to_mint: initial_lp,
         }
     };
 
