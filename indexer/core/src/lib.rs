@@ -15,7 +15,6 @@ use crate::{block_store::IndexerStore, config::IndexerConfig};
 
 pub mod block_store;
 pub mod config;
-pub mod state;
 
 #[derive(Clone)]
 pub struct IndexerCore {
@@ -123,6 +122,10 @@ impl IndexerCore {
                         l2_blocks: l2_block_vec,
                         l1_header,
                     } in start_buff {
+                        let mut l2_blocks_parsed_ids: Vec<_> = l2_block_vec.iter().map(|block| block.header.block_id).collect();
+                        l2_blocks_parsed_ids.sort();
+                        info!("Parsed {} L2 blocks with ids {:?}", l2_block_vec.len(), l2_blocks_parsed_ids);
+
                         for l2_block in l2_block_vec {
                             self.store.put_block(l2_block.clone(), l1_header)?;
 
@@ -153,6 +156,10 @@ impl IndexerCore {
                     l2_blocks: l2_block_vec,
                     l1_header: header,
                 } in buff {
+                    let mut l2_blocks_parsed_ids: Vec<_> = l2_block_vec.iter().map(|block| block.header.block_id).collect();
+                    l2_blocks_parsed_ids.sort();
+                    info!("Parsed {} L2 blocks with ids {:?}", l2_block_vec.len(), l2_blocks_parsed_ids);
+
                     for l2_block in l2_block_vec {
                         self.store.put_block(l2_block.clone(), header)?;
 
@@ -260,7 +267,7 @@ impl IndexerCore {
 
         Ok(BackfillData {
             block_data: block_buffer,
-            curr_fin_l1_lib_header: backfill_limit,
+            curr_fin_l1_lib_header: curr_last_l1_lib_header,
         })
     }
 

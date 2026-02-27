@@ -28,7 +28,7 @@ pub fn App() -> impl IntoView {
 
     view! {
         <Stylesheet id="leptos" href="/explorer.css" />
-        <Title text="LEE Blockchain Explorer" />
+        <Title text="LEZ Block Explorer" />
         <Meta name="description" content="Explore the blockchain - view blocks, transactions, and accounts" />
 
         <Router>
@@ -36,7 +36,7 @@ pub fn App() -> impl IntoView {
                 <header class="app-header">
                     <nav class="app-nav">
                         <a href="/" class="nav-logo">
-                            "LEE Blockchain Explorer"
+                            "LEZ Block Explorer"
                         </a>
                     </nav>
                 </header>
@@ -69,7 +69,7 @@ pub fn App() -> impl IntoView {
                 </main>
 
                 <footer class="app-footer">
-                    <p>"LEE Blockchain Explorer © 2026"</p>
+                    <p>"LEZ Block Explorer © 2026"</p>
                 </footer>
             </div>
         </Router>

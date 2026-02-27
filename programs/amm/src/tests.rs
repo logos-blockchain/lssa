@@ -70,7 +70,7 @@ impl BalanceForTests {
     }
 
     fn remove_actual_a_successful() -> u128 {
-        100
+        141
     }
 
     fn remove_min_amount_b_low() -> u128 {
@@ -103,6 +103,11 @@ impl BalanceForTests {
 
     fn add_min_amount_lp() -> u128 {
         20
+    }
+
+    fn lp_supply_init() -> u128 {
+        // sqrt(vault_a_reserve_init * vault_b_reserve_init) = sqrt(1000 * 500) = 707
+        (BalanceForTests::vault_a_reserve_init() * BalanceForTests::vault_b_reserve_init()).isqrt()
     }
 
     fn vault_a_swap_test_1() -> u128 {
@@ -142,11 +147,11 @@ impl BalanceForTests {
     }
 
     fn vault_a_remove_successful() -> u128 {
-        900
+        859
     }
 
     fn vault_b_remove_successful() -> u128 {
-        450
+        430
     }
 }
 
@@ -249,7 +254,7 @@ impl ChainedCallForTests {
             TOKEN_PROGRAM_ID,
             vec![pool_lp_auth, AccountForTests::user_holding_lp_init()],
             &token_core::Instruction::Mint {
-                amount_to_mint: BalanceForTests::add_successful_amount_a(),
+                amount_to_mint: 282,
             },
         )
         .with_pda_seeds(vec![compute_liquidity_token_pda_seed(
@@ -282,7 +287,7 @@ impl ChainedCallForTests {
             TOKEN_PROGRAM_ID,
             vec![vault_b_auth, AccountForTests::user_holding_b()],
             &token_core::Instruction::Transfer {
-                amount_to_transfer: BalanceForTests::remove_min_amount_b_low(),
+                amount_to_transfer: 70,
             },
         )
         .with_pda_seeds(vec![compute_vault_pda_seed(
@@ -341,7 +346,7 @@ impl ChainedCallForTests {
                 AccountForTests::user_holding_lp_uninit(),
             ],
             &token_core::Instruction::Mint {
-                amount_to_mint: BalanceForTests::add_successful_amount_a(),
+                amount_to_mint: BalanceForTests::lp_supply_init(),
             },
         )
         .with_pda_seeds(vec![compute_liquidity_token_pda_seed(
@@ -568,7 +573,7 @@ impl AccountForTests {
                 balance: 0u128,
                 data: Data::from(&TokenDefinition::Fungible {
                     name: String::from("test"),
-                    total_supply: BalanceForTests::vault_a_reserve_init(),
+                    total_supply: BalanceForTests::lp_supply_init(),
                     metadata_id: None,
                 }),
                 nonce: 0,
@@ -585,7 +590,7 @@ impl AccountForTests {
                 balance: 0u128,
                 data: Data::from(&TokenDefinition::Fungible {
                     name: String::from("test"),
-                    total_supply: BalanceForTests::vault_a_reserve_init(),
+                    total_supply: BalanceForTests::lp_supply_init(),
                     metadata_id: None,
                 }),
                 nonce: 0,
@@ -638,7 +643,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: BalanceForTests::vault_a_reserve_init(),
                     reserve_b: BalanceForTests::vault_b_reserve_init(),
                     fees: 0u128,
@@ -662,7 +667,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: 0,
                     reserve_b: BalanceForTests::vault_b_reserve_init(),
                     fees: 0u128,
@@ -686,7 +691,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: BalanceForTests::vault_a_reserve_init(),
                     reserve_b: 0,
                     fees: 0u128,
@@ -758,7 +763,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: BalanceForTests::vault_a_swap_test_1(),
                     reserve_b: BalanceForTests::vault_b_swap_test_1(),
                     fees: 0u128,
@@ -782,7 +787,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: BalanceForTests::vault_a_swap_test_2(),
                     reserve_b: BalanceForTests::vault_b_swap_test_2(),
                     fees: 0u128,
@@ -830,7 +835,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_add_successful(),
+                    liquidity_pool_supply: 989,
                     reserve_a: BalanceForTests::vault_a_add_successful(),
                     reserve_b: BalanceForTests::vault_b_add_successful(),
                     fees: 0u128,
@@ -854,7 +859,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_remove_successful(),
+                    liquidity_pool_supply: 607,
                     reserve_a: BalanceForTests::vault_a_remove_successful(),
                     reserve_b: BalanceForTests::vault_b_remove_successful(),
                     fees: 0u128,
@@ -878,7 +883,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: BalanceForTests::vault_a_reserve_init(),
                     reserve_b: BalanceForTests::vault_b_reserve_init(),
                     fees: 0u128,
@@ -902,7 +907,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: BalanceForTests::vault_a_reserve_init(),
                     reserve_b: BalanceForTests::vault_b_reserve_init(),
                     fees: 0u128,
@@ -958,7 +963,7 @@ impl AccountForTests {
                     vault_a_id: IdForTests::vault_a_id(),
                     vault_b_id: IdForTests::vault_b_id(),
                     liquidity_pool_id: IdForTests::token_lp_definition_id(),
-                    liquidity_pool_supply: BalanceForTests::vault_a_reserve_init(),
+                    liquidity_pool_supply: BalanceForTests::lp_supply_init(),
                     reserve_a: BalanceForTests::vault_a_reserve_init(),
                     reserve_b: BalanceForTests::vault_b_reserve_init(),
                     fees: 0u128,
@@ -1716,4 +1721,74 @@ fn test_call_swap_chained_call_successful_2() {
         chained_call_b,
         ChainedCallForTests::cc_swap_token_b_test_2()
     );
+}
+
+#[test]
+fn test_new_definition_lp_asymmetric_amounts() {
+    let (post_states, chained_calls) = new_definition(
+        AccountForTests::pool_definition_inactive(),
+        AccountForTests::vault_a_init(),
+        AccountForTests::vault_b_init(),
+        AccountForTests::pool_lp_init(),
+        AccountForTests::user_holding_a(),
+        AccountForTests::user_holding_b(),
+        AccountForTests::user_holding_lp_uninit(),
+        NonZero::new(BalanceForTests::vault_a_reserve_init()).unwrap(),
+        NonZero::new(BalanceForTests::vault_b_reserve_init()).unwrap(),
+        AMM_PROGRAM_ID,
+    );
+
+    // check the minted LP amount
+    let pool_post = post_states[0].clone();
+    let pool_def = PoolDefinition::try_from(&pool_post.account().data).unwrap();
+    assert_eq!(
+        pool_def.liquidity_pool_supply,
+        BalanceForTests::lp_supply_init()
+    );
+
+    let chained_call_lp = chained_calls[0].clone();
+    assert!(chained_call_lp == ChainedCallForTests::cc_new_definition_token_lp());
+}
+
+#[test]
+fn test_new_definition_lp_symmetric_amounts() {
+    // token_a=100, token_b=100 → LP=sqrt(10_000)=100
+    let token_a_amount = 100u128;
+    let token_b_amount = 100u128;
+    let expected_lp = (token_a_amount * token_b_amount).isqrt();
+    assert_eq!(expected_lp, 100);
+
+    let (post_states, chained_calls) = new_definition(
+        AccountForTests::pool_definition_inactive(),
+        AccountForTests::vault_a_init(),
+        AccountForTests::vault_b_init(),
+        AccountForTests::pool_lp_init(),
+        AccountForTests::user_holding_a(),
+        AccountForTests::user_holding_b(),
+        AccountForTests::user_holding_lp_uninit(),
+        NonZero::new(token_a_amount).unwrap(),
+        NonZero::new(token_b_amount).unwrap(),
+        AMM_PROGRAM_ID,
+    );
+
+    let pool_post = post_states[0].clone();
+    let pool_def = PoolDefinition::try_from(&pool_post.account().data).unwrap();
+    assert_eq!(pool_def.liquidity_pool_supply, expected_lp);
+
+    let chained_call_lp = chained_calls[0].clone();
+    let expected_lp_call = ChainedCall::new(
+        TOKEN_PROGRAM_ID,
+        vec![
+            AccountForTests::pool_lp_init(),
+            AccountForTests::user_holding_lp_uninit(),
+        ],
+        &token_core::Instruction::Mint {
+            amount_to_mint: expected_lp,
+        },
+    )
+    .with_pda_seeds(vec![compute_liquidity_token_pda_seed(
+        IdForTests::pool_definition_id(),
+    )]);
+
+    assert_eq!(chained_call_lp, expected_lp_call);
 }

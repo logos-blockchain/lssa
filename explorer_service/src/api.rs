@@ -83,6 +83,17 @@ pub async fn get_block_by_id(block_id: BlockId) -> Result<Block, ServerFnError> 
         .map_err(|e| ServerFnError::ServerError(format!("RPC error: {}", e)))
 }
 
+/// Get latest block ID
+#[server]
+pub async fn get_latest_block_id() -> Result<BlockId, ServerFnError> {
+    use indexer_service_rpc::RpcClient as _;
+    let client = expect_context::<IndexerRpcClient>();
+    client
+        .get_last_finalized_block_id()
+        .await
+        .map_err(|e| ServerFnError::ServerError(format!("RPC error: {}", e)))
+}
+
 /// Get block by hash
 #[server]
 pub async fn get_block_by_hash(block_hash: HashType) -> Result<Block, ServerFnError> {
