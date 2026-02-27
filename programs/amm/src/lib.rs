@@ -7,4 +7,5 @@ pub mod new_definition;
 pub mod remove;
 pub mod swap;
 
+mod full_tests;
 mod tests;
