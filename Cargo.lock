@@ -1765,6 +1765,7 @@ dependencies = [
  "serde_with",
  "sha2",
  "thiserror 2.0.18",
+ "tokio-retry",
  "url",
 ]
 
@@ -2733,6 +2734,7 @@ dependencies = [
  "env_logger",
  "indexer_service_protocol",
  "indexer_service_rpc",
+ "itertools 0.14.0",
  "jsonrpsee",
  "leptos",
  "leptos_axum",

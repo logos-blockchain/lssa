@@ -182,8 +182,16 @@ async fn retry_pending_blocks(seq_core: &Arc<Mutex<SequencerCore>>) -> Result<()
         (pending_blocks, client)
     };
 
-    for block in pending_blocks.iter() {
+    if !pending_blocks.is_empty() {
         info!(
+            "Resubmitting blocks from {} to {}",
+            pending_blocks.first().unwrap().header.block_id,
+            pending_blocks.last().unwrap().header.block_id
+        );
+    }
+
+    for block in pending_blocks.iter() {
+        debug!(
             "Resubmitting pending block with id {}",
             block.header.block_id
         );
