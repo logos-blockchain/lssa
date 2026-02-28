@@ -5,7 +5,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     let mod_dir = out_dir.join("program_methods");
     let mod_file = mod_dir.join("mod.rs");
-    let program_methods_dir = manifest_dir.join("../artifacts/program_methods/");
+    // Allow overriding the artifacts directory via environment variable.
+    // This is needed for reproducible/sandboxed builds (e.g., Nix) where the
+    // default relative path may resolve to a read-only location.
+    let program_methods_dir = env::var("NSSA_ARTIFACTS_DIR")
+        .map(|d| PathBuf::from(d).join("program_methods"))
+        .unwrap_or_else(|_| manifest_dir.join("../artifacts/program_methods/"));
 
     println!("cargo:rerun-if-changed={}", program_methods_dir.display());
 
