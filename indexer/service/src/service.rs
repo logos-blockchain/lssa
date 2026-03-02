@@ -127,7 +127,7 @@ impl indexer_service_rpc::RpcServer for IndexerService {
 
     async fn healthcheck(&self) -> Result<(), ErrorObjectOwned> {
         // Checking, that indexer can calculate last state
-        let _ = self.indexer.store.final_state().map_err(db_error)?;
+        let _ = self.indexer.store.final_state_db().map_err(db_error)?;
 
         Ok(())
     }
@@ -179,7 +179,7 @@ impl SubscriptionService {
         Ok(())
     }
 
-    fn spawn_respond_subscribers_loop(indexer: IndexerCore) -> SubscriptionLoopParts {
+    fn spawn_respond_subscribers_loop(mut indexer: IndexerCore) -> SubscriptionLoopParts {
         let (new_subscription_sender, mut sub_receiver) =
             tokio::sync::mpsc::unbounded_channel::<Subscription<BlockId>>();
 

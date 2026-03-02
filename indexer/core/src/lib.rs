@@ -98,7 +98,9 @@ impl IndexerCore {
         })
     }
 
-    pub async fn subscribe_parse_block_stream(&self) -> impl futures::Stream<Item = Result<Block>> {
+    pub async fn subscribe_parse_block_stream(
+        &mut self,
+    ) -> impl futures::Stream<Item = Result<Block>> {
         async_stream::stream! {
             info!("Searching for initial header");
 

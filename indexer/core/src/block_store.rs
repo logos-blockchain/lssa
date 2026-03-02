@@ -12,6 +12,7 @@ use storage::indexer::RocksDBIO;
 #[derive(Clone)]
 pub struct IndexerStore {
     dbio: Arc<RocksDBIO>,
+    final_state: V02State,
 }
 
 impl IndexerStore {
@@ -24,9 +25,11 @@ impl IndexerStore {
         start_data: Option<(Block, V02State)>,
     ) -> Result<Self> {
         let dbio = RocksDBIO::open_or_create(location, start_data)?;
+        let final_state = dbio.final_state()?;
 
         Ok(Self {
             dbio: Arc::new(dbio),
+            final_state,
         })
     }
 
@@ -95,22 +98,30 @@ impl IndexerStore {
         Ok(self.dbio.calculate_state_for_id(block_id)?)
     }
 
-    pub fn final_state(&self) -> Result<V02State> {
+    pub fn final_state(&self) -> &V02State {
+        &self.final_state
+    }
+
+    pub fn final_state_mut(&mut self) -> &mut V02State {
+        &mut self.final_state
+    }
+
+    pub fn final_state_db(&self) -> Result<V02State> {
         Ok(self.dbio.final_state()?)
     }
 
     pub fn get_account_final(&self, account_id: &AccountId) -> Result<Account> {
-        Ok(self.final_state()?.get_account_by_id(*account_id))
+        Ok(self.final_state().get_account_by_id(*account_id))
     }
 
-    pub fn put_block(&self, mut block: Block, l1_header: HeaderId) -> Result<()> {
-        let mut final_state = self.dbio.final_state()?;
+    pub fn put_block(&mut self, mut block: Block, l1_header: HeaderId) -> Result<()> {
+        let final_state = self.final_state_mut();
 
         for transaction in &block.body.transactions {
             transaction
                 .clone()
                 .transaction_stateless_check()?
-                .execute_check_on_state(&mut final_state)?;
+                .execute_check_on_state(final_state)?;
         }
 
         // ToDo: Currently we are fetching only finalized blocks
