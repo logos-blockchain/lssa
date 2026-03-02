@@ -25,7 +25,7 @@ async fn get_existing_account() -> Result<()> {
     );
     assert_eq!(account.balance, 10000);
     assert!(account.data.is_empty());
-    assert_eq!(account.nonce, 0);
+    assert_eq!(account.nonce.0, 0);
 
     info!("Successfully retrieved account with correct details");
 

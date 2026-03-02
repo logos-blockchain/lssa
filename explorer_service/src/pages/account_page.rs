@@ -94,7 +94,7 @@ pub fn AccountPage() -> impl IntoView {
                                 let account_id_str = acc_id.to_string();
                                 let program_id = program_owner.to_string();
                                 let balance_str = balance.to_string();
-                                let nonce_str = nonce.to_string();
+                                let nonce_str = nonce.0.to_string();
                                 let data_len = data.0.len();
                                 view! {
                                     <div class="account-detail">

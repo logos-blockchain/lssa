@@ -3,14 +3,83 @@ use std::{fmt::Display, str::FromStr};
 use base58::{FromBase58, ToBase58};
 use borsh::{BorshDeserialize, BorshSerialize};
 pub use data::Data;
+use risc0_zkvm::sha::{Impl, Sha256};
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
-use crate::program::ProgramId;
+use crate::{NullifierPublicKey, NullifierSecretKey, program::ProgramId};
 
 pub mod data;
 
-pub type Nonce = u128;
+#[derive(Copy, Debug, Default, Clone, Eq, PartialEq)]
+pub struct Nonce(pub u128);
+
+impl Nonce {
+    pub fn public_account_nonce_increment(&mut self) {
+        self.0 += 1;
+    }
+
+    pub fn private_account_nonce_init(self, npk: &NullifierPublicKey) -> Nonce {
+        let mut bytes: [u8; 64] = [0u8; 64];
+        bytes[..32].copy_from_slice(&npk.0);
+        let result: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        let result = result.first_chunk::<16>().unwrap();
+
+        Nonce(u128::from_le_bytes(*result))
+    }
+
+    pub fn private_account_nonce_increment(self, nsk: &NullifierSecretKey) -> Nonce {
+        let mut bytes: [u8; 64] = [0u8; 64];
+        bytes[..32].copy_from_slice(nsk);
+        bytes[32..48].copy_from_slice(&self.0.to_le_bytes());
+        let result: [u8; 32] = Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap();
+        let result = result.first_chunk::<16>().unwrap();
+
+        Nonce(u128::from_le_bytes(*result))
+    }
+}
+
+impl From<u128> for Nonce {
+    fn from(value: u128) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Nonce> for u128 {
+    fn from(value: Nonce) -> Self {
+        value.0
+    }
+}
+
+impl Serialize for Nonce {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Serialize::serialize(&self.0, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Nonce {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(<u128 as Deserialize>::deserialize(deserializer)?.into())
+    }
+}
+
+impl BorshSerialize for Nonce {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        BorshSerialize::serialize(&self.0, writer)
+    }
+}
+
+impl BorshDeserialize for Nonce {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        Ok(<u128 as BorshDeserialize>::deserialize_reader(reader)?.into())
+    }
+}
 
 /// Account to be used both in public and private contexts
 #[derive(
@@ -123,7 +192,7 @@ mod tests {
     fn test_zero_nonce_account_data_creation() {
         let new_acc = Account::default();
 
-        assert_eq!(new_acc.nonce, 0);
+        assert_eq!(new_acc.nonce.0, 0);
     }
 
     #[test]
@@ -150,7 +219,7 @@ mod tests {
                 .to_vec()
                 .try_into()
                 .unwrap(),
-            nonce: 0xdeadbeef,
+            nonce: Nonce(0xdeadbeef),
         };
         let fingerprint = AccountId::new([8; 32]);
         let new_acc_with_metadata = AccountWithMetadata::new(account.clone(), true, fingerprint);
@@ -196,5 +265,53 @@ mod tests {
         let default_account_id = AccountId::default();
         let expected_account_id = AccountId::new([0; 32]);
         assert!(default_account_id == expected_account_id);
+    }
+
+    #[test]
+    fn initialize_private_nonce() {
+        let npk = NullifierPublicKey([42; 32]);
+        let nonce = Nonce::default().private_account_nonce_init(&npk);
+        let expected_nonce = Nonce(37937661125547691021612781941709513486);
+        assert_eq!(nonce, expected_nonce);
+    }
+
+    #[test]
+    fn increment_private_nonce() {
+        let nsk: NullifierSecretKey = [42u8; 32];
+        let nonce =
+            Nonce(37937661125547691021612781941709513486).private_account_nonce_increment(&nsk);
+        let expected_nonce = Nonce(327300903218789900388409116014290259894);
+        assert_eq!(nonce, expected_nonce);
+    }
+
+    #[test]
+    fn increment_public_nonce() {
+        let value = 42u128;
+        let mut nonce = Nonce(value);
+        nonce.public_account_nonce_increment();
+        let expected_nonce = Nonce(value + 1);
+        assert_eq!(nonce, expected_nonce);
+    }
+
+    #[test]
+    fn test_serde_roundtrip_for_nonce() {
+        let nonce: Nonce = 7u128.into();
+
+        let serde_serialized_nonce = serde_json::to_vec(&nonce).unwrap();
+
+        let nonce_restored = serde_json::from_slice(&serde_serialized_nonce).unwrap();
+
+        assert_eq!(nonce, nonce_restored);
+    }
+
+    #[test]
+    fn test_borsh_roundtrip_for_nonce() {
+        let nonce: Nonce = 7u128.into();
+
+        let borsh_serialized_nonce = borsh::to_vec(&nonce).unwrap();
+
+        let nonce_restored = borsh::from_slice(&borsh_serialized_nonce).unwrap();
+
+        assert_eq!(nonce, nonce_restored);
     }
 }
