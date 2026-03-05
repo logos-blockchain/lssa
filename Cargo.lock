@@ -359,6 +359,7 @@ name = "amm_program"
 version = "0.1.0"
 dependencies = [
  "amm_core",
+ "nssa",
  "nssa_core",
  "token_core",
 ]
@@ -5560,7 +5561,6 @@ dependencies = [
 name = "nssa"
 version = "0.1.0"
 dependencies = [
- "amm_core",
  "borsh",
  "env_logger",
  "hex",

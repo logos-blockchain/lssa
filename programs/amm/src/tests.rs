@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use std::num::NonZero;
 
 use amm_core::{
