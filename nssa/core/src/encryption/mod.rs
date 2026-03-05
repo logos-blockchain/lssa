@@ -75,6 +75,17 @@ impl EncryptionScheme {
         Self::symmetric_transform(&mut buffer, shared_secret, commitment, output_index);
 
         let mut cursor = Cursor::new(buffer.as_slice());
-        Account::from_cursor(&mut cursor).ok()
+        Account::from_cursor(&mut cursor)
+            .inspect_err(|err| {
+                println!(
+                    "Failed to decode {ciphertext:?} \n
+                      with secret {:?} ,\n 
+                      commitment {commitment:?} ,\n
+                      and output_index {output_index} ,\n
+                      with error {err:?}",
+                    shared_secret.0
+                )
+            })
+            .ok()
     }
 }
