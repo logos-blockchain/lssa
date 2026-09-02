@@ -368,12 +368,11 @@ impl<S: StorageActorTrait, BP: BlockPublisherTrait> SequencerCore<S, BP> {
         let (mempool, mempool_handle) = MemPool::new(config.mempool_max_size);
         sequencer_core_metrics::record_mempool_max_size(config.mempool_max_size);
 
-        // At threshold 1 one accredited sequencer can slash a peer on its own.
         let slasher = SlasherActor::spawn(
             SlasherActor::load(
                 store.storage_ref().clone(),
                 bedrock_signing_key.clone(),
-                sequencer_stake_core::SLASH_APPROVAL_THRESHOLD,
+                committee_discovery::read_config(&state),
             )
             .await,
         );
