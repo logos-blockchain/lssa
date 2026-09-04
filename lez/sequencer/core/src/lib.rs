@@ -57,7 +57,6 @@ pub mod committee_discovery;
 pub mod config;
 pub mod cross_zone_watcher;
 pub mod fees;
-pub mod gossip;
 pub mod logging;
 #[cfg(feature = "mock")]
 pub mod mock;
