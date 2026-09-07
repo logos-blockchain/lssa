@@ -268,6 +268,35 @@ fn metered_guest_panic_is_charged_the_full_budget() {
 }
 
 #[test]
+fn metered_nonzero_exit_is_charged_its_metered_cycles() {
+    // Unlike a panic, `env::exit(n)` keeps the session, so the revert pays what
+    // it actually ran rather than the whole budget.
+    let from_key = PrivateKey::try_new([1_u8; 32]).unwrap();
+    let from = AccountId::from(&PublicKey::new_from_private_key(&from_key));
+    let state = V03State::new()
+        .with_public_accounts(public_state_from_balances(&[(from, 100)]))
+        .with_programs(std::iter::once(crate::test_methods::exits_nonzero()));
+    let program_id: AccountId = crate::test_methods::exits_nonzero().id().into();
+    let message = Message::try_new(program_id, vec![from], vec![Nonce(0)], ()).unwrap();
+    let witness_set = WitnessSet::for_message(&message, &[&from_key]);
+    let tx = crate::PublicTransaction::new(message, witness_set);
+
+    let budget = crate::program::DEFAULT_PUBLIC_CYCLE_BUDGET;
+    let (outcome, result) =
+        ValidatedStateDiff::from_public_transaction_metered(&tx, &state, 1, 0, budget);
+    assert!(
+        outcome.cycles > 0 && outcome.cycles < budget,
+        "a non-zero exit is metered, not charged the full budget: {}",
+        outcome.cycles
+    );
+    let diff = result.expect("a charged revert still yields an applicable diff");
+    assert!(
+        diff.public_diff().is_empty(),
+        "a reverted action moves no balances"
+    );
+}
+
+#[test]
 fn metered_revert_reports_cycles_and_yields_a_nonce_only_diff() {
     let (mut state, tx) = metering_transfer_fixture();
     let from = AccountId::from(&PublicKey::new_from_private_key(

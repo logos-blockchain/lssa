@@ -151,11 +151,11 @@ impl ValidatedStateDiff {
             cycle_budget,
             &mut cycles_used,
         );
-        // any failure pays the full declared budget
-        let cycles = if result.is_err() {
-            cycle_budget
-        } else {
-            cycles_used
+        // A panic or session-limit bail loses the count and pays the full budget; a non-zero
+        // exit code is metered like a success.
+        let cycles = match &result {
+            Ok(_) | Err(LeeError::ProgramExitedWithCode { .. }) => cycles_used,
+            Err(_) => cycle_budget,
         };
         let diff = match result {
             Ok(diff) => diff,
@@ -359,13 +359,22 @@ impl ValidatedStateDiff {
                     });
                 };
                 let program = Program::new_unchecked(program_id, Cow::Owned(elf));
-                let (program_output, call_cycles) = program.execute(
+                let (program_output, call_cycles) = match program.execute(
                     chained_call.program_account_id,
                     caller_data.account_id,
                     &real_pre_states,
                     &chained_call.instruction_data,
                     cycle_budget.saturating_sub(*cycles_used),
-                )?;
+                ) {
+                    Ok(ok) => ok,
+                    Err(err) => {
+                        // if there is a non-zero halt, we should charge up to the cycle
+                        if let LeeError::ProgramExitedWithCode { cycles, .. } = err {
+                            *cycles_used = cycles_used.saturating_add(cycles);
+                        }
+                        return Err(err);
+                    }
+                };
                 *cycles_used = cycles_used
                     .checked_add(call_cycles)
                     .expect("cycle sums fit u64: overflow would need ~2^64 executed cycles");

@@ -9,7 +9,7 @@ use lee_core::{
 };
 #[cfg(not(feature = "prove"))]
 use risc0_zkvm::default_executor;
-use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder};
+use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, ExitCode};
 
 use crate::error::LeeError;
 
@@ -31,6 +31,7 @@ pub const DEFAULT_PUBLIC_CYCLE_BUDGET: Cycles = 1024 * 1024 * 32; // 32M cycles
 pub(crate) struct SessionOutcome {
     pub journal: Vec<u8>,
     pub cycles: Cycles,
+    pub exit_code: ExitCode,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -109,8 +110,6 @@ impl Program {
     /// Runs the session, translating the executor's session-limit bail into the
     /// typed [`LeeError::OutOfGas`]. The only place that error string is
     /// recognized.
-    ///
-    /// FIXME: This is a brittle string match; the executor should provide a typed error.
     pub(crate) fn execute_session(
         env: ExecutorEnv<'_>,
         elf: &[u8],
@@ -125,10 +124,13 @@ impl Program {
             SessionOutcome {
                 journal: info.journal.bytes,
                 cycles,
+                exit_code: info.exit_code,
             }
         });
 
-        raw.map_err(|e| {
+        // map the r0 error to LeeError
+        // FIXME: This is a brittle string match; the executor should provide a typed error.
+        let outcome = raw.map_err(|e| {
             // check for "Guest panicked" to prevent spoofing
             // via `panic!("Session limit exceeded")` cases
             let message = format!("{e:#}");
@@ -139,7 +141,24 @@ impl Program {
             } else {
                 LeeError::ProgramExecutionFailed(e.to_string())
             }
-        })
+        })?;
+
+        // check the exit code for non-zero terminations
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "we only care about ExitCode::Halted"
+        )]
+        match outcome.exit_code {
+            ExitCode::Halted(0) => Ok(outcome),
+            ExitCode::Halted(code) => Err(LeeError::ProgramExitedWithCode {
+                code,
+                cycles: outcome.cycles,
+            }),
+            // anything other than Halted is an actual error (e.g. r0vm termination)
+            other => Err(LeeError::ProgramExecutionFailed(format!(
+                "unexpected exit {other:?}"
+            ))),
+        }
     }
 
     /// Writes a `CallKind::Execute` frame followed by the guest's `ProgramInput` as a single
