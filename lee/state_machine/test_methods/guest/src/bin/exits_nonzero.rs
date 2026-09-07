@@ -1,7 +1,7 @@
 use risc0_zkvm::guest::env;
 
-// FIXME: we can remove this program when other guests are re-written
-// andalso handle non-zero codes
+// FIXME: Remove this program once other guests are rewritten
+// to use and handle non-zero exit codes.
 
 fn main() {
     // Commits, then halts with a non-zero code: the host must reject the run but keep the
