@@ -128,13 +128,15 @@ impl Program {
             }
         });
 
-        // map the r0 error to LeeError
-        // FIXME: This is a brittle string match; the executor should provide a typed error.
+        // NOTE: risc0 bails with an untyped anyhow error and the r0vm IPC path
+        // flattens it to a string. the best we can do is a string match...
         let outcome = raw.map_err(|e| {
-            // check for "Guest panicked" to prevent spoofing
-            // via `panic!("Session limit exceeded")` cases
-            let message = format!("{e:#}");
-            if message.contains("Session limit exceeded") && !message.contains("Guest panicked") {
+            // check the root cause specifically to avoid spoofed errors
+            // like "Guest panicked: Session limit exceeded"
+            if e.root_cause()
+                .to_string()
+                .starts_with("Session limit exceeded:")
+            {
                 LeeError::OutOfGas {
                     budget: cycle_budget,
                 }
