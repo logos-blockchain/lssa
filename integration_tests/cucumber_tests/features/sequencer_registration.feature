@@ -190,7 +190,7 @@ Feature: Sequencer registration — a first Stake turns balance into stake
     And the funding account balance decreased by the staked amount
 
   @stake_registration_ci @P-23 @P1 @L3
-  # ⚠️ Diverges further from the plan than the earlier L1 port did. The plan
+  # ⚠️ Diverges further from the plan than the earlier L1 test did. The plan
   # expects acceptance with expected_balance_after = donation + amount; at L1
   # the runtime instead rejected the Stake because the donation had made the
   # unclaimed ownership account non-default (validate_execution rule 6). At
