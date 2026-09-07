@@ -157,6 +157,9 @@ impl Program {
                 cycles: outcome.cycles,
             }),
             // anything other than Halted is an actual error (e.g. r0vm termination)
+            //
+            // NOTE: ExitCode::SessionLimit actually exists, but r0vm does not use it
+            // see their own code for the comment
             other => Err(LeeError::ProgramExecutionFailed(format!(
                 "unexpected exit {other:?}"
             ))),
