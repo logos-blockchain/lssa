@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use bytesize::ByteSize;
 use common::config::BasicAuth;
 pub use cross_zone_inbox_core::{CrossZoneConfig, CrossZonePeer, CrossZoneRoute};
@@ -14,8 +14,23 @@ use humantime_serde;
 use lee::{AccountId, Balance, PublicKey, Signature};
 use logos_blockchain_core::mantle::ops::channel::ChannelId;
 use logos_blockchain_key_management_system_service::keys::ZkPublicKey;
+pub use sequencer_stake_core::ChannelParams;
 use serde::{Deserialize, Serialize};
 use url::Url;
+
+/// Bytes reserved out of `max_block_size` for the block header plus the forced
+/// fee and clock tail transactions; RPC and gossip cap a single transaction at
+/// `max_block_size - BLOCK_OVERHEAD`.
+pub const BLOCK_OVERHEAD: u64 = 2_048;
+
+/// The largest usable `max_block_size`: an L2 block is published to Bedrock as
+/// a single inscription, which the L1 caps at this many bytes.
+#[expect(
+    clippy::as_conversions,
+    reason = "usize::try_from is not const & usize fits u64 on every supported target"
+)]
+pub const MAX_PUBLISHABLE_BLOCK_SIZE: u64 =
+    logos_blockchain_core::mantle::ops::channel::inscribe::MAX_BYTES as u64;
 
 /// A transaction to be applied at genesis to supply initial balances.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -28,7 +43,8 @@ pub enum GenesisAction {
     SupplyBridgeAccount {
         balance: Balance,
     },
-    /// Seeds a bridge-lock holder's initial bridgeable balance into genesis state.
+    /// Funds a holder's holding PDA at genesis with one replayable faucet
+    /// credit; the balance-only PDA needs no claim.
     SupplyBridgeLockHolding {
         holder: AccountId,
         amount: Balance,
@@ -80,7 +96,9 @@ pub struct SequencerConfig {
     /// Genesis configuration.
     #[serde(default)]
     pub genesis: Vec<GenesisAction>,
-    /// Cross-zone messaging configuration. `None` disables the watcher.
+    /// Presence selects the genesis program set, must match the indexer's, and
+    /// cannot change on an existing chain. A source-only zone declares
+    /// `"cross_zone": {}`.
     #[serde(default)]
     pub cross_zone: Option<CrossZoneConfig>,
     /// Address the Prometheus metrics exporter binds to.
@@ -100,8 +118,12 @@ pub struct BedrockConfig {
     /// Bedrock auth.
     pub auth: Option<BasicAuth>,
     pub funding_key: ZkPublicKey,
-    #[serde(default = "default_priority_fee")]
-    pub priority_fee: u64,
+    #[serde(default = "default_priority_fee_percent")]
+    pub priority_fee_percent: u64,
+    /// What it takes to write on this channel, fixed at genesis: the stake a
+    /// key needs to be accredited, and the turn timing round robin runs on.
+    /// Every node on the channel must agree on them.
+    pub channel_params: ChannelParams,
 }
 
 impl SequencerConfig {
@@ -112,8 +134,20 @@ impl SequencerConfig {
     pub fn from_path(config_home: &Path) -> Result<Self> {
         let file = File::open(config_home)?;
         let reader = BufReader::new(file);
+        let config: Self = serde_json::from_reader(reader)?;
 
-        Ok(serde_json::from_reader(reader)?)
+        // A turn passes on after `posting_timeout` idle slots (1 slot = 1s), so a slower block
+        // interval drops our turn between our own blocks.
+        let posting_timeout = Duration::from_secs(u64::from(
+            config.bedrock_config.channel_params.posting_timeout,
+        ));
+        ensure!(
+            config.block_create_timeout < posting_timeout,
+            "block_create_timeout ({:?}) must be under posting_timeout ({posting_timeout:?})",
+            config.block_create_timeout
+        );
+
+        Ok(config)
     }
 
     /// Where this sequencer's database lives, suffixed with the channel id like
@@ -142,9 +176,19 @@ const fn default_metrics_address() -> Option<SocketAddr> {
     Some(SequencerConfig::DEFAULT_METRICS_ADDRESS)
 }
 
-/// Extra fee added to every funded Bedrock transaction, covering a gas price
-/// rise before it is mined.
+/// Percentage of the mandatory fee reserved on every funded Bedrock
+/// transaction, covering a gas price rise before it is mined.
 #[must_use]
-pub const fn default_priority_fee() -> u64 {
-    10_000
+pub const fn default_priority_fee_percent() -> u64 {
+    12
+}
+
+/// Production defaults for the values genesis fixes.
+#[must_use]
+pub const fn default_channel_params() -> ChannelParams {
+    ChannelParams {
+        minimum_sequencer_stake: system_accounts::DEFAULT_MINIMUM_SEQUENCER_STAKE,
+        posting_timeframe: system_accounts::DEFAULT_SEQUENCER_POSTING_TIMEFRAME,
+        posting_timeout: system_accounts::DEFAULT_SEQUENCER_POSTING_TIMEOUT,
+    }
 }

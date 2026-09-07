@@ -1,15 +1,30 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     AuthorizationSecretKey, Commitment, CommitmentSetDigest, Identifier, MembershipProof,
     Nullifier, NullifierPublicKey, NullifierSecretKey,
-    account::{Account, AccountWithMetadata},
+    account::{Account, AccountId, AccountWithMetadata},
     encryption::{EncryptedAccountData, ViewTag, ViewingPublicKey},
     program::{BlockValidityWindow, PdaSeed, ProgramId, ProgramOutput, TimestampValidityWindow},
 };
 
-#[derive(Serialize, Deserialize)]
+/// A claim that `account_id`'s program account currently has `image_id`.
+///
+/// Supplied by the prover as circuit input (untrusted). The circuit uses it for `env::verify` in
+/// place of a legacy-bijection lookup — an address-deployed program's account doesn't encode its
+/// image id — and echoes it unchanged into the circuit's output. The circuit itself does **not**
+/// check `image_id` against `account_id`; the sequencer does, independently, against real chain
+/// state (`V03State::get_program_image_id`) before accepting the proof. Side effect for now:
+/// every program invoked in a private transaction's call graph is publicly visible via this claim
+/// list.
+#[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+pub struct ProgramImageClaim {
+    pub account_id: AccountId,
+    pub image_id: ProgramId,
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct PrivacyPreservingCircuitInput {
     /// Outputs of the program execution.
     pub program_outputs: Vec<ProgramOutput>,
@@ -18,12 +33,19 @@ pub struct PrivacyPreservingCircuitInput {
     /// The guest's `private_pda_by_position` and `private_pda_bound_positions`
     /// rely on this position alignment.
     pub account_identities: Vec<InputAccountIdentity>,
-    /// Program ID.
-    pub program_id: ProgramId,
+    /// The top-level call's own dispatch address.
+    pub program_account_id: AccountId,
     pub dummy_inputs: Vec<DummyInput>,
+    /// `account_id`s the top-level call was invoked with. Every one must still appear somewhere
+    /// in the final accumulated pre-states, or the guest rejects — catches a chained call
+    /// silently dropping an account from its own output.
+    pub initial_pre_states: Vec<AccountId>,
+    /// Real `image_id`s for every address-deployed program invoked in the call graph, keyed by
+    /// account id. See [`ProgramImageClaim`].
+    pub program_image_claims: Vec<ProgramImageClaim>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 #[expect(
     clippy::large_enum_variant,
     reason = "Private carries the ML-KEM viewing key and dominates; boxing it would add a guest heap allocation per witness, and the footprint matches the pre-refactor enum"
@@ -35,7 +57,7 @@ pub enum InputAccountIdentity {
     Private(PrivateWitness),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub struct PrivateWitness {
     pub vpk: ViewingPublicKey,
     pub random_seed: [u8; 32],
@@ -44,27 +66,28 @@ pub struct PrivateWitness {
     pub nullifier: NullifierWitness,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub enum WitnessKind {
     /// Standalone private account. The `account_id` is derived as
     /// `AccountId::for_regular_private_account(&npk, vpk, identifier)` and matched against
     /// `pre_state.account_id`. An honest authorized account's `npk` for Id computation gets
     /// derived from the supplied `ask`.
     Regular { ask: Option<AuthorizationSecretKey> },
-    /// Private PDA. The npk-to-account_id binding is proven upstream via `Claim::Pda(seed)` or a
+    /// Private PDA. The npk-to-account_id binding is proven upstream via the `binding` below or a
     /// caller's `pda_seeds` match. The identifier diversifies the PDA within the
-    /// `(program_id, seed, npk)` family: `AccountId::for_private_pda` uses it as the 4th input.
+    /// `(program_account_id, seed, npk)` family: `AccountId::for_private_pda` uses it as the 4th
+    /// input.
     Pda {
-        /// When `Some((authority_program_id, seed))`, the circuit binds this position via the
+        /// When `Some((authority_account_id, seed))`, the circuit binds this position via the
         /// external derivation check
-        /// `AccountId::for_private_pda(authority_program_id, seed, npk, vpk, identifier) ==
-        /// pre_state.account_id` rather than requiring a `Claim::Pda` or caller
-        /// `pda_seeds` to establish the binding.
-        binding: Option<(ProgramId, PdaSeed)>,
+        /// `AccountId::for_private_pda(authority_account_id, seed, npk, vpk, identifier) ==
+        /// pre_state.account_id` rather than requiring a caller's `pda_seeds` to establish the
+        /// binding.
+        binding: Option<(AccountId, PdaSeed)>,
     },
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub enum NullifierWitness {
     /// Init of a private account: no membership proof. The `pre_state` must be
     /// `Account::default()`. `npk` is supplied directly, so the caller need not own the account
@@ -84,7 +107,7 @@ pub enum NullifierWitness {
 
 /// A struct containing necessary data for dummy nullifier and
 /// commitment generation.
-#[derive(Serialize, Deserialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct DummyInput {
     /// The seed used for generating the dummy nullifier.
     pub nullifier_seed: [u8; 32],
@@ -140,7 +163,7 @@ impl NullifierWitness {
     }
 }
 
-#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(
     any(feature = "host", test),
     derive(Debug, Clone, Default, PartialEq, Eq)
@@ -155,20 +178,23 @@ pub struct PrivateAction {
     pub encrypted_post_state: EncryptedAccountData,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct PublicAction {
     pub pre: AccountWithMetadata,
     pub post: Account,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq, Default))]
 pub struct PrivacyPreservingCircuitOutput {
     pub public_actions: Vec<PublicAction>,
     pub private_actions: Vec<PrivateAction>,
     pub block_validity_window: BlockValidityWindow,
     pub timestamp_validity_window: TimestampValidityWindow,
+    /// Unchanged echo of [`PrivacyPreservingCircuitInput::program_image_claims`] — what the
+    /// receipt actually commits to, so the sequencer can check it against real chain state.
+    pub program_image_claims: Vec<ProgramImageClaim>,
 }
 
 #[cfg(any(feature = "host", test))]
@@ -192,18 +218,16 @@ impl PrivacyPreservingCircuitOutput {
 
 #[cfg(feature = "host")]
 impl PrivacyPreservingCircuitOutput {
-    /// Serializes the circuit output to a byte vector.
+    /// Serializes the circuit output to the exact journal byte sequence the circuit guest commits.
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
-        bytemuck::cast_slice(&risc0_zkvm::serde::to_vec(&self).unwrap()).to_vec()
+        crate::to_borsh_frame(self)
     }
 }
 
 #[cfg(feature = "host")]
 #[cfg(test)]
 mod tests {
-    use risc0_zkvm::serde::from_slice;
-
     use super::*;
     use crate::{
         Commitment, Nullifier,
@@ -212,7 +236,7 @@ mod tests {
     };
 
     #[test]
-    fn privacy_preserving_circuit_output_to_bytes_is_compatible_with_from_slice() {
+    fn privacy_preserving_circuit_output_to_bytes_round_trips_via_borsh_frame() {
         let output = PrivacyPreservingCircuitOutput {
             public_actions: vec![
                 PublicAction {
@@ -267,9 +291,16 @@ mod tests {
             }],
             block_validity_window: (1..).into(),
             timestamp_validity_window: TimestampValidityWindow::new_unbounded(),
+            program_image_claims: vec![ProgramImageClaim {
+                account_id: AccountId::new([3; 32]),
+                image_id: [4; 8],
+            }],
         };
         let bytes = output.to_bytes();
-        let output_from_slice: PrivacyPreservingCircuitOutput = from_slice(&bytes).unwrap();
-        assert_eq!(output, output_from_slice);
+        let decoded: PrivacyPreservingCircuitOutput = borsh::from_slice(
+            crate::from_frame(&bytes).expect("self-produced frame is well-formed"),
+        )
+        .unwrap();
+        assert_eq!(output, decoded);
     }
 }

@@ -23,6 +23,7 @@ members = [
   "lez/sequencer/service/protocol",
   "lez/sequencer/service/rpc",
   "lez/sequencer/actors/executor",
+  "lez/sequencer/actors/executor/metrics",
   "lez/sequencer/actors/rpc_server",
   "lez/sequencer/actors/rpc_server/metrics",
   "lez/sequencer/actors/storage",
@@ -45,10 +46,9 @@ members = [
   "lez/programs/bridge",
   "lez/programs/clock",
   "lez/programs/faucet",
-  "lez/programs/pinata",
-  "lez/programs/pinata_token",
+  "lez/programs/fee",
+  "lez/programs/fee/core",
   "lez/programs/token",
-  "lez/programs/vault",
   "lez/programs/cross_zone_marker",
   "lez/programs/cross_zone_inbox",
   "lez/programs/cross_zone_outbox",
@@ -57,6 +57,7 @@ members = [
   "lez/programs/ping_sender",
   "lez/programs/ping_receiver",
   "lez/programs/sequencer_stake",
+  "lez/programs/program_loader/core",
   "lez/cross_zone",
 
   "test_programs",
@@ -90,6 +91,7 @@ sequencer_core_metrics = { path = "lez/sequencer/core/metrics" }
 sequencer_service_protocol = { path = "lez/sequencer/service/protocol" }
 sequencer_service_rpc = { path = "lez/sequencer/service/rpc" }
 sequencer_executor_actor = { path = "lez/sequencer/actors/executor" }
+sequencer_executor_actor_metrics = { path = "lez/sequencer/actors/executor/metrics" }
 sequencer_rpc_server_actor = { path = "lez/sequencer/actors/rpc_server" }
 sequencer_rpc_server_actor_metrics = { path = "lez/sequencer/actors/rpc_server/metrics" }
 sequencer_storage_actor = { path = "lez/sequencer/actors/storage" }
@@ -108,6 +110,7 @@ programs = { path = "lez/programs", default-features = false, features = [
 system_accounts = { path = "lez/system_accounts" }
 clock_core = { path = "lez/programs/clock/core" }
 cross_zone_marker_core = { path = "lez/programs/cross_zone_marker" }
+fee_core = { path = "lez/programs/fee/core" }
 token_core = { path = "lez/programs/token/core" }
 token_program = { path = "lez/programs/token" }
 amm_core = { path = "lez/programs/amm/core" }
@@ -117,15 +120,16 @@ ata_program = { path = "lez/programs/associated_token_account" }
 authenticated_transfer_core = { path = "lez/programs/authenticated_transfer/core" }
 faucet_core = { path = "lez/programs/faucet/core" }
 bridge_core = { path = "lez/programs/bridge/core" }
-vault_core = { path = "lez/programs/vault/core" }
 cross_zone_inbox_core = { path = "lez/programs/cross_zone_inbox/core" }
 cross_zone_outbox_core = { path = "lez/programs/cross_zone_outbox/core" }
 bridge_lock_core = { path = "lez/programs/bridge_lock/core" }
 wrapped_token_core = { path = "lez/programs/wrapped_token/core" }
 ping_core = { path = "lez/programs/ping_core" }
 sequencer_stake_core = { path = "lez/programs/sequencer_stake/core" }
+program_loader_core = { path = "lez/programs/program_loader/core" }
 cross_zone = { path = "lez/cross_zone" }
 build_utils = { path = "build_utils" }
+test_methods = { path = "lee/state_machine/test_methods" }
 test_programs = { path = "test_programs" }
 testnet_initial_state = { path = "lez/testnet_initial_state" }
 keycard_wallet = { path = "lez/keycard_wallet" }
@@ -211,15 +215,15 @@ async-stream = "0.3.6"
 strum = { version = "0.28.0", features = ["derive"] }
 mockall = "0.15.0"
 
-logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-codec = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-chain-broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-chain-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-zone-sdk = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-http-api-common = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
-logos-blockchain-testing-framework = { package = "testing-framework", git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "97d5e104fc20ce6e2fb404f8a9364afcb181a3e5" }
+logos-blockchain-common-http-client = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-key-management-system-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-codec = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-core = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-chain-broadcast-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-chain-service = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-zone-sdk = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-http-api-common = { git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
+logos-blockchain-testing-framework = { package = "testing-framework", git = "https://github.com/logos-blockchain/logos-blockchain.git", rev = "da7bd3792df481858400b322a257502f6c45e369" }
 testing-framework-app = { git = "https://github.com/logos-blockchain/logos-blockchain-testing.git", rev = "db880d61155db3a4f32177ef16b0f1e4bf22b1f6" }
 testing-framework-core = { git = "https://github.com/logos-blockchain/logos-blockchain-testing.git", rev = "db880d61155db3a4f32177ef16b0f1e4bf22b1f6" }
 
@@ -250,6 +254,7 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 zeroize = "1"
 criterion = { version = "0.8", features = ["html_reports"] }
 num-traits = "0.2.19"
+enum-iterator = "2.3.0"
 
 # Profile for leptos WASM release builds
 [profile.wasm-release]

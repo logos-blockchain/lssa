@@ -17,9 +17,13 @@ result
 
 wallet-ffi/wallet_ffi.h
 bedrock_signing_key
+sequencer_stake_signing_key
 integration_tests/configs/debug/
 
 .DS_Store
 
 /integration_tests/cucumber_tests/temp/
 MyLogFile.log
+# default sequencer home for `just run-sequencer`
+lez/sequencer/service/sequencer_home/
+__pycache__/

@@ -1,13 +1,16 @@
 use std::time::Duration;
 
-use anyhow::Context as _;
+use anyhow::{Context as _, Result, ensure};
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use lee_core::account::AccountId;
 use log::info;
-use sequencer_service_rpc::RpcClient as _;
+use sequencer_core::{
+    block_publisher::{Ed25519PublicKey, read_channel_state},
+    config::BedrockConfig,
+};
+use sequencer_service_rpc::{RpcClient as _, SequencerClient};
 use test_fixtures::{TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext, verify_commitment_is_in_state};
 use wallet::{
-    AccountIdentity,
     cli::{
         CliAccountMention, Command, SubcommandReturnValue,
         account::{AccountSubcommand, NewSubcommand},
@@ -15,12 +18,76 @@ use wallet::{
             native_token_transfer::AuthTransferSubcommand, token::TokenProgramAgnosticSubcommand,
         },
     },
-    program_facades::{native_token_transfer::NativeTokenTransfer, token::Token},
     storage::key_chain::FoundPrivateAccount,
 };
 
 /// Maximum time to wait for the indexer to catch up to the sequencer.
 pub const L2_TO_L1_TIMEOUT: Duration = Duration::from_mins(6);
+/// Maximum time a single [`wait_until`] may poll before giving up.
+const PHASE_TIMEOUT: Duration = Duration::from_secs(360);
+const POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+/// Polls `check` until it reports ready, failing with `what` on timeout.
+pub async fn wait_until<F, Fut>(what: &str, mut check: F) -> Result<()>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<bool>>,
+{
+    let wait = async {
+        while !check().await? {
+            tokio::time::sleep(POLL_INTERVAL).await;
+        }
+        Ok::<(), anyhow::Error>(())
+    };
+    tokio::time::timeout(PHASE_TIMEOUT, wait)
+        .await
+        .with_context(|| format!("Timed out waiting for {what}"))?
+}
+
+/// The channel's accredited keys, sorted, plus whose turn the tip was written on.
+pub async fn committee(
+    config: &BedrockConfig,
+) -> Result<(Vec<[u8; 32]>, Option<Ed25519PublicKey>)> {
+    let Some(state) = read_channel_state(config).await? else {
+        return Ok((Vec::new(), None));
+    };
+    let turn = state
+        .accredited_keys
+        .get(usize::from(state.tip_sequencer))
+        .copied();
+    let mut keys: Vec<_> = state
+        .accredited_keys
+        .iter()
+        .map(Ed25519PublicKey::to_bytes)
+        .collect();
+    keys.sort_unstable();
+    Ok((keys, turn))
+}
+
+/// Asserts A and B hold byte-identical block hashes over their common prefix.
+pub async fn assert_same_chain(a: &SequencerClient, b: &SequencerClient) -> Result<()> {
+    let common = a
+        .get_last_block_id()
+        .await?
+        .min(b.get_last_block_id().await?);
+    for id in 1..=common {
+        let block_a = a
+            .get_block(id)
+            .await?
+            .with_context(|| format!("A is missing block {id}"))?;
+        let block_b = b
+            .get_block(id)
+            .await?
+            .with_context(|| format!("B is missing block {id}"))?;
+        ensure!(
+            block_a.header.hash == block_b.header.hash,
+            "Chain divergence at block {id}: A {:?} vs B {:?}",
+            block_a.header.hash,
+            block_b.header.hash
+        );
+    }
+    Ok(())
+}
 
 /// Create a private or public account at the given chain index and return its ID.
 /// Pass `cci: None` to use the wallet's next available chain index.
@@ -65,34 +132,6 @@ pub async fn send(
     Ok(())
 }
 
-/// Like [`send`], but for a `to` that is still a fresh, unclaimed account.
-///
-/// The wallet CLI's `AuthTransfer::Send` never signs with the recipient's key (by design: the
-/// sender's wallet must not sign on behalf of an account it doesn't own). But claiming a fresh
-/// account is only possible if that account's own key signs the transaction, so this bypasses
-/// the CLI and calls the program facade directly with an explicit `AccountIdentity::Public` for
-/// the recipient, using the key the test wallet holds for the account it just created.
-///
-/// Unlike `send`, this doesn't go through the CLI's own poll-until-included step, so it waits
-/// for block creation itself before returning.
-pub async fn send_claiming_new_account(
-    ctx: &mut TestContext,
-    from: AccountId,
-    to: AccountId,
-    amount: u128,
-) -> anyhow::Result<()> {
-    NativeTokenTransfer(ctx.wallet())
-        .send_public_transfer(
-            AccountIdentity::Public(from),
-            AccountIdentity::Public(to),
-            amount,
-        )
-        .await?;
-    info!("Waiting for next block creation");
-    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-    Ok(())
-}
-
 /// Create a token (New) and wait for the block to be included.
 pub async fn create_token(
     ctx: &mut TestContext,
@@ -130,26 +169,6 @@ pub async fn token_send(
         amount,
     };
     wallet::cli::execute_subcommand(ctx.wallet_mut(), Command::Token(subcommand)).await?;
-    info!("Waiting for next block creation");
-    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-    Ok(())
-}
-
-/// Like [`token_send`], but for a `to` that is still a fresh, unclaimed holding account. See
-/// [`send_claiming_new_account`] for why the CLI can't be used here.
-pub async fn token_send_claiming_new_account(
-    ctx: &mut TestContext,
-    from: AccountId,
-    to: AccountId,
-    amount: u128,
-) -> anyhow::Result<()> {
-    Token(ctx.wallet())
-        .send_transfer_transaction(
-            AccountIdentity::Public(from),
-            AccountIdentity::Public(to),
-            amount,
-        )
-        .await?;
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
     Ok(())

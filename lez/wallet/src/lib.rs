@@ -19,7 +19,7 @@ use common::{HashType, block::Block, transaction::LeeTransaction};
 use config::WalletConfig;
 use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use lee::{
-    Account, AccountId, PrivacyPreservingTransaction, ProgramDeploymentTransaction, ProgramId,
+    Account, AccountId, PrivacyPreservingTransaction, ProgramId,
     privacy_preserving_transaction::{
         circuit::ProgramWithDependencies,
         message::{EncryptedAccountData, Message},
@@ -57,6 +57,25 @@ pub const SUPPRESS_VERBOSE_PRINTS: &str = "SUPPRESS_VERBOSE_PRINTS";
 
 pub const HOME_DIR_ENV_VAR: &str = "LEE_WALLET_HOME_DIR";
 
+/// Default execution gas limit for wallet-built public transactions: roughly
+/// three times the widest measured program call, one fifth of the per-block cap.
+pub const DEFAULT_GAS_LIMIT: u64 = 2_000_000;
+
+/// Base fee the default `max_fee` is sized against: 8x the genesis minimum,
+/// so defaults survive early congestion without re-signing.
+const ASSUMED_BASE_FEE: u128 = 64;
+
+/// Serialized-size allowance the default `max_fee` is sized against.
+const ASSUMED_DATA_BYTES: u128 = 100_000;
+
+/// Default cap on the fee reservation for wallet-built public transactions.
+#[expect(
+    clippy::as_conversions,
+    reason = "u128::from is not const; the widening is lossless"
+)]
+pub const DEFAULT_MAX_FEE: u128 =
+    (DEFAULT_GAS_LIMIT as u128 + ASSUMED_DATA_BYTES) * ASSUMED_BASE_FEE;
+
 pub enum AccDecodeData {
     Skip,
     Decode(lee_core::SharedSecretKey, AccountId),
@@ -77,12 +96,14 @@ pub enum ExecutionFailureKind {
     AmountMismatchError,
     #[error("Accounts key not found")]
     KeyNotFoundError,
-    #[error("Sequencer client error")]
+    #[error("Sequencer client error: {0}")]
     SequencerClientError(#[from] sequencer_service_rpc::ClientError),
     #[error("Can not pay for operation")]
     InsufficientFundsError,
     #[error("Account {0} data is invalid")]
     AccountDataError(AccountId),
+    #[error("Program bytecode splits into {expected} segment(s) but {actual} were supplied")]
+    SegmentCountMismatch { expected: usize, actual: usize },
     #[error("Failed to build transaction: {0}")]
     TransactionBuildError(#[from] lee::error::LeeError),
     #[error("Failed to sign transaction: {0}")]
@@ -491,7 +512,13 @@ impl WalletCore {
         let keys = holder.derive_keys_for_pda(&program_id, &pda_seed);
         let npk = keys.generate_nullifier_public_key();
         let vpk = keys.generate_viewing_public_key();
-        let account_id = AccountId::for_private_pda(&program_id, &pda_seed, &npk, &vpk, identifier);
+        let account_id = AccountId::for_private_pda(
+            &AccountId::from(program_id),
+            &pda_seed,
+            &npk,
+            &vpk,
+            identifier,
+        );
 
         self.register_shared_account(
             account_id,
@@ -809,13 +836,11 @@ impl WalletCore {
             .map(|keys| keys.ssk)
             .collect();
 
-        let call_res = self
-            .multi_sequencer_client
-            .metered_send_transaction(LeeTransaction::PrivacyPreserving(tx))
-            .await
-            .into_iter()
-            .find(std::result::Result::is_ok)
-            .ok_or(ExecutionFailureKind::MultiSequencerTransactionSendError)?;
+        let call_res = first_success_or_error(
+            self.multi_sequencer_client
+                .metered_send_transaction(LeeTransaction::PrivacyPreserving(tx))
+                .await,
+        );
 
         Ok((call_res?, shared_secrets))
     }
@@ -824,9 +849,9 @@ impl WalletCore {
         &self,
         accounts: Vec<AccountIdentity>,
         instruction_data: InstructionData,
-        program_id: ProgramId,
+        program_account_id: AccountId,
     ) -> Result<HashType, ExecutionFailureKind> {
-        self.send_pub_tx_with_pre_check(accounts, instruction_data, program_id, |_| Ok(()))
+        self.send_pub_tx_with_pre_check(accounts, instruction_data, program_account_id, |_| Ok(()))
             .await
     }
 
@@ -834,7 +859,7 @@ impl WalletCore {
         &self,
         accounts: Vec<AccountIdentity>,
         instruction_data: InstructionData,
-        program_id: ProgramId,
+        program_account_id: AccountId,
         tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) -> Result<HashType, ExecutionFailureKind> {
         // Public transaction, all accounts must be public
@@ -859,11 +884,23 @@ impl WalletCore {
         let account_ids = acc_manager.public_account_ids();
         let nonces = acc_manager.public_account_nonces();
 
+        let payer = acc_manager.fee_payer_account_id().ok_or_else(|| {
+            ExecutionFailureKind::TransactionBuildError(lee::error::LeeError::InvalidInput(
+                "Public transaction has no signing account to pay its fees".to_owned(),
+            ))
+        })?;
+
         let message = lee::public_transaction::Message::new_preserialized(
-            program_id,
+            program_account_id,
             account_ids,
             nonces,
             instruction_data,
+            Some(lee::FeeDeclaration::new(
+                payer,
+                DEFAULT_GAS_LIMIT,
+                0,
+                DEFAULT_MAX_FEE,
+            )),
         );
 
         let message_hash = message.hash();
@@ -876,25 +913,25 @@ impl WalletCore {
 
         let tx = lee::public_transaction::PublicTransaction::new(message, witness_set);
 
-        self.multi_sequencer_client
-            .metered_send_transaction(LeeTransaction::Public(tx))
-            .await
-            .into_iter()
-            .find(std::result::Result::is_ok)
-            .ok_or(ExecutionFailureKind::MultiSequencerTransactionSendError)?
+        first_success_or_error(
+            self.multi_sequencer_client
+                .metered_send_transaction(LeeTransaction::Public(tx))
+                .await,
+        )
     }
 
-    pub async fn send_program_deployment_transaction(&self, bytecode: Vec<u8>) -> Result<HashType> {
-        let message = lee::program_deployment_transaction::Message::new(bytecode);
-        let transaction = ProgramDeploymentTransaction::new(message);
-
-        Ok(self
-            .multi_sequencer_client
-            .metered_send_transaction(LeeTransaction::ProgramDeployment(transaction))
-            .await
-            .into_iter()
-            .find(std::result::Result::is_ok)
-            .ok_or(ExecutionFailureKind::MultiSequencerTransactionSendError)??)
+    /// Submits an already-built public transaction directly, for callers that need to construct
+    /// their own [`FeeDeclaration`] (e.g. a facade taking a separate fee payer) instead of going
+    /// through [`Self::send_pub_tx`]'s self-pay selection.
+    pub(crate) async fn submit_public_transaction(
+        &self,
+        tx: lee::public_transaction::PublicTransaction,
+    ) -> Result<HashType, ExecutionFailureKind> {
+        first_success_or_error(
+            self.multi_sequencer_client
+                .metered_send_transaction(LeeTransaction::Public(tx))
+                .await,
+        )
     }
 
     pub async fn sync_to_latest_block(&mut self) -> Result<u64> {
@@ -1075,6 +1112,28 @@ impl WalletCore {
     pub const fn config_overrides(&self) -> &Option<WalletConfigOverrides> {
         &self.config_overrides
     }
+}
+
+/// Collapses the per-sequencer send results into one outcome: the first
+/// success, or — when every sequencer refused — the first refusal, so the
+/// caller sees *why* (e.g. a fee-admission `PayerCannotFund`) instead of a
+/// generic failure. Only an empty leader set yields
+/// [`ExecutionFailureKind::MultiSequencerTransactionSendError`].
+fn first_success_or_error(
+    results: Vec<Result<HashType, ExecutionFailureKind>>,
+) -> Result<HashType, ExecutionFailureKind> {
+    let mut first_error = None;
+    for result in results {
+        match result {
+            Ok(hash) => return Ok(hash),
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+        }
+    }
+    Err(first_error.unwrap_or(ExecutionFailureKind::MultiSequencerTransactionSendError))
 }
 
 fn decrypt_note_at(

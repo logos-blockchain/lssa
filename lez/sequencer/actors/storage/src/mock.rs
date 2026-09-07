@@ -19,16 +19,16 @@ use crate::{
     Result, StorageActorTrait,
     error::Error,
     protocol::{
-        AddPendingCrossZoneDispatches, AddPendingDepositEvent, ApplyStoreUpdate,
-        CleanPendingBlocksUpTo, ConsumeUnseenWithdrawCount, DbDump, DeadLetterDispatchRecord,
+        AddPendingCrossZoneDispatches, AtomicUpdate, DbDump, DeadLetterDispatch, DeadLetterRequeue,
         DeleteBlock, DeleteCrossZonePeerFloor, DeleteZoneCheckpoint, DispatchFailure,
-        DropSettledCrossZoneDispatches, DumpDb, GetAllBlocks, GetBlock, GetCrossZonePeerFloorBytes,
-        GetCrossZonePeerTip, GetDeadLetterDispatchCount, GetDeadLetterDispatches, GetFinalSnapshot,
-        GetFirstBlockId, GetLastBlockId, GetLatestBlockMeta, GetLeeState,
-        GetPendingCrossZoneDispatches, GetPendingDepositEvents, GetPublishedHighWater,
-        GetTransactionByHash, GetZoneAnchor, GetZoneCheckpointBytes, MarkBlockAsFinalized,
-        PendingCrossZoneDispatchRecord, PendingDepositEventRecord, RaisePublishedHighWater,
-        RecordDispatchFailure, RecordNewBlock, ResetAllBlocksToPending, SetCrossZonePeerFloorBytes,
+        DropSettledCrossZoneDispatches, DumpDb, GetAllBlocks, GetBlock, GetChannelCursor,
+        GetCrossZonePeerFloorBytes, GetCrossZonePeerTip, GetDeadLetterDispatchCount,
+        GetDeadLetterDispatches, GetFinalSnapshot, GetFirstBlockId, GetLastBlockId,
+        GetLatestBlockMeta, GetLeeState, GetPendingCrossZoneDispatches, GetPendingDepositEvents,
+        GetPublishedHighWater, GetSlashRecordBytes, GetTransactionByHash, GetZoneAnchor,
+        GetZoneCheckpointBytes, MsgId, PendingCrossZoneDispatchRecord, PendingDepositEventRecord,
+        PutSlashRecordBytes, RaisePublishedHighWater, RecordDispatchFailure,
+        RequeueDeadLetterDispatch, ResetAllBlocksToPending, SetCrossZonePeerFloorBytes,
         SetCrossZonePeerTip, SetZoneAnchor, SetZoneCheckpointBytes, StoreUpdateOutcome,
         ZoneAnchorRecord,
     },
@@ -36,12 +36,6 @@ use crate::{
 
 mockall::mock! {
     pub StorageActor {
-        pub fn handle_record_new_block(
-            &mut self,
-            msg: RecordNewBlock,
-            ctx: &mut Context<Self, Result<()>>
-        ) -> Result<()>;
-
         pub fn handle_get_block(
             &mut self,
             msg: GetBlock,
@@ -63,12 +57,6 @@ mockall::mock! {
         pub fn handle_delete_block(
             &mut self,
             msg: DeleteBlock,
-            ctx: &mut Context<Self, Result<()>>
-        ) -> Result<()>;
-
-        pub fn handle_mark_block_as_finalized(
-            &mut self,
-            msg: MarkBlockAsFinalized,
             ctx: &mut Context<Self, Result<()>>
         ) -> Result<()>;
 
@@ -114,6 +102,18 @@ mockall::mock! {
             ctx: &mut Context<Self, Result<()>>
         ) -> Result<()>;
 
+        pub fn handle_get_slash_record_bytes(
+            &mut self,
+            msg: GetSlashRecordBytes,
+            ctx: &mut Context<Self, Result<Option<Vec<u8>>>>
+        ) -> Result<Option<Vec<u8>>>;
+
+        pub fn handle_put_slash_record_bytes(
+            &mut self,
+            msg: PutSlashRecordBytes,
+            ctx: &mut Context<Self, Result<()>>
+        ) -> Result<()>;
+
         pub fn handle_delete_zone_checkpoint(
             &mut self,
             msg: DeleteZoneCheckpoint,
@@ -131,6 +131,12 @@ mockall::mock! {
             msg: SetZoneAnchor,
             ctx: &mut Context<Self, Result<()>>
         ) -> Result<()>;
+
+        pub fn handle_get_channel_cursor(
+            &mut self,
+            msg: GetChannelCursor,
+            ctx: &mut Context<Self, Result<Option<MsgId>>>
+        ) -> Result<Option<MsgId>>;
 
         pub fn handle_get_published_high_water(
             &mut self,
@@ -152,33 +158,15 @@ mockall::mock! {
 
         pub fn handle_apply_store_update(
             &mut self,
-            msg: ApplyStoreUpdate,
+            msg: AtomicUpdate,
             ctx: &mut Context<Self, Result<StoreUpdateOutcome>>
         ) -> Result<StoreUpdateOutcome>;
-
-        pub fn handle_clean_pending_blocks_up_to(
-            &mut self,
-            msg: CleanPendingBlocksUpTo,
-            ctx: &mut Context<Self, Result<()>>
-        ) -> Result<()>;
 
         pub fn handle_get_final_snapshot(
             &mut self,
             msg: GetFinalSnapshot,
             ctx: &mut Context<Self, Result<Option<(V03State, BlockMeta)>>>
         ) -> Result<Option<(V03State, BlockMeta)>>;
-
-        pub fn handle_add_pending_deposit_event(
-            &mut self,
-            msg: AddPendingDepositEvent,
-            ctx: &mut Context<Self, Result<bool>>
-        ) -> Result<bool>;
-
-        pub fn handle_consume_unseen_withdraw_count(
-            &mut self,
-            msg: ConsumeUnseenWithdrawCount,
-            ctx: &mut Context<Self, Result<bool>>
-        ) -> Result<bool>;
 
         pub fn handle_get_pending_cross_zone_dispatches(
             &mut self,
@@ -195,8 +183,8 @@ mockall::mock! {
         pub fn handle_drop_settled_cross_zone_dispatches(
             &mut self,
             msg: DropSettledCrossZoneDispatches,
-            ctx: &mut Context<Self, Result<usize>>
-        ) -> Result<usize>;
+            ctx: &mut Context<Self, Result<()>>
+        ) -> Result<()>;
 
         pub fn handle_record_dispatch_failure(
             &mut self,
@@ -204,11 +192,17 @@ mockall::mock! {
             ctx: &mut Context<Self, Result<DispatchFailure>>
         ) -> Result<DispatchFailure>;
 
+        pub fn handle_requeue_dead_letter_dispatch(
+            &mut self,
+            msg: RequeueDeadLetterDispatch,
+            ctx: &mut Context<Self, Result<DeadLetterRequeue>>
+        ) -> Result<DeadLetterRequeue>;
+
         pub fn handle_get_dead_letter_dispatches(
             &mut self,
             msg: GetDeadLetterDispatches,
-            ctx: &mut Context<Self, Result<Vec<DeadLetterDispatchRecord>>>
-        ) -> Result<Vec<DeadLetterDispatchRecord>>;
+            ctx: &mut Context<Self, Result<Vec<DeadLetterDispatch>>>
+        ) -> Result<Vec<DeadLetterDispatch>>;
 
         pub fn handle_get_dead_letter_dispatch_count(
             &mut self,
@@ -305,18 +299,6 @@ impl Message<Replace> for MockStorageActor {
     }
 }
 
-impl Message<RecordNewBlock> for MockStorageActor {
-    type Reply = Result<()>;
-
-    async fn handle(
-        &mut self,
-        msg: RecordNewBlock,
-        ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        self.handle_record_new_block(msg, ctx)
-    }
-}
-
 impl Message<GetBlock> for MockStorageActor {
     type Reply = Result<Option<Block>>;
 
@@ -358,18 +340,6 @@ impl Message<DeleteBlock> for MockStorageActor {
         ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         self.handle_delete_block(msg, ctx)
-    }
-}
-
-impl Message<MarkBlockAsFinalized> for MockStorageActor {
-    type Reply = Result<()>;
-
-    async fn handle(
-        &mut self,
-        msg: MarkBlockAsFinalized,
-        ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        self.handle_mark_block_as_finalized(msg, ctx)
     }
 }
 
@@ -457,6 +427,30 @@ impl Message<SetZoneCheckpointBytes> for MockStorageActor {
     }
 }
 
+impl Message<GetSlashRecordBytes> for MockStorageActor {
+    type Reply = Result<Option<Vec<u8>>>;
+
+    async fn handle(
+        &mut self,
+        msg: GetSlashRecordBytes,
+        ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        self.handle_get_slash_record_bytes(msg, ctx)
+    }
+}
+
+impl Message<PutSlashRecordBytes> for MockStorageActor {
+    type Reply = Result<()>;
+
+    async fn handle(
+        &mut self,
+        msg: PutSlashRecordBytes,
+        ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        self.handle_put_slash_record_bytes(msg, ctx)
+    }
+}
+
 impl Message<DeleteZoneCheckpoint> for MockStorageActor {
     type Reply = Result<()>;
 
@@ -490,6 +484,18 @@ impl Message<SetZoneAnchor> for MockStorageActor {
         ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         self.handle_set_zone_anchor(msg, ctx)
+    }
+}
+
+impl Message<GetChannelCursor> for MockStorageActor {
+    type Reply = Result<Option<MsgId>>;
+
+    async fn handle(
+        &mut self,
+        msg: GetChannelCursor,
+        ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        self.handle_get_channel_cursor(msg, ctx)
     }
 }
 
@@ -537,27 +543,15 @@ impl Message<DumpDb> for MockStorageActor {
     }
 }
 
-impl Message<ApplyStoreUpdate> for MockStorageActor {
+impl Message<AtomicUpdate> for MockStorageActor {
     type Reply = Result<StoreUpdateOutcome>;
 
     async fn handle(
         &mut self,
-        msg: ApplyStoreUpdate,
+        msg: AtomicUpdate,
         ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         self.handle_apply_store_update(msg, ctx)
-    }
-}
-
-impl Message<CleanPendingBlocksUpTo> for MockStorageActor {
-    type Reply = Result<()>;
-
-    async fn handle(
-        &mut self,
-        msg: CleanPendingBlocksUpTo,
-        ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        self.handle_clean_pending_blocks_up_to(msg, ctx)
     }
 }
 
@@ -570,30 +564,6 @@ impl Message<GetFinalSnapshot> for MockStorageActor {
         ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
         self.handle_get_final_snapshot(msg, ctx)
-    }
-}
-
-impl Message<AddPendingDepositEvent> for MockStorageActor {
-    type Reply = Result<bool>;
-
-    async fn handle(
-        &mut self,
-        msg: AddPendingDepositEvent,
-        ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        self.handle_add_pending_deposit_event(msg, ctx)
-    }
-}
-
-impl Message<ConsumeUnseenWithdrawCount> for MockStorageActor {
-    type Reply = Result<bool>;
-
-    async fn handle(
-        &mut self,
-        msg: ConsumeUnseenWithdrawCount,
-        ctx: &mut Context<Self, Self::Reply>,
-    ) -> Self::Reply {
-        self.handle_consume_unseen_withdraw_count(msg, ctx)
     }
 }
 
@@ -622,7 +592,7 @@ impl Message<AddPendingCrossZoneDispatches> for MockStorageActor {
 }
 
 impl Message<DropSettledCrossZoneDispatches> for MockStorageActor {
-    type Reply = Result<usize>;
+    type Reply = Result<()>;
 
     async fn handle(
         &mut self,
@@ -645,8 +615,20 @@ impl Message<RecordDispatchFailure> for MockStorageActor {
     }
 }
 
+impl Message<RequeueDeadLetterDispatch> for MockStorageActor {
+    type Reply = Result<DeadLetterRequeue>;
+
+    async fn handle(
+        &mut self,
+        msg: RequeueDeadLetterDispatch,
+        ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        self.handle_requeue_dead_letter_dispatch(msg, ctx)
+    }
+}
+
 impl Message<GetDeadLetterDispatches> for MockStorageActor {
-    type Reply = Result<Vec<DeadLetterDispatchRecord>>;
+    type Reply = Result<Vec<DeadLetterDispatch>>;
 
     async fn handle(
         &mut self,

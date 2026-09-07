@@ -6,6 +6,7 @@ use lee_core::{
     BlockId, Commitment,
     account::{Account, AccountId},
 };
+pub use sequencer_storage_actor::protocol::{CrossZoneMessageKey, DeadLetterRequeue};
 
 /// The widest range a [`GetBlockRange`] may span.
 pub const MAX_BLOCK_RANGE_LEN: usize = 1024;
@@ -13,8 +14,35 @@ pub const MAX_BLOCK_RANGE_LEN: usize = 1024;
 #[derive(Copy, Clone)]
 pub struct ProduceBlock;
 
+/// The origin of a transaction.
+#[derive(Clone, Copy)]
+pub enum TransactionOrigin {
+    /// Basic transactions submitted by users via RPC.
+    User,
+    /// Transactions received via p2p gossip from a peer sequencer.
+    Gossip,
+}
+
 pub struct Transaction {
     pub transaction: LeeTransaction,
+    pub origin: TransactionOrigin,
+}
+
+pub struct GetFeeQuote;
+
+/// The fee market priced off the head state, for wallets sizing `max_fee`.
+#[derive(Reply)]
+pub struct FeeStateQuote {
+    /// The block height the quoted state settled at, for staleness checks.
+    pub height: u64,
+    pub base_fee_exec: u64,
+    pub base_fee_stor: u64,
+    pub next_base_fee_exec_floor: u64,
+    pub next_base_fee_exec_ceiling: u64,
+    pub next_base_fee_stor_floor: u64,
+    pub next_base_fee_stor_ceiling: u64,
+    pub max_gas_exec: u64,
+    pub max_gas_stor: u64,
 }
 
 pub struct GetBlock {
@@ -103,5 +131,14 @@ pub struct GetCrossZoneDeadLetters;
 #[derive(Reply)]
 pub struct GetCrossZoneDeadLettersReply {
     pub total_retired: u64,
-    pub retained: Vec<sequencer_storage_actor::protocol::DeadLetterDispatchRecord>,
+    pub retained: Vec<sequencer_storage_actor::protocol::DeadLetterDispatch>,
+}
+
+pub struct RequeueCrossZoneDeadLetter {
+    pub message_key: CrossZoneMessageKey,
+}
+
+#[derive(Reply)]
+pub struct RequeueCrossZoneDeadLetterReply {
+    pub outcome: sequencer_storage_actor::protocol::DeadLetterRequeue,
 }

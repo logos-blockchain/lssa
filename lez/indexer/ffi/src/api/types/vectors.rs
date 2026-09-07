@@ -11,13 +11,11 @@ pub type FfiBlockBody = FfiVec<FfiTransaction>;
 
 pub type FfiNonceList = FfiVec<FfiNonce>;
 
-pub type FfiInstructionDataList = FfiVec<u32>;
+pub type FfiInstructionDataList = FfiVec<u8>;
 
 pub type FfiSignaturePubKeyList = FfiVec<FfiSignaturePubKeyEntry>;
 
 pub type FfiProof = FfiVecU8;
-
-pub type FfiProgramDeploymentMessage = FfiVecU8;
 
 pub type FfiPublicActionList = FfiVec<FfiPublicAction>;
 

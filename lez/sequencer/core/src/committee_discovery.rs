@@ -19,6 +19,8 @@ pub fn committee_update(
     live_accredited_keys: &[SequencerKey],
 ) -> Option<Vec<SequencerKey>> {
     let config = read_config(state)?;
+    // Absent only before genesis, which no committee update can precede.
+    let minimum_sequencer_stake = config.channel_params?.minimum_sequencer_stake;
 
     // Sorted by key bytes so the list is deterministic across calls: a
     // `ChannelConfigOp`'s `keys` field must reproduce the same order every
@@ -27,7 +29,7 @@ pub fn committee_update(
     let mut desired: Vec<SequencerKey> = config
         .entries
         .iter()
-        .filter(|(_, entry)| entry.net_stake() >= config.minimum_sequencer_stake)
+        .filter(|(_, entry)| entry.net_stake() >= minimum_sequencer_stake)
         .map(|(key, _)| *key)
         .collect();
     desired.sort_unstable();
@@ -70,47 +72,40 @@ pub fn finalize_unstake_candidates(state: &lee::V03State) -> Vec<(lee::AccountId
         .collect()
 }
 
-/// Block-validity rule for a `FinalizeUnstake` on `ownership_id`.
+// TODO: Only checked on blocks we build, never re-checked on adoption.
+/// Whether a `FinalizeUnstake` on `ownership_id` may go in a block: one that
+/// removes the key waits until the removal can no longer be undone.
 ///
-/// A partial release is always valid: `UnstakeRequest` already guarantees it
-/// leaves the key at or above the minimum, so committee membership is
-/// unaffected. A full drain — measured against tracked stake, not balance,
-/// which anyone can inflate — is valid only once the key is no longer
-/// accredited. An unknown account, no pending request, or no config entry
-/// also counts as valid; the program itself rejects those cases anyway.
-///
-/// TODO: checks live Bedrock membership, not an ordered history walk like the
-/// spec calls for. Fine for the sequencer building the next block, but a
-/// follower re-checking an already-adopted block has no independent way to
-/// verify it this way. Switch once zone-sdk exposes ordered `ChannelConfigOp`
-/// data to LEZ.
+/// `finalized_committee` is the accredited-key list only when it is known to be
+/// final. `None` means a config is still in flight, so no removal counts yet.
 #[must_use]
 pub fn finalize_unstake_is_valid(
     state: &lee::V03State,
     ownership_id: lee::AccountId,
-    live_accredited_keys: &[SequencerKey],
+    finalized_committee: Option<&[SequencerKey]>,
 ) -> bool {
     let Some(record) = stake_record(state, ownership_id) else {
         return true;
     };
-    let Some(pending) = record.pending_unstake else {
+    if record.pending_unstake.is_none() {
         return true;
-    };
+    }
     let Some(entry) =
         read_config(state).and_then(|config| config.entries.get(&record.sequencer_key).copied())
     else {
         return true;
     };
 
-    let fully_drains = entry.total_staked == pending.amount;
-    !fully_drains || !live_accredited_keys.contains(&record.sequencer_key)
+    let fully_drains = entry.net_stake() == 0;
+    !fully_drains
+        || finalized_committee.is_some_and(|committee| !committee.contains(&record.sequencer_key))
 }
 
 /// Reads the `sequencer_stake` config account — a single account read, not a
 /// scan, since every `Stake`/`UnstakeRequest`/`FinalizeUnstake` keeps its
 /// `entries` map current as it executes. `None` only if the account is absent
 /// or undecodable, which genesis rules out.
-fn read_config(state: &lee::V03State) -> Option<SequencerStakeConfig> {
+pub(crate) fn read_config(state: &lee::V03State) -> Option<SequencerStakeConfig> {
     let Some(account) =
         state.get_account_by_id_ref(system_accounts::sequencer_stake_config_account_id())
     else {
@@ -122,6 +117,12 @@ fn read_config(state: &lee::V03State) -> Option<SequencerStakeConfig> {
         warn!("sequencer_stake config account did not decode as SequencerStakeConfig");
     }
     config
+}
+
+/// Channel posting params from the config account. `None` before genesis set
+/// them, which a live chain rules out.
+pub(crate) fn channel_params(state: &lee::V03State) -> Option<crate::config::ChannelParams> {
+    read_config(state)?.channel_params
 }
 
 /// The `StakeRecord` an ownership account carries: which key it backs, plus
@@ -208,7 +209,11 @@ mod tests {
         let config = Account {
             program_owner: programs::sequencer_stake().id().into(),
             data: SequencerStakeConfig {
-                minimum_sequencer_stake: MINIMUM,
+                channel_params: Some(sequencer_stake_core::ChannelParams {
+                    minimum_sequencer_stake: MINIMUM,
+                    posting_timeframe: system_accounts::DEFAULT_SEQUENCER_POSTING_TIMEFRAME,
+                    posting_timeout: system_accounts::DEFAULT_SEQUENCER_POSTING_TIMEOUT,
+                }),
                 entries: stakes
                     .iter()
                     .map(|staked| {
@@ -349,37 +354,63 @@ mod tests {
         let staked = Staked::new(5, MINIMUM + 10).pending(10);
         let state = state_with([staked]);
 
+        // Still accredited in a final committee, and it still passes.
         assert!(finalize_unstake_is_valid(
             &state,
             staked.account_id,
-            &[staked.key]
+            Some(&[staked.key])
         ));
-        assert!(finalize_unstake_is_valid(&state, staked.account_id, &[]));
+        assert!(finalize_unstake_is_valid(&state, staked.account_id, None));
     }
 
     #[test]
-    fn a_full_drain_is_valid_only_once_absent_from_the_live_committee() {
+    fn a_full_drain_waits_for_the_removal_to_finalize() {
         let staked = Staked::new(6, MINIMUM).pending(MINIMUM);
         let state = state_with([staked]);
+        let valid = |committee: &[SequencerKey]| {
+            finalize_unstake_is_valid(&state, staked.account_id, Some(committee))
+        };
 
+        // Still in the finalized committee: the removal has not landed.
+        let accredited = [staked.key];
+        assert!(!valid(&accredited));
+
+        // Gone from it: the config that removed the key is irreversible.
+        assert!(valid(&[]));
+
+        // A config in flight says nothing about what is final.
+        assert!(!finalize_unstake_is_valid(&state, staked.account_id, None));
+    }
+
+    #[test]
+    fn each_removal_only_frees_its_own_release() {
+        let exiting = Staked::new(6, MINIMUM).pending(MINIMUM);
+        let staying = Staked::new(8, MINIMUM).pending(MINIMUM);
+        let state = state_with([exiting, staying]);
+
+        // Only the key actually absent from the finalized committee is freed.
+        let committee = [staying.key];
+        assert!(finalize_unstake_is_valid(
+            &state,
+            exiting.account_id,
+            Some(&committee)
+        ));
         assert!(!finalize_unstake_is_valid(
             &state,
-            staked.account_id,
-            &[staked.key]
+            staying.account_id,
+            Some(&committee)
         ));
-        assert!(finalize_unstake_is_valid(&state, staked.account_id, &[]));
     }
 
     #[test]
     fn a_donated_balance_does_not_make_a_full_drain_look_partial() {
-        // The drain is measured against the tracked stake, so a donation
-        // sitting on the ownership account does not reclassify it as partial.
+        // Measured against tracked stake, so a donation cannot hide the drain.
         let staked = Staked::new(7, MINIMUM).pending(MINIMUM).donated(1);
 
         assert!(!finalize_unstake_is_valid(
             &state_with([staked]),
             staked.account_id,
-            &[staked.key]
+            Some(&[staked.key])
         ));
     }
 }

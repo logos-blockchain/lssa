@@ -1,7 +1,9 @@
 use std::future::Future;
 
 use common::{block::Block, transaction::LeeTransaction};
-use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _, future::ready, stream};
+use futures::{
+    FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _, future::ready, stream,
+};
 use kameo::{
     Actor,
     actor::{ActorRef, WeakActorRef},
@@ -17,32 +19,41 @@ use lee_core::{
 use log::{info, warn};
 use mempool::MemPoolHandle;
 use sequencer_core::{
-    SequencerCore, TransactionOrigin,
-    block_publisher::{BlockPublisherTrait, Ed25519Key},
+    PinBehindTip, SequencerCore, TransactionOrigin,
+    block_publisher::{BlockPublisherTrait, MsgId},
     config::SequencerConfig,
     task_group::TaskGroup,
 };
-use sequencer_storage_actor::{StorageActor, StorageActorTrait};
+use sequencer_storage_actor::StorageActorTrait;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    Result,
+    ExecutorActorTrait, Result,
     error::Error,
     protocol::{
-        GetAccount, GetAccountBalance, GetAccountNonces, GetAccountReply, GetBlock, GetBlockRange,
-        GetChannelId, GetChannelIdReply, GetCrossZoneDeadLetters, GetCrossZoneDeadLettersReply,
-        GetLastBlockId, GetProofsAndRoot, GetTransaction, ProduceBlock, Transaction,
+        FeeStateQuote, GetAccount, GetAccountBalance, GetAccountNonces, GetAccountReply, GetBlock,
+        GetBlockRange, GetChannelId, GetChannelIdReply, GetCrossZoneDeadLetters,
+        GetCrossZoneDeadLettersReply, GetFeeQuote, GetLastBlockId, GetProofsAndRoot,
+        GetTransaction, ProduceBlock, RequeueCrossZoneDeadLetter, RequeueCrossZoneDeadLetterReply,
+        Transaction,
     },
 };
+
+mod conversions;
+#[cfg(test)]
+mod tests;
 
 /// How many block lookups a single [`GetBlockRange`] keeps in flight.
 const BLOCK_RANGE_CONCURRENCY: usize = 16;
 
+/// Skips behind an unchanging tip past which this is a stuck pin, not catch-up.
+const BLOCKED_ATTEMPTS_BEFORE_WEDGED: u32 = 4;
+
 // TODO: Remove `BP` once this part is moved to a separate actor
-pub struct ExecutorActor<BP: BlockPublisherTrait, S: StorageActorTrait = StorageActor> {
+pub struct ExecutorActor<S: StorageActorTrait, BP: BlockPublisherTrait> {
     mempool_handle: MemPoolHandle<(TransactionOrigin, LeeTransaction)>,
-    sequencer: SequencerCore<BP, S>,
+    sequencer: SequencerCore<S, BP>,
     storage_ref: ActorRef<S>,
 
     // --- TODO: Remove these fields below ---
@@ -53,22 +64,53 @@ pub struct ExecutorActor<BP: BlockPublisherTrait, S: StorageActorTrait = Storage
     /// handle owns no reference to the core itself, so without these there is
     /// nothing to wait on: aborting the main loop only starts the teardown.
     background_tasks: Vec<TaskGroup>,
+    blocked_attempts: BlockedAttempts,
+    /// Consecutive production turns that failed outright. A run of these looks
+    /// exactly like an idle node in every other signal, so it gets its own.
+    failed_attempts: u32,
 }
 
-impl<BP: BlockPublisherTrait + Send + 'static, S: StorageActorTrait> ExecutorActor<BP, S> {
-    #[expect(
-        clippy::manual_async_fn,
-        reason = "Explicit Send future works around rust-lang/rust#100013"
-    )]
+/// Consecutive production attempts skipped because the pin trailed the tip.
+/// The run restarts on a new tip, so its length separates catching up from
+/// being stuck.
+#[derive(Default)]
+pub(crate) struct BlockedAttempts {
+    count: u32,
+    behind: Option<MsgId>,
+}
+
+impl BlockedAttempts {
+    /// Counts a skipped attempt and returns the run's new length.
+    pub(crate) fn record(&mut self, tip: MsgId) -> u32 {
+        if self.behind == Some(tip) {
+            self.count = self.count.saturating_add(1);
+        } else {
+            self.behind = Some(tip);
+            self.count = 1;
+        }
+        self.count
+    }
+
+    /// Ends the run, reporting whether there was one to end.
+    pub(crate) fn clear(&mut self) -> bool {
+        let blocked = self.behind.is_some();
+        *self = Self::default();
+        blocked
+    }
+}
+
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + 'static> ExecutorActor<S, BP> {
     pub fn new(
         config: SequencerConfig,
         storage_ref: ActorRef<S>,
     ) -> impl Future<Output = Self> + Send + 'static {
+        sequencer_executor_actor_metrics::init();
+
         async move {
             // TODO: Leave storage_ref as a top-level field only in `ExecutorActor`,
             // while moving `SequencerCore` code into this actor.
             let (sequencer, mempool_handle) =
-                SequencerCore::<BP, S>::start_from_config(config, storage_ref.clone()).await;
+                SequencerCore::<S, BP>::start_from_config(config, storage_ref.clone()).await;
 
             let driver_cancellation = sequencer.block_publisher().driver_cancellation();
             let background_tasks = sequencer.background_tasks();
@@ -79,20 +121,20 @@ impl<BP: BlockPublisherTrait + Send + 'static, S: StorageActorTrait> ExecutorAct
                 storage_ref,
                 driver_cancellation,
                 background_tasks,
+                blocked_attempts: BlockedAttempts::default(),
+                failed_attempts: 0,
             }
         }
     }
-
-    /// Handle to the sequencer's mempool, for feeding externally-received
-    /// (e.g. gossiped) transactions in.
-    #[must_use]
-    pub fn mempool_handle(&self) -> MemPoolHandle<(TransactionOrigin, LeeTransaction)> {
-        self.mempool_handle.clone()
-    }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Actor
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> ExecutorActorTrait
+    for ExecutorActor<S, BP>
+{
+}
+
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Actor
+    for ExecutorActor<S, BP>
 {
     type Args = Self;
     type Error = Error;
@@ -140,8 +182,17 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Acto
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<ProduceBlock>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait> ExecutorActor<S, BP> {
+    /// Ends a blocked run, reporting the drop to zero only if there was one.
+    fn clear_blocked_attempts(&mut self) {
+        if self.blocked_attempts.clear() {
+            sequencer_executor_actor_metrics::record_publish_blocked_attempts(0);
+        }
+    }
+}
+
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<ProduceBlock>
+    for ExecutorActor<S, BP>
 {
     type Reply = Result<()>;
 
@@ -150,61 +201,112 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Mess
         ProduceBlock: ProduceBlock,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        // Only produce on our turn.
+        // Only produce on our turn. Losing the seat ends any blocked run: a node
+        // dropped from the committee is not wedged, and would otherwise hold the
+        // gauge non-zero forever.
         if !self.sequencer.is_our_turn() {
             info!("Not our turn to produce a block, skipping");
+            self.clear_blocked_attempts();
             return Ok(());
         }
 
         // Never inscribe a second block at a height we already published: the
         // channel would carry two chains from there and nothing resolves that.
-        // The head rewinds under us when the sdk orphans our own unfinalized
-        // blocks, and recovers once they finalize, so this is a wait.
         if let Some(high_water) = self.sequencer.rewound_below_published().await {
             warn!(
                 "Skipping turn: head rewound to {} but block {high_water} is already inscribed; \
                  waiting for the channel to restore it",
                 self.sequencer.next_block_height().await.saturating_sub(1),
             );
+            // The count is only for skips behind a frozen pin, so keeping it
+            // here would warn about the wrong problem.
+            self.clear_blocked_attempts();
             return Ok(());
         }
 
-        info!("Our turn: producing a block and any committee update");
-        let id = self
-            .sequencer
-            .run_production_turn()
-            .await
-            .map_err(Error::BlockProductionFailed)?;
+        // The channel moved past our pin, so every publish this turn would be refused.
+        if let Some(PinBehindTip { pin, tip }) = self.sequencer.pin_behind_channel_tip().await {
+            let attempts = self.blocked_attempts.record(tip);
+            sequencer_executor_actor_metrics::record_publish_blocked_attempts(attempts);
+            if attempts >= BLOCKED_ATTEMPTS_BEFORE_WEDGED {
+                warn!(
+                    "Skipped {attempts} production attempts behind an unchanging channel tip \
+                     {tip}: our pin {pin} is frozen and cannot recover on its own. Land any \
+                     inscription on the channel to trigger recovery, or reset the store.",
+                );
+            } else {
+                info!(
+                    "Skipping turn: channel tip {tip} moved past our pin {pin}; catching up first"
+                );
+            }
+            return Ok(());
+        }
+        self.clear_blocked_attempts();
 
-        let author_identity = hex::encode(
-            Ed25519Key::from_bytes(&self.sequencer.sequencer_config().signing_key)
-                .public_key()
-                .as_bytes(),
-        );
-        log::info!("Block with id {id} created by {author_identity:?}");
+        info!("Our turn: producing a block and any committee update");
+        // A failed turn costs this block only. Returning the error would stop
+        // this actor, and the scheduler's interval task gives up for good the
+        // first time it finds us not running — the node then looks healthy and
+        // never produces again.
+        match self.sequencer.run_production_turn().await {
+            Ok(id) => {
+                // The count is how many turns failed in a row, so a success
+                // clears it and the gauge drops to zero, unless it was zero
+                // already.
+                if std::mem::take(&mut self.failed_attempts) != 0 {
+                    sequencer_executor_actor_metrics::record_production_failed_attempts(0);
+                }
+                log::info!(
+                    "Block with id {id} created by {}",
+                    self.sequencer.bedrock_public_key_hex()
+                );
+            }
+            Err(err) => {
+                self.failed_attempts = self.failed_attempts.saturating_add(1);
+                sequencer_executor_actor_metrics::record_production_failed_attempts(
+                    self.failed_attempts,
+                );
+                warn!(
+                    "Skipping turn: block production failed ({} in a row): {err:#}",
+                    self.failed_attempts
+                );
+            }
+        }
 
         Ok(())
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<Transaction>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<Transaction>
+    for ExecutorActor<S, BP>
 {
     type Reply = Result<()>;
 
     async fn handle(
         &mut self,
-        Transaction { transaction }: Transaction,
+        Transaction {
+            transaction,
+            origin,
+        }: Transaction,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
+        // Fee admission against the head state, before the mempool sees it.
+        // Advisory (base fees and balances move), but everything it turns
+        // away would have been refused by the block builder anyway.
+        self.sequencer
+            .with_state(|state| sequencer_core::fees::screen(&transaction, state))
+            .await
+            .map_err(|err| Error::IncorrectFee(err.into()))?;
+
         self.mempool_handle
-            .try_push((TransactionOrigin::User, transaction))
-            .map_err(|_err| Error::MempoolIsFull)
+            .try_push((origin.into(), transaction))
+            .map_err(|_err| Error::MempoolIsFull)?;
+        Ok(())
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<GetBlock>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<GetBlock>
+    for ExecutorActor<S, BP>
 {
     type Reply = Result<Option<Block>>;
 
@@ -220,8 +322,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Mess
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<GetBlockRange>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<GetBlockRange>
+    for ExecutorActor<S, BP>
 {
     type Reply = DelegatedReply<Result<Vec<Block>>>;
 
@@ -249,8 +351,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Mess
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<GetLastBlockId>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<GetLastBlockId>
+    for ExecutorActor<S, BP>
 {
     type Reply = Result<BlockId>;
 
@@ -263,8 +365,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Mess
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
-    Message<GetAccountBalance> for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static>
+    Message<GetAccountBalance> for ExecutorActor<S, BP>
 {
     type Reply = Balance;
 
@@ -279,8 +381,25 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<GetTransaction>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<GetFeeQuote>
+    for ExecutorActor<S, BP>
+{
+    type Reply = FeeStateQuote;
+
+    async fn handle(
+        &mut self,
+        GetFeeQuote: GetFeeQuote,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        self.sequencer
+            .with_state(sequencer_core::fees::fee_quote)
+            .map(Into::into)
+            .await
+    }
+}
+
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<GetTransaction>
+    for ExecutorActor<S, BP>
 {
     type Reply = Result<Option<(LeeTransaction, BlockId)>>;
 
@@ -296,8 +415,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Mess
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
-    Message<GetAccountNonces> for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static>
+    Message<GetAccountNonces> for ExecutorActor<S, BP>
 {
     type Reply = Vec<Nonce>;
 
@@ -317,8 +436,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
-    Message<GetProofsAndRoot> for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static>
+    Message<GetProofsAndRoot> for ExecutorActor<S, BP>
 {
     type Reply = (
         Vec<Option<lee_core::MembershipProof>>,
@@ -342,8 +461,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<GetAccount>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<GetAccount>
+    for ExecutorActor<S, BP>
 {
     type Reply = GetAccountReply;
 
@@ -361,8 +480,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Mess
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Message<GetChannelId>
-    for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static> Message<GetChannelId>
+    for ExecutorActor<S, BP>
 {
     type Reply = GetChannelIdReply;
 
@@ -377,8 +496,8 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait> Mess
     }
 }
 
-impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
-    Message<GetCrossZoneDeadLetters> for ExecutorActor<BP, S>
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static>
+    Message<GetCrossZoneDeadLetters> for ExecutorActor<S, BP>
 {
     type Reply = Result<GetCrossZoneDeadLettersReply>;
 
@@ -396,5 +515,24 @@ impl<BP: BlockPublisherTrait + Send + Sync + 'static, S: StorageActorTrait>
             total_retired,
             retained: retained.into_iter().collect(),
         })
+    }
+}
+
+impl<S: StorageActorTrait, BP: BlockPublisherTrait + Send + Sync + 'static>
+    Message<RequeueCrossZoneDeadLetter> for ExecutorActor<S, BP>
+{
+    type Reply = Result<RequeueCrossZoneDeadLetterReply>;
+
+    async fn handle(
+        &mut self,
+        RequeueCrossZoneDeadLetter { message_key }: RequeueCrossZoneDeadLetter,
+        _ctx: &mut Context<Self, Self::Reply>,
+    ) -> Self::Reply {
+        let outcome = self
+            .sequencer
+            .requeue_cross_zone_dead_letter(message_key)
+            .await
+            .map_err(Error::CrossZoneDeadLetterRequeueFailed)?;
+        Ok(RequeueCrossZoneDeadLetterReply { outcome })
     }
 }
