@@ -151,10 +151,14 @@ impl ValidatedStateDiff {
             cycle_budget,
             &mut cycles_used,
         );
-        // A panic or session-limit bail loses the count and pays the full budget; a non-zero
-        // exit code is metered like a success.
+        // A non-zero exit keeps its count: the failing call's cycles ride on the error since
+        // `execute_authorized` bailed before adding them. A panic or session-limit bail loses
+        // the count and pays the full budget.
         let cycles = match &result {
-            Ok(_) | Err(LeeError::ProgramExitedWithCode { .. }) => cycles_used,
+            Ok(_) => cycles_used,
+            Err(LeeError::ProgramExitedWithCode { cycles, .. }) => {
+                cycles_used.saturating_add(*cycles)
+            }
             Err(_) => cycle_budget,
         };
         let diff = match result {
@@ -359,22 +363,13 @@ impl ValidatedStateDiff {
                     });
                 };
                 let program = Program::new_unchecked(program_id, Cow::Owned(elf));
-                let (program_output, call_cycles) = match program.execute(
+                let (program_output, call_cycles) = program.execute(
                     chained_call.program_account_id,
                     caller_data.account_id,
                     &real_pre_states,
                     &chained_call.instruction_data,
                     cycle_budget.saturating_sub(*cycles_used),
-                ) {
-                    Ok(ok) => ok,
-                    Err(err) => {
-                        // if there is a non-zero halt, we should charge up to the cycle
-                        if let LeeError::ProgramExitedWithCode { cycles, .. } = err {
-                            *cycles_used = cycles_used.saturating_add(cycles);
-                        }
-                        return Err(err);
-                    }
-                };
+                )?;
                 *cycles_used = cycles_used
                     .checked_add(call_cycles)
                     .expect("cycle sums fit u64: overflow would need ~2^64 executed cycles");

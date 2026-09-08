@@ -145,25 +145,12 @@ impl Program {
             }
         })?;
 
-        // check the exit code for non-zero terminations
-        #[expect(
-            clippy::wildcard_enum_match_arm,
-            reason = "we only care about ExitCode::Halted"
-        )]
-        match outcome.exit_code {
-            ExitCode::Halted(0) => Ok(outcome),
-            ExitCode::Halted(code) => Err(LeeError::ProgramExitedWithCode {
-                code,
-                cycles: outcome.cycles,
-            }),
-            // anything other than Halted is an actual error (e.g. r0vm termination)
-            //
-            // NOTE: ExitCode::SessionLimit actually exists, but r0vm does not use it
-            // see their own code for the comment
-            other => Err(LeeError::ProgramExecutionFailed(format!(
-                "unexpected exit {other:?}"
-            ))),
-        }
+        check_exit_code(
+            outcome.exit_code,
+            outcome.cycles,
+            LeeError::ProgramExecutionFailed,
+        )?;
+        Ok(outcome)
     }
 
     /// Writes a `CallKind::Execute` frame followed by the guest's `ProgramInput` as a single
@@ -188,5 +175,32 @@ impl Program {
             borsh::to_vec(&input).map_err(|e| LeeError::ProgramWriteInputFailed(e.to_string()))?;
         env_builder.write_slice(&to_frame(&payload));
         Ok(())
+    }
+}
+
+/// Gates a finished session on its exit code.
+///
+/// - `ExitCode::Halted(0)` is a success
+/// - `ExitCode::Halted(code)` with a non-zero `code` is a cycle-counted failure
+/// - `ExitCode::Paused(code)` is treated as a full failure as we do not expect `Pause`'s to occur
+/// - Any other exit code is treated as a full failure
+pub(crate) fn check_exit_code(
+    exit_code: ExitCode,
+    cycles: Cycles,
+    on_failure: fn(String) -> LeeError,
+) -> Result<(), LeeError> {
+    match exit_code {
+        ExitCode::Halted(0) => Ok(()),
+        ExitCode::Halted(code) => Err(LeeError::ProgramExitedWithCode { code, cycles }),
+        // A pause keeps its journal and count, but a program is one call to a final output and
+        // the circuit's `env::verify` only resolves a `Halted(0)` claim, so it is a plain
+        // failure on both paths and pays the full budget like a panic.
+        ExitCode::Paused(code) => Err(on_failure(format!("program paused with code {code}"))),
+        // `SystemSplit` never ends a session and `SessionLimit` is documented as never emitted
+        // (risc0-binfmt `exit_code.rs`): the executor bails with "Session limit exceeded"
+        // instead, which `execute_session` maps to `OutOfGas`.
+        ExitCode::SessionLimit | ExitCode::SystemSplit | _ => {
+            Err(on_failure(format!("unexpected exit {exit_code:?}")))
+        }
     }
 }

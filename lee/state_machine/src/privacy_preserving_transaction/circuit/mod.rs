@@ -11,12 +11,12 @@ use lee_core::{
     },
     to_frame,
 };
-use risc0_zkvm::{ExecutorEnv, ExitCode, InnerReceipt, ProverOpts, Receipt, default_prover};
+use risc0_zkvm::{ExecutorEnv, InnerReceipt, ProverOpts, Receipt, default_prover};
 
 use crate::{
     PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID,
     error::{InvalidProgramBehaviorError, LeeError},
-    program::Program,
+    program::{Program, check_exit_code},
     state::MAX_NUMBER_CHAINED_CALLS,
 };
 
@@ -386,20 +386,12 @@ fn execute_and_prove_program(
         .as_value()
         .map_err(|e| LeeError::ProgramProveFailed(e.to_string()))?
         .exit_code;
-    #[expect(
-        clippy::wildcard_enum_match_arm,
-        reason = "we only care about ExitCode::Halted"
-    )]
-    match exit_code {
-        ExitCode::Halted(0) => Ok(prove_info.receipt),
-        ExitCode::Halted(code) => Err(LeeError::ProgramExitedWithCode {
-            code,
-            cycles: prove_info.stats.user_cycles,
-        }),
-        other => Err(LeeError::ProgramProveFailed(format!(
-            "unexpected exit {other:?}"
-        ))),
-    }
+    check_exit_code(
+        exit_code,
+        prove_info.stats.user_cycles,
+        LeeError::ProgramProveFailed,
+    )?;
+    Ok(prove_info.receipt)
 }
 
 #[cfg(test)]
