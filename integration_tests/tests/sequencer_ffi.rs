@@ -233,7 +233,7 @@ fn seq_ffi_test_1() -> Result<()> {
         anyhow::bail!("Sequecner FFI error {:?}", res.error);
     }
 
-    let mut sequencer_ffi = unsafe { std::ptr::read(res.value) };
+    let sequencer_ffi = unsafe { std::ptr::read(res.value) };
 
     let joined_at = ctx.block_on(|ctx| ctx.sequencer_client().get_last_block_id())?;
     sequencer_ffi_helpers::wait_for_sequencer_ffi_block(&sequencer_ffi, joined_at)?;
@@ -284,9 +284,9 @@ fn seq_ffi_test_1() -> Result<()> {
 
     // No need for unstaking in general case
 
-    unsafe {
-        sequencer_ffi_helpers::stop_sequencer(&raw mut sequencer_ffi);
-    }
+    // unsafe {
+    //     sequencer_ffi_helpers::stop_sequencer(&raw mut sequencer_ffi);
+    // }
 
     Ok(())
 }
