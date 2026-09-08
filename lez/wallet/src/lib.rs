@@ -876,12 +876,14 @@ impl WalletCore {
 
     /// Sends a public transaction over `accounts`, paid by `payer` if given.
     ///
-    /// `payer: None` picks the first funded signing account in `accounts`. An explicit payer may
-    /// be one of `accounts`' signing entries, or any other public account whose signing key the
-    /// wallet holds: the latter co-signs (nonce and signature appended after `accounts`' own)
-    /// without joining the message's `account_ids`, so programs with a fixed account shape — e.g.
-    /// `program_loader`, whose accounts are all freshly claimed and unfunded — can still be paid
-    /// for.
+    /// `payer: None` picks the first funded signing account in `accounts`, or the first signing
+    /// account if none is funded (see [`AccountManager::fee_payer_account_id`]).
+    ///
+    /// An explicit payer may be one of `accounts`' signing entries, or any other public account
+    /// whose signing key the wallet holds: the latter co-signs (nonce and signature appended
+    /// after `accounts`' own) without joining the message's `account_ids`, so programs with a
+    /// fixed account shape (like the `program_loader`, whose accounts are all freshly claimed
+    /// and unfunded) can still be paid for.
     pub async fn send_pub_tx_with_pre_check(
         &self,
         accounts: Vec<AccountIdentity>,
