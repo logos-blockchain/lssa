@@ -962,6 +962,8 @@ enum WalletFfiError wallet_ffi_account_id_for_private_pda(struct FfiProgramId pr
  * - `bytecode_data` must be a valid pointer to `bytecode_size` bytes
  * - `next_segment` may be null (meaning this is the chain's last segment), otherwise a valid
  *   pointer to a `FfiBytes32` for an already-uploaded segment
+ * - `payer` may be null (self-pay from the transaction's own accounts), otherwise a valid pointer
+ *   to a `FfiBytes32` for a funded account whose signing key the wallet holds
  * - `out_result` must be a valid pointer to a `FfiTransactionResult` struct
  */
 enum WalletFfiError wallet_ffi_program_loader_write_segment(struct WalletHandle *handle,
@@ -969,6 +971,7 @@ enum WalletFfiError wallet_ffi_program_loader_write_segment(struct WalletHandle 
                                                             const uint8_t *bytecode_data,
                                                             uintptr_t bytecode_size,
                                                             const struct FfiBytes32 *next_segment,
+                                                            const struct FfiBytes32 *payer,
                                                             struct FfiTransactionResult *out_result);
 
 /**
@@ -978,12 +981,15 @@ enum WalletFfiError wallet_ffi_program_loader_write_segment(struct WalletHandle 
  * - `handle` must be a valid wallet handle from `wallet_ffi_create_new` or `wallet_ffi_open`
  * - `target` must be a valid pointer to a `FfiBytes32`; the wallet must hold its signing key
  * - `first_segment` must be a valid pointer to a `FfiBytes32` for an already-uploaded segment
+ * - `payer` may be null (self-pay from the transaction's own accounts), otherwise a valid pointer
+ *   to a `FfiBytes32` for a funded account whose signing key the wallet holds
  * - `out_result` must be a valid pointer to a `FfiTransactionResult` struct
  */
 enum WalletFfiError wallet_ffi_program_loader_create_header(struct WalletHandle *handle,
                                                             const struct FfiBytes32 *target,
                                                             const struct FfiBytes32 *first_segment,
                                                             bool immutable,
+                                                            const struct FfiBytes32 *payer,
                                                             struct FfiTransactionResult *out_result);
 
 /**
@@ -995,12 +1001,15 @@ enum WalletFfiError wallet_ffi_program_loader_create_header(struct WalletHandle 
  * - `header` must be a valid pointer to a `FfiBytes32` for an existing header the wallet is still
  *   authorized over
  * - `first_segment` must be a valid pointer to a `FfiBytes32` for an already-uploaded segment
+ * - `payer` may be null (self-pay from the transaction's own accounts), otherwise a valid pointer
+ *   to a `FfiBytes32` for a funded account whose signing key the wallet holds
  * - `out_result` must be a valid pointer to a `FfiTransactionResult` struct
  */
 enum WalletFfiError wallet_ffi_program_loader_update_header(struct WalletHandle *handle,
                                                             const struct FfiBytes32 *header,
                                                             const struct FfiBytes32 *first_segment,
                                                             bool immutable,
+                                                            const struct FfiBytes32 *payer,
                                                             struct FfiTransactionResult *out_result);
 
 /**
@@ -1016,6 +1025,8 @@ enum WalletFfiError wallet_ffi_program_loader_update_header(struct WalletHandle 
  * - `segments` must be a valid pointer to `segments_len` contiguous `FfiBytes32`s, in chain order
  *   (first chunk first); the wallet must hold every segment's signing key
  * - `elf_data` must be a valid pointer to `elf_size` bytes
+ * - `payer` may be null (self-pay from the transaction's own accounts), otherwise a valid pointer
+ *   to a `FfiBytes32` for a funded account whose signing key the wallet holds
  * - `out_result` must be a valid pointer to a `FfiTransactionResult` struct
  */
 enum WalletFfiError wallet_ffi_program_loader_deploy(struct WalletHandle *handle,
@@ -1025,6 +1036,7 @@ enum WalletFfiError wallet_ffi_program_loader_deploy(struct WalletHandle *handle
                                                      const uint8_t *elf_data,
                                                      uintptr_t elf_size,
                                                      bool immutable,
+                                                     const struct FfiBytes32 *payer,
                                                      struct FfiTransactionResult *out_result);
 
 /**
@@ -1041,6 +1053,8 @@ enum WalletFfiError wallet_ffi_program_loader_deploy(struct WalletHandle *handle
  * - `segments` must be a valid pointer to `segments_len` contiguous `FfiBytes32`s, in chain order;
  *   the wallet must hold every segment's signing key
  * - `elf_data` must be a valid pointer to `elf_size` bytes
+ * - `payer` may be null (self-pay from the transaction's own accounts), otherwise a valid pointer
+ *   to a `FfiBytes32` for a funded account whose signing key the wallet holds
  * - `out_result` must be a valid pointer to a `FfiTransactionResult` struct
  */
 enum WalletFfiError wallet_ffi_program_loader_update(struct WalletHandle *handle,
@@ -1050,6 +1064,7 @@ enum WalletFfiError wallet_ffi_program_loader_update(struct WalletHandle *handle
                                                      const uint8_t *elf_data,
                                                      uintptr_t elf_size,
                                                      bool immutable,
+                                                     const struct FfiBytes32 *payer,
                                                      struct FfiTransactionResult *out_result);
 
 /**
