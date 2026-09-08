@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use key_protocol::key_management::{
     KeyChain, key_tree::chain_index::ChainIndex, secret_holders::SecretSpendingKey,
 };
-use lee::{Account, AccountId, Data, PrivateKey, PublicKey, V03State, program::Program};
-use lee_core::program::DEFAULT_PROGRAM_OWNER;
+use lee::{Account, AccountData, AccountId, PrivateKey, PublicKey, V03State, program::Program};
 use serde::{Deserialize, Serialize};
 
 const PRIVATE_KEY_PUB_ACC_A: [u8; 32] = [
@@ -112,10 +111,11 @@ fn initial_priv_accounts_private_keys() -> Vec<PrivateAccountPrivateInitialData>
     vec![
         PrivateAccountPrivateInitialData {
             account: Account {
-                program_owner: DEFAULT_PROGRAM_OWNER,
-                balance: PRIV_ACC_A_INITIAL_BALANCE,
-                data: Data::default(),
-                nonce: 0.into(),
+                data: AccountData {
+                    balance: PRIV_ACC_A_INITIAL_BALANCE,
+                    ..AccountData::default()
+                },
+                ..Account::default()
             },
             key_chain: key_chain_1,
             chain_index: None,
@@ -123,10 +123,11 @@ fn initial_priv_accounts_private_keys() -> Vec<PrivateAccountPrivateInitialData>
         },
         PrivateAccountPrivateInitialData {
             account: Account {
-                program_owner: DEFAULT_PROGRAM_OWNER,
-                balance: PRIV_ACC_B_INITIAL_BALANCE,
-                data: Data::default(),
-                nonce: 0.into(),
+                data: AccountData {
+                    balance: PRIV_ACC_B_INITIAL_BALANCE,
+                    ..AccountData::default()
+                },
+                ..Account::default()
             },
             key_chain: key_chain_2,
             chain_index: None,
@@ -154,12 +155,8 @@ fn initial_private_accounts() -> Vec<(lee_core::Commitment, lee_core::Nullifier)
             let account_id =
                 lee::AccountId::for_regular_private_account(npk, &init_comm_data.vpk, 0);
 
-            let mut acc = init_comm_data.account.clone();
-
-            acc.program_owner = programs::authenticated_transfer().id().into();
-
             (
-                lee_core::Commitment::new(&account_id, &acc),
+                lee_core::Commitment::new(&account_id, &init_comm_data.account),
                 lee_core::Nullifier::for_account_initialization(&account_id),
             )
         })
@@ -192,8 +189,10 @@ fn initial_public_accounts() -> HashMap<AccountId, Account> {
             (
                 acc_data.account_id,
                 Account {
-                    program_owner: programs::authenticated_transfer().id().into(),
-                    balance: acc_data.balance,
+                    data: AccountData {
+                        balance: acc_data.balance,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
             )
@@ -203,10 +202,7 @@ fn initial_public_accounts() -> HashMap<AccountId, Account> {
                 system_accounts::faucet_account_id(),
                 system_accounts::faucet_account(),
             ),
-            (
-                system_accounts::bridge_account_id(),
-                system_accounts::bridge_account(),
-            ),
+            (system_accounts::bridge_account_id(), Account::default()),
         ])
         .chain(
             system_accounts::clock_account_ids()
@@ -222,14 +218,8 @@ fn initial_public_accounts() -> HashMap<AccountId, Account> {
                 system_accounts::fee_state_account_id(),
                 system_accounts::fee_state_account(),
             ),
-            (
-                system_accounts::fee_escrow_account_id(),
-                system_accounts::fee_account(),
-            ),
-            (
-                system_accounts::fee_inbox_account_id(),
-                system_accounts::fee_account(),
-            ),
+            (system_accounts::fee_escrow_account_id(), Account::default()),
+            (system_accounts::fee_inbox_account_id(), Account::default()),
         ])
         .collect()
 }
@@ -390,12 +380,7 @@ mod tests {
                     .key_chain
                     .viewing_public_key
                     .clone(),
-                account: Account {
-                    program_owner: DEFAULT_PROGRAM_OWNER,
-                    balance: PRIV_ACC_A_INITIAL_BALANCE,
-                    data: Data::default(),
-                    nonce: 0.into(),
-                },
+                account: Account::funded(PRIV_ACC_A_INITIAL_BALANCE),
             }
         );
 
@@ -407,18 +392,13 @@ mod tests {
                     .key_chain
                     .viewing_public_key
                     .clone(),
-                account: Account {
-                    program_owner: DEFAULT_PROGRAM_OWNER,
-                    balance: PRIV_ACC_B_INITIAL_BALANCE,
-                    data: Data::default(),
-                    nonce: 0.into(),
-                },
+                account: Account::funded(PRIV_ACC_B_INITIAL_BALANCE),
             }
         );
     }
 
     #[test]
-    fn genesis_fee_accounts_are_registered_and_owned() {
+    fn genesis_fee_accounts_are_registered_with_their_records() {
         let state = initial_state(true);
         let fee_program_id = programs::fee().id();
 
@@ -430,59 +410,47 @@ mod tests {
                 assert_ne!(id, other);
             }
             let account = state.get_account_by_id(*id);
-            assert_eq!(account.program_owner, fee_program_id.into());
-            assert_eq!(account.balance, 0);
+            assert_eq!(account.data.balance, 0);
         }
 
         // The fee-state account carries the genesis market state; escrow and
         // inbox start empty.
         let fee_state = fee_core::state::FeeState::from_bytes(
-            &state
+            state
                 .get_account_by_id(system_accounts::fee_state_account_id())
                 .data
-                .into_inner(),
+                .shard(fee_program_id.into()),
         );
         assert_eq!(fee_state, fee_core::state::FeeState::genesis());
         for empty_id in [
             system_accounts::fee_escrow_account_id(),
             system_accounts::fee_inbox_account_id(),
         ] {
-            assert!(
-                state
-                    .get_account_by_id(empty_id)
-                    .data
-                    .into_inner()
-                    .is_empty()
-            );
+            assert!(state.get_account_by_id(empty_id).data.shards.is_empty());
         }
     }
 
     #[test]
     fn genesis_system_accounts_have_expected_contents() {
-        // System-account IDs must be distinct and non-default, and the genesis
-        // faucet/bridge accounts must carry their expected field values.  Catches
-        // mutations that replace `system_faucet_account`/`system_bridge_account`
-        // with `Default::default()`, delete their `balance`/`program_owner`
-        // fields, or replace `system_bridge_account_id` with `Default::default()`.
         let faucet_id = system_accounts::faucet_account_id();
         let bridge_id = system_accounts::bridge_account_id();
         assert_ne!(bridge_id, AccountId::default());
         assert_ne!(faucet_id, bridge_id);
 
         let state = initial_state(true);
-        let default_owner = Account::default().program_owner;
 
         let faucet = state.get_account_by_id(faucet_id);
-        assert_eq!(faucet.balance, u128::MAX, "faucet must hold u128::MAX");
-        assert_ne!(
-            faucet.program_owner, default_owner,
-            "faucet must have a non-default program_owner"
+        assert_eq!(faucet.data.balance, u128::MAX, "faucet must hold u128::MAX");
+        assert!(
+            faucet.data.shards.is_empty(),
+            "the faucet holds balance alone, no program's record"
         );
 
         let bridge = state.get_account_by_id(bridge_id);
-        assert_ne!(
-            bridge.program_owner, default_owner,
-            "bridge must have a non-default program_owner"
+        assert_eq!(
+            bridge,
+            Account::default(),
+            "the bridge escrow starts empty, before any deposit mints through it"
         );
     }
 
