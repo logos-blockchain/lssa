@@ -11,7 +11,7 @@ use lee_core::{
     },
     to_frame,
 };
-use risc0_zkvm::{ExecutorEnv, InnerReceipt, ProverOpts, Receipt, default_prover};
+use risc0_zkvm::{ExecutorEnv, ExitCode, InnerReceipt, ProverOpts, Receipt, default_prover};
 
 use crate::{
     PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID,
@@ -373,10 +373,33 @@ fn execute_and_prove_program(
 
     // Prove the program
     let prover = default_prover();
-    Ok(prover
+    let prove_info = prover
         .prove(env, program.elf())
+        .map_err(|e| LeeError::ProgramProveFailed(e.to_string()))?;
+
+    // The local prover proves any exit code, and the circuit's `env::verify` only resolves a
+    // `Halted(0)` claim, so gate here for a typed error before the expensive circuit proof.
+    let exit_code = prove_info
+        .receipt
+        .claim()
         .map_err(|e| LeeError::ProgramProveFailed(e.to_string()))?
-        .receipt)
+        .as_value()
+        .map_err(|e| LeeError::ProgramProveFailed(e.to_string()))?
+        .exit_code;
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "we only care about ExitCode::Halted"
+    )]
+    match exit_code {
+        ExitCode::Halted(0) => Ok(prove_info.receipt),
+        ExitCode::Halted(code) => Err(LeeError::ProgramExitedWithCode {
+            code,
+            cycles: prove_info.stats.user_cycles,
+        }),
+        other => Err(LeeError::ProgramProveFailed(format!(
+            "unexpected exit {other:?}"
+        ))),
+    }
 }
 
 #[cfg(test)]

@@ -297,6 +297,59 @@ fn metered_nonzero_exit_is_charged_its_metered_cycles() {
 }
 
 #[test]
+fn chained_nonzero_exit_adds_callee_cycles_to_callers() {
+    // The accumulation branch only matters once the caller has burned cycles: a chained
+    // callee's non-zero exit must charge caller + callee, not just the callee.
+    let chain_caller = crate::test_methods::chain_caller();
+    let from_key = PrivateKey::try_new([1_u8; 32]).unwrap();
+    let from = AccountId::from(&PublicKey::new_from_private_key(&from_key));
+    let to = AccountId::new([2_u8; 32]);
+    let state = V03State::new()
+        .with_public_accounts(public_state_from_balances(&[(from, 1_000), (to, 0)]))
+        .with_test_programs();
+    let budget = crate::program::DEFAULT_PUBLIC_CYCLE_BUDGET;
+    let run = |num_chain_calls: u32| {
+        let instruction: (
+            u128,
+            lee_core::program::ProgramId,
+            u32,
+            Option<lee_core::program::PdaSeed>,
+        ) = (
+            0,
+            crate::test_methods::exits_nonzero().id(),
+            num_chain_calls,
+            None,
+        );
+        let message = Message::try_new(
+            chain_caller.id().into(),
+            vec![to, from],
+            vec![Nonce(0)],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = WitnessSet::for_message(&message, &[&from_key]);
+        let tx = crate::PublicTransaction::new(message, witness_set);
+        ValidatedStateDiff::from_public_transaction_metered(&tx, &state, 1, 0, budget)
+    };
+
+    let (caller_only, ok) = run(0);
+    ok.expect("the caller alone succeeds");
+
+    let (outcome, result) = run(1);
+    assert!(
+        outcome.cycles > caller_only.cycles && outcome.cycles < budget,
+        "caller + callee cycles are metered: {} vs caller-only {}",
+        outcome.cycles,
+        caller_only.cycles
+    );
+    let diff = result.expect("a charged revert still yields an applicable diff");
+    assert!(
+        diff.public_diff().is_empty(),
+        "a reverted action moves no balances"
+    );
+}
+
+#[test]
 fn metered_revert_reports_cycles_and_yields_a_nonce_only_diff() {
     let (mut state, tx) = metering_transfer_fixture();
     let from = AccountId::from(&PublicKey::new_from_private_key(
