@@ -1,8 +1,11 @@
 use std::{ffi::c_char, path::PathBuf};
 
 use anyhow::Context;
-use kameo::actor::Spawn;
-use sequencer_core::{config::SequencerConfig, load_or_create_signing_key};
+use kameo::actor::{ActorRef, Spawn};
+use sequencer_core::{
+    block_publisher::ZoneSdkPublisher, config::SequencerConfig, gossip::GossipNetwork,
+    load_or_create_signing_key,
+};
 use sequencer_executor_actor::ExecutorActor;
 use sequencer_storage_actor::StorageActor;
 
@@ -40,6 +43,86 @@ pub unsafe extern "C" fn start_sequencer(
     )
 }
 
+async fn make_sequencer_compoments(
+    config: SequencerConfig,
+) -> Result<
+    (
+        ActorRef<StorageActor>,
+        ActorRef<ExecutorActor<StorageActor, ZoneSdkPublisher>>,
+        Option<GossipNetwork>,
+    ),
+    OperationStatus,
+> {
+    let gossip_config = config.gossip.clone();
+    let bedrock_config = config.bedrock_config.clone();
+    let sequencer_home = config.home.clone();
+    let max_block_size = config.max_block_size;
+
+    let storage = StorageActor::new(&config.db_path())
+        .context("Failed to initialize Storage Actor")
+        .map_err(|e| {
+            log::error!("Could not create sequencer storage: {e}");
+            OperationStatus::InitializationError
+        })?;
+    let storage_ref = StorageActor::spawn(storage);
+    log::info!("Storage Actor spawned");
+
+    let executor = ExecutorActor::new(config, storage_ref.clone()).await;
+    let executor_ref = ExecutorActor::spawn(executor);
+    log::info!("Executor Actor spawned");
+
+    // TODO: Should be a separate actor
+    let gossip_network = match gossip_config {
+        None => None,
+        Some(gossip_config) => {
+            // The node's L1 bedrock signing key is deliberately reused as the
+            // libp2p identity; `GossipNetwork::start` derives the keypair.
+            let signing_key = load_or_create_signing_key(
+                &sequencer_home.join("bedrock_signing_key"),
+            )
+            .map_err(|e| {
+                log::error!("Could not load signing key: {e}");
+                OperationStatus::InitializationError
+            })?;
+            let channel_id = *bedrock_config.channel_id.as_ref();
+            // Gossiped transactions enter through the executor's admission
+            // door (fee screen + mempool push), same as RPC submissions —
+            // gossip never touches the mempool directly.
+            let submit_ref = executor_ref.clone();
+            let submit: sequencer_core::gossip::IngestSubmit =
+                std::sync::Arc::new(move |transaction| {
+                    let executor_submit_ref = submit_ref.clone();
+                    Box::pin(async move {
+                        use sequencer_executor_actor::protocol::{Transaction, TransactionOrigin};
+                        let message = Transaction {
+                            transaction,
+                            origin: TransactionOrigin::Gossip,
+                        };
+                        executor_submit_ref.ask(message).await.map_err(Into::into)
+                    })
+                });
+
+            let network = sequencer_core::gossip::GossipNetwork::start(
+                gossip_config,
+                channel_id,
+                signing_key,
+                max_block_size.as_u64(),
+                submit,
+            )
+            .await
+            .context("Failed to start sequencer gossip network")
+            .map_err(|e| {
+                log::error!("Could not start gossip network: {e}");
+                OperationStatus::InitializationError
+            })?;
+            log::info!("Gossip network started as {}", network.local_peer_id());
+            Some(network)
+        }
+    };
+
+    Ok((storage_ref, executor_ref, gossip_network))
+}
+
 /// Initializes and starts an sequencer based on the provided
 /// configuration file path.
 ///
@@ -74,11 +157,6 @@ unsafe fn setup_sequencer(
         OperationStatus::InitializationError
     })?;
 
-    let gossip_config = config.gossip.clone();
-    let bedrock_config = config.bedrock_config.clone();
-    let sequencer_home = config.home.clone();
-    let max_block_size = config.max_block_size;
-
     // Use the caller's runtime if one was supplied, otherwise create (and own)
     // our own. The `Runtime` wrapper drops the underlying tokio runtime only
     // when we own it; a borrowed one is left to its external owner.
@@ -93,53 +171,8 @@ unsafe fn setup_sequencer(
         unsafe { Runtime::from_borrowed(caller.as_ref()) }
     };
 
-    let storage = StorageActor::new(&config.db_path())
-        .context("Failed to initialize Storage Actor")
-        .map_err(|e| {
-            log::error!("Could not create sequencer storage: {e}");
-            OperationStatus::InitializationError
-        })?;
-    let storage_ref = StorageActor::spawn(storage);
-    log::info!("Storage Actor spawned");
-
-    let executor = runtime.block_on(ExecutorActor::new(config, storage_ref.clone()));
-
-    let mempool_handle = executor.mempool_handle();
-
-    let executor_ref = ExecutorActor::spawn(executor);
-    log::info!("Executor Actor spawned");
-
-    // TODO: Should be a separate actor
-    let gossip_network = match gossip_config {
-        None => None,
-        Some(gossip_config) => {
-            // The node's L1 bedrock signing key is deliberately reused as the
-            // libp2p identity; `GossipNetwork::start` derives the keypair.
-            let signing_key = load_or_create_signing_key(
-                &sequencer_home.join("bedrock_signing_key"),
-            )
-            .map_err(|e| {
-                log::error!("Could not load signing key: {e}");
-                OperationStatus::InitializationError
-            })?;
-            let channel_id = *bedrock_config.channel_id.as_ref();
-            let network = runtime
-                .block_on(sequencer_core::gossip::GossipNetwork::start(
-                    gossip_config,
-                    channel_id,
-                    signing_key,
-                    mempool_handle,
-                    max_block_size.as_u64(),
-                ))
-                .context("Failed to start sequencer gossip network")
-                .map_err(|e| {
-                    log::error!("Could not start gossip network: {e}");
-                    OperationStatus::InitializationError
-                })?;
-            log::info!("Gossip network started as {}", network.local_peer_id());
-            Some(network)
-        }
-    };
+    let (storage_ref, executor_ref, gossip_network) =
+        runtime.block_on(make_sequencer_compoments(config))?;
 
     Ok(SequencerServiceFFI::new(
         storage_ref,
@@ -173,6 +206,9 @@ pub unsafe extern "C" fn stop_sequencer(sequencer: *mut SequencerServiceFFI) -> 
     }
 
     let sequencer = unsafe { Box::from_raw(sequencer) };
+
+    log::info!("=================== DESTRUCTION: SEQUENCER BOXED");
+
     drop(sequencer);
 
     OperationStatus::Ok

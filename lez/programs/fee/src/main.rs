@@ -1,90 +1,77 @@
-//! Fee Program.
-//!
-//! A system program that owns the fee subsystem's accounts: the fee-state
-//! account (base fees, payout window), the escrow account (payout smoothing),
-//! and the inbox account (per-block fee collection). Fee accounts are assigned
-//! to the fee program at genesis, so no claiming is required here.
-//!
-//! Two system-authorized instructions, neither carrying a user signature:
-//! - [`Instruction::Distribute`] — the block-tail settlement invoked as the second-to-last
-//!   transaction of every block: applies the per-block market update and drains the inbox (base
-//!   revenue to escrow, tips to the producer), paying the smoothed payout from escrow to the
-//!   producer (the fourth account).
-//! - [`Instruction::Refund`] — a per-transaction refund of the unspent reserve, returning balance
-//!   from the inbox to the payer. Only the fee program owns the inbox, so only it can debit it.
-
-use fee_core::{BlockFeeSummary, Instruction, market, state::FeeState};
+use authenticated_transfer_core::custody_transfer;
+use fee_core::{
+    BlockFeeSummary, Instruction, fee_escrow_seed, fee_inbox_seed, market, state::FeeState,
+};
 use lee_core::{
-    account::AccountWithMetadata,
-    program::{AccountPostState, ProgramId, ProgramInput, ProgramOutput, read_lee_inputs},
+    account::{AccountWithMetadata, BalanceDiff},
+    program::{
+        AccountStateDiff, ChainedCall, ProgramCall, ProgramInput, ProgramOutput, read_lee_call,
+        respond_unsupported_call,
+    },
 };
 
 fn main() {
-    let (
+    let call = read_lee_call::<Instruction>();
+    let ProgramCall::Execute(
         ProgramInput {
-            self_program_id,
-            caller_program_id,
+            self_account_id,
+            caller_account_id,
             pre_states,
             instruction,
         },
         instruction_words,
-    ) = read_lee_inputs::<Instruction>();
+    ) = call
+    else {
+        respond_unsupported_call(call);
+    };
+
     assert!(
-        caller_program_id.is_none(),
+        caller_account_id.is_none(),
         "Fee program is only invoked as a top-level system transaction"
     );
 
-    let (pre_states, post_states) = match instruction {
-        Instruction::Distribute(summary) => distribute(self_program_id, pre_states, summary),
-        Instruction::Refund { amount } => refund(self_program_id, pre_states, amount),
+    let (state_diffs, chained_calls) = match instruction {
+        Instruction::Distribute(summary) => distribute(self_account_id, pre_states, summary),
+        Instruction::Refund { amount } => refund(self_account_id, pre_states, amount),
     };
 
     ProgramOutput::new(
-        self_program_id,
-        caller_program_id,
+        self_account_id,
+        caller_account_id,
         instruction_words,
-        pre_states,
-        post_states,
+        state_diffs,
     )
+    .with_chained_calls(chained_calls)
     .write();
 }
 
-/// Block-tail distribution over `[state, escrow, inbox, producer]`.
+/// Every balance leaves a fee PDA through a chained authenticated transfer the PDA's seed
+/// authorizes; the fee program itself only rewrites its state account.
 fn distribute(
-    self_program_id: ProgramId,
+    self_account_id: lee_core::account::AccountId,
     pre_states: Vec<AccountWithMetadata>,
     summary: BlockFeeSummary,
-) -> (Vec<AccountWithMetadata>, Vec<AccountPostState>) {
+) -> (Vec<AccountStateDiff>, Vec<ChainedCall>) {
     let Ok([pre_state, pre_escrow, pre_inbox, pre_producer]) = <[_; 4]>::try_from(pre_states)
     else {
         panic!("Distribute requires exactly 4 accounts");
     };
-
-    // Verify pre-states correspond to the expected fee account IDs.
-    if pre_state.account_id != fee_core::compute_fee_state_account_id(self_program_id)
-        || pre_escrow.account_id != fee_core::compute_fee_escrow_account_id(self_program_id)
-        || pre_inbox.account_id != fee_core::compute_fee_inbox_account_id(self_program_id)
+    if pre_state.account_id != fee_core::compute_fee_state_account_id(self_account_id)
+        || pre_escrow.account_id != fee_core::compute_fee_escrow_account_id(self_account_id)
+        || pre_inbox.account_id != fee_core::compute_fee_inbox_account_id(self_account_id)
     {
         panic!("Invalid input accounts");
     }
-
-    // Verify all fee accounts are owned by this program (assigned at genesis).
-    if pre_state.account.program_owner != self_program_id.into()
-        || pre_escrow.account.program_owner != self_program_id.into()
-        || pre_inbox.account.program_owner != self_program_id.into()
+    if pre_state.account.program_owner != self_account_id
+        || pre_escrow.account.program_owner != self_account_id
+        || pre_inbox.account.program_owner != self_account_id
     {
         panic!("Fee accounts must be owned by the fee program");
     }
-
-    // A summary above the per-block caps is not a valid block; the transition
-    // also pins the summary byte-for-byte.
     if summary.gas_used_exec > market::MAX_GAS_EXEC || summary.gas_used_stor > market::MAX_GAS_STOR
     {
         panic!("Block fee summary exceeds per-block gas caps");
     }
-
-    // Conservation pin: the transition credited exactly the block's revenue to
-    // the inbox; anything else is an invalid block.
     let revenue_total = summary
         .revenue_base
         .checked_add(summary.revenue_tip)
@@ -96,84 +83,59 @@ fn distribute(
 
     let mut fee_state = FeeState::from_bytes(&pre_state.account.data);
     let payout = fee_state.apply_block(&summary);
-
-    let mut post_state_account = pre_state.account.clone();
-    post_state_account.data = fee_state
+    let post_state_data = fee_state
         .to_bytes()
         .try_into()
         .expect("FeeState data should fit in account data");
 
-    // Money movement: inbox drains fully (base revenue to escrow, tips to the
-    // producer); the smoothed payout leaves escrow for the producer.
-    let mut post_escrow = pre_escrow.account.clone();
-    post_escrow.balance = post_escrow
-        .balance
-        .checked_add(summary.revenue_base)
-        .expect("escrow credit fits u128")
-        .checked_sub(payout)
-        .expect("payout never exceeds escrow");
+    let inbox = pre_inbox.account_id;
+    let escrow = pre_escrow.account_id;
+    let producer = pre_producer.account_id;
+    // Order matters: the escrow receives the base before it pays out of it.
+    let chained_calls = [
+        (inbox, fee_inbox_seed(), escrow, summary.revenue_base),
+        (inbox, fee_inbox_seed(), producer, summary.revenue_tip),
+        (escrow, fee_escrow_seed(), producer, payout),
+    ]
+    .into_iter()
+    .filter(|(_, _, _, amount)| *amount > 0)
+    .map(|(from, seed, to, amount)| custody_transfer(from, seed, to, amount))
+    .collect();
 
-    let mut post_inbox = pre_inbox.account.clone();
-    post_inbox.balance = 0;
-
-    let mut post_producer = pre_producer.account.clone();
-    post_producer.balance = post_producer
-        .balance
-        .checked_add(payout)
-        .and_then(|balance| balance.checked_add(summary.revenue_tip))
-        .expect("producer credit fits u128");
-
-    let post_states = vec![
-        AccountPostState::new(post_state_account),
-        AccountPostState::new(post_escrow),
-        AccountPostState::new(post_inbox),
-        AccountPostState::new(post_producer),
+    let state_diffs = vec![
+        AccountStateDiff::new(pre_state, BalanceDiff::Add(0), post_state_data),
+        AccountStateDiff::unchanged(pre_escrow),
+        AccountStateDiff::unchanged(pre_inbox),
+        AccountStateDiff::unchanged(pre_producer),
     ];
-    (
-        vec![pre_state, pre_escrow, pre_inbox, pre_producer],
-        post_states,
-    )
+    (state_diffs, chained_calls)
 }
 
-/// Per-transaction refund over `[inbox, payer]`: return `amount` from the inbox
-/// to the payer. The fee program owns the inbox, so debiting it is legal; the
-/// payer credit is an ordinary balance increase and needs no authorization.
 fn refund(
-    self_program_id: ProgramId,
+    self_account_id: lee_core::account::AccountId,
     pre_states: Vec<AccountWithMetadata>,
     amount: u128,
-) -> (Vec<AccountWithMetadata>, Vec<AccountPostState>) {
+) -> (Vec<AccountStateDiff>, Vec<ChainedCall>) {
     let Ok([pre_inbox, pre_payer]) = <[_; 2]>::try_from(pre_states) else {
         panic!("Refund requires exactly 2 accounts");
     };
-
-    // The inbox must be this program's inbox account (and thus owned by it).
     assert!(
-        pre_inbox.account_id == fee_core::compute_fee_inbox_account_id(self_program_id),
+        pre_inbox.account_id == fee_core::compute_fee_inbox_account_id(self_account_id),
         "Invalid inbox account"
     );
     assert!(
-        pre_inbox.account.program_owner == self_program_id.into(),
+        pre_inbox.account.program_owner == self_account_id,
         "Inbox must be owned by the fee program"
     );
-
-    let mut post_inbox = pre_inbox.account.clone();
-    post_inbox.balance = post_inbox
-        .balance
-        .checked_sub(amount)
-        .expect("refund never exceeds the inbox balance");
-
-    let mut post_payer = pre_payer.account.clone();
-    post_payer.balance = post_payer
-        .balance
-        .checked_add(amount)
-        .expect("payer credit fits u128");
-
-    (
-        vec![pre_inbox, pre_payer],
-        vec![
-            AccountPostState::new(post_inbox),
-            AccountPostState::new(post_payer),
-        ],
-    )
+    let chained_calls = vec![custody_transfer(
+        pre_inbox.account_id,
+        fee_inbox_seed(),
+        pre_payer.account_id,
+        amount,
+    )];
+    let state_diffs = vec![
+        AccountStateDiff::unchanged(pre_inbox),
+        AccountStateDiff::unchanged(pre_payer),
+    ];
+    (state_diffs, chained_calls)
 }

@@ -1,19 +1,3 @@
-//! Fee admission and pricing for the RPC ingest path.
-//!
-//! Admission is **anti-spam, not consensus**: the block transition
-//! (`chain_state::apply::settle_charged_transaction`) enforces these rules
-//! authoritatively. What this adds is a door — a transaction no block could
-//! ever include is turned away at submission instead of sitting in the
-//! mempool, and the client is told which rule it broke as a typed
-//! [`AdmissionRejection`] instead of watching its transaction silently never
-//! land.
-//!
-//! Two of the checks are advisory by nature: base fees move every block and
-//! balances move every transaction, so the `max_fee >= fee_reserve` and
-//! payer-affordability verdicts are judged against the head state at
-//! submission time and can go stale either way afterwards. The rest are
-//! static properties of the transaction and cannot.
-
 use chain_state::{
     apply::opening_fee_state,
     classify::{ClassifyError, FeeClass, classify},
@@ -24,26 +8,46 @@ use fee_core::{
     market,
     validity::{FeeError, validate_static_tx},
 };
-use sequencer_service_protocol::{AdmissionRejection, FeeStateQuote};
+use lee::AccountId;
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("designated payer {payer:?} authorized nothing in this transaction")]
+    UnauthorizedPayer { payer: AccountId },
+
+    #[error("payer {payer:?} holds {balance} but the fee reserve is {fee_reserve}")]
+    PayerCannotFund {
+        payer: AccountId,
+        balance: u128,
+        fee_reserve: u128,
+    },
+
+    #[error("transaction fee classification failed")]
+    Classification(#[from] ClassifyError),
+
+    #[error(transparent)]
+    FeeCore(#[from] FeeError),
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// The fee market priced off the head state, for wallets sizing `max_fee`.
+pub struct FeeStateQuote {
+    /// The block height the quoted state settled at, for staleness checks.
+    pub height: u64,
+    pub base_fee_exec: u64,
+    pub base_fee_stor: u64,
+    pub next_base_fee_exec_floor: u64,
+    pub next_base_fee_exec_ceiling: u64,
+    pub next_base_fee_stor_floor: u64,
+    pub next_base_fee_stor_ceiling: u64,
+    pub max_gas_exec: u64,
+    pub max_gas_stor: u64,
+}
 
 /// Screens a submitted transaction against the head state.
-///
-/// The checks run in the order `settle_charged_transaction` runs the same
-/// ones, plus the payer-affordability check that only a live state can
-/// answer. Fee-exempt classes pass unscreened: exempt transactions pay
-/// nothing and contribute nothing to the block gas totals under the interim
-/// policy.
-///
-/// # Errors
-///
-/// The first check that fails, with the values that decided it.
-pub fn screen(tx: &LeeTransaction, state: &lee::V03State) -> Result<(), AdmissionRejection> {
-    let class = classify(tx, false, state).map_err(|err| match err {
-        ClassifyError::Unserializable(err) => AdmissionRejection::OtherFeeValidity {
-            reason: format!("unserializable transaction: {err}"),
-        },
-        ClassifyError::MissingFeeDeclaration => AdmissionRejection::MissingFeeDeclaration,
-    })?;
+pub fn screen(tx: &LeeTransaction, state: &lee::V03State) -> Result<()> {
+    let class = classify(tx, false)?;
     let FeeClass::Charged(view) = class else {
         return Ok(());
     };
@@ -52,17 +56,17 @@ pub fn screen(tx: &LeeTransaction, state: &lee::V03State) -> Result<(), Admissio
     };
     let fee_state = opening_fee_state(state);
 
-    validate_static_tx(&view, &fee_state).map_err(static_rejection)?;
+    validate_static_tx(&view, &fee_state)?;
 
     let payer = view.payer();
     if !lee::is_fee_authorized(public_tx.message(), public_tx.witness_set()) {
-        return Err(AdmissionRejection::UnauthorizedPayer { payer });
+        return Err(Error::UnauthorizedPayer { payer });
     }
 
     let fee_reserve = fee_reserve(&view, &fee_state);
     let balance = state.get_account_by_id(payer).balance;
     if balance < fee_reserve {
-        return Err(AdmissionRejection::PayerCannotFund {
+        return Err(Error::PayerCannotFund {
             payer,
             balance,
             fee_reserve,
@@ -72,45 +76,7 @@ pub fn screen(tx: &LeeTransaction, state: &lee::V03State) -> Result<(), Admissio
     Ok(())
 }
 
-/// One static fee-validity failure, as the rejection carrying its comparands.
-///
-/// The accumulator arms belong to block-level totals admission never sums;
-/// they fall through to the catch-all so the mapping stays total without a
-/// wildcard.
-fn static_rejection(err: FeeError) -> AdmissionRejection {
-    match err {
-        FeeError::DataBytesOutOfRange { data_bytes } => AdmissionRejection::DataBytesOutOfRange {
-            data_bytes,
-            max: market::MAX_GAS_STOR,
-        },
-        FeeError::GasLimitAboveCap { gas_limit } => AdmissionRejection::GasLimitExceedsMax {
-            gas_limit,
-            max: market::MAX_GAS_EXEC,
-        },
-        FeeError::MaxFeeBelowReserve {
-            fee_reserve,
-            max_fee,
-        } => AdmissionRejection::MaxFeeBelowReserve {
-            fee_reserve,
-            max_fee,
-        },
-        FeeError::ExecGasCapExceeded { .. } | FeeError::StorGasCapExceeded { .. } => {
-            AdmissionRejection::OtherFeeValidity {
-                reason: err.to_string(),
-            }
-        }
-    }
-}
-
 /// Prices the next block off the head state's fee market.
-///
-/// The next-block figures are a band rather than a single estimate: the block
-/// being filled is not observable at query time, so the quote steps the
-/// market once at an empty block and once at a block filled to its caps.
-/// Every possible next-block base fee lies between them, which is exactly
-/// what a wallet needs to size `max_fee` for a transaction that may wait.
-/// Both steps go through the same `fee_core` arithmetic the block transition
-/// moves the real fee state with.
 #[must_use]
 pub fn fee_quote(state: &lee::V03State) -> FeeStateQuote {
     let fee_state = opening_fee_state(state);
@@ -222,10 +188,10 @@ mod tests {
             &sign_key,
         );
 
-        assert_eq!(
+        assert!(matches!(
             screen(&tx, &state).expect_err("a fee-less transfer is turned away at the door"),
-            AdmissionRejection::MissingFeeDeclaration,
-        );
+            Error::Classification(ClassifyError::MissingFeeDeclaration)
+        ));
         assert!(settle_verdict(&tx, &state).is_err());
     }
 
@@ -243,13 +209,11 @@ mod tests {
         );
 
         let err = screen(&tx, &state).expect_err("no block can execute that much gas");
-        assert_eq!(
+        assert!(matches!(
             err,
-            AdmissionRejection::GasLimitExceedsMax {
-                gas_limit: market::MAX_GAS_EXEC + 1,
-                max: market::MAX_GAS_EXEC,
-            },
-        );
+            Error::FeeCore(FeeError::GasLimitAboveCap { gas_limit })
+            if gas_limit == market::MAX_GAS_EXEC + 1
+        ));
         assert!(settle_verdict(&tx, &state).is_err());
     }
 
@@ -274,13 +238,13 @@ mod tests {
             + 7;
 
         let err = screen(&tx, &state).expect_err("a max_fee of 1 covers nothing");
-        assert_eq!(
+        assert!(matches!(
             err,
-            AdmissionRejection::MaxFeeBelowReserve {
-                fee_reserve: expected,
-                max_fee: 1,
-            },
-        );
+            Error::FeeCore(FeeError::MaxFeeBelowReserve {
+                fee_reserve,
+                max_fee,
+            }) if fee_reserve == expected && max_fee == 1
+        ));
         assert!(settle_verdict(&tx, &state).is_err());
     }
 
@@ -304,7 +268,7 @@ mod tests {
         assert!(
             matches!(
                 err,
-                AdmissionRejection::PayerCannotFund {
+                Error::PayerCannotFund {
                     payer,
                     balance: 0,
                     ..
@@ -333,48 +297,10 @@ mod tests {
 
         let err = screen(&tx, &state).expect_err("nobody authorized the stranger to pay");
         assert!(
-            matches!(err, AdmissionRejection::UnauthorizedPayer { payer } if payer == stranger),
+            matches!(err, Error::UnauthorizedPayer { payer } if payer == stranger),
             "expected an unauthorized payer, got: {err}",
         );
         assert!(settle_verdict(&tx, &state).is_err());
-    }
-
-    /// The bootstrap case: a full vault sweep is fee-exempt, so none of the
-    /// charged checks may run against it — its whole point is that the
-    /// sweeper holds nothing yet.
-    #[test]
-    fn a_full_vault_sweep_by_an_unfunded_account_is_admitted() {
-        let mut state = initial_state(true);
-        let sweeper_key = key(9);
-        let sweeper = account_of(&sweeper_key);
-        let vault_id = vault_core::compute_vault_account_id(programs::vault().id(), sweeper);
-        state.force_insert_account(
-            vault_id,
-            lee::Account {
-                program_owner: programs::vault().id().into(),
-                balance: 500_000_000,
-                ..lee::Account::default()
-            },
-        );
-
-        let message = lee::public_transaction::Message::try_new_with_fees(
-            programs::vault().id(),
-            vec![sweeper, vault_id],
-            vec![0_u128.into()],
-            vault_core::Instruction::Claim {
-                amount: 500_000_000,
-            },
-            // A sweep is exempt whatever it declares, and a wallet with
-            // nothing to pay with signs a zero max_fee: neither the reserve
-            // check nor the balance check may see this.
-            FeeDeclaration::new(sweeper, TEST_GAS_LIMIT, 0, 0),
-        )
-        .expect("message builds");
-        let witness_set =
-            lee::public_transaction::WitnessSet::for_message(&message, &[&sweeper_key]);
-        let tx = LeeTransaction::Public(lee::PublicTransaction::new(message, witness_set));
-
-        screen(&tx, &state).expect("a full sweep must be admitted unscreened");
     }
 
     /// Private transactions are fee-exempt under the interim policy, so
@@ -393,22 +319,6 @@ mod tests {
         ));
 
         screen(&tx, &state).expect("private transactions are uncharged and unscreened");
-    }
-
-    /// Deployments are exempt *and* uncapped in the delivered interim policy
-    /// (they contribute nothing to the block gas totals), so even one larger
-    /// than the storage cap passes — a deliberate divergence from the
-    /// reference design, where uncharged transactions were still capped.
-    /// The block size limit at ingest is what bounds it.
-    #[test]
-    fn an_oversized_deployment_is_admitted_unscreened() {
-        let state = initial_state(true);
-        let bytecode = vec![0_u8; usize::try_from(market::MAX_GAS_STOR).expect("fits") + 1];
-        let tx = LeeTransaction::ProgramDeployment(lee::ProgramDeploymentTransaction::new(
-            lee::program_deployment_transaction::Message::new(bytecode),
-        ));
-
-        screen(&tx, &state).expect("deployments are uncharged and uncapped today");
     }
 
     /// SPECS §Overview worked example: at the genesis base fees of 8/8 the
@@ -459,7 +369,7 @@ mod tests {
         screen(&build(by_hand), &state).expect("max_fee equal to the reserve is admitted");
         assert!(matches!(
             screen(&build(by_hand - 1), &state).expect_err("one unit short"),
-            AdmissionRejection::MaxFeeBelowReserve { .. }
+            Error::FeeCore(FeeError::MaxFeeBelowReserve { .. })
         ));
     }
 }

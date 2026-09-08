@@ -786,6 +786,8 @@ name = "authenticated_transfer_core"
 version = "0.1.0"
 dependencies = [
  "borsh",
+ "build_utils",
+ "lee_core",
 ]
 
 [[package]]
@@ -1267,6 +1269,7 @@ dependencies = [
 name = "bridge_lock_program"
 version = "0.1.0"
 dependencies = [
+ "authenticated_transfer_core",
  "borsh",
  "bridge_lock_core",
  "cross_zone_outbox_core",
@@ -1279,9 +1282,9 @@ dependencies = [
 name = "bridge_program"
 version = "0.1.0"
 dependencies = [
+ "authenticated_transfer_core",
  "bridge_core",
  "lee_core",
- "vault_core",
 ]
 
 [[package]]
@@ -1820,7 +1823,6 @@ dependencies = [
  "sha2 0.10.9",
  "system_accounts",
  "thiserror 2.0.18",
- "vault_core",
 ]
 
 [[package]]
@@ -2691,6 +2693,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abd57806937c9cc163efc8ea3910e00a62e2aeb0b8119f1793a978088f8f6b04"
 
 [[package]]
+name = "devnet_configs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lee",
+ "logos-blockchain-key-management-system-service",
+ "sequencer_core",
+ "sequencer_stake_core",
+ "serde_json",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2741,7 +2755,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3035,6 +3049,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum-iterator"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4549325971814bda7a44061bf3fe7e487d447cba01e4220a4b454d630d7a016"
+dependencies = [
+ "enum-iterator-derive",
+]
+
+[[package]]
+name = "enum-iterator-derive"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "685adfa4d6f3d765a26bc5dbc936577de9abf756c1feeb3089b01dd395034842"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "enum-map"
 version = "2.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3127,7 +3161,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3267,7 +3301,6 @@ dependencies = [
  "authenticated_transfer_core",
  "faucet_core",
  "lee_core",
- "vault_core",
 ]
 
 [[package]]
@@ -3294,6 +3327,7 @@ dependencies = [
 name = "fee_program"
 version = "0.1.0"
 dependencies = [
+ "authenticated_transfer_core",
  "fee_core",
  "lee_core",
 ]
@@ -3874,9 +3908,9 @@ checksum = "17e2ac29387b1aa07a1e448f7bb4f35b500787971e965b02842b900afa5c8f6f"
 
 [[package]]
 name = "h2"
-version = "0.4.16"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
+checksum = "839c0e8a181239723652be9062bb56ca5bf5f64011f73b623f6f4fc59086a228"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -4370,7 +4404,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -4634,6 +4668,7 @@ dependencies = [
  "logos-blockchain-core",
  "logos-blockchain-zone-sdk",
  "ping_core",
+ "program_loader_core",
  "programs",
  "serde",
  "serde_json",
@@ -4821,6 +4856,7 @@ dependencies = [
  "logos-blockchain-zone-sdk",
  "num-bigint 0.4.6",
  "ping_core",
+ "program_loader_core",
  "programs",
  "sequencer_core",
  "sequencer_ffi",
@@ -4840,7 +4876,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.23",
- "vault_core",
  "wallet",
  "wallet-ffi",
  "wrapped_token_core",
@@ -5624,9 +5659,11 @@ dependencies = [
  "k256 0.13.4",
  "lee_core",
  "log",
+ "program_loader_core",
  "rand 0.8.6",
  "risc0-binfmt",
  "risc0-zkvm",
+ "semver",
  "serde_with",
  "sha2 0.10.9",
  "test-case",
@@ -5640,7 +5677,6 @@ version = "0.1.0"
 dependencies = [
  "base58",
  "borsh",
- "bytemuck",
  "bytesize",
  "chacha20",
  "ml-kem",
@@ -5648,6 +5684,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sha2 0.10.9",
  "thiserror 2.0.18",
 ]
 
@@ -8369,7 +8406,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9136,23 +9173,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
-name = "pinata_program"
-version = "0.1.0"
-dependencies = [
- "lee_core",
- "risc0-zkvm",
-]
-
-[[package]]
-name = "pinata_token_program"
-version = "0.1.0"
-dependencies = [
- "lee_core",
- "risc0-zkvm",
- "token_core",
-]
-
-[[package]]
 name = "ping_core"
 version = "0.1.0"
 dependencies = [
@@ -9495,6 +9515,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "program_loader_core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "lee_core",
+ "risc0-binfmt",
+]
+
+[[package]]
 name = "programs"
 version = "0.1.0"
 dependencies = [
@@ -9516,11 +9545,9 @@ dependencies = [
  "lee",
  "lee_core",
  "ping_core",
- "risc0-zkvm",
  "sequencer_stake_core",
  "token_core",
  "token_program",
- "vault_core",
  "wrapped_token_core",
 ]
 
@@ -9713,7 +9740,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -9751,7 +9778,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.59.0",
 ]
@@ -10778,7 +10805,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -11108,26 +11135,25 @@ dependencies = [
  "mempool",
  "num-bigint 0.4.6",
  "ping_core",
+ "program_loader_core",
  "programs",
  "rand 0.8.6",
  "sequencer_core_metrics",
- "sequencer_service_protocol",
  "sequencer_stake_core",
  "sequencer_storage_actor",
  "serde",
  "serde_json",
- "storage",
  "system_accounts",
  "tempfile",
  "test_programs",
  "testnet_initial_state",
+ "thiserror 2.0.18",
  "token_core",
  "tokio",
  "tokio-retry",
  "tokio-util",
  "trait-variant",
  "url",
- "vault_core",
 ]
 
 [[package]]
@@ -11144,11 +11170,11 @@ name = "sequencer_executor_actor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "borsh",
  "bytesize",
  "common",
  "env_logger",
  "futures",
- "hex",
  "kameo",
  "lee",
  "lee_core",
@@ -11157,8 +11183,9 @@ dependencies = [
  "mockall",
  "num-bigint 0.4.6",
  "num-traits",
+ "programs",
  "sequencer_core",
- "sequencer_service_protocol",
+ "sequencer_executor_actor_metrics",
  "sequencer_stake_core",
  "sequencer_storage_actor",
  "system_accounts",
@@ -11168,6 +11195,13 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "sequencer_executor_actor_metrics"
+version = "0.1.0"
+dependencies = [
+ "metrics",
 ]
 
 [[package]]
@@ -11257,7 +11291,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -11282,6 +11315,7 @@ dependencies = [
 name = "sequencer_stake_program"
 version = "0.1.0"
 dependencies = [
+ "authenticated_transfer_core",
  "lee_core",
  "sequencer_stake_core",
 ]
@@ -11290,17 +11324,23 @@ dependencies = [
 name = "sequencer_storage_actor"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "borsh",
  "common",
+ "enum-iterator",
  "itertools 0.14.0",
  "kameo",
  "lee",
  "lee_core",
  "log",
  "mockall",
- "storage",
+ "num-traits",
+ "rocksdb",
+ "strum 0.28.0",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "zstd",
 ]
 
 [[package]]
@@ -11912,7 +11952,6 @@ dependencies = [
  "system_accounts",
  "tempfile",
  "thiserror 2.0.18",
- "zstd",
 ]
 
 [[package]]
@@ -12218,7 +12257,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -13609,24 +13648,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
-name = "vault_core"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "lee_core",
- "risc0-zkvm",
-]
-
-[[package]]
-name = "vault_program"
-version = "0.1.0"
-dependencies = [
- "authenticated_transfer_core",
- "lee_core",
- "vault_core",
-]
-
-[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13685,13 +13706,13 @@ dependencies = [
  "lee_core",
  "log",
  "optfield",
+ "program_loader_core",
  "programs",
  "rand 0.8.6",
  "rpassword",
  "sequencer_service_rpc",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "system_accounts",
  "tempfile",
  "testnet_initial_state",
@@ -13699,7 +13720,6 @@ dependencies = [
  "token_core",
  "tokio",
  "url",
- "vault_core",
  "zeroize",
 ]
 
@@ -13714,9 +13734,9 @@ dependencies = [
  "lee",
  "lee_core",
  "programs",
+ "sequencer_service_rpc",
  "serde_json",
  "tokio",
- "vault_core",
  "wallet",
 ]
 
@@ -13975,7 +13995,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

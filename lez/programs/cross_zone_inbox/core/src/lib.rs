@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use borsh::{BorshDeserialize, BorshSerialize};
 use lee_core::{
     account::{AccountId, Balance, data::DATA_MAX_LENGTH},
-    program::{PdaSeed, ProgramId},
+    program::PdaSeed,
 };
 use serde::{Deserialize, Serialize};
 
@@ -34,9 +34,9 @@ pub type MessageKey = [u8; 32];
 #[serde(deny_unknown_fields)]
 pub struct CrossZoneRoute {
     /// The program on the peer zone that emitted the message.
-    pub src_program_id: ProgramId,
+    pub src_account_id: AccountId,
     /// The program on this zone it may be delivered to.
-    pub target_program_id: ProgramId,
+    pub target_account_id: AccountId,
     /// Lifetime mint allowance for this source at the target; `None` is
     /// uncapped. Only meaningful on a route whose target mints against the
     /// message (`wrapped_token`); genesis refuses it on any other target.
@@ -96,18 +96,13 @@ pub struct CrossZoneConfig {
     /// ever be set at genesis and there is no rotation. One value seeds every
     /// target, including the ones that mint, and whoever holds it can authorize
     /// a source, so its compromise is theft rather than delay.
-    ///
-    /// Must be a fresh, never-used account: the first use has the target claim
-    /// it, renouncing seizes it the same way, whichever target acts first owns
-    /// it, and anything sent to it is frozen for good. An `AccountId` rather
-    /// than a key so a governance program's PDA can hold it later.
     #[serde(default)]
     pub source_authority: Option<AccountId>,
     /// Program allowed to act on the source authority's behalf through a chained
     /// call, seeded into every target's config at genesis. Needed only for a PDA
     /// authority, which cannot sign; unset means the authority acts at top level.
     #[serde(default)]
-    pub source_governance: Option<ProgramId>,
+    pub source_governance: Option<AccountId>,
 }
 
 /// A finalized outbound message observed on a peer zone, addressed to a program
@@ -125,8 +120,8 @@ pub struct CrossZoneMessage {
     /// without either trusting what the peer wrote.
     pub src_block_hash: [u8; 32],
     pub src_tx_index: u32,
-    pub src_program_id: ProgramId,
-    pub target_program_id: ProgramId,
+    pub src_account_id: AccountId,
+    pub target_account_id: AccountId,
     pub payload: Vec<u8>,
     /// Reserved for a future source-state proof; MUST be `None` in v1.
     pub l1_inclusion_witness: Option<Vec<u8>>,
@@ -246,9 +241,7 @@ impl SeenShard {
 pub enum Instruction {
     /// Delivers a finalized peer message to its target program.
     Dispatch(CrossZoneMessage),
-    /// Initializes the inbox config account at genesis. Written once, into a
-    /// default (unclaimed) config PDA; the guest refuses a non-default pre-state,
-    /// so it cannot be re-run to overwrite the allowlists.
+    /// Initializes the inbox config account at genesis.
     InitConfig(InboxConfig),
 }
 
@@ -275,33 +268,37 @@ pub fn message_key(src_zone: &ZoneId, src_block_id: u64, src_tx_index: u32) -> M
 
 /// The config account holding the allowlists.
 #[must_use]
-pub fn inbox_config_account_id(inbox_id: ProgramId) -> AccountId {
+pub fn inbox_config_account_id(inbox_id: AccountId) -> AccountId {
     AccountId::for_public_pda(&inbox_id, &inbox_config_seed())
 }
 
-/// Seed of the config PDA, exposed so the guest can claim the account when it
-/// initializes the config at genesis.
+/// Seed of the config PDA the guest initializes at genesis.
 #[must_use]
-pub const fn inbox_config_seed() -> PdaSeed {
+const fn inbox_config_seed() -> PdaSeed {
     PdaSeed::new(INBOX_CONFIG_SEED)
 }
 
 /// The seen-set shard for the peer block the message came from.
+///
+/// TODO(squatting): the address is derivable from `(src_zone, src_block_id)`,
+/// so a squatter can own a future shard first. The dispatch trusts a shard only
+/// when the inbox owns it, so delivery from that peer block then fails loudly
+/// rather than the squatter's bytes deciding what counts as delivered.
 #[must_use]
 pub fn inbox_seen_shard_account_id(
-    inbox_id: ProgramId,
+    inbox_id: AccountId,
     src_zone: &ZoneId,
     src_block_id: u64,
 ) -> AccountId {
     AccountId::for_public_pda(&inbox_id, &inbox_seen_shard_seed(src_zone, src_block_id))
 }
 
-/// Seed of the seen-shard PDA, exposed so the guest can claim the account.
+/// Seed of the seen-shard PDA.
 ///
 /// One shard per peer block, so a peer cannot accumulate deliveries from many
 /// blocks into one account.
 #[must_use]
-pub fn inbox_seen_shard_seed(src_zone: &ZoneId, src_block_id: u64) -> PdaSeed {
+fn inbox_seen_shard_seed(src_zone: &ZoneId, src_block_id: u64) -> PdaSeed {
     use risc0_zkvm::sha::{Impl, Sha256 as _};
 
     let mut bytes = [0_u8; 72];
@@ -334,7 +331,7 @@ mod tests {
 
     #[test]
     fn every_peer_block_gets_its_own_seen_shard() {
-        let id: ProgramId = [9; 8];
+        let id = AccountId::new([9; 32]);
         assert_eq!(
             inbox_seen_shard_account_id(id, &zone(1), 7),
             inbox_seen_shard_account_id(id, &zone(1), 7),

@@ -12,8 +12,8 @@ use integration_tests::{
     verify_commitment_is_in_state,
 };
 use lee::{
-    AccountId, execute_and_prove, privacy_preserving_transaction::circuit::ProgramWithDependencies,
-    program::Program,
+    AccountId, PrivateKey, PublicKey, execute_and_prove,
+    privacy_preserving_transaction::circuit::ProgramWithDependencies, program::Program,
 };
 use lee_core::{
     DUMMY_COMMITMENT_HASH, InputAccountIdentity, Nullifier, NullifierPublicKey, NullifierWitness,
@@ -22,12 +22,12 @@ use lee_core::{
     encryption::ViewingPublicKey,
 };
 use sequencer_service_rpc::RpcClient as _;
+use testnet_initial_state::initial_pub_accounts_private_keys;
 use tokio::test;
 use wallet::{
     account::Label,
     cli::{
-        CliAccountMention, Command, SubcommandReturnValue,
-        account::{AccountSubcommand, NewSubcommand},
+        CliAccountMention, Command, SubcommandReturnValue, account::AccountSubcommand,
         programs::native_token_transfer::AuthTransferSubcommand,
     },
 };
@@ -176,7 +176,7 @@ async fn deshielded_transfer_does_not_sign_with_recipient_key() -> Result<()> {
 }
 
 #[test]
-async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
+async fn private_transfer_to_owned_account_over_foreign_keys() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
     let from: AccountId = ctx.existing_private_accounts()[0];
@@ -192,7 +192,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
         .private_account(to_account_id)
         .context("Failed to get private account")?;
 
-    // Send to this account using claiming path (using npk and vpk instead of account ID)
+    // Send to this account over the foreign-keys path (npk and vpk instead of the account ID)
     let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
         from: private_mention(from),
         to: None,
@@ -210,7 +210,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
 
     let tx = fetch_privacy_preserving_tx(ctx.sequencer_client(), tx_hash).await;
 
-    // Sync the wallet to claim the new account
+    // Sync the wallet to discover the new account
     sync_private(&mut ctx).await?;
 
     let sender_commitment = ctx
@@ -229,7 +229,7 @@ async fn private_transfer_to_owned_account_using_claiming_path() -> Result<()> {
         .context("Failed to get recipient's private account")?;
     assert_eq!(to_res_acc.balance, 100);
 
-    log::info!("Successfully transferred using claiming path");
+    log::info!("Successfully transferred over the foreign-keys path");
 
     Ok(())
 }
@@ -370,41 +370,6 @@ async fn private_transfer_to_owned_account_continuous_run_path() -> Result<()> {
 }
 
 #[test]
-async fn initialize_private_account() -> Result<()> {
-    let mut ctx = TestContext::new().await?;
-
-    let account_id = new_account(&mut ctx, true, None).await?;
-
-    let command = Command::AuthTransfer(AuthTransferSubcommand::Init {
-        account_id: private_mention(account_id),
-    });
-    wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
-
-    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-    log::info!("Syncing private accounts");
-    sync_private(&mut ctx).await?;
-
-    assert_private_commitment_in_state(&ctx, account_id, "account").await?;
-
-    let account = ctx
-        .wallet()
-        .get_account_private(account_id)
-        .context("Failed to get private account")?;
-
-    assert_eq!(
-        account.program_owner,
-        programs::authenticated_transfer().id().into()
-    );
-    assert_eq!(account.balance, 0);
-    assert!(account.data.is_empty());
-
-    log::info!("Successfully initialized private account");
-
-    Ok(())
-}
-
-#[test]
 async fn private_transfer_using_from_label() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
@@ -435,48 +400,6 @@ async fn private_transfer_using_from_label() -> Result<()> {
     assert_private_commitment_in_state(&ctx, to, "receiver").await?;
 
     log::info!("Successfully transferred privately using from_label");
-
-    Ok(())
-}
-
-#[test]
-async fn initialize_private_account_using_label() -> Result<()> {
-    let mut ctx = TestContext::new().await?;
-
-    // Create a new private account with a label
-    let label = Label::new("init-private-label");
-    let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {
-        cci: None,
-        label: Some(label.clone()),
-    }));
-    let result = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
-    let SubcommandReturnValue::RegisterAccount { account_id } = result else {
-        anyhow::bail!("Expected RegisterAccount return value");
-    };
-
-    // Initialize using the label instead of account ID
-    let command = Command::AuthTransfer(AuthTransferSubcommand::Init {
-        account_id: label.into(),
-    });
-    wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await?;
-
-    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-    sync_private(&mut ctx).await?;
-
-    assert_private_commitment_in_state(&ctx, account_id, "account").await?;
-
-    let account = ctx
-        .wallet()
-        .get_account_private(account_id)
-        .context("Failed to get private account")?;
-
-    assert_eq!(
-        account.program_owner,
-        programs::authenticated_transfer().id().into()
-    );
-
-    log::info!("Successfully initialized private account using label");
 
     Ok(())
 }
@@ -590,8 +513,59 @@ async fn ppt_cant_chain_call_faucet() -> Result<()> {
     let ctx = TestContext::new().await?;
 
     let faucet_chain_caller = test_programs::faucet_chain_caller();
-    let deploy_tx = LeeTransaction::ProgramDeployment(lee::ProgramDeploymentTransaction::new(
-        lee::program_deployment_transaction::Message::new(faucet_chain_caller.elf().to_owned()),
+    let faucet_chain_caller_id: AccountId = faucet_chain_caller.id().into();
+
+    // Deploy through `program_loader`, at `faucet_chain_caller`'s own bijection address: a
+    // `WriteSegment` claiming a fresh segment account, then a `CreateHeader` naming
+    // `faucet_chain_caller_id` as the header — no signature needed from either, since claiming
+    // an unowned account is permissionless (the write is the claim); a funded genesis account
+    // signs and pays the fee for both, since neither freshly-claimed account holds anything to
+    // self-pay with.
+    let payer = &initial_pub_accounts_private_keys()[0];
+    let segment_key = PrivateKey::try_new([210; 32]).unwrap();
+    let segment_id = AccountId::from(&PublicKey::new_from_private_key(&segment_key));
+    let payer_nonce = get_account(&ctx, payer.account_id).await?.nonce;
+
+    let segment_message = lee::public_transaction::Message::try_new_with_fees(
+        lee_core::program::PROGRAM_LOADER_ACCOUNT_ID,
+        vec![segment_id],
+        vec![lee_core::account::Nonce(0), payer_nonce],
+        program_loader_core::Instruction::WriteSegment {
+            bytecode: faucet_chain_caller.elf().to_vec(),
+            next_segment: None,
+        },
+        common::test_utils::test_fee_declaration(payer.account_id),
+    )
+    .expect("WriteSegment instruction data should always be serializable");
+    let segment_witness_set = lee::public_transaction::WitnessSet::for_message(
+        &segment_message,
+        &[&segment_key, &payer.pub_sign_key],
+    );
+    let segment_tx = LeeTransaction::Public(lee::PublicTransaction::new(
+        segment_message,
+        segment_witness_set,
+    ));
+    ctx.sequencer_client().send_transaction(segment_tx).await?;
+
+    log::info!("Waiting for segment block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let header_message = lee::public_transaction::Message::try_new_with_fees(
+        lee_core::program::PROGRAM_LOADER_ACCOUNT_ID,
+        vec![faucet_chain_caller_id, segment_id],
+        vec![lee_core::account::Nonce(payer_nonce.0 + 1)],
+        program_loader_core::Instruction::CreateHeader {
+            first_segment: segment_id,
+            immutable: true,
+        },
+        common::test_utils::test_fee_declaration(payer.account_id),
+    )
+    .expect("CreateHeader instruction data should always be serializable");
+    let header_witness_set =
+        lee::public_transaction::WitnessSet::for_message(&header_message, &[&payer.pub_sign_key]);
+    let deploy_tx = LeeTransaction::Public(lee::PublicTransaction::new(
+        header_message,
+        header_witness_set,
     ));
     ctx.sequencer_client().send_transaction(deploy_tx).await?;
 
@@ -599,18 +573,13 @@ async fn ppt_cant_chain_call_faucet() -> Result<()> {
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
     let faucet_account_id = system_accounts::faucet_account_id();
-    let attacker_id = ctx.existing_public_accounts()[0];
-    let faucet_program_id = programs::faucet().id();
-    let vault_program_id = programs::vault().id();
-    let auth_transfer_program_id = programs::authenticated_transfer().id();
+    let faucet_program_id: AccountId = programs::faucet().id().into();
+    let auth_transfer_program_id: AccountId = programs::authenticated_transfer().id().into();
     let ask = lee_core::AuthorizationSecretKey([3; 32]);
     let nsk = lee_core::NullifierSecretKey::from(&ask);
     let npk = NullifierPublicKey::from(&nsk);
     let vpk = ViewingPublicKey::from_bytes(vec![4_u8; 1184]).unwrap();
-    let attacker_vault_id = {
-        let seed = vault_core::compute_vault_seed(attacker_id);
-        AccountId::for_private_pda(&vault_program_id, &seed, &npk, &vpk, 1337)
-    };
+    let attacker_private_id = AccountId::for_regular_private_account(&npk, &vpk, 1337);
     let amount: u128 = 1;
 
     let faucet_pre = AccountWithMetadata::new(
@@ -618,27 +587,26 @@ async fn ppt_cant_chain_call_faucet() -> Result<()> {
         false,
         faucet_account_id,
     );
-    let vault_pda_pre = AccountWithMetadata::new(
-        get_account(&ctx, attacker_vault_id).await?,
+    let recipient_pre = AccountWithMetadata::new(
+        get_account(&ctx, attacker_private_id).await?,
         false,
-        attacker_vault_id,
+        attacker_private_id,
     );
 
     let program_with_deps = ProgramWithDependencies::new(
         faucet_chain_caller,
+        faucet_chain_caller_id,
         [
             (faucet_program_id, programs::faucet()),
-            (vault_program_id, programs::vault()),
             (auth_transfer_program_id, programs::authenticated_transfer()),
         ]
         .into(),
     );
 
-    let instruction =
-        Program::serialize_instruction((faucet_program_id, vault_program_id, attacker_id, amount))?;
+    let instruction = Program::serialize_instruction((faucet_program_id, amount))?;
 
     let res = execute_and_prove(
-        vec![faucet_pre, vault_pda_pre],
+        vec![faucet_pre, recipient_pre],
         instruction,
         vec![
             InputAccountIdentity::Public,
@@ -646,7 +614,7 @@ async fn ppt_cant_chain_call_faucet() -> Result<()> {
                 vpk,
                 random_seed: [0; 32],
                 identifier: 1337,
-                kind: WitnessKind::Pda { binding: None },
+                kind: WitnessKind::Regular { ask: None },
                 nullifier: NullifierWitness::Init {
                     npk,
                     commitment_root: DUMMY_COMMITMENT_HASH,

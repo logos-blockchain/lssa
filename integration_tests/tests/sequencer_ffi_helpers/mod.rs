@@ -41,6 +41,12 @@ pub fn wait_for_sequencer_ffi_block(
         if res.error.is_ok() && res.is_some && res.block_id >= min_block_id {
             return Ok(res.block_id);
         }
+
+        log::info!(
+            "====================== Observed last block id ON FFI is {}",
+            res.block_id
+        );
+
         if start.elapsed() >= L2_TO_L1_TIMEOUT {
             anyhow::bail!(
                 "Sequencer FFI did not reach block {min_block_id} within {:?}. Last observed block id: {}",

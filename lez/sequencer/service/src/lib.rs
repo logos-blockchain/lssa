@@ -29,7 +29,7 @@ pub struct SequencerHandle {
     // NOTE: Order of fields matters as it affects drop order.
     scheduler: ActorHandle<Scheduler>,
     rpc_server: ActorHandle<RpcServerActor>,
-    executor: ActorHandle<ExecutorActor<BlockPublisher>>,
+    executor: ActorHandle<ExecutorActor<StorageActor, BlockPublisher>>,
     storage: ActorHandle<StorageActor>,
     addr: SocketAddr,
     /// Held for its lifetime: dropping it stops the gossip drive task.
@@ -41,7 +41,7 @@ impl SequencerHandle {
     const fn new(
         scheduler: ActorHandle<Scheduler>,
         rpc_server: ActorHandle<RpcServerActor>,
-        executor: ActorHandle<ExecutorActor<BlockPublisher>>,
+        executor: ActorHandle<ExecutorActor<StorageActor, BlockPublisher>>,
         storage: ActorHandle<StorageActor>,
         addr: SocketAddr,
         gossip: Option<sequencer_core::gossip::GossipNetwork>,
@@ -164,11 +164,10 @@ pub fn run(
         info!("Storage Actor spawned");
 
         let executor = ExecutorActor::new(config, storage_ref.clone()).await;
-        let mempool_handle = executor.mempool_handle();
         let executor_ref = ExecutorActor::spawn(executor);
         info!("Executor Actor spawned");
 
-        // TODO: Should be a separate actor
+        // TODO: Should be a separate actorr
         let gossip_network = match gossip_config {
             None => None,
             Some(gossip_config) => {
@@ -177,12 +176,30 @@ pub fn run(
                 let signing_key =
                     load_or_create_signing_key(&sequencer_home.join("bedrock_signing_key"))?;
                 let channel_id = *bedrock_config.channel_id.as_ref();
+                // Gossiped transactions enter through the executor's admission
+                // door (fee screen + mempool push), same as RPC submissions —
+                // gossip never touches the mempool directly.
+                let submit_ref = executor_ref.clone();
+                let submit: sequencer_core::gossip::IngestSubmit =
+                    std::sync::Arc::new(move |transaction| {
+                        let executor_submit_ref = submit_ref.clone();
+                        Box::pin(async move {
+                            use sequencer_executor_actor::protocol::{
+                                Transaction, TransactionOrigin,
+                            };
+                            let message = Transaction {
+                                transaction,
+                                origin: TransactionOrigin::Gossip,
+                            };
+                            executor_submit_ref.ask(message).await.map_err(Into::into)
+                        })
+                    });
                 let network = sequencer_core::gossip::GossipNetwork::start(
                     gossip_config,
                     channel_id,
                     signing_key,
-                    mempool_handle,
                     max_block_size.as_u64(),
+                    submit,
                 )
                 .await
                 .context("Failed to start sequencer gossip network")?;

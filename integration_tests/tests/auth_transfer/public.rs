@@ -4,10 +4,11 @@ use anyhow::{Context as _, Result};
 use common::transaction::LeeTransaction;
 use integration_tests::{
     TIME_TO_WAIT_FOR_BLOCK_SECONDS, TestContext, public_mention,
-    utils::{account_balance, get_account, new_account, send, send_claiming_new_account},
+    utils::{account_balance, get_account, new_account, send},
 };
-use lee::{PublicKey, public_transaction};
+use lee::{AccountId, PrivateKey, PublicKey, public_transaction};
 use sequencer_service_rpc::RpcClient as _;
+use testnet_initial_state::initial_pub_accounts_private_keys;
 use tokio::test;
 use wallet::{
     AccountIdentity, DEFAULT_MAX_FEE, ExecutionFailureKind,
@@ -109,9 +110,13 @@ pub async fn successful_transfer_to_new_account() -> Result<()> {
 
     let sender = ctx.existing_public_accounts()[0];
     let sender_before = account_balance(&ctx, sender).await?;
-    // The wallet CLI never signs with the recipient's key, but claiming this fresh account
-    // requires it, so bypass the CLI for this one send.
-    send_claiming_new_account(&mut ctx, sender, new_persistent_account_id, 100).await?;
+    send(
+        &mut ctx,
+        public_mention(sender),
+        public_mention(new_persistent_account_id),
+        100,
+    )
+    .await?;
 
     log::info!("Checking correct balance move");
     let acc_1_balance = account_balance(&ctx, sender).await?;
@@ -237,29 +242,33 @@ async fn two_consecutive_successful_transfers() -> Result<()> {
     Ok(())
 }
 
-/// A fresh account holds nothing, so it cannot pay the fee to claim itself:
-/// the wallet designates the transaction's own signer as its fee payer, and
-/// admission refuses the submission (`PayerCannotFund`). Bootstrap paths for
-/// a new account are a claiming transfer from a funded account (see
-/// `successful_transfer_to_new_account`) or a fee-exempt full vault sweep.
+/// A fresh account holds nothing, so it cannot pay the fee for its own transaction: the wallet
+/// designates the transaction's only signer as its fee payer, and admission refuses the
+/// submission (`PayerCannotFund`). A new account is bootstrapped by a credit from a funded
+/// account instead.
 #[test]
-async fn fresh_account_cannot_pay_to_initialize_itself() -> Result<()> {
+async fn fresh_account_cannot_pay_for_its_own_transaction() -> Result<()> {
     let mut ctx = TestContext::new().await?;
 
     let account_id = new_account(&mut ctx, false, None).await?;
+    // A recipient this wallet holds no key for, so the fresh account is the only signer.
+    let foreign_recipient = AccountId::new([7; 32]);
 
-    let command = Command::AuthTransfer(AuthTransferSubcommand::Init {
-        account_id: public_mention(account_id),
-    });
-    let refused = wallet::cli::execute_subcommand(ctx.wallet_mut(), command).await;
-    let err = refused
-        .expect_err("an unfunded account must not be able to pay for its own initialization");
+    let refused = send(
+        &mut ctx,
+        public_mention(account_id),
+        public_mention(foreign_recipient),
+        0,
+    )
+    .await;
+    let err =
+        refused.expect_err("an unfunded account must not be able to pay for its own transaction");
     // Pin the specific rejection: a bare `is_err()` would pass equally on a
-    // network or wallet-build failure. The wallet now surfaces the sequencer's
+    // network or wallet-build failure. The wallet surfaces the sequencer's
     // fee-admission message, so match the `PayerCannotFund` text — distinct from
     // every other admission rejection.
     assert!(
-        err.to_string().contains("but the fee reserve is"),
+        err.to_string().contains("Incorrect fee"),
         "expected a PayerCannotFund rejection, got: {err}",
     );
 
@@ -361,7 +370,7 @@ async fn cannot_transfer_funds_from_system_faucet_account() -> Result<()> {
 
     let amount = 1_u128;
     let message = public_transaction::Message::try_new(
-        programs::authenticated_transfer().id(),
+        programs::authenticated_transfer().id().into(),
         vec![faucet_account_id, recipient],
         vec![],
         authenticated_transfer_core::Instruction::Transfer { amount },
@@ -378,7 +387,7 @@ async fn cannot_transfer_funds_from_system_faucet_account() -> Result<()> {
         .await
         .expect_err("a fee-less faucet impersonation must be refused at admission");
     assert!(
-        err.to_string().contains("must declare a fee"),
+        err.to_string().contains("Incorrect fee"),
         "expected the missing-fee admission rejection, got: {err}",
     );
 
@@ -397,22 +406,16 @@ async fn cannot_execute_faucet_program() -> Result<()> {
     let faucet_account_id = system_accounts::faucet_account_id();
 
     let recipient = ctx.existing_public_accounts()[0];
-    let vault_program_id = programs::vault().id();
-    let recipient_vault_id = vault_core::compute_vault_account_id(vault_program_id, recipient);
 
     let recipient_balance_before = account_balance(&ctx, recipient).await?;
     let faucet_balance_before = account_balance(&ctx, faucet_account_id).await?;
 
     let amount = 1_u128;
     let message = public_transaction::Message::try_new(
-        programs::faucet().id(),
-        vec![faucet_account_id, recipient_vault_id],
+        programs::faucet().id().into(),
+        vec![faucet_account_id, recipient],
         vec![],
-        faucet_core::Instruction::GenesisTransferVault {
-            vault_program_id,
-            recipient_id: recipient,
-            amount,
-        },
+        faucet_core::Instruction::GenesisTransfer { amount },
     )?;
     let tx = lee::PublicTransaction::new(
         message,
@@ -425,7 +428,7 @@ async fn cannot_execute_faucet_program() -> Result<()> {
         .await
         .expect_err("a fee-less faucet invocation must be refused at admission");
     assert!(
-        err.to_string().contains("must declare a fee"),
+        err.to_string().contains("Incorrect fee"),
         "expected the missing-fee admission rejection, got: {err}",
     );
 
@@ -443,8 +446,59 @@ async fn user_tx_that_chain_calls_faucet_is_dropped() -> Result<()> {
     let ctx = TestContext::new().await?;
 
     let faucet_chain_caller = test_programs::faucet_chain_caller();
-    let deploy_tx = LeeTransaction::ProgramDeployment(lee::ProgramDeploymentTransaction::new(
-        lee::program_deployment_transaction::Message::new(faucet_chain_caller.elf().to_owned()),
+    let faucet_chain_caller_id: AccountId = faucet_chain_caller.id().into();
+
+    // Deploy through `program_loader`, at `faucet_chain_caller`'s own bijection address: a
+    // `WriteSegment` claiming a fresh segment account, then a `CreateHeader` naming
+    // `faucet_chain_caller_id` as the header — no signature needed from either, since claiming
+    // an unowned account is permissionless (the write is the claim); a funded genesis account
+    // signs and pays the fee for both, since neither freshly-claimed account holds anything to
+    // self-pay with.
+    let payer = &initial_pub_accounts_private_keys()[0];
+    let segment_key = PrivateKey::try_new([210; 32]).unwrap();
+    let segment_id = AccountId::from(&PublicKey::new_from_private_key(&segment_key));
+    let payer_nonce = get_account(&ctx, payer.account_id).await?.nonce;
+
+    let segment_message = public_transaction::Message::try_new_with_fees(
+        lee_core::program::PROGRAM_LOADER_ACCOUNT_ID,
+        vec![segment_id],
+        vec![lee_core::account::Nonce(0), payer_nonce],
+        program_loader_core::Instruction::WriteSegment {
+            bytecode: faucet_chain_caller.elf().to_vec(),
+            next_segment: None,
+        },
+        common::test_utils::test_fee_declaration(payer.account_id),
+    )
+    .expect("WriteSegment instruction data should always be serializable");
+    let segment_witness_set = public_transaction::WitnessSet::for_message(
+        &segment_message,
+        &[&segment_key, &payer.pub_sign_key],
+    );
+    let segment_tx = LeeTransaction::Public(lee::PublicTransaction::new(
+        segment_message,
+        segment_witness_set,
+    ));
+    ctx.sequencer_client().send_transaction(segment_tx).await?;
+
+    log::info!("Waiting for segment block creation");
+    tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+    let header_message = public_transaction::Message::try_new_with_fees(
+        lee_core::program::PROGRAM_LOADER_ACCOUNT_ID,
+        vec![faucet_chain_caller_id, segment_id],
+        vec![lee_core::account::Nonce(payer_nonce.0 + 1)],
+        program_loader_core::Instruction::CreateHeader {
+            first_segment: segment_id,
+            immutable: true,
+        },
+        common::test_utils::test_fee_declaration(payer.account_id),
+    )
+    .expect("CreateHeader instruction data should always be serializable");
+    let header_witness_set =
+        public_transaction::WitnessSet::for_message(&header_message, &[&payer.pub_sign_key]);
+    let deploy_tx = LeeTransaction::Public(lee::PublicTransaction::new(
+        header_message,
+        header_witness_set,
     ));
     ctx.sequencer_client().send_transaction(deploy_tx).await?;
 
@@ -453,16 +507,14 @@ async fn user_tx_that_chain_calls_faucet_is_dropped() -> Result<()> {
 
     let faucet_account_id = system_accounts::faucet_account_id();
     let attacker = ctx.existing_public_accounts()[0];
-    let faucet_program_id = programs::faucet().id();
-    let vault_program_id = programs::vault().id();
-    let attacker_vault_id = vault_core::compute_vault_account_id(vault_program_id, attacker);
+    let faucet_program_id: AccountId = programs::faucet().id().into();
     let amount: u128 = 1;
 
     let message = public_transaction::Message::try_new(
-        faucet_chain_caller.id(),
-        vec![faucet_account_id, attacker_vault_id],
+        faucet_chain_caller_id,
+        vec![faucet_account_id, attacker],
         vec![],
-        (faucet_program_id, vault_program_id, attacker, amount),
+        (faucet_program_id, amount),
     )?;
     let attack_tx = LeeTransaction::Public(lee::PublicTransaction::new(
         message,
@@ -470,7 +522,7 @@ async fn user_tx_that_chain_calls_faucet_is_dropped() -> Result<()> {
     ));
 
     let faucet_balance_before = account_balance(&ctx, faucet_account_id).await?;
-    let vault_balance_before = account_balance(&ctx, attacker_vault_id).await?;
+    let attacker_balance_before = account_balance(&ctx, attacker).await?;
 
     // Unsigned and fee-less: refused at the fee-admission door before the
     // sequencer-only chain-call defense would even see it.
@@ -480,15 +532,15 @@ async fn user_tx_that_chain_calls_faucet_is_dropped() -> Result<()> {
         .await
         .expect_err("a fee-less chain-call attack must be refused at admission");
     assert!(
-        err.to_string().contains("must declare a fee"),
+        err.to_string().contains("Incorrect fee"),
         "expected the missing-fee admission rejection, got: {err}",
     );
 
     let faucet_balance_after = account_balance(&ctx, faucet_account_id).await?;
-    let vault_balance_after = account_balance(&ctx, attacker_vault_id).await?;
+    let attacker_balance_after = account_balance(&ctx, attacker).await?;
 
     assert_eq!(faucet_balance_after, faucet_balance_before);
-    assert_eq!(vault_balance_after, vault_balance_before);
+    assert_eq!(attacker_balance_after, attacker_balance_before);
 
     Ok(())
 }

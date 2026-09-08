@@ -29,6 +29,7 @@ fn transition_from_privacy_preserving_transaction_shielded() {
             ..Account::default()
         },
     )]);
+    register_program(&mut state, &crate::test_methods::simple_balance_transfer());
 
     let balance_to_move = 37;
 
@@ -73,6 +74,7 @@ fn transition_from_privacy_preserving_transaction_private() {
     let recipient_keys = test_private_account_keys_2();
 
     let mut state = V03State::new().with_private_account(&sender_keys, &sender_private_account);
+    register_program(&mut state, &crate::test_methods::simple_balance_transfer());
 
     let balance_to_move = 37;
 
@@ -105,7 +107,6 @@ fn transition_from_privacy_preserving_transaction_private() {
     let expected_new_commitment_2 = Commitment::new(
         &recipient_account_id,
         &Account {
-            program_owner: crate::test_methods::simple_balance_transfer().id().into(),
             nonce: Nonce::private_account_nonce_init(&recipient_account_id),
             balance: balance_to_move,
             ..Account::default()
@@ -204,6 +205,7 @@ fn transition_from_privacy_preserving_transaction_deshielded() {
             },
         )])
         .with_private_account(&sender_keys, &sender_private_account);
+    register_program(&mut state, &crate::test_methods::simple_balance_transfer());
 
     let balance_to_move = 37;
 
@@ -303,29 +305,6 @@ fn minter_program_should_fail_in_privacy_preserving_circuit() {
 }
 
 #[test]
-fn nonce_changer_program_should_fail_in_privacy_preserving_circuit() {
-    let program = crate::test_methods::nonce_changer();
-    let public_account = AccountWithMetadata::new(
-        Account {
-            program_owner: program.id().into(),
-            balance: 0,
-            ..Account::default()
-        },
-        true,
-        AccountId::new([0; 32]),
-    );
-
-    let result = execute_and_prove(
-        vec![public_account],
-        Program::serialize_instruction(()).unwrap(),
-        vec![InputAccountIdentity::Public],
-        &program.into(),
-    );
-
-    assert_circuit_proving_failure(&result, "Unallowed modification of nonce");
-}
-
-#[test]
 fn data_changer_program_should_fail_for_non_owned_account_in_privacy_preserving_circuit() {
     let program = crate::test_methods::data_changer();
     let public_account = AccountWithMetadata::new(
@@ -380,94 +359,7 @@ fn data_changer_program_should_fail_for_too_large_data_in_privacy_preserving_cir
 }
 
 #[test]
-fn extra_output_program_should_fail_in_privacy_preserving_circuit() {
-    let program = crate::test_methods::extra_output();
-    let public_account = AccountWithMetadata::new(
-        Account {
-            program_owner: program.id().into(),
-            balance: 0,
-            ..Account::default()
-        },
-        true,
-        AccountId::new([0; 32]),
-    );
-
-    let result = execute_and_prove(
-        vec![public_account],
-        Program::serialize_instruction(()).unwrap(),
-        vec![InputAccountIdentity::Public],
-        &program.into(),
-    );
-
-    assert_circuit_proving_failure(
-        &result,
-        "Pre-state and post-state lengths do not match: pre-state length 1, post-state length 2",
-    );
-}
-
-#[test]
-fn missing_output_program_should_fail_in_privacy_preserving_circuit() {
-    let program = crate::test_methods::missing_output();
-    let public_account_1 = AccountWithMetadata::new(
-        Account {
-            program_owner: program.id().into(),
-            balance: 0,
-            ..Account::default()
-        },
-        true,
-        AccountId::new([0; 32]),
-    );
-    let public_account_2 = AccountWithMetadata::new(
-        Account {
-            program_owner: program.id().into(),
-            balance: 0,
-            ..Account::default()
-        },
-        true,
-        AccountId::new([1; 32]),
-    );
-
-    let result = execute_and_prove(
-        vec![public_account_1, public_account_2],
-        Program::serialize_instruction(()).unwrap(),
-        vec![InputAccountIdentity::Public, InputAccountIdentity::Public],
-        &program.into(),
-    );
-
-    assert_circuit_proving_failure(
-        &result,
-        "Pre-state and post-state lengths do not match: pre-state length 2, post-state length 1",
-    );
-}
-
-#[test]
-fn program_owner_changer_should_fail_in_privacy_preserving_circuit() {
-    let program = crate::test_methods::program_owner_changer();
-    let public_account = AccountWithMetadata::new(
-        Account {
-            program_owner: program.id().into(),
-            balance: 0,
-            ..Account::default()
-        },
-        true,
-        AccountId::new([0; 32]),
-    );
-
-    let result = execute_and_prove(
-        vec![public_account],
-        Program::serialize_instruction(()).unwrap(),
-        vec![InputAccountIdentity::Public],
-        &program.into(),
-    );
-
-    assert_circuit_proving_failure(
-        &result,
-        "Unallowed modification of program owner for account",
-    );
-}
-
-#[test]
-fn transfer_from_non_owned_account_should_fail_in_privacy_preserving_circuit() {
+fn unauthorized_debit_should_fail_in_privacy_preserving_circuit() {
     let program = crate::test_methods::simple_balance_transfer();
     let public_account_1 = AccountWithMetadata::new(
         Account {
@@ -475,7 +367,7 @@ fn transfer_from_non_owned_account_should_fail_in_privacy_preserving_circuit() {
             balance: 100,
             ..Account::default()
         },
-        true,
+        false,
         AccountId::new([0; 32]),
     );
     let public_account_2 = AccountWithMetadata::new(
@@ -495,5 +387,5 @@ fn transfer_from_non_owned_account_should_fail_in_privacy_preserving_circuit() {
         &program.into(),
     );
 
-    assert_circuit_proving_failure(&result, "which is not the owner");
+    assert_circuit_proving_failure(&result, "decrease balance of unauthorized account");
 }

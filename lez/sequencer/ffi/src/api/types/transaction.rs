@@ -1,27 +1,24 @@
-use std::ffi::{CString, c_char};
-
 use common::transaction::LeeTransaction;
 use lee::{
-    AccountId, EphemeralPublicKey, FeeDeclaration, PrivacyPreservingTransaction,
-    ProgramDeploymentTransaction, PublicKey, PublicTransaction, Signature,
+    AccountId, EphemeralPublicKey, FeeDeclaration, PrivacyPreservingTransaction, PublicKey,
+    PublicTransaction, Signature,
     privacy_preserving_transaction::{
         circuit::Proof,
         message::{EncryptedAccountData, PublicActionWithID},
     },
 };
 use lee_core::{
-    Commitment, Nullifier, PrivateAction, encryption::Ciphertext, program::ValidityWindow,
+    Commitment, Nullifier, PrivateAction, ProgramImageClaim, encryption::Ciphertext,
+    program::ValidityWindow,
 };
-use sequencer_executor_actor::protocol::{SubmitOutcome, Transaction};
+use sequencer_executor_actor::protocol::Transaction;
 
 use crate::api::types::{
-    FfiAccountId, FfiBytes32, FfiHashType, FfiOption, FfiProgramId, FfiPublicKey, FfiSignature,
-    FfiU128, FfiVec,
+    FfiAccountId, FfiBytes32, FfiHashType, FfiOption, FfiPublicKey, FfiSignature, FfiU128, FfiVec,
     account::FfiAccount,
     vectors::{
-        FfiAccountIdList, FfiInstructionDataList, FfiNonceList, FfiPrivateActionList,
-        FfiProgramDeploymentMessage, FfiProof, FfiPublicActionList, FfiSignaturePubKeyList,
-        FfiVecU8,
+        FfiAccountIdList, FfiInstructionDataList, FfiNonceList, FfiPrivateActionList, FfiProof,
+        FfiPublicActionList, FfiSignaturePubKeyList, FfiVecU8,
     },
 };
 
@@ -59,7 +56,7 @@ impl From<Box<FfiPublicTransactionBody>> for PublicTransaction {
     fn from(value: Box<FfiPublicTransactionBody>) -> Self {
         Self {
             message: lee::public_transaction::Message {
-                program_id: value.message.program_id.data,
+                program_account_id: value.message.program_account_id.into(),
                 account_ids: {
                     let std_vec: Vec<_> = value.message.account_ids.into();
                     std_vec
@@ -135,7 +132,7 @@ impl From<FfiFeeDeclaration> for FeeDeclaration {
 
 #[repr(C)]
 pub struct FfiPublicMessage {
-    pub program_id: FfiProgramId,
+    pub program_account_id: FfiAccountId,
     pub account_ids: FfiAccountIdList,
     pub nonces: FfiNonceList,
     pub instruction_data: FfiInstructionDataList,
@@ -146,7 +143,7 @@ pub struct FfiPublicMessage {
 impl From<lee::public_transaction::Message> for FfiPublicMessage {
     fn from(value: lee::public_transaction::Message) -> Self {
         let lee::public_transaction::Message {
-            program_id,
+            program_account_id,
             account_ids,
             nonces,
             instruction_data,
@@ -154,7 +151,7 @@ impl From<lee::public_transaction::Message> for FfiPublicMessage {
         } = value;
 
         Self {
-            program_id: program_id.into(),
+            program_account_id: program_account_id.into(),
             account_ids: account_ids
                 .into_iter()
                 .map(Into::into)
@@ -171,6 +168,32 @@ impl From<lee::public_transaction::Message> for FfiPublicMessage {
         }
     }
 }
+
+#[repr(C)]
+pub struct FfiProgramImageClaim {
+    account_id: FfiAccountId,
+    image_id: [u32; 8],
+}
+
+impl From<ProgramImageClaim> for FfiProgramImageClaim {
+    fn from(value: ProgramImageClaim) -> Self {
+        Self {
+            account_id: value.account_id.into(),
+            image_id: value.image_id,
+        }
+    }
+}
+
+impl From<FfiProgramImageClaim> for ProgramImageClaim {
+    fn from(value: FfiProgramImageClaim) -> Self {
+        Self {
+            account_id: value.account_id.into(),
+            image_id: value.image_id,
+        }
+    }
+}
+
+type FfiProgramImageClaims = FfiVec<FfiProgramImageClaim>;
 
 #[repr(C)]
 pub struct FfiPrivateTransactionBody {
@@ -246,6 +269,10 @@ impl From<Box<FfiPrivateTransactionBody>> for PrivacyPreservingTransaction {
                 timestamp_validity_window: cast_ffi_validity_window(
                     value.message.timestamp_validity_window,
                 ),
+                program_image_claims: {
+                    let std_vec: Vec<_> = value.message.program_image_claims.into();
+                    std_vec.into_iter().map(Into::into).collect()
+                },
             },
             witness_set: lee::privacy_preserving_transaction::WitnessSet::from_raw_parts(
                 {
@@ -317,6 +344,7 @@ pub struct FfiPrivacyPreservingMessage {
     pub private_actions: FfiPrivateActionList,
     pub block_validity_window: [u64; 2],
     pub timestamp_validity_window: [u64; 2],
+    pub program_image_claims: FfiProgramImageClaims,
 }
 
 impl From<lee::privacy_preserving_transaction::Message> for FfiPrivacyPreservingMessage {
@@ -327,6 +355,7 @@ impl From<lee::privacy_preserving_transaction::Message> for FfiPrivacyPreserving
             private_actions,
             block_validity_window,
             timestamp_validity_window,
+            program_image_claims,
         } = value;
 
         Self {
@@ -347,6 +376,11 @@ impl From<lee::privacy_preserving_transaction::Message> for FfiPrivacyPreserving
                 .into(),
             block_validity_window: cast_validity_window(block_validity_window),
             timestamp_validity_window: cast_validity_window(timestamp_validity_window),
+            program_image_claims: program_image_claims
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<_>>()
+                .into(),
         }
     }
 }
@@ -390,37 +424,9 @@ impl From<(Signature, PublicKey)> for FfiSignaturePubKeyEntry {
 }
 
 #[repr(C)]
-pub struct FfiProgramDeploymentTransactionBody {
-    pub hash: FfiHashType,
-    pub message: FfiProgramDeploymentMessage,
-}
-
-impl From<Box<FfiProgramDeploymentTransactionBody>> for ProgramDeploymentTransaction {
-    fn from(value: Box<FfiProgramDeploymentTransactionBody>) -> Self {
-        Self {
-            message: lee::program_deployment_transaction::Message::new(value.message.into()),
-        }
-    }
-}
-
-impl From<ProgramDeploymentTransaction> for FfiProgramDeploymentTransactionBody {
-    fn from(value: ProgramDeploymentTransaction) -> Self {
-        let hash = value.hash();
-
-        let ProgramDeploymentTransaction { message } = value;
-
-        Self {
-            hash: FfiBytes32::from_bytes(hash),
-            message: message.into_bytecode().into(),
-        }
-    }
-}
-
-#[repr(C)]
 pub struct FfiTransactionBody {
     pub public_body: *mut FfiPublicTransactionBody,
     pub private_body: *mut FfiPrivateTransactionBody,
-    pub program_deployment_body: *mut FfiProgramDeploymentTransactionBody,
 }
 
 #[repr(C)]
@@ -436,7 +442,6 @@ impl From<LeeTransaction> for FfiTransaction {
                 body: FfiTransactionBody {
                     public_body: Box::into_raw(Box::new(pub_tx.into())),
                     private_body: std::ptr::null_mut(),
-                    program_deployment_body: std::ptr::null_mut(),
                 },
                 kind: FfiTransactionKind::Public,
             },
@@ -444,17 +449,8 @@ impl From<LeeTransaction> for FfiTransaction {
                 body: FfiTransactionBody {
                     public_body: std::ptr::null_mut(),
                     private_body: Box::into_raw(Box::new(priv_tx.into())),
-                    program_deployment_body: std::ptr::null_mut(),
                 },
                 kind: FfiTransactionKind::Private,
-            },
-            LeeTransaction::ProgramDeployment(pr_dep_tx) => Self {
-                body: FfiTransactionBody {
-                    public_body: std::ptr::null_mut(),
-                    private_body: std::ptr::null_mut(),
-                    program_deployment_body: Box::into_raw(Box::new(pr_dep_tx.into())),
-                },
-                kind: FfiTransactionKind::ProgramDeploy,
             },
         }
     }
@@ -479,11 +475,6 @@ impl From<FfiTransaction> for LeeTransaction {
                 let std_body: PrivacyPreservingTransaction = body.into();
                 LeeTransaction::PrivacyPreserving(std_body)
             }
-            FfiTransactionKind::ProgramDeploy => {
-                let body = unsafe { Box::from_raw(value.body.program_deployment_body) };
-                let std_body: ProgramDeploymentTransaction = body.into();
-                LeeTransaction::ProgramDeployment(std_body)
-            }
         }
     }
 }
@@ -492,38 +483,6 @@ impl From<FfiTransaction> for LeeTransaction {
 pub enum FfiTransactionKind {
     Public = 0x0,
     Private,
-    ProgramDeploy,
-}
-
-#[repr(C)]
-pub enum FfiSubmitOutcomeKind {
-    Admitted = 0x0,
-    Rejected,
-}
-
-#[repr(C)]
-pub struct FfiSubmitOutcome {
-    kind: FfiSubmitOutcomeKind,
-    /// `AdmissionRejection` naturally have string representation,
-    /// for now returning it, so that the reason could be at least human-readable.
-    ///
-    /// ToDo: Find a way to return structured error through a FFI.
-    err_message: *mut c_char,
-}
-
-impl From<SubmitOutcome> for FfiSubmitOutcome {
-    fn from(value: SubmitOutcome) -> Self {
-        match value {
-            SubmitOutcome::Admitted => FfiSubmitOutcome {
-                kind: FfiSubmitOutcomeKind::Admitted,
-                err_message: std::ptr::null_mut(),
-            },
-            SubmitOutcome::Rejected(err) => FfiSubmitOutcome {
-                kind: FfiSubmitOutcomeKind::Rejected,
-                err_message: CString::new(err.to_string()).unwrap().into_raw(),
-            },
-        }
-    }
 }
 
 /// Frees the resources associated with the given ffi transaction.
@@ -551,11 +510,6 @@ pub unsafe extern "C" fn free_ffi_transaction(val: FfiTransaction) {
         FfiTransactionKind::Private => {
             let body = unsafe { Box::from_raw(val.body.private_body) };
             let std_body: PrivacyPreservingTransaction = body.into();
-            drop(std_body);
-        }
-        FfiTransactionKind::ProgramDeploy => {
-            let body = unsafe { Box::from_raw(val.body.program_deployment_body) };
-            let std_body: ProgramDeploymentTransaction = body.into();
             drop(std_body);
         }
     }
@@ -672,7 +626,7 @@ mod tests {
     fn public_transaction_fee_roundtrips_over_the_ffi() {
         let tx = |fee| PublicTransaction {
             message: lee::public_transaction::Message {
-                program_id: [2; 8],
+                program_account_id: [2; 8].into(),
                 account_ids: vec![AccountId::new([3; 32])],
                 nonces: vec![],
                 instruction_data: vec![9, 9],

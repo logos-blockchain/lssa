@@ -40,7 +40,7 @@ const JOINER_SIGNING_KEY: [u8; 32] = [0x42; 32];
 /// Short block cadence for the demo.
 fn fast_blocks() -> SequencerPartialConfig {
     SequencerPartialConfig {
-        block_create_timeout: Duration::from_secs(2),
+        block_create_timeout: Duration::from_secs(5),
         ..SequencerPartialConfig::default()
     }
 }
@@ -73,33 +73,9 @@ fn seq_ffi_test_1() -> Result<()> {
         .key_chain_mut()
         .add_imported_public_account(funding_private_key);
 
-    // Claim the genesis supply out of its vault.
-    let owner_vault_id = vault_core::compute_vault_account_id(programs::vault().id(), funding_id);
-    let claim_instruction_data = Program::serialize_instruction(vault_core::Instruction::Claim {
-        amount: FUNDING_BALANCE,
-    })
-    .context("Failed to serialize vault Claim instruction")?;
-    ctx.block_on(|ctx| async {
-        ctx.wallet()
-            .send_pub_tx(
-                vec![
-                    AccountIdentity::Public(funding_id),
-                    AccountIdentity::PublicNoSign(owner_vault_id),
-                ],
-                claim_instruction_data,
-                programs::vault().id(),
-            )
-            .await
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "Failed to claim the demo funding account from its genesis vault: {err:?}"
-                )
-            })
-    })?;
-    info!("Waiting for the vault-claim transaction's block to land");
-
+    info!("Waiting for the genesis supply to land on the funding account");
     ctx.block_on(|ctx| {
-        poll_until("vault claim to land", 30, || async {
+        poll_until("genesis supply to land", 30, || async {
             Ok(account_balance(ctx, funding_id).await? == FUNDING_BALANCE)
         })
     })?;
@@ -112,6 +88,8 @@ fn seq_ffi_test_1() -> Result<()> {
     })?;
     info!("Fresh stake ownership account: {ownership_id}");
 
+    let funds_id = system_accounts::stake_funds_account_id(&ownership_id);
+
     let mover_instruction_data =
         Program::serialize_instruction(authenticated_transfer_core::Instruction::Transfer {
             amount: FUNDING_BALANCE,
@@ -121,7 +99,7 @@ fn seq_ffi_test_1() -> Result<()> {
         Program::serialize_instruction(sequencer_stake_core::Instruction::Stake {
             sequencer_key: demo_stake_key,
             amount: FUNDING_BALANCE,
-            mover_program_id: programs::authenticated_transfer().id(),
+            mover_account_id: programs::authenticated_transfer().id().into(),
             mover_instruction_data,
         })
         .context("Failed to serialize Stake instruction")?;
@@ -137,10 +115,11 @@ fn seq_ffi_test_1() -> Result<()> {
                 vec![
                     AccountIdentity::Public(funding_id),
                     AccountIdentity::Public(ownership_id),
+                    AccountIdentity::PublicNoSign(funds_id),
                     AccountIdentity::PublicNoSign(config_id),
                 ],
                 stake_instruction_data,
-                programs::sequencer_stake().id(),
+                programs::sequencer_stake().id().into(),
             )
             .await
             .map_err(|err| anyhow::anyhow!("Failed to submit Stake transaction: {err:?}"))
@@ -165,16 +144,16 @@ fn seq_ffi_test_1() -> Result<()> {
         programs::sequencer_stake().id().into(),
         "ownership account should now be owned by sequencer_stake"
     );
+    let staked_balance = ctx.block_on(|ctx| account_balance(ctx, funds_id))?;
     assert_eq!(
-        ownership_account.balance, FUNDING_BALANCE,
-        "ownership account should hold the staked balance"
+        staked_balance, FUNDING_BALANCE,
+        "the funds PDA should hold the staked balance"
     );
     let record = sequencer_stake_core::StakeRecord::from_bytes(ownership_account.data.as_ref())
         .context("ownership account data did not decode as a StakeRecord")?;
     assert_eq!(record.sequencer_key, demo_stake_key);
     info!(
-        "Ownership account confirmed: {} staked for sequencer key {}",
-        ownership_account.balance,
+        "Ownership account confirmed: {staked_balance} staked for sequencer key {}",
         hex::encode(record.sequencer_key)
     );
 
@@ -195,7 +174,10 @@ fn seq_ffi_test_1() -> Result<()> {
             .context("Failed to read Bedrock channel state")?
             .context("Bedrock channel does not exist")?;
 
-        info!("================================  THERE IS {} ACCREDITED KEYS", state.accredited_keys.len());
+        info!(
+            "================================  THERE IS {} ACCREDITED KEYS",
+            state.accredited_keys.len()
+        );
 
         if state
             .accredited_keys
@@ -219,7 +201,9 @@ fn seq_ffi_test_1() -> Result<()> {
         channel_state.accredited_keys.len()
     );
 
-    info!("================================================= ACTUALLY IMPORTANT THINGS HAPPEN HERE");
+    info!(
+        "================================================= ACTUALLY IMPORTANT THINGS HAPPEN HERE"
+    );
 
     // Only now start a node behind the key, against a channel that already has a chain.
     let setuper = SequencerSetup::new(fast_blocks(), ctx.ctx().bedrock_addr())

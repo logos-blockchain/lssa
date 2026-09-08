@@ -22,13 +22,11 @@ faucet_core.workspace = true
 authenticated_transfer_core.workspace = true
 fee_core.workspace = true
 bridge_core.workspace = true
-vault_core.workspace = true
 programs.workspace = true
 system_accounts.workspace = true
 cross_zone.workspace = true
 cross_zone_inbox_core.workspace = true
 sequencer_stake_core.workspace = true
-sequencer_service_protocol.workspace = true
 
 logos-blockchain-key-management-system-service.workspace = true
 logos-blockchain-core.workspace = true
@@ -52,10 +50,10 @@ url.workspace = true
 num-bigint.workspace = true
 futures.workspace = true
 libp2p.workspace = true
+thiserror.workspace = true
 
 [features]
 default = []
-testnet = []
 # Generate mock external clients implementations for testing
 mock = []
 # Enable mDNS-based local peer discovery for gossip.
@@ -65,10 +63,10 @@ test-utils = []
 
 [dev-dependencies]
 cross_zone = { workspace = true, features = ["test-utils"] }
-sequencer_storage_actor = { workspace = true, features = ["mock"] }
-storage.workspace = true
+sequencer_storage_actor = { workspace = true, features = ["actor", "mock"] }
 futures.workspace = true
 test_programs.workspace = true
+program_loader_core.workspace = true
 lee = { workspace = true, features = ["test-utils"] }
 key_protocol.workspace = true
 token_core.workspace = true

@@ -14,14 +14,14 @@ pub enum Error {
         #[source] kameo::error::SendError<NoMatter, sequencer_storage_actor::error::Error>,
     ),
 
-    #[error("Block production failed")]
-    BlockProductionFailed(#[source] anyhow::Error),
-
     #[error("Failed to read the cross-zone dead letter")]
     CrossZoneDeadLettersUnavailable(#[source] anyhow::Error),
 
-    #[error("Failed to requeue the cross-zone dead letter: {0}")]
+    #[error("Failed to requeue the cross-zone dead letter")]
     CrossZoneDeadLetterRequeueFailed(#[source] anyhow::Error),
+
+    #[error("Incorrect fee")]
+    IncorrectFee(#[source] anyhow::Error),
 }
 
 /// A dummy struct replacing message type in [`kameo::error::SendError`]

@@ -26,7 +26,7 @@ impl SequencerServiceFFI {
     #[must_use]
     pub fn new(
         storage_actor: ActorRef<StorageActor>,
-        executor_actor: ActorRef<ExecutorActor<ZoneSdkPublisher, StorageActor>>,
+        executor_actor: ActorRef<ExecutorActor<StorageActor, ZoneSdkPublisher>>,
         gossip: Option<GossipNetwork>,
         runtime: Runtime,
     ) -> Self {
@@ -51,10 +51,10 @@ impl SequencerServiceFFI {
 
     /// Borrow the [`ExecutorActor`] to run a query against the node.
     #[must_use]
-    pub const fn executor_actor(&self) -> &ActorRef<ExecutorActor<ZoneSdkPublisher, StorageActor>> {
+    pub const fn executor_actor(&self) -> &ActorRef<ExecutorActor<StorageActor, ZoneSdkPublisher>> {
         unsafe {
             self.executor_actor
-                .cast::<ActorRef<ExecutorActor<ZoneSdkPublisher, StorageActor>>>()
+                .cast::<ActorRef<ExecutorActor<StorageActor, ZoneSdkPublisher>>>()
                 .as_ref()
                 .expect("ExecutorActor must be a non-null pointer")
         }
@@ -79,7 +79,7 @@ impl Drop for SequencerServiceFFI {
             let executor_actor = unsafe {
                 Box::from_raw(
                     self.executor_actor
-                        .cast::<ActorRef<ExecutorActor<ZoneSdkPublisher, StorageActor>>>(),
+                        .cast::<ActorRef<ExecutorActor<StorageActor, ZoneSdkPublisher>>>(),
                 )
             };
             // stop the executor actor before storage.
@@ -89,9 +89,11 @@ impl Drop for SequencerServiceFFI {
             }
             drop(executor_actor);
         }
+
         if !self.storage_actor.is_null() {
             let storage_actor =
-                unsafe { Box::from_raw(self.executor_actor.cast::<ActorRef<StorageActor>>()) };
+                unsafe { Box::from_raw(self.storage_actor.cast::<ActorRef<StorageActor>>()) };
+
             let send_res = self.runtime.block_on(storage_actor.stop_gracefully());
             if let Err(err) = send_res {
                 log::error!("Failed to send shutdown signal: {err}");

@@ -2,17 +2,21 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
     hash::Hash,
+    panic::{AssertUnwindSafe, catch_unwind},
 };
 
 use lee_core::{
-    BlockId, Commitment, Nullifier, PrivacyPreservingCircuitOutput, PublicAction, Timestamp,
+    BlockId, Commitment, Nullifier, PrivacyPreservingCircuitOutput, ProgramImageClaim,
+    PublicAction, Timestamp,
     account::{Account, AccountId, AccountWithMetadata, Cycles},
     program::{
-        CallerData, ChainedCall, Claim, DEFAULT_PROGRAM_OWNER, ProgramId, TransactionEvent,
-        compute_public_authorized_pdas, pre_states_match_accounts, validate_execution,
+        CallKind, CallerData, ChainedCall, DEFAULT_PROGRAM_OWNER, PROGRAM_LOADER_ACCOUNT_ID,
+        ProgramOutput, TransactionEvent, compute_public_authorized_pdas, get_program_via,
+        is_ownership_settled, post_state, pre_states_match_accounts, validate_execution,
     },
 };
 use log::debug;
+use program_loader_core::Instruction as ProgramLoaderInstruction;
 
 use crate::{
     V03State, ensure,
@@ -21,7 +25,6 @@ use crate::{
         PrivacyPreservingTransaction, circuit::Proof, message::Message,
     },
     program::Program,
-    program_deployment_transaction::ProgramDeploymentTransaction,
     public_transaction::PublicTransaction,
     state::MAX_NUMBER_CHAINED_CALLS,
 };
@@ -31,7 +34,6 @@ pub struct StateDiff {
     pub public_diff: HashMap<AccountId, Account>,
     pub new_commitments: Vec<Commitment>,
     pub new_nullifiers: Vec<Nullifier>,
-    pub program: Option<Program>,
     pub events: Vec<TransactionEvent>,
 }
 
@@ -138,7 +140,7 @@ impl ValidatedStateDiff {
         let authorized: HashSet<AccountId> = signers.iter().copied().collect();
         let mut cycles_used: u64 = 0;
         let result = Self::execute_authorized(
-            message.program_id,
+            message.program_account_id,
             &message.account_ids,
             &message.instruction_data,
             &authorized,
@@ -165,7 +167,6 @@ impl ValidatedStateDiff {
                 public_diff: HashMap::new(),
                 new_commitments: Vec::new(),
                 new_nullifiers: Vec::new(),
-                program: None,
                 events: Vec::new(),
             }),
             // A non-chargeable failure is a structural defect a correct proposer
@@ -183,7 +184,7 @@ impl ValidatedStateDiff {
     /// not read as a general escape hatch. `authorized` is the guest's
     /// `is_authorized` set — the payer for the reserve, empty for the refund.
     pub fn from_fee_settlement_invocation(
-        program_id: ProgramId,
+        program_account_id: AccountId,
         account_ids: &[AccountId],
         instruction_data: &[u8],
         authorized: &HashSet<AccountId>,
@@ -193,7 +194,7 @@ impl ValidatedStateDiff {
     ) -> Result<Self, LeeError> {
         let mut cycles_used = 0; // dont care
         Self::execute_authorized(
-            program_id,
+            program_account_id,
             account_ids,
             instruction_data,
             authorized,
@@ -219,7 +220,7 @@ impl ValidatedStateDiff {
         // Signers both authorize the execution and advance their replay nonces.
         let authorized: HashSet<AccountId> = signer_account_ids.iter().copied().collect();
         Self::execute_authorized(
-            message.program_id,
+            message.program_account_id,
             &message.account_ids,
             &message.instruction_data,
             &authorized,
@@ -241,7 +242,7 @@ impl ValidatedStateDiff {
         reason = "the execution core threads the full invocation context"
     )]
     fn execute_authorized(
-        program_id: ProgramId,
+        program_account_id: AccountId,
         account_ids: &[AccountId],
         instruction_data: &[u8],
         authorized: &HashSet<AccountId>,
@@ -268,14 +269,14 @@ impl ValidatedStateDiff {
         let mut events: Vec<TransactionEvent> = Vec::new();
 
         let initial_call = ChainedCall {
-            program_id,
+            program_account_id,
             instruction_data: instruction_data.to_vec(),
             pre_state_ids: account_ids.to_vec(),
             pda_seeds: vec![],
         };
 
         let initial_caller_data = CallerData {
-            program_id: None,
+            account_id: None,
             authorized_accounts: authorized.clone(),
         };
 
@@ -289,18 +290,8 @@ impl ValidatedStateDiff {
                 LeeError::MaxChainedCallsDepthExceeded
             );
 
-            let Some(program_account) = state.get_program(chained_call.program_id) else {
-                return Err(LeeError::UnknownProgram {
-                    chained: caller_data.program_id.is_some(),
-                });
-            };
-            let program = Program::new_unchecked(
-                chained_call.program_id,
-                Cow::Owned(program_account.data.to_vec()),
-            );
-
             let authorized_pdas =
-                compute_public_authorized_pdas(caller_data.program_id, &chained_call.pda_seeds);
+                compute_public_authorized_pdas(caller_data.account_id, &chained_call.pda_seeds);
 
             // Account is authorized if it is either in the caller's authorized accounts or in the
             // list of PDAs the caller has authorized.
@@ -340,44 +331,81 @@ impl ValidatedStateDiff {
 
             debug!(
                 "Program {:?} pre_states: {:?}, instruction_data: {:?}",
-                chained_call.program_id, real_pre_states, chained_call.instruction_data
+                chained_call.program_account_id, real_pre_states, chained_call.instruction_data
             );
-            let (mut program_output, call_cycles) = program.execute(
-                caller_data.program_id,
-                &real_pre_states,
-                &chained_call.instruction_data,
-                cycle_budget.saturating_sub(*cycles_used),
-            )?;
-            *cycles_used = cycles_used
-                .checked_add(call_cycles)
-                .expect("cycle sums fit u64: overflow would need ~2^64 executed cycles");
+            let program_output = if chained_call.program_account_id == PROGRAM_LOADER_ACCOUNT_ID {
+                // Native dispatch: `program_loader` is a pseudo-program run as Rust rather than a
+                // guest ELF, so there is no zkVM session to charge cycles against.
+                execute_program_loader(
+                    chained_call.program_account_id,
+                    caller_data.account_id,
+                    &real_pre_states,
+                    &chained_call.instruction_data,
+                )?
+            } else {
+                // Looks through `state_diff` first, falling back to `state` — so an earlier
+                // chained call in this same transaction that deployed this program is seen
+                // immediately, rather than only on the next transaction.
+                let Some((program_id, elf)) =
+                    get_program_via(chained_call.program_account_id, |id| {
+                        state_diff
+                            .get(&id)
+                            .cloned()
+                            .unwrap_or_else(|| state.get_account_by_id(id))
+                    })
+                else {
+                    return Err(LeeError::UnknownProgram {
+                        chained: caller_data.account_id.is_some(),
+                    });
+                };
+                let program = Program::new_unchecked(program_id, Cow::Owned(elf));
+                let (program_output, call_cycles) = program.execute(
+                    chained_call.program_account_id,
+                    caller_data.account_id,
+                    &real_pre_states,
+                    &chained_call.instruction_data,
+                    cycle_budget.saturating_sub(*cycles_used),
+                )?;
+                *cycles_used = cycles_used
+                    .checked_add(call_cycles)
+                    .expect("cycle sums fit u64: overflow would need ~2^64 executed cycles");
+                program_output
+            };
             debug!(
                 "Program {:?} output: {:?}",
-                chained_call.program_id, program_output
+                chained_call.program_account_id, program_output
             );
 
             // A chained callee must account for exactly the accounts its caller named, in
             // order. The top-level call has no caller, so it's exempt here.
             ensure!(
-                caller_data.program_id.is_none()
+                caller_data.account_id.is_none()
                     || pre_states_match_accounts(
                         &chained_call.pre_state_ids,
-                        &program_output.pre_states
+                        &program_output
+                            .state_diffs
+                            .iter()
+                            .map(|diff| diff.pre_state.clone())
+                            .collect::<Vec<_>>()
                     ),
                 InvalidProgramBehaviorError::ChainedCallAccountsMismatch {
-                    program_id: chained_call.program_id
+                    program_account_id: chained_call.program_account_id
                 }
             );
 
             let named_accounts: HashSet<AccountId> =
                 chained_call.pre_state_ids.iter().copied().collect();
 
-            for pre in &program_output.pre_states {
+            for pre in program_output
+                .state_diffs
+                .iter()
+                .map(|diff| &diff.pre_state)
+            {
                 let account_id = pre.account_id;
                 ensure!(
                     named_accounts.contains(&account_id),
                     InvalidProgramBehaviorError::UndeclaredAccountInProgramOutput {
-                        program_id: chained_call.program_id,
+                        program_account_id: chained_call.program_account_id,
                         account_id
                     }
                 );
@@ -412,32 +440,38 @@ impl ValidatedStateDiff {
                 );
             }
 
-            // Verify that the program output's self_program_id matches the expected program ID.
+            // Verify that the program output's self_account_id matches the expected address.
             ensure!(
-                program_output.self_program_id == chained_call.program_id,
+                program_output.self_account_id == chained_call.program_account_id,
                 InvalidProgramBehaviorError::MismatchedProgramId {
-                    expected: chained_call.program_id,
-                    actual: program_output.self_program_id
+                    expected: chained_call.program_account_id,
+                    actual: program_output.self_account_id
                 }
             );
 
-            // Verify that the program output's caller_program_id matches the actual caller.
+            // Verify that the program output's caller_account_id matches the actual caller.
             ensure!(
-                program_output.caller_program_id == caller_data.program_id,
+                program_output.caller_account_id == caller_data.account_id,
                 InvalidProgramBehaviorError::MismatchedCallerProgramId {
-                    expected: caller_data.program_id,
-                    actual: program_output.caller_program_id,
+                    expected: caller_data.account_id,
+                    actual: program_output.caller_account_id,
                 }
             );
+
+            // Only a top-level call may legitimately be a no-op; a chained call must execute.
+            if caller_data.account_id.is_some() {
+                ensure!(
+                    program_output.call_kind == CallKind::Execute,
+                    InvalidProgramBehaviorError::ChainedCallDidNotExecute {
+                        program_account_id: chained_call.program_account_id
+                    }
+                );
+            }
 
             // Verify execution corresponds to a well-behaved program.
             // See the # Programs section for the definition of the `validate_execution` method.
-            validate_execution(
-                &program_output.pre_states,
-                &program_output.post_states,
-                chained_call.program_id,
-            )
-            .map_err(InvalidProgramBehaviorError::ExecutionValidationFailed)?;
+            validate_execution(&program_output.state_diffs, chained_call.program_account_id)
+                .map_err(InvalidProgramBehaviorError::ExecutionValidationFailed)?;
 
             // Verify validity window
             ensure!(
@@ -448,52 +482,12 @@ impl ValidatedStateDiff {
                 LeeError::OutOfValidityWindow
             );
 
-            for (i, post) in program_output.post_states.iter_mut().enumerate() {
-                let Some(claim) = post.required_claim() else {
-                    continue;
-                };
-                let pre = &program_output.pre_states[i];
-                let account_id = pre.account_id;
-
-                // The invoked program can only claim accounts with default program id.
-                ensure!(
-                    post.account().program_owner == DEFAULT_PROGRAM_OWNER,
-                    InvalidProgramBehaviorError::ClaimedNonDefaultAccount { account_id }
-                );
-
-                match claim {
-                    Claim::Authorized => {
-                        // The program can only claim accounts that were authorized by the signer.
-                        ensure!(
-                            pre.is_authorized,
-                            InvalidProgramBehaviorError::ClaimedUnauthorizedAccount { account_id }
-                        );
-                    }
-                    Claim::Pda(seed) => {
-                        // The program can only claim accounts that correspond to the PDAs it is
-                        // authorized to claim. The public-execution path only sees public
-                        // accounts, so the public-PDA derivation is the correct formula here.
-                        let pda = AccountId::for_public_pda(&chained_call.program_id, &seed);
-                        ensure!(
-                            account_id == pda,
-                            InvalidProgramBehaviorError::MismatchedPdaClaim {
-                                expected: pda,
-                                actual: account_id
-                            }
-                        );
-                    }
-                }
-
-                post.account_mut().program_owner = AccountId::from(chained_call.program_id);
-            }
-
-            // Update the state diff
-            for (pre, post) in program_output
-                .pre_states
-                .iter()
-                .zip(program_output.post_states.iter())
-            {
-                state_diff.insert(pre.account_id, post.account().clone());
+            // Update the state diff, acquiring ownership of every unowned account this call
+            // wrote data to.
+            for diff in &program_output.state_diffs {
+                let post = post_state(diff, chained_call.program_account_id)
+                    .map_err(InvalidProgramBehaviorError::BalanceDiffFailed)?;
+                state_diff.insert(diff.pre_state.account_id, post);
             }
 
             // Write all the output event data into a proper event struct,
@@ -503,15 +497,16 @@ impl ValidatedStateDiff {
                     .events
                     .into_iter()
                     .map(|event| TransactionEvent {
-                        program_id: chained_call.program_id,
+                        account_id: chained_call.program_account_id,
                         event,
                     }),
             );
 
-            // Source from `program_output.pre_states` (the callee's own checked echo), not
+            // Source from `program_output.state_diffs` (the callee's own checked echo), not
             // `chained_call.pre_state_ids` (bare ids the caller supplied, carrying no
-            // authorization claim at all) — the loop above already gates program_output's
-            // `is_authorized` via the `!pre.is_authorized || is_indeed_authorized` check.
+            // authorization claim at all and forgeable, audit-issue 91) — the loop above
+            // already gates program_output's `is_authorized` via the `!pre.is_authorized ||
+            // is_indeed_authorized` check.
             //
             // Union with the caller's authorized set so that authorization is monotonically
             // growing: once an account is authorized at any point in the chain it remains
@@ -519,8 +514,9 @@ impl ValidatedStateDiff {
             let mut authorized_accounts = caller_data.authorized_accounts;
             authorized_accounts.extend(
                 program_output
-                    .pre_states
+                    .state_diffs
                     .iter()
+                    .map(|diff| &diff.pre_state)
                     .filter(|pre| pre.is_authorized)
                     .map(|pre| pre.account_id),
             );
@@ -528,7 +524,7 @@ impl ValidatedStateDiff {
                 chained_calls.push_front((
                     new_call,
                     CallerData {
-                        program_id: Some(chained_call.program_id),
+                        account_id: Some(chained_call.program_account_id),
                         authorized_accounts: authorized_accounts.clone(),
                     },
                 ));
@@ -539,7 +535,7 @@ impl ValidatedStateDiff {
                 .expect("we check the max depth at the beginning of the loop");
         }
 
-        // Check that all modified uninitialized accounts where claimed
+        // Check that all programs writing data to default accounts claimed ownership.
         for (account_id, post) in state_diff.iter().filter_map(|(account_id, post)| {
             let pre = state.get_account_by_id(*account_id);
             if pre.program_owner != DEFAULT_PROGRAM_OWNER {
@@ -551,8 +547,8 @@ impl ValidatedStateDiff {
             Some((*account_id, post))
         }) {
             ensure!(
-                post.program_owner != DEFAULT_PROGRAM_OWNER,
-                InvalidProgramBehaviorError::DefaultAccountModifiedWithoutClaim { account_id }
+                is_ownership_settled(post),
+                InvalidProgramBehaviorError::DataBearingUnownedAccount { account_id }
             );
         }
 
@@ -572,7 +568,6 @@ impl ValidatedStateDiff {
             public_diff: state_diff,
             new_commitments: vec![],
             new_nullifiers: vec![],
-            program: None,
             events,
         }))
     }
@@ -661,6 +656,7 @@ impl ValidatedStateDiff {
 
         // 4. Proof verification
         check_privacy_preserving_circuit_proof_is_valid(
+            state,
             &witness_set.proof,
             &public_pre_states,
             message,
@@ -684,26 +680,6 @@ impl ValidatedStateDiff {
             public_diff,
             new_commitments: commitments,
             new_nullifiers,
-            program: None,
-            events: vec![],
-        }))
-    }
-
-    pub fn from_program_deployment_transaction(
-        tx: &ProgramDeploymentTransaction,
-        state: &V03State,
-    ) -> Result<Self, LeeError> {
-        // TODO: remove clone
-        let program = Program::new(tx.message.bytecode.clone().into())?;
-        if state.get_program(program.id()).is_some() {
-            return Err(LeeError::ProgramAlreadyExists);
-        }
-        Ok(Self(StateDiff {
-            signer_account_ids: vec![],
-            public_diff: HashMap::new(),
-            new_commitments: vec![],
-            new_nullifiers: vec![],
-            program: Some(program),
             events: vec![],
         }))
     }
@@ -720,6 +696,54 @@ impl ValidatedStateDiff {
     pub(crate) fn into_state_diff(self) -> StateDiff {
         self.0
     }
+}
+
+/// Runs `program_loader`'s instruction as native Rust rather than a guest ELF, producing the same
+/// [`ProgramOutput`] shape a guest call would — so the rest of the dispatch loop (chained-call
+/// bookkeeping, `validate_execution`, ownership acquisition) treats it identically either way.
+///
+/// `program_loader_core`'s functions panic on malformed input, mirroring the assert-based style
+/// every other `*_core` crate uses under its guest's sandbox. There is no zkVM sandbox here, so
+/// `catch_unwind` stands in for it: a panic becomes a chargeable
+/// [`LeeError::ProgramExecutionFailed`] instead of taking down the caller.
+fn execute_program_loader(
+    self_account_id: AccountId,
+    caller_account_id: Option<AccountId>,
+    pre_states: &[AccountWithMetadata],
+    instruction_data: &[u8],
+) -> Result<ProgramOutput, LeeError> {
+    let instruction: ProgramLoaderInstruction = borsh::from_slice(instruction_data)
+        .map_err(|e| LeeError::ProgramExecutionFailed(e.to_string()))?;
+
+    let state_diffs = catch_unwind(AssertUnwindSafe(|| match instruction {
+        ProgramLoaderInstruction::WriteSegment {
+            bytecode,
+            next_segment,
+        } => program_loader_core::write_segment(pre_states, bytecode, next_segment),
+        ProgramLoaderInstruction::CreateHeader {
+            first_segment,
+            immutable,
+        } => program_loader_core::create_header(pre_states, first_segment, immutable),
+        ProgramLoaderInstruction::UpdateHeader {
+            first_segment,
+            immutable,
+        } => program_loader_core::update_header(pre_states, first_segment, immutable),
+    }))
+    .map_err(|panic| {
+        let message = panic
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_owned())
+            .or_else(|| panic.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "program_loader panicked".to_owned());
+        LeeError::ProgramExecutionFailed(message)
+    })?;
+
+    Ok(ProgramOutput::new(
+        self_account_id,
+        caller_account_id,
+        instruction_data.to_vec(),
+        state_diffs,
+    ))
 }
 
 /// Validates the witness set and replay nonces of a public transaction against
@@ -756,10 +780,32 @@ fn authenticate_public_transaction_signers(
 }
 
 fn check_privacy_preserving_circuit_proof_is_valid(
+    state: &V03State,
     proof: &Proof,
     public_pre_states: &[AccountWithMetadata],
     message: &Message,
 ) -> Result<(), LeeError> {
+    // Anchor each claimed image_id to real chain state: reconstruct the claims using the
+    // program's *actual* current image_id (via `get_program_image_id`), not the message's own
+    // claim. If the claim was wrong, the reconstructed journal won't match what the receipt
+    // actually committed to, and `proof.is_valid_for` below fails — the same mechanism
+    // `public_actions` already relies on for authenticating account content against real state.
+    let program_image_claims = message
+        .program_image_claims
+        .iter()
+        .map(|claim| {
+            let image_id = state
+                .get_program_image_id(claim.account_id)
+                .ok_or_else(|| {
+                    LeeError::InvalidInput(format!("Unknown program {}", claim.account_id))
+                })?;
+            Ok(ProgramImageClaim {
+                account_id: claim.account_id,
+                image_id,
+            })
+        })
+        .collect::<Result<Vec<_>, LeeError>>()?;
+
     let output = PrivacyPreservingCircuitOutput {
         public_actions: public_pre_states
             .iter()
@@ -773,6 +819,7 @@ fn check_privacy_preserving_circuit_proof_is_valid(
         private_actions: message.private_actions.clone(),
         block_validity_window: message.block_validity_window,
         timestamp_validity_window: message.timestamp_validity_window,
+        program_image_claims,
     };
     proof
         .is_valid_for(&output)

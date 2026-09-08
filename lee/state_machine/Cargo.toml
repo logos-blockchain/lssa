@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 lee_core = { workspace = true, features = ["host"] }
+program_loader_core.workspace = true
 
 anyhow.workspace = true
 thiserror.workspace = true
@@ -20,6 +21,7 @@ borsh.workspace = true
 hex.workspace = true
 k256.workspace = true
 risc0-binfmt = "3.0.2"
+semver = { version = "1", optional = true }
 log.workspace = true
 
 [build-dependencies]
@@ -34,5 +36,5 @@ test-case = "3.3.1"
 
 [features]
 default = []
-prove = ["risc0-zkvm/prove"]
+prove = ["risc0-zkvm/prove", "dep:semver"]
 test-utils = []

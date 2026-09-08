@@ -3,10 +3,7 @@
 //! cross-zone message minting the wrapped token on the target zone.
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use lee_core::{
-    account::AccountId,
-    program::{PdaSeed, ProgramId},
-};
+use lee_core::{account::AccountId, program::PdaSeed};
 
 const ESCROW_SEED_DOMAIN: [u8; 32] = *b"/LEZ/v0.3/BridgeLockEscrow/0000/";
 const CONFIG_SEED_DOMAIN: [u8; 32] = *b"/LEZ/v0.3/BridgeLockCfg/0000000/";
@@ -31,7 +28,7 @@ pub enum Instruction {
     Lock {
         amount: u128,
         target_zone: [u8; 32],
-        target_program_id: ProgramId,
+        target_account_id: AccountId,
         target_accounts: Vec<[u8; 32]>,
         payload: Vec<u8>,
         ordinal: u32,
@@ -42,30 +39,25 @@ pub enum Instruction {
     ///
     /// Required accounts (1): the config PDA.
     InitConfig {
-        outbox_program_id: ProgramId,
-        target_program_id: ProgramId,
+        outbox_account_id: AccountId,
+        target_account_id: AccountId,
     },
-    /// Claims the holder's holding PDA, idempotently; anyone may run it, and a
-    /// re-run on a funded holding leaves it untouched.
-    ///
-    /// Required accounts (1): the holder's holding PDA.
-    InitHolding { holder: [u8; 32] },
 }
 
 /// PDA accumulating all locked balance on this zone.
 #[must_use]
-pub fn escrow_account_id(bridge_lock_id: ProgramId) -> AccountId {
+pub fn escrow_account_id(bridge_lock_id: AccountId) -> AccountId {
     AccountId::for_public_pda(&bridge_lock_id, &escrow_seed())
 }
 
 #[must_use]
-pub const fn escrow_seed() -> PdaSeed {
+const fn escrow_seed() -> PdaSeed {
     PdaSeed::new(ESCROW_SEED_DOMAIN)
 }
 
 /// PDA holding one holder's bridgeable balance, debited by `Lock`.
 #[must_use]
-pub fn holding_account_id(bridge_lock_id: ProgramId, holder: &[u8; 32]) -> AccountId {
+pub fn holding_account_id(bridge_lock_id: AccountId, holder: &[u8; 32]) -> AccountId {
     AccountId::for_public_pda(&bridge_lock_id, &holding_seed(holder))
 }
 
@@ -86,44 +78,34 @@ pub fn holding_seed(holder: &[u8; 32]) -> PdaSeed {
 /// PDA holding the outbox program id and the mint target, seeded at genesis so
 /// the guest can pin both without importing their image ids.
 #[must_use]
-pub fn config_account_id(bridge_lock_id: ProgramId) -> AccountId {
+pub fn config_account_id(bridge_lock_id: AccountId) -> AccountId {
     AccountId::for_public_pda(&bridge_lock_id, &config_seed())
 }
 
 #[must_use]
-pub const fn config_seed() -> PdaSeed {
+const fn config_seed() -> PdaSeed {
     PdaSeed::new(CONFIG_SEED_DOMAIN)
 }
 
 /// Encodes the pinned outbox and mint target for the config account's data.
 #[must_use]
-pub fn config_bytes(outbox_program_id: ProgramId, target_program_id: ProgramId) -> [u8; 64] {
+pub fn config_bytes(outbox_account_id: AccountId, target_account_id: AccountId) -> [u8; 64] {
     let mut bytes = [0_u8; 64];
-    for (word, chunk) in outbox_program_id
-        .iter()
-        .chain(target_program_id.iter())
-        .zip(bytes.chunks_exact_mut(4))
-    {
-        chunk.copy_from_slice(&word.to_le_bytes());
-    }
+    bytes[..32].copy_from_slice(outbox_account_id.as_ref());
+    bytes[32..].copy_from_slice(target_account_id.as_ref());
     bytes
 }
 
 /// Decodes the pinned outbox and mint target from the config account's data.
 #[must_use]
-pub fn read_config(data: &[u8]) -> Option<(ProgramId, ProgramId)> {
+pub fn read_config(data: &[u8]) -> Option<(AccountId, AccountId)> {
     if data.len() < 64 {
         return None;
     }
-    let mut ids = [0_u32; 16];
-    for (word, chunk) in ids.iter_mut().zip(data[..64].chunks_exact(4)) {
-        *word = u32::from_le_bytes(chunk.try_into().unwrap_or_else(|_| unreachable!()));
-    }
-    let (outbox, target) = ids.split_at(8);
-    Some((
-        outbox.try_into().unwrap_or_else(|_| unreachable!()),
-        target.try_into().unwrap_or_else(|_| unreachable!()),
-    ))
+    assert!(data.len() >= 64, "checked above");
+    let outbox: [u8; 32] = data[..32].try_into().unwrap_or_else(|_| unreachable!());
+    let target: [u8; 32] = data[32..64].try_into().unwrap_or_else(|_| unreachable!());
+    Some((AccountId::new(outbox), AccountId::new(target)))
 }
 
 #[cfg(test)]
@@ -132,14 +114,14 @@ mod tests {
 
     #[test]
     fn escrow_is_stable() {
-        let id: ProgramId = [4; 8];
+        let id = AccountId::new([4; 32]);
         assert_eq!(escrow_account_id(id), escrow_account_id(id));
     }
 
     #[test]
     fn config_ids_round_trip() {
-        let outbox: ProgramId = [3; 8];
-        let target: ProgramId = [5; 8];
+        let outbox = AccountId::new([3; 32]);
+        let target = AccountId::new([5; 32]);
         assert_eq!(
             read_config(&config_bytes(outbox, target)),
             Some((outbox, target))
@@ -148,7 +130,7 @@ mod tests {
 
     #[test]
     fn holding_is_unique_per_holder() {
-        let id: ProgramId = [4; 8];
+        let id = AccountId::new([4; 32]);
         assert_ne!(
             holding_account_id(id, &[1; 32]),
             holding_account_id(id, &[2; 32])
@@ -159,14 +141,6 @@ mod tests {
         );
     }
 
-    /// Genesis blocks already carry `InitHolding` at this tag: wire format.
-    #[test]
-    fn init_holding_is_the_third_variant() {
-        let init = Instruction::InitHolding { holder: [7; 32] };
-        let bytes = borsh::to_vec(&init).expect("InitHolding serializes");
-        assert_eq!(bytes[0], 2);
-    }
-
     /// `extract_emission` decodes `Lock` off peer transactions, so its tag byte is
     /// wire format: a variant inserted ahead of it would silently shift every
     /// existing encoding.
@@ -175,7 +149,7 @@ mod tests {
         let lock = Instruction::Lock {
             amount: 1,
             target_zone: [7; 32],
-            target_program_id: [1; 8],
+            target_account_id: AccountId::new([1; 32]),
             target_accounts: vec![],
             payload: vec![],
             ordinal: 0,

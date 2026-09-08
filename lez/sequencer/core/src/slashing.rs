@@ -161,11 +161,12 @@ pub(crate) fn build_slash_tx(
     inscription: [u8; 32],
     approvals: Vec<SlashApproval>,
 ) -> Result<LeeTransaction> {
-    let program_id = programs::sequencer_stake().id();
+    let program_id: AccountId = programs::sequencer_stake().id().into();
     let message = Message::try_new(
         program_id,
         vec![
             ownership_id,
+            system_accounts::stake_funds_account_id(&ownership_id),
             sequencer_stake_core::slash_sink_account_id(program_id),
             system_accounts::sequencer_stake_config_account_id(),
         ],
@@ -234,7 +235,11 @@ mod tests {
         let config = Account {
             program_owner: programs::sequencer_stake().id().into(),
             data: SequencerStakeConfig {
-                minimum_sequencer_stake: 1,
+                channel_params: Some(sequencer_stake_core::ChannelParams {
+                    minimum_sequencer_stake: 1,
+                    posting_timeframe: system_accounts::DEFAULT_SEQUENCER_POSTING_TIMEFRAME,
+                    posting_timeout: system_accounts::DEFAULT_SEQUENCER_POSTING_TIMEOUT,
+                }),
                 entries: [(
                     key,
                     SequencerEntry {

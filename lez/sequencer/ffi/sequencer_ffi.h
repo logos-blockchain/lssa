@@ -15,7 +15,6 @@ typedef enum OperationStatus {
 typedef enum FfiTransactionKind {
   Public = 0,
   Private,
-  ProgramDeploy,
 } FfiTransactionKind;
 
 typedef enum FfiBedrockStatus {
@@ -23,11 +22,6 @@ typedef enum FfiBedrockStatus {
   Safe,
   Finalized,
 } FfiBedrockStatus;
-
-typedef enum FfiSubmitOutcomeKind {
-  Admitted = 0,
-  Rejected,
-} FfiSubmitOutcomeKind;
 
 typedef enum PointerKind_Tag {
   Owned,
@@ -134,13 +128,6 @@ typedef struct FfiBlockHeader {
   FfiSignature signature;
 } FfiBlockHeader;
 
-/**
- * Program ID - 8 u32 values (32 bytes total).
- */
-typedef struct FfiProgramId {
-  uint32_t data[8];
-} FfiProgramId;
-
 typedef struct FfiBytes32 FfiAccountId;
 
 typedef struct FfiVec_FfiAccountId {
@@ -189,7 +176,7 @@ typedef struct FfiFeeDeclaration {
 } FfiFeeDeclaration;
 
 typedef struct FfiPublicMessage {
-  struct FfiProgramId program_id;
+  FfiAccountId program_account_id;
   FfiAccountIdList account_ids;
   FfiNonceList nonces;
   FfiInstructionDataList instruction_data;
@@ -282,12 +269,26 @@ typedef struct FfiVec_FfiPrivateAction {
 
 typedef struct FfiVec_FfiPrivateAction FfiPrivateActionList;
 
+typedef struct FfiProgramImageClaim {
+  FfiAccountId account_id;
+  uint32_t image_id[8];
+} FfiProgramImageClaim;
+
+typedef struct FfiVec_FfiProgramImageClaim {
+  struct FfiProgramImageClaim *entries;
+  uintptr_t len;
+  uintptr_t capacity;
+} FfiVec_FfiProgramImageClaim;
+
+typedef struct FfiVec_FfiProgramImageClaim FfiProgramImageClaims;
+
 typedef struct FfiPrivacyPreservingMessage {
   FfiPublicActionList public_actions;
   FfiNonceList nonces;
   FfiPrivateActionList private_actions;
   uint64_t block_validity_window[2];
   uint64_t timestamp_validity_window[2];
+  FfiProgramImageClaims program_image_claims;
 } FfiPrivacyPreservingMessage;
 
 typedef FfiVecU8 FfiProof;
@@ -299,17 +300,9 @@ typedef struct FfiPrivateTransactionBody {
   FfiProof proof;
 } FfiPrivateTransactionBody;
 
-typedef FfiVecU8 FfiProgramDeploymentMessage;
-
-typedef struct FfiProgramDeploymentTransactionBody {
-  FfiHashType hash;
-  FfiProgramDeploymentMessage message;
-} FfiProgramDeploymentTransactionBody;
-
 typedef struct FfiTransactionBody {
   struct FfiPublicTransactionBody *public_body;
   struct FfiPrivateTransactionBody *private_body;
-  struct FfiProgramDeploymentTransactionBody *program_deployment_body;
 } FfiTransactionBody;
 
 typedef struct FfiTransaction {
@@ -360,27 +353,16 @@ typedef struct PointerResult_FfiAccount__OperationStatus {
   enum OperationStatus error;
 } PointerResult_FfiAccount__OperationStatus;
 
-typedef struct FfiSubmitOutcome {
-  enum FfiSubmitOutcomeKind kind;
-  /**
-   * `AdmissionRejection` naturally have string representation,
-   * for now returning it, so that the reason could be at least human-readable.
-   *
-   * ToDo: Find a way to return structured error through a FFI.
-   */
-  char *err_message;
-} FfiSubmitOutcome;
-
 /**
  * Simple wrapper around a pointer to a value or an error.
  *
  * Pointer is not guaranteed. You should check the error field before
  * dereferencing the pointer.
  */
-typedef struct PointerResult_FfiSubmitOutcome__OperationStatus {
-  struct FfiSubmitOutcome *value;
+typedef struct PointerResult_u8__OperationStatus {
+  uint8_t *value;
   enum OperationStatus error;
-} PointerResult_FfiSubmitOutcome__OperationStatus;
+} PointerResult_u8__OperationStatus;
 
 typedef struct FfiOption_FfiTransaction {
   struct FfiTransaction *value;
@@ -612,7 +594,7 @@ struct PointerResult_FfiAccount__OperationStatus query_account(const struct Sequ
  *
  * # Returns
  *
- * A `PointerResult<FfiSubmitOutcome, OperationStatus>` indicating success or failure.
+ * A `PointerResult<u8, OperationStatus>` indicating success or failure.
  *
  * # Safety
  *
@@ -620,8 +602,8 @@ struct PointerResult_FfiAccount__OperationStatus query_account(const struct Sequ
  * - `sequencer` is a valid pointer to a [`SequencerServiceFFI`] instance.
  * - `transaction` is a valid object of `FfiTransaction` type.
  */
-struct PointerResult_FfiSubmitOutcome__OperationStatus send_transaction(const struct SequencerServiceFFI *sequencer,
-                                                                        struct FfiTransaction transaction);
+struct PointerResult_u8__OperationStatus send_transaction(const struct SequencerServiceFFI *sequencer,
+                                                          struct FfiTransaction transaction);
 
 /**
  * Send transaction into sequencer.

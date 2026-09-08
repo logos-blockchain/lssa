@@ -1,21 +1,28 @@
 use lee_core::{
     account::AccountId,
-    program::{AccountPostState, ProgramInput, ProgramOutput, read_lee_inputs},
+    program::{
+        AccountStateDiff, ProgramCall, ProgramInput, ProgramOutput, read_lee_call,
+        respond_unsupported_call,
+    },
 };
 
 /// Asserts only the named account is authorized, ignoring every other `pre_state` it receives.
 type Instruction = AccountId;
 
 fn main() {
-    let (
+    let call = read_lee_call::<Instruction>();
+    let ProgramCall::Execute(
         ProgramInput {
-            self_program_id,
-            caller_program_id,
+            self_account_id,
+            caller_account_id,
             pre_states,
             instruction: account_to_check,
         },
         instruction_data,
-    ) = read_lee_inputs::<Instruction>();
+    ) = call
+    else {
+        respond_unsupported_call(call);
+    };
 
     if let Some(pre) = pre_states
         .iter()
@@ -27,17 +34,16 @@ fn main() {
         );
     }
 
-    let post_states = pre_states
-        .iter()
-        .map(|pre| AccountPostState::new(pre.account.clone()))
+    let state_diffs = pre_states
+        .into_iter()
+        .map(AccountStateDiff::unchanged)
         .collect();
 
     ProgramOutput::new(
-        self_program_id,
-        caller_program_id,
+        self_account_id,
+        caller_account_id,
         instruction_data,
-        pre_states,
-        post_states,
+        state_diffs,
     )
     .write();
 }

@@ -103,7 +103,8 @@ async fn a_sequencer_is_slashed_by_its_peer_for_inscribing_a_non_block() -> Resu
             .context("The offender's Bedrock key is not a valid Ed25519 point")?;
     let offender_owner = config::founding_stake_owner_key(OFFENDER_SEED)?;
     let offender_account = AccountId::from(&lee::PublicKey::new_from_private_key(&offender_owner));
-    let sink = sequencer_stake_core::slash_sink_account_id(programs::sequencer_stake().id());
+    let offender_funds = system_accounts::stake_funds_account_id(&offender_account);
+    let sink = sequencer_stake_core::slash_sink_account_id(programs::sequencer_stake().id().into());
 
     let bedrock_config = BedrockConfig {
         channel_id: channel,
@@ -111,6 +112,7 @@ async fn a_sequencer_is_slashed_by_its_peer_for_inscribing_a_non_block() -> Resu
         funding_key: config::bedrock_funding_key(),
         auth: None,
         priority_fee_percent: sequencer_core::config::default_priority_fee_percent(),
+        channel_params: sequencer_core::config::default_channel_params(),
     };
 
     // An unaccredited key writes nothing that L1 accepts.
@@ -122,7 +124,7 @@ async fn a_sequencer_is_slashed_by_its_peer_for_inscribing_a_non_block() -> Resu
     })
     .await?;
     ensure!(
-        balance(&ctx, offender_account).await? == STAKE,
+        balance(&ctx, offender_funds).await? == STAKE,
         "the offender should start with its genesis stake"
     );
     ensure!(
@@ -175,7 +177,7 @@ async fn a_sequencer_is_slashed_by_its_peer_for_inscribing_a_non_block() -> Resu
     .await?;
 
     ensure!(
-        balance(&ctx, offender_account).await? == 0,
+        balance(&ctx, offender_funds).await? == 0,
         "the offender's whole tracked stake should be gone"
     );
 

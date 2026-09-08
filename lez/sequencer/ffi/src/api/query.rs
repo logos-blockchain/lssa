@@ -2,7 +2,7 @@ use std::ffi::{CString, c_char};
 
 use sequencer_executor_actor::protocol::{
     BoundedRangeInclusive, GetAccount, GetBlock, GetBlockRange, GetLastBlockId, GetTransaction,
-    Transaction,
+    Transaction, TransactionOrigin,
 };
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
             FfiAccountId, FfiBlockId, FfiHashType, FfiOption, FfiVec,
             account::FfiAccount,
             block::{FfiBlock, FfiBlockOpt},
-            transaction::{FfiSubmitOutcome, FfiTransaction},
+            transaction::FfiTransaction,
         },
     },
     errors::OperationStatus,
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn query_account(
 ///
 /// # Returns
 ///
-/// A `PointerResult<FfiSubmitOutcome, OperationStatus>` indicating success or failure.
+/// A `PointerResult<u8, OperationStatus>` indicating success or failure.
 ///
 /// # Safety
 ///
@@ -280,7 +280,7 @@ pub unsafe extern "C" fn query_account(
 pub unsafe extern "C" fn send_transaction(
     sequencer: *const SequencerServiceFFI,
     transaction: FfiTransaction,
-) -> PointerResult<FfiSubmitOutcome, OperationStatus> {
+) -> PointerResult<u8, OperationStatus> {
     if sequencer.is_null() {
         log::error!("Attempted to query a null sequencer pointer. This is a bug. Aborting.");
         return PointerResult::from_error(OperationStatus::NullPointer);
@@ -295,6 +295,7 @@ pub unsafe extern "C" fn send_transaction(
             .executor_actor()
             .ask(Transaction {
                 transaction: lee_tx,
+                origin: TransactionOrigin::User,
             })
             .send(),
     );
@@ -304,11 +305,7 @@ pub unsafe extern "C" fn send_transaction(
             log::error!("Failed to query transaction: {e:#}");
             PointerResult::from_error(OperationStatus::ClientError)
         },
-        |submit_outcome| {
-            let submit_outcome_ffi = submit_outcome.into();
-
-            PointerResult::from_value(submit_outcome_ffi)
-        },
+        |_| PointerResult::from_value(0u8),
     )
 }
 

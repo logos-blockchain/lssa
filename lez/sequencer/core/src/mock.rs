@@ -28,7 +28,7 @@ use crate::{
 /// Channel id a test uses to make the mock report that no channel exists.
 pub const ABSENT_CHANNEL_ID: [u8; 32] = [0xAB_u8; 32];
 
-pub type SequencerCoreWithMockClients = crate::SequencerCore<MockBlockPublisher>;
+pub type SequencerCoreWithMockClients<S> = crate::SequencerCore<S, MockBlockPublisher>;
 
 #[derive(Clone)]
 pub struct MockBlockPublisher {
@@ -159,6 +159,7 @@ impl BlockPublisherTrait for MockBlockPublisher {
         &self,
         block: &Block,
         _keys: Vec<Ed25519PublicKey>,
+        _channel_params: crate::config::ChannelParams,
     ) -> Result<PublishOutcome> {
         self.publish_block(block, Vec::new()).await
     }
@@ -169,7 +170,11 @@ impl BlockPublisherTrait for MockBlockPublisher {
         Ok(self.tip_slot.map(|_| (Vec::new(), MsgId::root())))
     }
 
-    async fn submit_channel_config(&self, _new_keys: Vec<Ed25519PublicKey>) -> Result<()> {
+    async fn submit_channel_config(
+        &self,
+        _new_keys: Vec<Ed25519PublicKey>,
+        _channel_params: crate::config::ChannelParams,
+    ) -> Result<()> {
         Ok(())
     }
 
