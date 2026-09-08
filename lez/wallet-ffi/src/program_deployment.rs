@@ -7,6 +7,7 @@ use crate::{
     block_on,
     error::{print_error, WalletFfiError},
     generic_transaction::{FfiProgram, FfiTransactionResult},
+    read_optional_account_id,
     wallet::get_wallet,
     FfiBytes32, WalletHandle,
 };
@@ -22,11 +23,6 @@ unsafe fn read_account_ids(data: *const FfiBytes32, len: usize) -> Vec<AccountId
         .iter()
         .map(|bytes| AccountId::from(*bytes))
         .collect()
-}
-
-/// Reads a nullable `FfiBytes32` pointer as an optional `AccountId`.
-unsafe fn read_optional_account_id(ptr: *const FfiBytes32) -> Option<AccountId> {
-    (!ptr.is_null()).then(|| AccountId::from(unsafe { *ptr }))
 }
 
 fn write_result(out_result: *mut FfiTransactionResult, tx_hash: common::HashType) {
