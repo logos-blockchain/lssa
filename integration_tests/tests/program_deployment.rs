@@ -29,8 +29,9 @@ async fn deploy_and_execute_program() -> Result<()> {
 
     let deployed = test_programs::data_writer();
 
-    // Deploy through `program_loader`: one segment holds the whole (small, test-sized) ELF, then
-    // a header claims it. Both accounts are freshly claimed, permissionless writes.
+    // Deploy through `program_loader`: one segment holds the (small, test-sized) program's
+    // `user_elf`, then a header claims it. Both accounts are freshly claimed, permissionless
+    // writes.
     let header_id = new_account(&mut ctx, false, None).await?;
     let segment_id = new_account(&mut ctx, false, None).await?;
     let account_id = wallet::program_facades::program_loader::ProgramLoader(ctx.wallet())
@@ -87,10 +88,9 @@ async fn deploy_and_execute_program() -> Result<()> {
 
 #[test]
 async fn deploy_invalid_program_fails() -> Result<()> {
-    // Invalid program bytecode is rejected when `program_loader`'s `CreateHeader` tries to
-    // recompute the real `image_id` from the segment chain, so the deploy never lands. Shrink the
-    // wallet's polling window so the command gives up quickly instead of waiting for the full
-    // default timeout.
+    // Invalid program bytecode is rejected when the wallet decodes it as a `ProgramBinary`
+    // before uploading, so the deploy never lands. Shrink the wallet's polling window so the
+    // command gives up quickly instead of waiting for the full default timeout.
 
     let mut ctx = MultiZoneTestContextBuilder::default()
         .with_zone(
