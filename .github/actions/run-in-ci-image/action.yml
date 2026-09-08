@@ -61,3 +61,19 @@ runs:
           "${env_args[@]}" \
           "$INPUT_IMAGE" \
           bash -e -o pipefail -c "$INPUT_RUN"
+
+    # The container runs as root, so everything it writes through a bind mount
+    # comes back root-owned and the unprivileged runner cannot tar it for the
+    # cache. Covers every mount above: rust-cache saves `.cargo/git` as well as
+    # `.cargo/registry`, so missing one still breaks the save. Runs on failure
+    # too, since a failed build leaves the same root-owned files behind.
+    - name: Restore workspace ownership
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo chown -R "$(id -u):$(id -g)" \
+          "$PWD" \
+          "$HOME/.cargo/registry" \
+          "$HOME/.cargo/git" \
+          "$HOME/.cache/logos/blockchain"
