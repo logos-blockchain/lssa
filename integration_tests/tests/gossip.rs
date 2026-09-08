@@ -40,8 +40,7 @@ async fn gossiped_transaction_reaches_producing_sequencer() -> Result<()> {
     let ctx = MultiZoneTestContextBuilder::default()
         .with_zone(
             ZoneTestContextBuilder::new(MultiNodeTestContextConfig {
-                num_nodes_to_build: 2,
-                add_num_nodes_vacant: 0,
+                num_nodes: 2,
                 bedrock_channel: bedrock_channel_id,
             })
             .disable_wallet()

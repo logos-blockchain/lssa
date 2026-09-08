@@ -34,8 +34,7 @@ async fn two_zones_share_one_bedrock_and_both_advance() -> Result<()> {
     let ctx = MultiZoneTestContextBuilder::default()
         .with_zone(
             ZoneTestContextBuilder::new(MultiNodeTestContextConfig {
-                num_nodes_to_build: 1,
-                add_num_nodes_vacant: 0,
+                num_nodes: 1,
                 bedrock_channel: channel_a,
             })
             .disable_wallet()
@@ -44,8 +43,7 @@ async fn two_zones_share_one_bedrock_and_both_advance() -> Result<()> {
         )
         .with_zone(
             ZoneTestContextBuilder::new(MultiNodeTestContextConfig {
-                num_nodes_to_build: 1,
-                add_num_nodes_vacant: 0,
+                num_nodes: 1,
                 bedrock_channel: channel_b,
             })
             .disable_wallet()

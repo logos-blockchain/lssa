@@ -63,8 +63,7 @@ async fn ping_crosses_from_zone_a_to_zone_b() -> Result<()> {
     let ctx = MultiZoneTestContextBuilder::default()
         .with_zone(
             ZoneTestContextBuilder::new(MultiNodeTestContextConfig {
-                num_nodes_to_build: 1,
-                add_num_nodes_vacant: 0,
+                num_nodes: 1,
                 bedrock_channel: channel_a,
             })
             .disable_wallet()
@@ -75,8 +74,7 @@ async fn ping_crosses_from_zone_a_to_zone_b() -> Result<()> {
         )
         .with_zone(
             ZoneTestContextBuilder::new(MultiNodeTestContextConfig {
-                num_nodes_to_build: 1,
-                add_num_nodes_vacant: 0,
+                num_nodes: 1,
                 bedrock_channel: channel_b,
             })
             .disable_wallet()

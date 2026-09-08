@@ -24,6 +24,11 @@ typedef enum FfiBedrockStatus {
   Finalized,
 } FfiBedrockStatus;
 
+typedef enum FfiSubmitOutcomeKind {
+  Admitted = 0,
+  Rejected,
+} FfiSubmitOutcomeKind;
+
 typedef enum PointerKind_Tag {
   Owned,
   Borrowed,
@@ -355,6 +360,28 @@ typedef struct PointerResult_FfiAccount__OperationStatus {
   enum OperationStatus error;
 } PointerResult_FfiAccount__OperationStatus;
 
+typedef struct FfiSubmitOutcome {
+  enum FfiSubmitOutcomeKind kind;
+  /**
+   * `AdmissionRejection` naturally have string representation,
+   * for now returning it, so that the reason could be at least human-readable.
+   *
+   * ToDo: Find a way to return structured error through a FFI.
+   */
+  char *err_message;
+} FfiSubmitOutcome;
+
+/**
+ * Simple wrapper around a pointer to a value or an error.
+ *
+ * Pointer is not guaranteed. You should check the error field before
+ * dereferencing the pointer.
+ */
+typedef struct PointerResult_FfiSubmitOutcome__OperationStatus {
+  struct FfiSubmitOutcome *value;
+  enum OperationStatus error;
+} PointerResult_FfiSubmitOutcome__OperationStatus;
+
 typedef struct FfiOption_FfiTransaction {
   struct FfiTransaction *value;
   bool is_some;
@@ -582,6 +609,27 @@ struct PointerResult_FfiAccount__OperationStatus query_account(const struct Sequ
  *
  * - `sequencer`: A pointer to the [`SequencerServiceFFI`] instance to be queried.
  * - `hash`: `FfiHashType` - hash of transaction
+ *
+ * # Returns
+ *
+ * A `PointerResult<FfiSubmitOutcome, OperationStatus>` indicating success or failure.
+ *
+ * # Safety
+ *
+ * The caller must ensure that:
+ * - `sequencer` is a valid pointer to a [`SequencerServiceFFI`] instance.
+ * - `transaction` is a valid object of `FfiTransaction` type.
+ */
+struct PointerResult_FfiSubmitOutcome__OperationStatus send_transaction(const struct SequencerServiceFFI *sequencer,
+                                                                        struct FfiTransaction transaction);
+
+/**
+ * Send transaction into sequencer.
+ *
+ * # Arguments
+ *
+ * - `sequencer`: A pointer to the [`SequencerServiceFFI`] instance to be queried.
+ * - `tx`: `FfiTransaction` object
  *
  * # Returns
  *

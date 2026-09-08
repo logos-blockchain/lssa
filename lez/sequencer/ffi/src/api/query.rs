@@ -2,6 +2,7 @@ use std::ffi::{CString, c_char};
 
 use sequencer_executor_actor::protocol::{
     BoundedRangeInclusive, GetAccount, GetBlock, GetBlockRange, GetLastBlockId, GetTransaction,
+    Transaction,
 };
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
             FfiAccountId, FfiBlockId, FfiHashType, FfiOption, FfiVec,
             account::FfiAccount,
             block::{FfiBlock, FfiBlockOpt},
-            transaction::FfiTransaction,
+            transaction::{FfiSubmitOutcome, FfiTransaction},
         },
     },
     errors::OperationStatus,
@@ -268,6 +269,58 @@ pub unsafe extern "C" fn query_account(
 ///
 /// # Returns
 ///
+/// A `PointerResult<FfiSubmitOutcome, OperationStatus>` indicating success or failure.
+///
+/// # Safety
+///
+/// The caller must ensure that:
+/// - `sequencer` is a valid pointer to a [`SequencerServiceFFI`] instance.
+/// - `transaction` is a valid object of `FfiTransaction` type.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn send_transaction(
+    sequencer: *const SequencerServiceFFI,
+    transaction: FfiTransaction,
+) -> PointerResult<FfiSubmitOutcome, OperationStatus> {
+    if sequencer.is_null() {
+        log::error!("Attempted to query a null sequencer pointer. This is a bug. Aborting.");
+        return PointerResult::from_error(OperationStatus::NullPointer);
+    }
+
+    let sequencer = unsafe { &*sequencer };
+
+    let lee_tx = transaction.into();
+
+    let tx_resp = sequencer.runtime().block_on(
+        sequencer
+            .executor_actor()
+            .ask(Transaction {
+                transaction: lee_tx,
+            })
+            .send(),
+    );
+
+    tx_resp.map_or_else(
+        |e| {
+            log::error!("Failed to query transaction: {e:#}");
+            PointerResult::from_error(OperationStatus::ClientError)
+        },
+        |submit_outcome| {
+            let submit_outcome_ffi = submit_outcome.into();
+
+            PointerResult::from_value(submit_outcome_ffi)
+        },
+    )
+}
+
+/// Send transaction into sequencer.
+///
+/// # Arguments
+///
+/// - `sequencer`: A pointer to the [`SequencerServiceFFI`] instance to be queried.
+/// - `tx`: `FfiTransaction` object
+///
+/// # Returns
+///
 /// A `PointerResult<FfiOption<FfiTransaction>, OperationStatus>` indicating success or failure.
 ///
 /// # Safety
@@ -399,7 +452,7 @@ pub unsafe extern "C" fn query_transactions_by_account(
     PointerResult::from_value(FfiVec::from(vec![]))
 }
 
-// ToDo: Current sequecner does not know about events yet
+// ToDo: Current sequenсer does not know about events yet
 
 // #[unsafe(no_mangle)]
 // pub unsafe extern "C" fn query_events(

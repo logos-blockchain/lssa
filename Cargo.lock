@@ -4823,6 +4823,7 @@ dependencies = [
  "ping_core",
  "programs",
  "sequencer_core",
+ "sequencer_ffi",
  "sequencer_service",
  "sequencer_service_rpc",
  "sequencer_stake_core",

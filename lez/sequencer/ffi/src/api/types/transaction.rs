@@ -1,3 +1,5 @@
+use std::ffi::{CString, c_char};
+
 use common::transaction::LeeTransaction;
 use lee::{
     AccountId, EphemeralPublicKey, FeeDeclaration, PrivacyPreservingTransaction,
@@ -10,7 +12,7 @@ use lee::{
 use lee_core::{
     Commitment, Nullifier, PrivateAction, encryption::Ciphertext, program::ValidityWindow,
 };
-use sequencer_executor_actor::protocol::Transaction;
+use sequencer_executor_actor::protocol::{SubmitOutcome, Transaction};
 
 use crate::api::types::{
     FfiAccountId, FfiBytes32, FfiHashType, FfiOption, FfiProgramId, FfiPublicKey, FfiSignature,
@@ -464,11 +466,64 @@ impl From<Transaction> for FfiTransaction {
     }
 }
 
+impl From<FfiTransaction> for LeeTransaction {
+    fn from(value: FfiTransaction) -> Self {
+        match value.kind {
+            FfiTransactionKind::Public => {
+                let body = unsafe { Box::from_raw(value.body.public_body) };
+                let std_body: PublicTransaction = body.into();
+                LeeTransaction::Public(std_body)
+            }
+            FfiTransactionKind::Private => {
+                let body = unsafe { Box::from_raw(value.body.private_body) };
+                let std_body: PrivacyPreservingTransaction = body.into();
+                LeeTransaction::PrivacyPreserving(std_body)
+            }
+            FfiTransactionKind::ProgramDeploy => {
+                let body = unsafe { Box::from_raw(value.body.program_deployment_body) };
+                let std_body: ProgramDeploymentTransaction = body.into();
+                LeeTransaction::ProgramDeployment(std_body)
+            }
+        }
+    }
+}
+
 #[repr(C)]
 pub enum FfiTransactionKind {
     Public = 0x0,
     Private,
     ProgramDeploy,
+}
+
+#[repr(C)]
+pub enum FfiSubmitOutcomeKind {
+    Admitted = 0x0,
+    Rejected,
+}
+
+#[repr(C)]
+pub struct FfiSubmitOutcome {
+    kind: FfiSubmitOutcomeKind,
+    /// `AdmissionRejection` naturally have string representation,
+    /// for now returning it, so that the reason could be at least human-readable.
+    ///
+    /// ToDo: Find a way to return structured error through a FFI.
+    err_message: *mut c_char,
+}
+
+impl From<SubmitOutcome> for FfiSubmitOutcome {
+    fn from(value: SubmitOutcome) -> Self {
+        match value {
+            SubmitOutcome::Admitted => FfiSubmitOutcome {
+                kind: FfiSubmitOutcomeKind::Admitted,
+                err_message: std::ptr::null_mut(),
+            },
+            SubmitOutcome::Rejected(err) => FfiSubmitOutcome {
+                kind: FfiSubmitOutcomeKind::Rejected,
+                err_message: CString::new(err.to_string()).unwrap().into_raw(),
+            },
+        }
+    }
 }
 
 /// Frees the resources associated with the given ffi transaction.
