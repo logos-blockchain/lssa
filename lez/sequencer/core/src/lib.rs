@@ -127,8 +127,8 @@ impl DeclaredGasBudget {
     }
 
     /// Snaps the budget to the gas the block's settled transactions were
-    /// actually charged. Failed-but-charged actions pay their full declared
-    /// budget, so the summary never undercounts what replay will enforce.
+    /// actually charged: the metered count for successes and non-zero exits,
+    /// the full declared budget for panics and out-of-gas.
     const fn sync(&mut self, summary: &fee_core::BlockFeeSummary) {
         self.exec = summary.gas_used_exec;
         self.stor = summary.gas_used_stor;
