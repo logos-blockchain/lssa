@@ -14,8 +14,7 @@ use logos_blockchain_zone_sdk::{
     CommonHttpClient,
     adapter::{Node as _, NodeHttpClient},
 };
-
-use crate::config::BedrockConfig;
+use sequencer_core::config::BedrockConfig;
 
 pub trait AccreditedKeysProvider: Send + 'static {
     /// The channel's current accredited Ed25519 keys.
