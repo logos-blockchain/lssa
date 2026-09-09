@@ -23,7 +23,11 @@ use sequencer_storage_actor::mock::MockStorageActor;
 use tempfile::TempDir;
 use tokio::{sync::mpsc, test, time::timeout};
 
-use crate::{ExecutorActor, actor::BlockedAttempts, protocol};
+use crate::{
+    ExecutorActor,
+    actor::BlockedAttempts,
+    protocol::{self, TransactionOrigin},
+};
 
 fn sequencer_config() -> (SequencerConfig, TempDir) {
     let home = TempDir::new().expect("Failed to create temporary home directory");
@@ -34,7 +38,7 @@ fn sequencer_config() -> (SequencerConfig, TempDir) {
         mempool_max_size: 10,
         block_create_timeout: std::time::Duration::from_secs(5),
         retry_pending_blocks_timeout: std::time::Duration::from_secs(5),
-        signing_key: [37; 32],
+        signing_key: Some([37; 32]),
         bedrock_config: BedrockConfig {
             channel_id: [0; 32].into(),
             node_url: "http://not-used".parse().expect("Failed to parse URL"),
@@ -252,7 +256,7 @@ async fn a_failed_production_turn_does_not_stop_the_actor() -> Result<()> {
     let storage_ref = MockStorageActor::spawn(mock_storage);
 
     let executor = ExecutorActor::spawn(
-        ExecutorActor::<MockBlockPublisher, _>::new(config, storage_ref.clone()).await,
+        ExecutorActor::<_, MockBlockPublisher>::new(config, storage_ref.clone()).await,
     );
     storage_ref
         .tell(sequencer_storage_actor::mock::Checkpoint)
@@ -278,7 +282,7 @@ async fn handle_transaction_fails_on_full_mempool() -> Result<()> {
     let storage_ref = MockStorageActor::spawn(mock_storage);
 
     let executor = ExecutorActor::spawn(
-        ExecutorActor::<MockBlockPublisher, _>::new(config, storage_ref.clone()).await,
+        ExecutorActor::<_, MockBlockPublisher>::new(config, storage_ref.clone()).await,
     );
 
     storage_ref
@@ -288,20 +292,22 @@ async fn handle_transaction_fails_on_full_mempool() -> Result<()> {
     // Fill mempool
     for _ in 0..mempool_max_size {
         let tx = test_transaction();
-        let outcome = executor
-            .ask(protocol::Transaction { transaction: tx })
+        executor
+            .ask(protocol::Transaction {
+                transaction: tx,
+                origin: TransactionOrigin::User,
+            })
             .await?;
-        assert!(
-            matches!(outcome, protocol::SubmitOutcome::Admitted),
-            "a funded, authorized submission must pass admission, got: {outcome:?}",
-        );
     }
 
     // Now the mempool is full, the next transaction should fail
     let tx = test_transaction();
     assert!(matches!(
         executor
-            .ask(protocol::Transaction { transaction: tx })
+            .ask(protocol::Transaction {
+                transaction: tx,
+                origin: TransactionOrigin::User
+            })
             .await
             .map_err(SendError::err),
         Err(Some(crate::error::Error::MempoolIsFull))
@@ -346,7 +352,7 @@ async fn get_block_range_keeps_executor_responsive() -> Result<()> {
 
     let storage_ref = MockStorageActor::spawn(mock_storage);
     let executor = ExecutorActor::spawn(
-        ExecutorActor::<MockBlockPublisher, _>::new(config, storage_ref.clone()).await,
+        ExecutorActor::<_, MockBlockPublisher>::new(config, storage_ref.clone()).await,
     );
 
     let range = (STALLED_FIRST..=STALLED_LAST)
@@ -390,7 +396,7 @@ async fn handle_transaction_rejects_a_fee_invalid_submission() -> Result<()> {
     let mock_storage = prepare_mock_storage_with_empty_genesis();
     let storage_ref = MockStorageActor::spawn(mock_storage);
     let executor = ExecutorActor::spawn(
-        ExecutorActor::<MockBlockPublisher, _>::new(config, storage_ref.clone()).await,
+        ExecutorActor::<_, MockBlockPublisher>::new(config, storage_ref.clone()).await,
     );
     storage_ref
         .tell(sequencer_storage_actor::mock::Checkpoint)
@@ -416,21 +422,16 @@ async fn handle_transaction_rejects_a_fee_invalid_submission() -> Result<()> {
     let witness_set = WitnessSet::for_message(&message, &[&payer_key, &key2]);
     let tx: LeeTransaction = PublicTransaction::new(message, witness_set).into();
 
-    let outcome = executor
-        .ask(protocol::Transaction { transaction: tx })
-        .await?;
-    assert!(
-        matches!(
-            outcome,
-            protocol::SubmitOutcome::Rejected(
-                sequencer_service_protocol::AdmissionRejection::MaxFeeBelowReserve {
-                    max_fee: 0,
-                    ..
-                }
-            )
-        ),
-        "expected the max-fee rejection, got: {outcome:?}",
-    );
+    let res = executor
+        .ask(protocol::Transaction {
+            transaction: tx,
+            origin: TransactionOrigin::User,
+        })
+        .await;
+    assert!(matches!(
+        res.map_err(SendError::err),
+        Err(Some(crate::error::Error::IncorrectFee(_)))
+    ));
 
     Ok(())
 }

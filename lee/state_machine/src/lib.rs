@@ -55,11 +55,37 @@ mod test_methods {
         )
     }
 
+    #[cfg(feature = "prove")]
+    #[must_use]
+    pub const fn multi_segment_burner() -> Program {
+        Program::new_unchecked(
+            test_methods::MULTI_SEGMENT_BURNER_ID,
+            Cow::Borrowed(test_methods::MULTI_SEGMENT_BURNER_ELF),
+        )
+    }
+
+    #[cfg(feature = "prove")]
+    #[must_use]
+    pub const fn panics_with_session_limit_text() -> Program {
+        Program::new_unchecked(
+            test_methods::PANICS_WITH_SESSION_LIMIT_TEXT_ID,
+            Cow::Borrowed(test_methods::PANICS_WITH_SESSION_LIMIT_TEXT_ELF),
+        )
+    }
+
     #[must_use]
     pub const fn malformed_journal() -> Program {
         Program::new_unchecked(
             test_methods::MALFORMED_JOURNAL_ID,
             Cow::Borrowed(test_methods::MALFORMED_JOURNAL_ELF),
+        )
+    }
+
+    #[must_use]
+    pub const fn exits_nonzero() -> Program {
+        Program::new_unchecked(
+            test_methods::EXITS_NONZERO_ID,
+            Cow::Borrowed(test_methods::EXITS_NONZERO_ELF),
         )
     }
 

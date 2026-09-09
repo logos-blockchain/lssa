@@ -30,7 +30,6 @@ use lee_core::{
     program::InstructionData,
 };
 use log::warn;
-pub use sequencer_service_rpc::AdmissionRejection;
 use sequencer_service_rpc::{RpcClient as _, SequencerClient};
 use storage::Storage;
 use tokio::io::AsyncWriteExt as _;
@@ -113,20 +112,6 @@ pub enum ExecutionFailureKind {
     MultiSequencerTransactionSendError,
     #[error("Failed to join a task: {0}")]
     JoinError(#[from] tokio::task::JoinError),
-}
-
-impl ExecutionFailureKind {
-    /// The structured fee-admission rejection behind a sequencer refusal, if
-    /// that is what this failure is, decoded from the JSON-RPC error's `data`
-    /// field.
-    #[must_use]
-    pub fn fee_admission_rejection(&self) -> Option<AdmissionRejection> {
-        let Self::SequencerClientError(sequencer_service_rpc::ClientError::Call(err)) = self else {
-            return None;
-        };
-        let data = err.data()?;
-        serde_json::from_str(data.get()).ok()
-    }
 }
 
 pub struct WalletCore {
@@ -866,15 +851,45 @@ impl WalletCore {
         instruction_data: InstructionData,
         program_account_id: AccountId,
     ) -> Result<HashType, ExecutionFailureKind> {
-        self.send_pub_tx_with_pre_check(accounts, instruction_data, program_account_id, |_| Ok(()))
+        self.send_pub_tx_paid_by(accounts, instruction_data, program_account_id, None)
             .await
     }
 
+    /// Like [`Self::send_pub_tx`], but `payer` (if given) covers the fee instead of the wallet's
+    /// self-pay selection. See [`Self::send_pub_tx_with_pre_check`].
+    pub async fn send_pub_tx_paid_by(
+        &self,
+        accounts: Vec<AccountIdentity>,
+        instruction_data: InstructionData,
+        program_account_id: AccountId,
+        payer: Option<AccountId>,
+    ) -> Result<HashType, ExecutionFailureKind> {
+        self.send_pub_tx_with_pre_check(
+            accounts,
+            instruction_data,
+            program_account_id,
+            payer,
+            |_| Ok(()),
+        )
+        .await
+    }
+
+    /// Sends a public transaction over `accounts`, paid by `payer` if given.
+    ///
+    /// `payer: None` picks the first funded signing account in `accounts`, or the first signing
+    /// account if none is funded (see [`AccountManager::fee_payer_account_id`]).
+    ///
+    /// An explicit payer may be one of `accounts`' signing entries, or any other public account
+    /// whose signing key the wallet holds: the latter co-signs (nonce and signature appended
+    /// after `accounts`' own) without joining the message's `account_ids`, so programs with a
+    /// fixed account shape (like the `program_loader`, whose accounts are all freshly claimed
+    /// and unfunded) can still be paid for.
     pub async fn send_pub_tx_with_pre_check(
         &self,
         accounts: Vec<AccountIdentity>,
         instruction_data: InstructionData,
         program_account_id: AccountId,
+        payer: Option<AccountId>,
         tx_pre_check: impl FnOnce(&[&Account]) -> Result<(), ExecutionFailureKind>,
     ) -> Result<HashType, ExecutionFailureKind> {
         // Public transaction, all accounts must be public
@@ -897,13 +912,38 @@ impl WalletCore {
         )?;
 
         let account_ids = acc_manager.public_account_ids();
-        let nonces = acc_manager.public_account_nonces();
+        let mut nonces = acc_manager.public_account_nonces();
 
-        let payer = acc_manager.fee_payer_account_id().ok_or_else(|| {
+        let invalid_input = |msg: &str| {
             ExecutionFailureKind::TransactionBuildError(lee::error::LeeError::InvalidInput(
-                "Public transaction has no signing account to pay its fees".to_owned(),
+                msg.to_owned(),
             ))
-        })?;
+        };
+        let (payer, co_signer) = match payer {
+            None => (
+                acc_manager.fee_payer_account_id().ok_or_else(|| {
+                    invalid_input("Public transaction has no signing account to pay its fees")
+                })?,
+                None,
+            ),
+            Some(payer) if acc_manager.signs_for(payer) => (payer, None),
+            Some(payer) if account_ids.contains(&payer) => {
+                return Err(invalid_input(
+                    "Fee payer is a non-signing account of this transaction",
+                ));
+            }
+            Some(payer) => {
+                let key = self.get_account_public_signing_key(payer).ok_or_else(|| {
+                    invalid_input("Fee payer's signing key is not held by this wallet")
+                })?;
+                let account = self
+                    .get_account_public(payer)
+                    .await
+                    .map_err(ExecutionFailureKind::SequencerError)?;
+                nonces.push(account.nonce);
+                (payer, Some(key))
+            }
+        };
 
         let message = lee::public_transaction::Message::new_preserialized(
             program_account_id,
@@ -919,29 +959,21 @@ impl WalletCore {
         );
 
         let message_hash = message.hash();
-        let signatures_public_keys = acc_manager
+        let mut signatures_public_keys = acc_manager
             .sign_message(message_hash)
             .map_err(ExecutionFailureKind::SignError)?;
+        if let Some(key) = co_signer {
+            signatures_public_keys.push((
+                lee::Signature::new(key, &message_hash),
+                lee::PublicKey::new_from_private_key(key),
+            ));
+        }
 
         let witness_set =
             lee::public_transaction::WitnessSet::from_raw_parts(signatures_public_keys);
 
         let tx = lee::public_transaction::PublicTransaction::new(message, witness_set);
 
-        first_success_or_error(
-            self.multi_sequencer_client
-                .metered_send_transaction(LeeTransaction::Public(tx))
-                .await,
-        )
-    }
-
-    /// Submits an already-built public transaction directly, for callers that need to construct
-    /// their own [`FeeDeclaration`] (e.g. a facade taking a separate fee payer) instead of going
-    /// through [`Self::send_pub_tx`]'s self-pay selection.
-    pub(crate) async fn submit_public_transaction(
-        &self,
-        tx: lee::public_transaction::PublicTransaction,
-    ) -> Result<HashType, ExecutionFailureKind> {
         first_success_or_error(
             self.multi_sequencer_client
                 .metered_send_transaction(LeeTransaction::Public(tx))
@@ -1183,28 +1215,5 @@ mod tests {
         let mn_ret = Mnemonic::from_str(mn_string).unwrap();
 
         assert_eq!(mnemonic, mn_ret);
-    }
-
-    #[test]
-    fn fee_admission_rejection_is_decoded_from_the_rpc_error_data() {
-        use sequencer_service_rpc::{AdmissionRejection, ClientError, ErrorObjectOwned};
-
-        use crate::ExecutionFailureKind;
-
-        let rejection = AdmissionRejection::PayerCannotFund {
-            payer: lee::AccountId::new([7; 32]),
-            balance: 0,
-            fee_reserve: 42,
-        };
-        let failure = ExecutionFailureKind::SequencerClientError(ClientError::Call(
-            ErrorObjectOwned::owned(rejection.code(), rejection.to_string(), Some(&rejection)),
-        ));
-        assert_eq!(failure.fee_admission_rejection(), Some(rejection));
-
-        assert!(
-            ExecutionFailureKind::InsufficientFundsError
-                .fee_admission_rejection()
-                .is_none()
-        );
     }
 }
