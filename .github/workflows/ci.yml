@@ -75,18 +75,20 @@ jobs:
       cancel-in-progress: true
 
   bedrock-resolver-tests:
-    needs: ci-image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.head_ref }}
 
-      - name: Test Bedrock resolver
+      - name: Test Bedrock resolver and live release contract
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RUN_LIVE_RELEASE_TESTS: "1"
-        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+        run: python3 bedrock/tools/test_resolve_bedrock_node.py -v
+
+      - name: Test integration test target discovery
+        run: python3 .github/scripts/test_discover_integration_test_targets.py -v
 
   fmt-rs:
     needs: ci-image

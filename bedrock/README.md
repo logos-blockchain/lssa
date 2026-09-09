@@ -43,7 +43,12 @@ Do not update an independent Logos Docker tag or digest. Docker and native
 host resolution may produce different platform binaries, but both are tied to
 the same Cargo-resolved Logos revision.
 
-## Scripts
+## Scripts and tools
+
+The `tools/` directory contains Bedrock provisioning helpers, including the
+Cargo-authoritative node resolver and its tests. The `scripts/` directory
+contains the runtime configuration entrypoints mounted into the Bedrock
+container.
 
 The scripts folder contains the existing configuration entrypoints:
 

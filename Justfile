@@ -97,10 +97,10 @@ run-bedrock *args:
     fi
 
 resolve-bedrock-node:
-    @bash .github/scripts/resolve_bedrock_node_in_docker.sh
+    @bash bedrock/tools/resolve_bedrock_node_in_docker.sh
 
 resolve-host-bedrock-node:
-    @python3 .github/scripts/resolve_bedrock_node.py \
+    @python3 bedrock/tools/resolve_bedrock_node.py \
         --target-platform host \
         --output-directory bedrock/.resolved-host \
         --target-directory target/bedrock-node-host

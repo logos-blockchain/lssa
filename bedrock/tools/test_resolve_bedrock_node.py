@@ -132,11 +132,18 @@ class ReleaseMatchingTests(unittest.TestCase):
         )
 
     def test_rejects_release_at_a_different_commit(self) -> None:
+        digest = hashlib.sha256(b"fixture archive").hexdigest()
         release = {
             "tag_name": "fixture-release",
             "published_at": "2026-01-01T00:00:00Z",
             "draft": False,
-            "assets": [],
+            "assets": [
+                {
+                    "name": "logos-blockchain-node-linux-x86_64-fixture-release.tar.gz",
+                    "browser_download_url": "https://example.invalid/node.tar.gz",
+                    "digest": "sha256:" + digest,
+                }
+            ],
         }
 
         self.assertIsNone(
@@ -147,6 +154,32 @@ class ReleaseMatchingTests(unittest.TestCase):
                 "linux-x86_64",
             )
         )
+
+    def test_does_not_resolve_tag_without_the_expected_asset(self) -> None:
+        revision = fixture_revision("matching revision")
+        release = {
+            "tag_name": "fixture-release",
+            "published_at": "2026-01-01T00:00:00Z",
+            "draft": False,
+            "assets": [
+                {
+                    "name": "logos-blockchain-node-linux-aarch64-fixture-release.tar.gz",
+                    "browser_download_url": "https://example.invalid/node.tar.gz",
+                    "digest": "sha256:" + hashlib.sha256(b"fixture archive").hexdigest(),
+                }
+            ],
+        }
+        commit_resolver = MagicMock(return_value=revision)
+
+        self.assertIsNone(
+            matching_release(
+                revision,
+                [release],
+                commit_resolver,
+                "linux-x86_64",
+            )
+        )
+        commit_resolver.assert_not_called()
 
     def test_rejects_an_unverifiable_asset_digest(self) -> None:
         revision = fixture_revision("matching revision")

@@ -46,5 +46,5 @@ docker run --rm \
     --env RUSTFLAGS=-A\ single-use-lifetimes \
     --env RISC0_DEV_MODE=1 \
     "$image" \
-    python3 .github/scripts/resolve_bedrock_node.py \
+    python3 bedrock/tools/resolve_bedrock_node.py \
         --target-platform "$target_platform"

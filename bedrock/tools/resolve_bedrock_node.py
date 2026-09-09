@@ -251,32 +251,13 @@ def release_commit(tag: str) -> str:
     return commit.lower()
 
 
-def asset_digest(asset: dict[str, Any], assets: list[dict[str, Any]]) -> str | None:
+def asset_digest(asset: dict[str, Any]) -> str | None:
     digest = asset.get("digest")
-    if isinstance(digest, str) and digest.startswith("sha256:"):
-        digest = digest.removeprefix("sha256:").lower()
-        if SHA256_PATTERN.fullmatch(digest):
-            return digest
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        return None
 
-    checksum_names = {
-        asset["name"]
-        for asset in assets
-        if isinstance(asset.get("name"), str)
-        and (
-            asset["name"] in {"SHA256SUMS", "sha256sums.txt", "checksums.txt"}
-            or asset["name"].endswith(".sha256")
-        )
-    }
-    for checksum_name in checksum_names:
-        checksum_asset = next(item for item in assets if item["name"] == checksum_name)
-        checksum_data = download_bytes(checksum_asset["browser_download_url"])
-        for line in checksum_data.decode("utf-8").splitlines():
-            fields = line.split()
-            if len(fields) >= 2 and fields[1].lstrip("*") == asset["name"]:
-                candidate = fields[0].lower()
-                if SHA256_PATTERN.fullmatch(candidate):
-                    return candidate
-    return None
+    digest = digest.removeprefix("sha256:").lower()
+    return digest if SHA256_PATTERN.fullmatch(digest) else None
 
 
 def matching_release(
@@ -292,14 +273,6 @@ def matching_release(
         tag = release.get("tag_name")
         if not isinstance(tag, str):
             continue
-        try:
-            commit = commit_resolver(tag).lower()
-        except ResolverError as error:
-            log(f"could not resolve release tag {tag}; skipping it ({error})")
-            continue
-        if commit != revision:
-            continue
-
         assets = release.get("assets", [])
         expected_asset = f"{NODE_BINARY}-{asset_prefix}-{tag}.tar.gz"
         matching_assets = [
@@ -316,7 +289,15 @@ def matching_release(
             continue
 
         asset = matching_assets[0]
-        digest = asset_digest(asset, assets)
+        try:
+            commit = commit_resolver(tag).lower()
+        except ResolverError as error:
+            log(f"could not resolve release tag {tag}; skipping it ({error})")
+            continue
+        if commit != revision:
+            continue
+
+        digest = asset_digest(asset)
         if digest is None:
             log(f"release {tag} has no published SHA-256 digest for {expected_asset}")
             continue
